@@ -144,5 +144,15 @@ class TpFrole(unittest.TestCase):
             self.assertEqual(ab.commentaires_ia_temps_reel({}, "BTC", {}, {}, ["🛑 STOP TOUCHÉ — 🟠 BTC"]), [])
 
 
+    def test_voir_plus_apres_8_lignes(self):
+        court = "\n".join(f"l{i}" for i in range(9))
+        self.assertEqual(ab.repli_voir_plus(court), court)
+        long_ = "\n".join(f"l{i}" for i in range(15))
+        out = ab.repli_voir_plus(long_)
+        self.assertTrue(out.startswith("\n".join(f"l{i}" for i in range(8)) + "\n<blockquote expandable>l8"))
+        self.assertTrue(out.endswith("l14</blockquote>"))
+        self.assertEqual(ab.repli_voir_plus(out), out)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -2687,6 +2687,25 @@ def _majuscule(l):
 
 NIVEAUX_GRAS = ("🎯 Entrée", "🛑 Stop", "🛑 SL", "💰 TP", "· Résistance", "· Support", "🎯 Entry")
 
+LIGNES_VISIBLES = 8   # règle d'Adel : 8 lignes visibles, la suite repliée derrière « voir plus » (comme Instagram / WhatsApp)
+
+def repli_voir_plus(t, n=LIGNES_VISIBLES):
+    """Message HTML de plus de n lignes : les n premières restent visibles, la suite passe dans un bloc repliable Telegram
+    (<blockquote expandable>, l'abonné touche pour tout lire). Les balises sont par ligne : couper entre deux lignes est sûr."""
+    if not isinstance(t, str) or "<blockquote" in t:
+        return t
+    lignes = t.split("\n")
+    if len(lignes) <= n + 1:          # 1 seule ligne cachée ne vaut pas un repli
+        return t
+    haut, bas = lignes[:n], lignes[n:]
+    while bas and not bas[0].strip():
+        bas.pop(0)
+    while bas and not bas[-1].strip():
+        bas.pop()
+    if not bas:
+        return t
+    return "\n".join(haut) + "\n<blockquote expandable>" + "\n".join(bas) + "</blockquote>"
+
 def rendu_html(t):
     """Design Telegram (parse_mode HTML) : titre en gras + séparateur, sections MAJUSCULES en gras
     entre séparateurs, intitulés en gras, unités en monospace (fond gris), notes ℹ️ en italique."""
@@ -2786,6 +2805,8 @@ def telegram(methode, **params):
             for k in ("text", "caption"):
                 if k in params:
                     params[k] = rendu_html(params[k])
+            if "text" in params:
+                params["text"] = repli_voir_plus(params["text"])
             params["parse_mode"] = "HTML"
     chat_id = params.get("chat_id")
     # Sans chat (getUpdates, setMyName…) : blocage PAR MÉTHODE. Un 429 de plusieurs heures sur setMyName
