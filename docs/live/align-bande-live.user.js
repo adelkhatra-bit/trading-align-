@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      6.3
+// @version      6.4
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '6.3';
+  const VERSION = '6.4';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -19,8 +19,57 @@
     '🔌 BRANCHE-TOI AU MARCHÉ • chaque bougie expliquée en direct • lien en bio 🎁',
     '🧭 CHEZ ALIGN ON NE VA JAMAIS CONTRE LA TENDANCE • on suit le marché, on ne le combat pas 💪',
     '📲 Le coach ALIGN en direct • lien en bio 🎁 gratuit',
-    '⚠️ Le trading comporte un risque de perte • ceci n\'est pas un conseil financier'
+    '⚠️ Le trading comporte un risque de perte • ceci n\'est pas un conseil financier',
+    // v6.4 : la même bande en anglais (FR + EN pour toucher tout le monde)
+    '👉 FOLLOW • SHARE • TAP THE SCREEN',
+    '🔗 LINK IN BIO: LIVE COACH',
+    '🔌 PLUG INTO THE MARKET • every candle explained live • link in bio 🎁',
+    '🧭 AT ALIGN WE NEVER TRADE AGAINST THE TREND • we follow the market, we don\'t fight it 💪',
+    '⚠️ Trading involves a risk of loss • this is not financial advice'
   ];
+  // v6.4 : traduction anglaise des messages de la bande (chaque info passe en FR puis en EN)
+  const EN = [
+    ['pas de panique • le marché respire, il est comme vous 😅 • patience, la suite en temps réel', 'don\'t panic • the market is breathing, just like you 😅 • patience, what\'s next live'],
+    ['le marché prépare quelque chose', 'the market is preparing something'], ['la suite en temps réel', 'what\'s next, live'],
+    ['infos en temps réel', 'live info'], ['plus d\'infos en temps réel', 'more live info'], ['plus d\'infos', 'more info'],
+    ['branche-toi au marché', 'plug into the market'], ['lien en bio', 'link in bio'], ['abonne-toi, partage', 'follow, share'],
+    ['abonne-toi', 'follow'], ['partage', 'share'], ['la team', 'team'], ['pas de panique', 'don\'t panic'], ['pourquoi ?', 'why?'],
+    ['COMPTE À REBOURS sur', 'COUNTDOWN on'], ['GROSSE DISTRIBUTION', 'BIG SELL-OFF'], ['ÇA VA PÉTER EN L\'AIR', 'IT\'S ABOUT TO BLAST OFF'],
+    ['min max', 'min max'], ['dans', 'in'], ['ÇA ACCÉLÈRE', 'IT\'S SPEEDING UP'], ['jusqu\'où ?', 'how far?'], ['ÇA CASSE', 'BREAKOUT'],
+    ['dernier plus bas cassé', 'last low broken'], ['dernier plus haut cassé', 'last high broken'], ['ça peut couler encore…', 'it can drop further…'],
+    ['ça peut décoller…', 'it can take off…'], ['LES BALEINES BOUGENT sur', 'WHALES ARE MOVING on'], ['gros volume', 'big volume'],
+    ['quelque chose se prépare', 'something is brewing'], ['LA PRESSION MONTE sur', 'PRESSURE IS BUILDING on'], ['MANIPULATION sur', 'MANIPULATION on'],
+    ['les gros piègent les acheteurs… la belle distribution', 'big players trap the buyers… the sell-off'],
+    ['les gros piègent les vendeurs… le rechargement', 'big players trap the sellers… the reload'],
+    ['ANNONCÉ !', 'CALLED IT!'], [' a coulé ', ' dropped '], [' a décollé ', ' took off '], ['la team ALIGN l\'a vu venir', 'team ALIGN saw it coming'],
+    ['REBOND sur une ligne clé', 'BOUNCE on a key level'], ['arrive sur une zone clé', 'reaches a key zone'], ['Zone clé du marché', 'Key market zone'],
+    ['ce qu\'elle annonce', 'what it means'], ['Zone clé : le marché pourrait y souffler… ce qu\'il prépare', 'Key zone: the market may pause here… what\'s next'],
+    ['Zone clé : le marché teste la patience de tout le monde…', 'Key zone: the market is testing everyone\'s patience…'],
+    ['BOUGIE 15 MIN CLÔTURÉE', '15 MIN CANDLE CLOSED'], ['Clôture 15 min dans', '15 min close in'], ['c\'est elle qui décide', 'it decides everything'],
+    ['veut remonter… jusqu\'où ? le coach le sait', 'wants to bounce… how far? the coach knows'], ['reprend des forces', 'is regaining strength'],
+    ['le marché pourrait remonter', 'the market could go up'], ['Les acheteurs reviennent sur', 'Buyers are back on'],
+    ['sous pression… va-t-il couler ? réponse en temps réel', 'under pressure… will it drop? live answer'],
+    ['Les vendeurs tiennent', 'Sellers are holding'], ['ça peut encore descendre', 'it can still go down'],
+    ['glisse… le coach surveille chaque bougie', 'is sliding… the coach watches every candle'],
+    ['se compresse… avant l\'explosion ? 💥 tiens-toi prêt', 'is squeezing… before the explosion? 💥 get ready'],
+    ['hésite… la prochaine clôture peut tout décider', 'hesitates… the next close can decide everything'],
+    ['est posé sur une zone clé en bas', 'sits on a key zone below'], ['rebond ou cassure ?', 'bounce or break?'],
+    ['teste le bas de sa zone… les acheteurs vont-ils tenir ?', 'tests the bottom of its zone… will buyers hold?'],
+    ['touche le haut de sa zone', 'touches the top of its zone'], ['cassure ou rejet ?', 'break or rejection?'],
+    ['bute sous un plafond… les vendeurs vont-ils frapper ?', 'is stuck under a ceiling… will sellers strike?'],
+    ['au milieu de sa zone : il cherche sa direction… le coach te dit quand ça part', 'in the middle of its zone: looking for direction… the coach tells you when it moves'],
+    ['en équilibre : acheteurs et vendeurs se regardent… qui va craquer ?', 'in balance: buyers and sellers stare each other down… who breaks first?'],
+    ['Le lien en bio = ton câble branché sur le marché : chaque bougie expliquée en direct', 'The link in bio = your cable plugged into the market: every candle explained live'],
+    ['Comme si tu étais connecté au marché : le coach lit chaque bougie avec toi', 'Like being wired to the market: the coach reads every candle with you'],
+    ['Tu vois les bougies, le coach te dit ce qu\'elles préparent', 'You see the candles, the coach tells you what they\'re preparing'],
+    ['Ressens le marché en direct : pression, pièges, accélérations… tout est dans le', 'Feel the market live: pressure, traps, accelerations… it\'s all in the'],
+    ['objectif TOUCHÉ', 'target HIT'], ['On protège', 'We protect'], ['risque zéro', 'zero risk'], ['ÇA ENCAISSE', 'CASHING IN'],
+    ['PASSE À L\'ACTION sur', 'TAKES ACTION on'], ['rejoint la team ALIGN, viens nous rejoindre', 'joined team ALIGN, come join us'],
+    ['prépare-toi', 'get ready'], ['ça peut couler', 'it may drop'], ['ça peut décoller', 'it may take off'], ['verdict dans', 'verdict in'],
+    ['Astuce', 'Tip'], ['Le trading comporte un risque de perte', 'Trading involves a risk of loss'], ['gratuit', 'free'], ['en direct', 'live'],
+    ['sur ', 'on ']
+  ].sort((a, b) => b[0].length - a[0].length);
+  function enAnglais(t) { let x = String(t); for (const [fr, en] of EN) x = x.split(fr).join(en); return x; }
   const DUREE_MAIN = 15000, DUREE_MSG = 8000;
 
   // ───── style ─────
@@ -121,7 +170,8 @@
     const g = couleur || genre(texte);
     texte = sansPrix(texte);
     const urgent = g && g !== 'proche' ? 1 : 0;
-    const items = []; for (let i = 0; i < (fois || 1); i++) items.push({ texte, bulle, g });
+    // v6.4 : chaque info passe en français PUIS en anglais (au moins 2 passages)
+    const items = []; for (let i = 0; i < Math.max(2, fois || 1); i++) items.push({ texte: i % 2 ? enAnglais(texte) : texte, bulle, g });
     if (urgent) { let k = 0; while (k < file.length && file[k].g && file[k].g !== 'proche') k++; file.splice(k, 0, ...items); }
     else file.push(...items);
     suivant();
