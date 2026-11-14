@@ -5826,7 +5826,9 @@ def traiter(etat, chats, updates):
                 fr = msg.get("from", {})
                 nom = (fr.get("first_name", "") + (" @" + fr["username"] if fr.get("username") else "")).strip() or cid
                 etat.setdefault("noms", {})[cid] = nom
-                live_bande(etat, f"🎉 BIENVENUE À {(fr.get('first_name') or 'un nouveau').split(' ')[0][:20].upper()} DANS ALIGN ! Rejoins le coach 👉 lien en bio 🎁")
+                # Nouveau membre → bande du live (même si « Je lance le live » n'est pas appuyé), prénom seulement
+                live_bande(etat, f"BULLE:🎉 {(fr.get('first_name') or 'Un nouveau').split(' ')[0][:20].upper()} REJOINT LA TEAM ALIGN ! 🙌 Viens nous rejoindre 👉 lien en bio 🎁 gratuit",
+                           f"bienvenue{cid}", 3600, toujours=True)
                 for p in proprio(etat):    # le propriétaire peut offrir l'accès en 1 clic
                     _envoi_sur(p, text=f"👤 Nouveau visiteur : {nom}",
                                reply_markup=json.dumps({"inline_keyboard": [[{"text": "🎁 Offrir l'accès VIP", "callback_data": f"offrir:{cid}"}]]}))
