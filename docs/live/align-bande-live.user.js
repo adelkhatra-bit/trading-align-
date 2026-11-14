@@ -454,7 +454,9 @@
         + (enAttente ? (arme.d === -1 ? '💥 GROSSE DISTRIBUTION ⬇️<br>' : '🚀 ÇA VA PÉTER EN L\'AIR ⬆️<br>') + (reste <= 20 ? 'C\'EST MAINTENANT !' : 'abonne-toi • partage 🎁') : '⏱ CLÔTURE 15 MIN<br>ça va se décider 👀') + '</small>';
       // v5.7 (demande d'Adel) : en bas à droite, côté prix, juste au-dessus du tableau de bord (TikTok coupe le haut gauche)
       chrono.style.left = (r.left + r.width - 70 - chrono.offsetWidth - 14) + 'px';
-      chrono.style.top = (r.top + (r.height || 700) - 150 - chrono.offsetHeight) + 'px';
+      // v5.7 : marché qui baisse → en haut à droite juste sous la bande (les bougies descendent, on ne les cache pas) ;
+      //        marché qui monte → en bas à droite, un peu au-dessus du tableau de bord (sans le mordre)
+      chrono.style.top = (enAttente && arme.d === -1 ? r.top + 90 : r.top + (r.height || 700) - 180 - chrono.offsetHeight) + 'px';
       if (reste === 45 && uneFois('cl' + s)) bandeShow('⏱ Clôture 15 min dans 45 s sur ' + nomMarche() + ' • c\'est elle qui décide 👀 • la suite en temps réel : lien en bio 🎁');
     } else if (chrono.style.display !== 'none') {
       chrono.style.display = 'none';
