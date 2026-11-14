@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      6.4
+// @version      6.5
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '6.4';
+  const VERSION = '6.5';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -19,10 +19,12 @@
     '🔌 BRANCHE-TOI AU MARCHÉ • chaque bougie expliquée en direct • lien en bio 🎁',
     '🧭 CHEZ ALIGN ON NE VA JAMAIS CONTRE LA TENDANCE • on suit le marché, on ne le combat pas 💪',
     '📲 Le coach ALIGN en direct • lien en bio 🎁 gratuit',
+    '🔔 ACTIVE TES NOTIFICATIONS • lien en bio : on te prévient dès que le marché se prépare 🎁',
     '⚠️ Le trading comporte un risque de perte • ceci n\'est pas un conseil financier',
     // v6.4 : la même bande en anglais (FR + EN pour toucher tout le monde)
     '👉 FOLLOW • SHARE • TAP THE SCREEN',
     '🔗 LINK IN BIO: LIVE COACH',
+    '🔔 TURN ON YOUR NOTIFICATIONS • link in bio: we\'ll tell you as soon as the market gets ready 🎁',
     '🔌 PLUG INTO THE MARKET • every candle explained live • link in bio 🎁',
     '🧭 AT ALIGN WE NEVER TRADE AGAINST THE TREND • we follow the market, we don\'t fight it 💪',
     '⚠️ Trading involves a risk of loss • this is not financial advice'
@@ -73,6 +75,17 @@
     ['ça devrait reprendre', 'it should resume'], ['clôture dans', 'close in'], ['le coach l\'a déjà annoncé', 'the coach already called it'],
     ['JEU : tapote l\'écran si tu penses que', 'GAME: tap the screen if you think'], ['va couler', 'will drop'], ['va monter', 'will rise'],
     ['réponse dans', 'answer in'], ['les niveaux en privé', 'levels in private'], ['Le coach ALIGN', 'The ALIGN coach'],
+    ['risque de perte, pas un conseil', 'risk of loss, not advice'],
+    ['est tout calme… va te faire un café tranquille, on te prévient quand ça bouge', 'is super calm… go grab a coffee, we\'ll ping you when it moves'],
+    ['Petit-déj time :', 'Breakfast time:'], ['se réveille doucement… le coach veille pour toi', 'is slowly waking up… the coach is watching for you'],
+    ['fait la sieste… va manger un bout, le coach surveille pour toi', 'is napping… go grab a bite, the coach is watching for you'],
+    ['Pause déj :', 'Lunch break:'], ['bouge pas d\'un poil… on te ping dès que ça part', 'isn\'t moving an inch… we\'ll ping you when it goes'],
+    ['chill grave… prends une pause, le marché te fera signe', 'is chilling hard… take a break, the market will let you know'],
+    ['Café de l\'aprèm ?', 'Afternoon coffee?'], ['est en mode tranquille… le coach reste branché', 'is in chill mode… the coach stays plugged in'],
+    ['est calme ce soir… va dîner, le coach garde un œil', 'is calm tonight… go have dinner, the coach keeps an eye on it'],
+    ['Soirée chill :', 'Chill evening:'], ['ne fait rien de fou… on te prévient si ça s\'énerve', 'isn\'t doing anything crazy… we\'ll tell you if it heats up'],
+    ['Il est tard et', 'It\'s late and'], ['dort à moitié… va te reposer, le coach veille', 'is half asleep… go get some rest, the coach is on watch'],
+    ['roupille… recharge les batteries, le marché sera encore là demain', 'is snoozing… recharge your batteries, the market will still be here tomorrow'],
     ['sur ', 'on ']
   ].sort((a, b) => b[0].length - a[0].length);
   function enAnglais(t) { let x = String(t); for (const [fr, en] of EN) x = x.split(fr).join(en); return x; }
@@ -177,6 +190,8 @@
     texte = sansPrix(texte);
     const urgent = g && g !== 'proche' ? 1 : 0;
     // v6.4 : chaque info passe en français PUIS en anglais (au moins 2 passages)
+    // v6.5 (règle d'Adel) : chaque info rappelle le risque, en français puis en anglais
+    if (!/risque|risk/i.test(texte)) texte += ' • ⚠️ risque de perte, pas un conseil';
     const items = []; for (let i = 0; i < Math.max(2, fois || 1); i++) items.push({ texte: i % 2 ? enAnglais(texte) : texte, bulle, g });
     if (urgent) { let k = 0; while (k < file.length && file[k].g && file[k].g !== 'proche') k++; file.splice(k, 0, ...items); }
     else file.push(...items);
@@ -497,6 +512,17 @@
               '📡 Comme si tu étais connecté au marché : le coach lit chaque bougie avec toi • lien en bio 🎁',
               '🧠 Tu vois les bougies, le coach te dit ce qu\'elles préparent • lien en bio 🎁',
               '⚡ Ressens le marché en direct : pression, pièges, accélérations… tout est dans le lien en bio 🎁'],
+    // v6.5 : marché tout calme → on parle comme un pote, selon l'heure
+    calme_matin: ['☕ {m} est tout calme… va te faire un café tranquille, on te prévient quand ça bouge 🔌 lien en bio 🎁',
+                  '🥐 Petit-déj time : {m} se réveille doucement… le coach veille pour toi • lien en bio 🎁'],
+    calme_midi: ['🍔 {m} fait la sieste… va manger un bout, le coach surveille pour toi 👀 lien en bio 🎁',
+                 '🥗 Pause déj : {m} bouge pas d\'un poil… on te ping dès que ça part • lien en bio 🎁'],
+    calme_aprem: ['🧃 {m} chill grave… prends une pause, le marché te fera signe 😎 lien en bio 🎁',
+                  '☕ Café de l\'aprèm ? {m} est en mode tranquille… le coach reste branché • lien en bio 🎁'],
+    calme_soir: ['🍕 {m} est calme ce soir… va dîner, le coach garde un œil 👀 lien en bio 🎁',
+                 '🎮 Soirée chill : {m} ne fait rien de fou… on te prévient si ça s\'énerve • lien en bio 🎁'],
+    calme_nuit: ['😴 Il est tard et {m} dort à moitié… va te reposer, le coach veille 🌙 lien en bio 🎁',
+                 '🌙 {m} roupille… recharge les batteries, le marché sera encore là demain 💤 lien en bio 🎁'],
     range: ['😴 {m} se compresse… avant l\'explosion ? 💥 tiens-toi prêt • lien en bio 🎁',
             '🧲 {m} hésite… la prochaine clôture peut tout décider ⏱ lien en bio 🎁']
   };
@@ -562,7 +588,11 @@
       if (Date.now() - derniereTend > 3 * 60000) {
         const c10 = B.slice(-10).map(x => x[4]), pente = (c10[9] - c10[0]) / moyR, larg = (Math.max(...B.slice(-10).map(x => x[2])) - Math.min(...B.slice(-10).map(x => x[3]))) / moyR;
         const pos = (cur[4] - ll) / Math.max(hh - ll, 1e-9), tour = tendN % 3;
-        const L = tour === 2 ? PHRASES.branche
+        // marché très calme (bougies récentes bien plus petites que d'habitude) → message « va te faire un café » selon l'heure
+        const r10 = B.slice(-10).reduce((a, x) => a + (x[2] - x[3]), 0) / 10, r40 = B.reduce((a, x) => a + (x[2] - x[3]), 0) / B.length;
+        const h = new Date().getHours(), calme = r10 < 0.6 * r40 && tour !== 2;
+        const CAL = h < 6 || h >= 23 ? PHRASES.calme_nuit : h < 11 ? PHRASES.calme_matin : h < 14 ? PHRASES.calme_midi : h < 19 ? PHRASES.calme_aprem : PHRASES.calme_soir;
+        const L = calme ? CAL : tour === 2 ? PHRASES.branche
           : tour === 1 ? (pos < 0.2 ? PHRASES.bas_zone : pos > 0.8 ? PHRASES.haut_zone : PHRASES.milieu)
           : larg < 3.2 ? PHRASES.range : pente > 1.2 ? PHRASES.hausse : pente < -1.2 ? PHRASES.baisse : PHRASES.range;
         if (bandeShow(L[Math.floor(tendN / 3) % L.length].replace('{m}', m))) {
