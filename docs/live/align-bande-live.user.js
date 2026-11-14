@@ -67,6 +67,12 @@
     ['PASSE À L\'ACTION sur', 'TAKES ACTION on'], ['rejoint la team ALIGN, viens nous rejoindre', 'joined team ALIGN, come join us'],
     ['prépare-toi', 'get ready'], ['ça peut couler', 'it may drop'], ['ça peut décoller', 'it may take off'], ['verdict dans', 'verdict in'],
     ['Astuce', 'Tip'], ['Le trading comporte un risque de perte', 'Trading involves a risk of loss'], ['gratuit', 'free'], ['en direct', 'live'],
+    ['Bravo à ceux qui ont suivi', 'Well done to everyone who followed'], ['Abonne-toi', 'Follow'], ['ABONNE-TOI', 'FOLLOW'],
+    ['protection touché', 'protection hit'], ['on coupe petit, on va se refaire', 'we cut small, we\'ll bounce back'],
+    ['objectif frôlé à un cheveu', 'target missed by a hair'], ['petit recul, on garde le cap', 'small pullback, we stay on course'],
+    ['ça devrait reprendre', 'it should resume'], ['clôture dans', 'close in'], ['le coach l\'a déjà annoncé', 'the coach already called it'],
+    ['JEU : tapote l\'écran si tu penses que', 'GAME: tap the screen if you think'], ['va couler', 'will drop'], ['va monter', 'will rise'],
+    ['réponse dans', 'answer in'], ['les niveaux en privé', 'levels in private'], ['Le coach ALIGN', 'The ALIGN coach'],
     ['sur ', 'on ']
   ].sort((a, b) => b[0].length - a[0].length);
   function enAnglais(t) { let x = String(t); for (const [fr, en] of EN) x = x.split(fr).join(en); return x; }
