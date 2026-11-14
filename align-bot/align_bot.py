@@ -7063,8 +7063,8 @@ def envoyer_prospects(etat, texte, signal, clavier=None):
             if "403" in str(ex) and cid in etat.get("prospects", []):
                 etat["prospects"].remove(cid)
 
-RISQUE_LIGNE = ("⚠️ Info éducative, pas un conseil en investissement · risque de perte · tu restes seul responsable de tes décisions\n"
-                "⚠️ Educational info, not investment advice · risk of loss · you alone are responsible for your decisions")
+RISQUE_LIGNE = ("⚠️ Ceci n'est pas un conseil en investissement. Fais tes propres recherches (DYOR) · risque de perte · tu restes seul responsable de tes décisions\n"
+                "⚠️ This is not financial advice. Do your own research (DYOR) · risk of loss · you alone are responsible for your decisions")
 # Avertissement complet (menus épinglés, VIP) : informatif et éducatif, pas un conseil en investissement
 RISQUE_COMPLET = ("⚠️ Le trading comporte un risque élevé de perte en capital. Contenu à caractère informatif et éducatif uniquement : "
                   "il ne constitue ni un conseil en investissement ni une recommandation personnalisée. "
@@ -7076,7 +7076,7 @@ _MOTS_TRADING = re.compile(r"\b(SHORT|LONG|ENTRÉE|ENTRY|SL|TP\d?|STOP|POSITION|
 def avec_risque(texte):
     """Règle d'Adel (15/11) : tout message qui parle de trading rappelle le risque, en français ET en anglais."""
     t = str(texte or "")
-    if not t or "not investment advice" in t or not _MOTS_TRADING.search(t):
+    if not t or "not financial advice. Do your own research" in t or not _MOTS_TRADING.search(t):
         return texte
     return t + "\n" + RISQUE_LIGNE
 
@@ -9194,6 +9194,7 @@ ECRAN_TITRES = {
     "ligne": ("📍 Le prix arrive sur {l} (par le haut) 🔴", "📍 Le prix arrive sur {l} (par le bas) 🟢"),
     "zone": ("📍 Le prix est sur le BAS de sa zone (support) 🔴", "📍 Le prix est sur le HAUT de sa zone (résistance) 🟢"),
     "respire": ("😮‍💨 Pas de distribution finalement : le marché respire", "😮‍💨 Pas d'envolée finalement : le marché respire"),
+    "feinte": ("🪤 FEINTE : le prix REMONTE contre la tendance baissière", "🪤 FEINTE : le prix RECULE contre la tendance haussière"),
 }
 ECRAN_LIGNES = {"TP1": "le TP1 (ligne bleue)", "TP2": "le TP2 (ligne bleue)", "SL": "le SL (ligne rouge)", "ENTRÉE": "la ligne ENTRÉE (jaune)"}
 ECRAN_CONSEIL = {
@@ -9213,6 +9214,11 @@ ECRAN_POURQUOI = {
     "ligne": "🕯 Pourquoi : le prix est collé à une ligne du plan ALIGN → c'est là que le marché décide",
     "zone": "🕯 Pourquoi : le prix touche l'extrême de ses 20 dernières bougies → rebond ou cassure, la clôture 15 min tranche",
     "respire": "🕯 La clôture 15 min n'a pas confirmé le mouvement → pas de panique, le plan ne change pas, on attend la prochaine",
+    "feinte": "🕯 Pourquoi : 3 bougies repartent contre la tendance, souvent un retour pour chercher de la liquidité avant de reprendre le vrai sens",
+}
+ECRAN_FEINTE = {
+    -1: "🙅 Ne cours pas après ce rebond : la tendance reste baissière tant que le dernier plus haut 15 min tient\n🧘 En SHORT ? C'est le retrace attendu, le SL est là pour ça, pas de panique",
+    1: "🙅 Ne vends pas ce repli dans la panique : la tendance reste haussière tant que le dernier plus bas 15 min tient\n🧘 En LONG ? C'est le retrace attendu, le SL est là pour ça, pas de panique",
 }
 
 def ecran_lire():
@@ -9249,6 +9255,8 @@ def texte_ecran(m, typ, d, minutes, r, cle, ligne=""):
     lignes = [f"🎬 EN DIRECT DU LIVE — {ICONE.get(m, '')} {m}", t0]
     if typ in ("rebond", "ligne"):
         lignes.append(ECRAN_CONSEIL[ligne])
+    if typ == "feinte":
+        lignes.append(ECRAN_FEINTE[d])
     if typ not in ("annonce", "rebond", "ligne", "respire"):
         lignes.append(f"⏳ Verdict à la clôture 15 min : dans {max(1, int(minutes or 1))} min")
     lignes.append(ECRAN_POURQUOI[typ])
@@ -9293,7 +9301,7 @@ def ecran_vers_telegram(etat):
         if not r or not canal:
             continue
         cle_vu = f"ecran{m}{typ}{d}{ligne}"
-        if typ in ("pression", "manip", "annonce", "respire"):
+        if typ in ("pression", "manip", "annonce", "respire", "feinte"):
             # une annonce = UNE fois par quart d'heure (même si l'écran du live est rechargé) : jamais 3 « distribution en vue » de suite
             cle_vu += str(int(time.time() // 900))
             if cle_vu in _LIVE_DERNIER:
