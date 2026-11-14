@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      5.7
+// @version      5.8
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '5.7';
+  const VERSION = '5.8';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -448,7 +448,8 @@
   const chronoT = setInterval(() => { try {
     const s = Math.floor(Date.now() / 1000), reste = 900 - (s % 900), r = zoneGraphique();
     const enAttente = arme && arme.quart === Math.floor(s / 900);
-    if ((reste <= 45 || enAttente) && !retour) {
+    // v5.8 (demande d'Adel) : le chrono n'est pas là tout le temps : il surgit dans la DERNIÈRE MINUTE puis disparaît à la clôture
+    if ((reste <= 45 || (enAttente && reste <= 60)) && !retour) {
       chrono.style.display = 'flex'; chrono.classList.toggle('urgent', reste <= (enAttente ? 30 : 10));
       chrono.innerHTML = Math.floor(reste / 60) + ':' + String(reste % 60).padStart(2, '0') + '<small>'
         + (enAttente ? (arme.d === -1 ? '💥 GROSSE DISTRIBUTION ⬇️<br>' : '🚀 ÇA VA PÉTER EN L\'AIR ⬆️<br>') + (reste <= 20 ? 'C\'EST MAINTENANT !' : 'abonne-toi • partage 🎁') : '⏱ CLÔTURE 15 MIN<br>ça va se décider 👀') + '</small>';
@@ -456,7 +457,7 @@
       chrono.style.left = (r.left + r.width - 70 - chrono.offsetWidth - 14) + 'px';
       // v5.7 : marché qui baisse → en haut à droite juste sous la bande (les bougies descendent, on ne les cache pas) ;
       //        marché qui monte → en bas à droite, un peu au-dessus du tableau de bord (sans le mordre)
-      chrono.style.top = (enAttente && arme.d === -1 ? r.top + 90 : r.top + (r.height || 700) - 180 - chrono.offsetHeight) + 'px';
+      chrono.style.top = (enAttente && arme.d === -1 ? r.top + 82 : r.top + (r.height || 700) - 205 - chrono.offsetHeight) + 'px';
       if (reste === 45 && uneFois('cl' + s)) bandeShow('⏱ Clôture 15 min dans 45 s sur ' + nomMarche() + ' • c\'est elle qui décide 👀 • la suite en temps réel : lien en bio 🎁');
     } else if (chrono.style.display !== 'none') {
       chrono.style.display = 'none';
