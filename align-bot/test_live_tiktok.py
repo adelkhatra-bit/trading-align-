@@ -192,6 +192,24 @@ class CartesCouleursGraphique(unittest.TestCase):
         self.assertIn("(red line)", ab.traduire("🛑 SL : 1 (ligne rouge)"))
 
 
+
+class TestFinDeTradeBande(unittest.TestCase):
+    def test_tp_final_et_sl_sur_la_bande(self):
+        pub = []
+        with mock.patch.object(ab, "live_publier", side_effect=lambda t: pub.append(t) or True):
+            ab._LIVE_DERNIER.clear()
+            ab.live_fin_de_trade({}, "BTC", {"e": 100.0}, 102.0, 2.0)
+            ab.live_fin_de_trade({}, "BTC", {"e": 100.0}, 102.0, 2.0)      # même annonce : une seule fois
+            ab.live_fin_de_trade({}, "GOLD", {"e": 100.0}, 99.0, -1.0)
+        self.assertEqual(len(pub), 2)
+        self.assertIn("TP TOUCHÉ", pub[0]); self.assertIn("lien en bio", pub[0]); self.assertNotIn("Telegram", pub[0])
+        self.assertIn("stop touché", pub[1])
+
+    def test_compte_a_rebours(self):
+        self.assertEqual(ab.min_avant_cloture15(900 * 10 + 1), 15)
+        self.assertEqual(ab.min_avant_cloture15(900 * 10 + 840), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
 

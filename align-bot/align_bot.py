@@ -9061,7 +9061,7 @@ def live_annonces(etat, m, textes):
     for t in textes or []:
         t = t if isinstance(t, str) else str(t)
         if "J'ENTRE MAINTENANT" in t:
-            live_bande(etat, f"🚀 ALIGN ENTRE EN POSITION sur {ic} {m} ! 👉 Le coach en direct : lien en bio 🎁", f"entre{m}", 600)
+            live_bande(etat, f"🚀 ALIGN ENTRE EN POSITION sur {ic} {m} ! 👉 Le coach en direct : lien en bio 🎁", f"entre{m}", 600, toujours=True)
         elif "OBJECTIF FINAL ATTEINT" in t or re.search(r"TP[2-9] TOUCHÉ", t):
             live_bande(etat, f"🏆 TP TOUCHÉ sur {ic} {m} ! Bravo à ceux qui ont suivi 🔥" + FIN_BANDE, f"tp2{m}", 600, toujours=True)
         elif "FRÔLÉ" in t:
@@ -9072,13 +9072,34 @@ def live_annonces(etat, m, textes):
             live_bande(etat, f"🎯 TP1 TOUCHÉ sur {ic} {m} ! ✅ On protège : SL à l'entrée 🛡" + FIN_BANDE, f"tp1{m}", 600, toujours=True)
         elif "POINT D'ENTRÉE À VENIR" in t:
             # Règle live : aucune info (ni sens, ni niveau, ni marché) ; jamais le mot « Telegram » à l'écran (TikTok réduit la portée des lives qui renvoient ailleurs) → « lien en bio »
-            live_bande(etat, "BULLE:🎯 Le prix arrive dans une zone clé 👀 • les infos en temps réel : lien en bio 🎁 gratuit", f"zone{m}", 900, toujours=True)
+            live_bande(etat, f"BULLE:🎯 Le prix arrive dans une zone clé 👀 • ⏱ verdict dans {min_avant_cloture15()} min (clôture 15 min) • "
+                             "les infos en temps réel : lien en bio 🎁 gratuit", f"zone{m}", 900, toujours=True)
         elif "RETOURNEMENT EN PRÉPARATION" in t:
             live_bande(etat, f"BULLE:↩ {ic} {m} : regarde la ligne RETOURNEMENT • le marché peut se retourner" + FIN_BANDE, f"ret{m}", 900, toujours=True)
         elif "MANIPULATION" in t or "MÈCHE SUSPECTE" in t:
             live_bande(etat, f"BULLE:🎣 {ic} {m} : grosse mèche = chasse aux stops • on attend la clôture" + FIN_BANDE, f"meche{m}", 900, toujours=True)
 
 FIN_BANDE = " • plus d'infos en temps réel ? Abonne-toi, lien en bio 🎁"
+
+def min_avant_cloture15(now=None):
+    """Minutes avant la prochaine clôture 15 min (compte à rebours affiché sur la bande du live)."""
+    now = time.time() if now is None else now
+    return max(1, -(-int(900 - now % 900) // 60))
+
+def live_fin_de_trade(etat, m, tr, sortie, gain):
+    """Fin de trade (TP final / SL / BE) → la bande du live, TOUJOURS : c'est le moment qui donne envie de s'abonner.
+    Même clé que live_annonces (tp2 / sl) : jamais 2 fois la même annonce."""
+    ic = ICONE.get(m, "")
+    try:
+        pp = pips_txt(m, abs(sortie - tr["e"]))
+    except Exception:
+        pp = ""
+    if gain > 0:
+        live_bande(etat, f"🏆🎆 TP TOUCHÉ sur {ic} {m} ! +{pp} 🔥 Bravo à ceux qui ont suivi 🥳" + FIN_BANDE, f"tp2{m}", 600, toujours=True)
+    elif abs(gain) < 0.02:
+        live_bande(etat, f"🛡 {ic} {m} : sorti à l'entrée, zéro perte 😎 on attend la prochaine" + FIN_BANDE, f"be{m}", 600, toujours=True)
+    else:
+        live_bande(etat, f"😤 {ic} {m} : stop touché • on coupe petit, on va se refaire 💪" + FIN_BANDE, f"sl{m}", 600, toujours=True)
 
 def textes_live_news(titre, reste):
     """Bande du live autour d'une news : préavis 15 / 10 / 5 min, réaction, fin. Jamais de sens ni de niveau."""
@@ -9538,6 +9559,10 @@ def un_tour(etat, chats):
                 apprendre(etat, trf, gain)
                 journal_trade(etat, nom_marche, trf, sortie, motif, gain)
                 publier_resultat(etat, nom_marche, trf, sortie, motif, gain)
+                try:
+                    live_fin_de_trade(etat, nom_marche, trf, sortie, gain)
+                except Exception as ex:
+                    print("live fin de trade", ex)
                 pr = trf.get("profil") or {}
                 n_, w_ = stats_profil(pr, ("m", "type", "d")) if pr else (0, 0)
                 if IA_AUTO:
