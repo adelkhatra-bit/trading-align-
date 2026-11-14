@@ -26,7 +26,7 @@ DERNIERS = {"GOLD": {"strat": "SWING", "bear": 11, "plan_fige": {"d": -1, "e": 4
 class TexteRadarTest(unittest.TestCase):
     def test_vip_focus_et_niveaux(self):
         t = ab.texte_radar(props_test(), DERNIERS, vip=True, now=time.time())
-        self.assertTrue(t.startswith("🎯 FOCUS : 🥇 GOLD — prépare-toi"))
+        self.assertIn("🎯 FOCUS : 🥇 GOLD — prépare-toi", t.split("\n")[0])
         for morceau in ("SHORT", "SWING", "Zone d'entrée", "SL", "TP1", "J'attends", "11/11", "2️⃣ 🟠 BTC", "3️⃣ 💠 NASDAQ"):
             self.assertIn(morceau, t)
         self.assertNotIn("SHORT ⬇️ · pas de plan", t)          # pas de sens affiché pour un marché sans plan
@@ -59,7 +59,7 @@ class AlignementRequisTest(unittest.TestCase):
         d = {"NASDAQ": {"bull": 6}, "GOLD": {"bear": 10}}
         p = [dict(m="NASDAQ", prix=1.0, atr_n=0.2, classe="dans_zone", rang=0, d=1, za=1, zb=2, dist=0, action="x", au_dessus=True),
              dict(m="GOLD", prix=1.0, atr_n=1.2, classe="proche", rang=1, d=-1, za=1, zb=2, dist=1, action="y", au_dessus=False)]
-        self.assertTrue(ab.texte_radar(p, d, vip=True, now=time.time()).startswith("🎯 FOCUS : 🥇 GOLD — prépare-toi"))
+        self.assertIn("🎯 FOCUS : 🥇 GOLD — prépare-toi", ab.texte_radar(p, d, vip=True, now=time.time()).split("\n")[0])
 
 
 class PlanIndicateurSurTest(unittest.TestCase):
@@ -208,3 +208,17 @@ class DureeHumaineTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSensEnTete(unittest.TestCase):
+    def test_sens_premiere_ligne_et_repli(self):
+        t = ab.texte_radar(props_test(), DERNIERS, vip=True, now=time.time())
+        l0 = t.split("\n")[0]
+        self.assertTrue(l0.startswith("🔴 SHORT") or l0.startswith("🟢 LONG"), l0)
+        self.assertIn("seulement au", t) if "DANS la zone" not in t else None
+
+    def test_ligne_vers_zone(self):
+        self.assertIn("remonte", ab.ligne_vers_zone(-1))
+        self.assertIn("redescend", ab.ligne_vers_zone(1))
+        self.assertIn("rejection", ab.ligne_vers_zone(-1, True))
+        self.assertEqual(ab.traduire(ab.ligne_vers_zone(-1)), ab.ligne_vers_zone(-1, True))
