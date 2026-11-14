@@ -34,8 +34,12 @@ class LiveTikTok(unittest.TestCase):
             textes = [b["text"] for ligne in json.loads(c)["keyboard"] for b in ligne]
             self.assertIn("🔴 Live", textes)
 
+    def test_live_24h_toujours_actif_par_defaut(self):
+        self.assertTrue(ab.live_actif({}))
+
     def test_rien_sur_la_bande_si_live_eteint(self):
-        ab.live_annonces(self.etat, "BTC", ["🟢🟢🟢 J'ENTRE MAINTENANT — BTC"])
+        with mock.patch.object(ab, "LIVE_24H", False):
+            ab.live_annonces(self.etat, "BTC", ["🟢🟢🟢 J'ENTRE MAINTENANT — BTC"])
         self.assertEqual(self.publie, [])
 
     def test_tp_touche_toujours_sur_la_bande(self):
@@ -114,6 +118,9 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("capture", ab.texte_live(self.etat))
 
     def test_paiement_refuse_si_live_eteint(self):
+        p24 = mock.patch.object(ab, "LIVE_24H", False)
+        p24.start()
+        self.addCleanup(p24.stop)
         self.assertFalse(ab.live_pre_checkout(self.etat, {"id": "q", "invoice_payload": "livemain:5"}))
         self.assertEqual(self.tg[-1][1]["ok"], "false")
         self.etat["live_on"] = True

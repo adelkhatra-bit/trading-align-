@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      5.2
+// @version      5.3
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,10 +10,10 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '5.2';
+  const VERSION = '5.3';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
-    '🔴 LIVE ALIGN • BTC • GOLD • NASDAQ',
+    '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
     '👉 ABONNE-TOI • PARTAGE • TAPOTE L\'ÉCRAN',
     '🔗 LIEN EN BIO : COACH EN DIRECT',
     '📲 Le coach ALIGN en direct • lien en bio 🎁 gratuit',
@@ -106,6 +106,22 @@
     sp.animate([{ transform: 'translateX(' + W + 'px)' }, { transform: 'translateX(' + (-w) + 'px)' }], { duration: dur, easing: 'linear' });
     setTimeout(() => { bande.classList.remove('on'); occupe = false; suivant(); }, dur);
   }
+
+  // v5.3 : de temps en temps une astuce (2 passages) pour apprendre à lire le graphique, sans aucun prix ni sens
+  // (les prix diffèrent d'un broker à l'autre : on montre OÙ regarder, la suite est « lien en bio »)
+  const ASTUCES = [
+    "👀 Astuce : mets-toi en vue 15 min et repère le dernier plus haut • c'est souvent là que le prix réagit • les infos en temps réel : lien en bio 🎁",
+    "📉 Astuce : en vue 15 min, repère le dernier plus bas • s'il casse en CLÔTURE, le mouvement peut continuer • lien en bio 🎁",
+    "🟨 Astuce : la ligne jaune ENTRÉE = la zone que le coach surveille • on attend la clôture 15 min • lien en bio 🎁",
+    "🕯 Astuce : une mèche seule ne suffit pas • c'est la CLÔTURE de la bougie 15 min qui décide • lien en bio 🎁",
+    "🔵 Astuce : ligne bleue = TP • ligne rouge = SL • le coach te dit quand ça s'approche • lien en bio 🎁",
+    "📊 Astuce : regarde le tableau en bas • plus il y a d'unités alignées, plus le mouvement est solide • lien en bio 🎁"
+  ];
+  let astuceN = 0;
+  const astuceT = setInterval(() => {
+    if (occupe || file.length) return;            // jamais par-dessus une vraie info (TP, SL, news…)
+    montrer(ASTUCES[astuceN++ % ASTUCES.length], true, 2);
+  }, 20 * 60 * 1000);
 
   // ───── télécommande 15 s ─────
   let retour = null;
@@ -248,6 +264,6 @@
 
   window.__ALIGN_BANDE__ = {
     version: VERSION, recu,
-    stop() { cancelAnimationFrame(raf); clearInterval(suivi); obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
+    stop() { cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
   };
 })();
