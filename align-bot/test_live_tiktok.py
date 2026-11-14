@@ -151,7 +151,7 @@ class CartesRelieesAuGraphique(unittest.TestCase):
         self.assertIn("red line", en)
         src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "align_bot.py"), encoding="utf-8").read()
         self.assertIn("🟨 Ligne jaune ENTRÉE : attends la CLÔTURE 15 min", src)
-        self.assertIn("BIENVENUE À", src)
+        self.assertIn("REJOINT LA TEAM ALIGN", src)
 
 
 
