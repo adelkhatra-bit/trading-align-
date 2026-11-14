@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      5.4
+// @version      5.5
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '5.4';
+  const VERSION = '5.5';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -40,6 +40,8 @@
   #align-bande .flash.sl{background:linear-gradient(90deg,#ff1744,#ff8a65);color:#fff;text-shadow:0 2px 3px rgba(0,0,0,.45)}
   #align-bande .flash.membre{background:linear-gradient(90deg,#8a2be2,#ff2d95);color:#fff;text-shadow:0 2px 3px rgba(0,0,0,.45)}
   #align-bande .flash.proche{background:linear-gradient(90deg,#1e90ff,#00e5ff);color:#000}
+  #align-bande .flash.bas{background:linear-gradient(90deg,#ff1744,#ff6d00);color:#fff;text-shadow:0 2px 3px rgba(0,0,0,.45)}
+  #align-bande .flash.haut{background:linear-gradient(90deg,#00c853,#00e5ff);color:#000}
   #align-bande .flash.alerte{background:linear-gradient(90deg,#ff9100,#ffd400);color:#000}
   #align-bande .flash span{display:inline-block;will-change:transform}
   #align-bande.on .piste{visibility:hidden} #align-bande.on .flash{display:flex}
@@ -108,8 +110,8 @@
     if (/prépare-toi|ENTRE EN POSITION|zone clé|pas de panique|revient vers l'entrée|NEWS/i.test(t)) return 'alerte';
     return '';
   }
-  function montrer(texte, bulle, fois) {
-    const g = genre(texte), urgent = g && g !== 'proche' ? 1 : 0;
+  function montrer(texte, bulle, fois, couleur) {
+    const g = couleur || genre(texte), urgent = g && g !== 'proche' ? 1 : 0;
     const items = []; for (let i = 0; i < (fois || 1); i++) items.push({ texte, bulle, g });
     if (urgent) { let k = 0; while (k < file.length && file[k].g && file[k].g !== 'proche') k++; file.splice(k, 0, ...items); }
     else file.push(...items);
@@ -283,8 +285,144 @@
   });
   obs.observe(document.body, { childList: true, subtree: true });
 
+  // ───── v5.5 : LE SPECTACLE — la bande regarde l'écran elle-même ─────
+  // Elle lit les bougies affichées (marché + unité de la vue) et anime le live : accélération, cassure, gros volume,
+  // compte à rebours de clôture, tendance, cœurs qui montent. JAMAIS un prix ni un niveau, jamais le mot Telegram :
+  // juste le spectacle + « lien en bio ». Les vraies infos précises restent dans le privé (bot).
+  const cssShow = document.createElement('style');
+  cssShow.textContent = `
+  #align-show{position:fixed;z-index:10001;pointer-events:none;display:none;align-items:center;gap:14px;padding:10px 26px;
+    border-radius:18px;font:900 40px/1.1 system-ui,Segoe UI,Arial,sans-serif;color:#fff;white-space:nowrap;
+    text-shadow:0 3px 6px rgba(0,0,0,.55);box-shadow:0 8px 30px rgba(0,0,0,.55);transform:translateX(-50%)}
+  #align-show.go{display:flex;animation:showPop 2.8s cubic-bezier(.2,1.4,.4,1) forwards}
+  #align-show.bas{background:linear-gradient(90deg,#ff1744,#ff6d00)} #align-show.haut{background:linear-gradient(90deg,#00c853,#00e5ff);color:#000;text-shadow:none}
+  #align-show.neutre{background:linear-gradient(90deg,#8a2be2,#ff2d95)}
+  #align-show .emo{font-size:54px;animation:showBat .5s ease-in-out infinite alternate}
+  @keyframes showPop{0%{opacity:0;transform:translateX(-50%) scale(.3)}15%{opacity:1;transform:translateX(-50%) scale(1.12)}
+    25%{transform:translateX(-50%) scale(1)}85%{opacity:1}100%{opacity:0;transform:translateX(-50%) scale(.9) translateY(-14px)}}
+  @keyframes showBat{from{transform:scale(1)}to{transform:scale(1.25)}}
+  #align-cadre{position:fixed;z-index:9998;pointer-events:none;border-radius:8px;opacity:0}
+  #align-cadre.go{animation:cadreFlash 1.6s ease-out 2}
+  @keyframes cadreFlash{0%{opacity:0}20%{opacity:1}100%{opacity:0}}
+  #align-chrono{position:fixed;z-index:10001;pointer-events:none;display:none;flex-direction:column;align-items:center;
+    padding:8px 18px;border-radius:16px;background:rgba(0,0,0,.72);border:3px solid #ffd400;color:#ffd400;
+    font:900 46px/1 system-ui,Segoe UI,Arial,sans-serif;text-align:center}
+  #align-chrono small{font:800 17px/1.3 system-ui,Segoe UI,Arial,sans-serif;color:#fff}
+  #align-chrono.urgent{border-color:#ff2d95;color:#ff2d95;animation:showBat .4s ease-in-out infinite alternate}
+  .align-coeur{position:fixed;z-index:9997;pointer-events:none;font-size:38px;animation:coeurMonte 3.2s ease-out forwards}
+  @keyframes coeurMonte{0%{opacity:0;transform:translate(0,0) scale(.5)}15%{opacity:1}
+    100%{opacity:0;transform:translate(var(--dx),-340px) scale(1.3) rotate(var(--rot))}}`;
+  document.head.appendChild(cssShow);
+  const cadre = document.createElement('div'); cadre.id = 'align-cadre'; document.body.appendChild(cadre);
+  const chrono = document.createElement('div'); chrono.id = 'align-chrono'; document.body.appendChild(chrono);
+
+  function nomMarche() {
+    const s = String((chart() && chart().symbol()) || '');
+    return /BTC/i.test(s) ? '🟠 BTC' : /XAU|GOLD/i.test(s) ? '🥇 GOLD' : /NAS|NQ|US100/i.test(s) ? '🟣 NASDAQ' : '📊 ' + s.split(':').pop();
+  }
+  function barres(n) {
+    try {
+      const b = chart()._chartWidget.model().mainSeries().bars(), fin = b.lastIndex(), out = [];
+      for (let i = Math.max(b.firstIndex(), fin - (n || 60) + 1); i <= fin; i++) { const v = b.valueAt(i); if (v) out.push(v); }
+      return out;                                   // [temps, ouverture, haut, bas, clôture, volume]
+    } catch (e) { return []; }
+  }
+  // v5.5 (demande d'Adel) : le spectacle passe DANS la bande, en défilant comme les autres infos (rouge = ça baisse, vert = ça monte)
+  function pop(emo, texte, sens, suite) {
+    montrer(emo + ' ' + texte + (suite ? ' • ' + suite : ''), false, 1, sens === -1 ? 'bas' : sens === 1 ? 'haut' : 'membre');
+  }
+  function lueur(sens) {
+    try {
+      const r = zoneGraphique(), col = sens === -1 ? '#ff1744' : sens === 1 ? '#00e676' : '#ff2d95';
+      Object.assign(cadre.style, { left: r.left + 'px', top: r.top + 'px', width: (r.width - 70) + 'px', height: (r.height || 600) + 'px',
+        boxShadow: 'inset 0 0 60px 12px ' + col, border: '4px solid ' + col });
+      cadre.classList.remove('go'); void cadre.offsetWidth; cadre.classList.add('go');
+    } catch (e) {}
+  }
+  function coeurs(n, liste) {
+    try {
+      const r = zoneGraphique(), em = liste || ['❤️', '🔥', '🚀', '💜', '💙', '👆'];
+      for (let i = 0; i < (n || 10); i++) setTimeout(() => {
+        const e = document.createElement('span'); e.className = 'align-coeur'; e.textContent = em[(Math.random() * em.length) | 0];
+        e.style.left = (r.left + r.width - 150 - Math.random() * 90) + 'px'; e.style.top = (r.top + (r.height || 600) * 0.62) + 'px';
+        e.style.setProperty('--dx', (Math.random() * 120 - 60) + 'px'); e.style.setProperty('--rot', (Math.random() * 60 - 30) + 'deg');
+        document.body.appendChild(e); setTimeout(() => e.remove(), 3400);
+      }, i * 160);
+    } catch (e) {}
+  }
+  window.__ALIGN_SHOW__ = { pop, lueur, coeurs };
+  // une info du spectacle sur la bande : jamais par-dessus une vraie info du bot, et pas plus d'une par minute
+  let dernierShow = 0;
+  function bandeShow(txt) {
+    if (occupe || file.length || Date.now() - dernierShow < 60000) return false;
+    dernierShow = Date.now(); montrer(txt, false, 1); return true;
+  }
+  const deja = {};
+  function uneFois(cle) { if (deja[cle]) return false; deja[cle] = 1; return true; }
+  const PHRASES = {
+        casseBas: [['🚨', 'ÇA CASSE !', ' casse le dernier plus bas 📉 • ça peut couler encore… infos en temps réel : lien en bio 🎁']],
+    casseHaut: [['🚀', 'ÇA CASSE !', ' casse le dernier plus haut 📈 • ça peut décoller… infos en temps réel : lien en bio 🎁']],
+    volume: [['🐋', 'LES BALEINES BOUGENT', ' : gros volume 👀 quelque chose se prépare • lien en bio 🎁']],
+    hausse: ['📈 {m} veut remonter… jusqu\'où ? le coach le sait : lien en bio 🎁',
+             '🟢 {m} reprend des forces 💪 le marché pourrait remonter • plus d\'infos : lien en bio 🎁',
+             '🚀 Les acheteurs reviennent sur {m} 👀 la suite en temps réel : lien en bio 🎁'],
+    baisse: ['📉 {m} sous pression… va-t-il couler ? réponse en temps réel : lien en bio 🎁',
+             '🔴 Les vendeurs tiennent {m} 😬 ça peut encore descendre • plus d\'infos : lien en bio 🎁',
+             '🌊 {m} glisse… le coach surveille chaque bougie : lien en bio 🎁'],
+    range: ['😴 {m} se compresse… avant l\'explosion ? 💥 tiens-toi prêt • lien en bio 🎁',
+            '🧲 {m} hésite… la prochaine clôture peut tout décider ⏱ lien en bio 🎁']
+  };
+  let tendN = 0, derniereTend = Date.now();
+  function regarder() {
+    try {
+      if (retour) return;                                   // un abonné a la main : on ne parle pas par-dessus
+      const B = barres(40); if (B.length < 25) return;
+      const cur = B[B.length - 1], prev = B.slice(-21, -1), m = nomMarche();
+      const moyR = prev.reduce((a, x) => a + (x[2] - x[3]), 0) / prev.length || 1;
+      const moyV = prev.reduce((a, x) => a + (x[5] || 0), 0) / prev.length || 0;
+      const corps = cur[4] - cur[1], sens = corps < 0 ? -1 : 1, id = m + cur[0];
+      // 1) bougie qui accélère (corps > 1,6× la taille moyenne) : explosion visuelle + lueur rouge/verte
+      if (Math.abs(corps) > 1.6 * moyR && uneFois('acc' + id)) {
+        pop(sens === -1 ? '📉' : '📈', 'ÇA ACCÉLÈRE ' + (sens === -1 ? '⬇️ ' : '⬆️ ') + m, sens, 'jusqu\'où ? la suite en temps réel : lien en bio 🎁'); lueur(sens);
+        return;
+      }
+      // 2) cassure du dernier plus haut / plus bas (20 bougies) : on le montre sans donner le prix
+      const hh = Math.max(...prev.map(x => x[2])), ll = Math.min(...prev.map(x => x[3]));
+      if (cur[4] < ll && uneFois('cb' + id)) { pop('🚨', 'ÇA CASSE ⬇️ ' + m, -1, 'dernier plus bas cassé 📉 ça peut couler encore… infos en temps réel : lien en bio 🎁'); lueur(-1); return; }
+      if (cur[4] > hh && uneFois('ch' + id)) { pop('🚀', 'ÇA CASSE ⬆️ ' + m, 1, 'dernier plus haut cassé 📈 ça peut décoller… infos en temps réel : lien en bio 🎁'); lueur(1); return; }
+      // 3) gros volume
+      if (moyV > 0 && (cur[5] || 0) > 2.5 * moyV && uneFois('vol' + id)) { pop('🐋', 'LES BALEINES BOUGENT sur ' + m, 0, 'gros volume 👀 quelque chose se prépare • lien en bio 🎁'); coeurs(8, ['🐋', '💰', '👀']); return; }
+      // 4) toutes les ~7 min : la bande dit où le marché a l'air d'aller (sans prix) et renvoie vers le lien en bio
+      if (Date.now() - derniereTend > 7 * 60000) {
+        const c10 = B.slice(-10).map(x => x[4]), pente = (c10[9] - c10[0]) / moyR, larg = (Math.max(...B.slice(-10).map(x => x[2])) - Math.min(...B.slice(-10).map(x => x[3]))) / moyR;
+        const L = larg < 3.2 ? PHRASES.range : pente > 1.2 ? PHRASES.hausse : pente < -1.2 ? PHRASES.baisse : PHRASES.range;
+        if (bandeShow(L[tendN++ % L.length].replace('{m}', m))) { derniereTend = Date.now(); coeurs(6); }
+      }
+    } catch (e) {}
+  }
+  setTimeout(() => { barres(40).slice(-1).forEach(b => { const k = nomMarche() + b[0]; ['acc', 'cb', 'ch', 'vol'].forEach(p => deja[p + k] = 1); }); }, 1500);  // rien au démarrage
+  const regardT = setInterval(regarder, 5000);
+
+  // compte à rebours de la clôture 15 min : les 45 dernières secondes, gros chrono + « ça va se décider »
+  const chronoT = setInterval(() => { try {
+    const s = Math.floor(Date.now() / 1000), reste = 900 - (s % 900), r = zoneGraphique();
+    if (reste <= 45 && !retour) {
+      chrono.style.display = 'flex'; chrono.classList.toggle('urgent', reste <= 10);
+      chrono.style.left = (r.left + 18) + 'px'; chrono.style.top = (r.top + 96) + 'px';
+      chrono.innerHTML = '0:' + String(reste).padStart(2, '0') + '<small>⏱ CLÔTURE 15 MIN<br>ça va se décider 👀</small>';
+      if (reste === 45 && uneFois('cl' + s)) bandeShow('⏱ Clôture 15 min dans 45 s sur ' + nomMarche() + ' • c\'est elle qui décide 👀 • la suite en temps réel : lien en bio 🎁');
+    } else if (chrono.style.display !== 'none') {
+      chrono.style.display = 'none';
+      const b = barres(2)[0];                              // la bougie qui vient de clôturer
+      if (b && reste > 880) { const v = b[4] >= b[1] ? 1 : -1; if (!occupe && !file.length) pop(v === 1 ? '🟢' : '🔴', 'BOUGIE 15 MIN CLÔTURÉE ' + (v === 1 ? '⬆️' : '⬇️') + ' ' + nomMarche(), v, 'la suite en temps réel : lien en bio 🎁'); }
+    }
+  } catch (e) {} }, 1000);
+  // de temps en temps des cœurs qui montent : « tapote l'écran »
+  const coeurT = setInterval(() => { if (!retour) coeurs(10); }, 100000);
+
   window.__ALIGN_BANDE__ = {
     version: VERSION, recu,
-    stop() { cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
+    stop() { cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT);
+      [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur').forEach(x => x.remove()); obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
   };
 })();
