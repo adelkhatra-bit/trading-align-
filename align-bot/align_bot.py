@@ -6433,6 +6433,11 @@ def texte_radar(props, derniers, vip=True, anglais=False, now=None, intro=None):
                 l.append((f"🎯 Entry : {px(es['e'])}" if anglais else f"🎯 Entrée : {px(es['e'])}") + f" ({es['src']})")
                 l.append(f"🛑 SL : {px(es['sl'])} · {px(abs(es['e'] - es['sl']))} pts")
                 l.append(f"🏁 TP1 : {px(es['tp1'])} · R/R {abs(es['tp1'] - es['e']) / max(abs(es['e'] - es['sl']), 1e-9):.1f}".replace(".", ","))
+                if not anglais:
+                    l.append(f"🧭 {'Ça peut couler' if d == -1 else 'Ça peut monter'} jusqu'au TP1 (ligne bleue) · "
+                             f"{'SHORT' if d == -1 else 'LONG'} seulement au retrace dans la zone 🟨")
+                else:
+                    l.append(f"🧭 It can {'drop' if d == -1 else 'rise'} to TP1 (blue line) · {'SHORT' if d == -1 else 'LONG'} only on the retrace into the zone 🟨")
                 if es.get("fvg") and tp2_affichable(d, es["tp1"], es.get("tp2")):
                     l.append(f"🏁 TP2 : {px(es['tp2'])}" + (" (if TP1 breaks, it keeps going)" if anglais else " (si le TP1 casse, ça continue)"))
                 if es.get("fvg"):
@@ -6524,10 +6529,26 @@ def intro_ia_radar(etat, m, r, cle, p, es):
         return None                               # le prix n'est pas encore dans la zone : jamais « imminent »
     return compacter_ia(avis)
 
+def live_prepare_toi(etat, derniers, now=None):
+    """Live : quand un marché devient « prépare-toi » (prix proche de la zone ET unités alignées), petite fenêtre sur l'écran :
+    le sens (ça peut couler / décoller) + compte à rebours, jamais de niveau ; les niveaux (retrace, cible) restent en privé."""
+    now = time.time() if now is None else now
+    for p in classer_marches(derniers, etat, list(MARCHES), now) or []:
+        if p.get("d") not in (1, -1) or not (0 <= p.get("rang", 9) <= RADAR_ALERTE_RANG) or not _radar_pret(p, derniers):
+            continue
+        ic = ICONE.get(p["m"], "")
+        sens = "ça peut couler 📉" if p["d"] == -1 else "ça peut décoller 📈"
+        live_bande(etat, f"BULLE:⚠️ {ic} {p['m']} : prépare-toi, {sens} • ⏱ verdict dans {min_avant_cloture15(now)} min • "
+                         "les niveaux en privé : lien en bio 🎁 gratuit", f"prep{p['m']}{p['d']}", 1800, toujours=True)
+
 def radar_tick(etat, chats, derniers, now=None):
     """Un RADAR par personne : édité sur place ; nouveau message (son) seulement quand un marché devient « prépare-toi »
     ou quand le marché en tête change (l'ancien radar est alors supprimé : jamais deux radars dans la conversation)."""
     now = time.time() if now is None else now
+    try:
+        live_prepare_toi(etat, derniers, now)
+    except Exception as ex:
+        print("live prépare-toi", ex)
     mem_all = etat.setdefault("radar_mem", {})
     for cid in destinataires_radar(etat, chats):
         try:
