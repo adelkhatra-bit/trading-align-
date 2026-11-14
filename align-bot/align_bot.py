@@ -8944,8 +8944,10 @@ LIVE_CHOIX = {"1": ("tf", "1", "⏱ 1 min"), "5": ("tf", "5", "⏱ 5 min"), "15"
 _LIVE_BOOSTS = {}
 _LIVE_DERNIER = {}
 
+LIVE_24H = os.environ.get("ALIGN_LIVE_24H", "1").strip() != "0"     # le live tourne 24 h / 24 (YouTube + TikTok) : toujours « en cours »
+
 def live_actif(etat):
-    return bool(etat.get("live_on"))
+    return LIVE_24H or bool(etat.get("live_on"))
 
 def live_publier(texte):
     """Envoie une ligne au graphique du live. Ne bloque jamais le bot (échec = ignoré)."""
