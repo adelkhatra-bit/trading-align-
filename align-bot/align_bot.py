@@ -3024,7 +3024,7 @@ def menu_canal_resultats(etat):
           [{"text": "🧑‍🏫 Mon coach perso (gratuit)", "url": BOT_LIEN}],
           [{"text": "💎 VIP", "url": BOT_LIEN + "?start=vip"}, {"text": "📺 Le live ALIGN", "url": LIVE_LIEN}]]
     texte = "\n".join(["📌 ALIGN RÉSULTATS", "━━━━━━━━━━━━━━━", "🏆 Ici : les gains des membres", "📊 Les TP / SL du bot : dans chaque chaîne",
-                        "📸 Ton gain : bouton Partager mon gain du coach", "⚠️ Pas un conseil financier"])
+                        "📸 Ton gain : bouton Partager mon gain du coach", "⚠️ Pas un conseil financier | Not financial advice"])
     try:
         res = telegram("sendMessage", chat_id=canal, text=texte, reply_markup=json.dumps({"inline_keyboard": kb}), disable_notification="true")
         telegram("pinChatMessage", chat_id=canal, message_id=res["result"]["message_id"], disable_notification="true")
@@ -4725,7 +4725,7 @@ def menu_chaine(etat, m):
     autres = [mk for mk in MARCHES if mk != m and LIENS_CHAINES.get(mk)]
     texte = "\n".join([f"📌 ALIGN {ICONE.get(m, '')} {m}", "━━━━━━━━━━━━━━━", "🎙 Ici : le marché commenté en direct",
                         "🎯 TP / SL et résultats du bot ici", "🔕 Commentaires sans son, TP / SL avec son", "🧑‍🏫 Ton coach perso + niveaux : bouton 👇", "🔴 Le live : bouton 👇",
-                        "⚠️ Pas un conseil financier"])
+                        "⚠️ Pas un conseil financier | Not financial advice"])
     kb = [[{"text": "🧑‍🏫 Mon coach perso (gratuit)", "url": BOT_LIEN}],
           [{"text": "🏆 Gagnantes", "url": BOT_LIEN + "?start=gagnantes"}, {"text": "❌ Perdantes", "url": BOT_LIEN + "?start=perdantes"}]]
     if autres:
@@ -7063,7 +7063,19 @@ def envoyer_prospects(etat, texte, signal, clavier=None):
             if "403" in str(ex) and cid in etat.get("prospects", []):
                 etat["prospects"].remove(cid)
 
+RISQUE_LIGNE = "⚠️ Risque de perte · pas un conseil financier | Risk of loss · not financial advice"
+_MOTS_TRADING = re.compile(r"\b(SHORT|LONG|ENTRÉE|ENTRY|SL|TP\d?|STOP|POSITION|BE)\b|J'ENTRE|PRÉPARE", re.I)
+
+def avec_risque(texte):
+    """Règle d'Adel (15/11) : tout message qui parle de trading rappelle le risque, en français ET en anglais."""
+    t = str(texte or "")
+    if not t or "Risk of loss" in t or not _MOTS_TRADING.search(t):
+        return texte
+    return t + "\n" + RISQUE_LIGNE
+
 def _envoi_sur(cid, **kw):
+    if "text" in kw:
+        kw["text"] = avec_risque(kw["text"])
     try:
         return telegram("sendMessage", chat_id=cid, **kw)
     except Exception as ex:
@@ -9895,9 +9907,10 @@ def un_tour(etat, chats):
                 else:
                     texte_cid = texte
                 try:
+                    texte_cid = avec_risque(texte_cid)
                     if cid == etat.get("canal"):
                         # Chaîne VIP : pas de clavier possible dans une chaîne → boutons sous le message (ils ouvrent le bot)
-                        txt = texte.replace("\n\n📍 Si tu prends cette position, active son suivi avec le bouton ci-dessous.", "")
+                        txt = avec_risque(texte).replace("\n\n📍 Si tu prends cette position, active son suivi avec le bouton ci-dessous.", "")
                         telegram("sendMessage", chat_id=cid, text=txt, reply_markup=boutons_canal(etat, texte))
                     elif clavier:
                         telegram("sendMessage", chat_id=cid, text=texte_cid, reply_markup=clavier)
