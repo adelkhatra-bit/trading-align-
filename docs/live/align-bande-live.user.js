@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      6.8
+// @version      6.9
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '6.8';
+  const VERSION = '6.9';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -18,6 +18,8 @@
     '🔗 LIEN EN BIO : COACH EN DIRECT',
     '🔌 BRANCHE-TOI AU MARCHÉ • chaque bougie expliquée en direct • lien en bio 🎁',
     '🧭 CHEZ ALIGN ON NE VA JAMAIS CONTRE LA TENDANCE • on suit le marché, on ne le combat pas 💪',
+    '⚠️ CECI N\'EST PAS UN CONSEIL EN INVESTISSEMENT • fais tes propres recherches (DYOR)',
+    '⚠️ NOT FINANCIAL ADVICE • do your own research (DYOR)',
     '📲 Le coach ALIGN en direct • lien en bio 🎁 gratuit',
     '🔔 ACTIVE TES NOTIFICATIONS • lien en bio : on te prévient dès que le marché se prépare 🎁',
     '⚠️ Le trading comporte un risque élevé de perte en capital • Contenu à caractère informatif et éducatif uniquement, qui ne constitue ni un conseil en investissement ni une recommandation personnalisée • Les performances passées ne préjugent pas des performances futures',
@@ -76,6 +78,13 @@
     ['JEU : tapote l\'écran si tu penses que', 'GAME: tap the screen if you think'], ['va couler', 'will drop'], ['va monter', 'will rise'],
     ['réponse dans', 'answer in'], ['les niveaux en privé', 'levels in private'], ['Le coach ALIGN', 'The ALIGN coach'],
     ['risque de perte, pas un conseil', 'risk of loss, not advice'],
+    ['Ceci n\'est pas un conseil en investissement, fais tes propres recherches (DYOR)', 'This is not financial advice, do your own research (DYOR)'],
+    ['risque de perte', 'risk of loss'],
+    ['ATTENTION LA FEINTE sur', 'WATCH THE FAKE-OUT on'],
+    ['le marché fait semblant de remonter… beaucoup vont acheter trop tôt et y laisser des plumes', 'the market is faking a bounce… many will buy too early and lose feathers'],
+    ['le marché fait semblant de chuter… beaucoup vont vendre trop tôt et y laisser des plumes', 'the market is faking a drop… many will sell too early and lose feathers'],
+    ['Ne te fais pas piéger', 'Don\'t get trapped'], ['ne cours pas après la bougie', 'don\'t chase the candle'],
+    ['les gros adorent ce genre de piège', 'big players love this kind of trap'], ['qui va mordre à l\'hameçon ?', 'who\'s going to take the bait?'],
     ['Pfff… on s\'ennuie,', 'Ugh… so boring,'], ['est trop calme', 'is way too calm'], ['pense à tapoter l\'écran', 'remember to tap the screen'],
     ['et à t\'abonner', 'and follow'], ['Marché ennuyant sur', 'Boring market on'], ['allez, tapote l\'écran pour le réveiller', 'come on, tap the screen to wake it up'],
     ['et abonne-toi', 'and follow'],
@@ -212,7 +221,7 @@
     const urgent = g && g !== 'proche' ? 1 : 0;
     // v6.4 : chaque info passe en français PUIS en anglais (au moins 2 passages)
     // v6.5 (règle d'Adel) : chaque info rappelle le risque, en français puis en anglais
-    if (!/risque|risk/i.test(texte)) texte += ' • ⚠️ risque de perte, pas un conseil';
+    if (!/risque|risk/i.test(texte)) texte += ' • ⚠️ Ceci n\'est pas un conseil en investissement, fais tes propres recherches (DYOR) • risque de perte';
     const items = []; for (let i = 0; i < Math.max(2, fois || 1); i++) items.push({ texte: plateforme(i % 2 ? enAnglais(texte) : texte), bulle, g });
     if (urgent) { let k = 0; while (k < file.length && file[k].g && file[k].g !== 'proche') k++; file.splice(k, 0, ...items); }
     else file.push(...items);
@@ -644,6 +653,18 @@
         pop('⏳', 'COMPTE À REBOURS sur ' + m + ' : ' + (dirT === -1 ? '🔴 GROSSE DISTRIBUTION' : '🟢 ÇA VA PÉTER EN L\'AIR'), dirT,
             'dans ' + minRest + ' min max 💥 la team : abonne-toi, partage • lien en bio 🎁');
         versBot('pression', dirT, minRest);
+        return;
+      }
+      // 5b) v6.9 FEINTE : 3 bougies qui repartent contre la tendance → « beaucoup vont y laisser des plumes »
+      const c3 = B.slice(-4).map(x => x[4]), contre = dirT ? (c3[3] - c3[0]) * -dirT / moyR : 0;
+      if (dirT && contre > 1.0 && uneFois('fe' + m + quart)) {
+        const PF = dirT === -1
+          ? ['🪤 ATTENTION LA FEINTE sur ' + m + ' : le marché fait semblant de remonter… beaucoup vont acheter trop tôt et y laisser des plumes 🪶 • lien en bio 🎁',
+             '🎣 ' + m + ' remonte… qui va mordre à l\'hameçon ? les gros adorent ce genre de piège 😏 • Ne te fais pas piéger : lien en bio 🎁']
+          : ['🪤 ATTENTION LA FEINTE sur ' + m + ' : le marché fait semblant de chuter… beaucoup vont vendre trop tôt et y laisser des plumes 🪶 • lien en bio 🎁',
+             '🎣 ' + m + ' recule… qui va mordre à l\'hameçon ? les gros adorent ce genre de piège 😏 • ne cours pas après la bougie : lien en bio 🎁'];
+        montrer(PF[quart % 2], false, 2, 'alerte'); lueur(0); coeurs(8, ['🪤', '🎣', '🪶']);
+        versBot('feinte', dirT, minRest);
         return;
       }
       // 6) manipulation : grosse mèche CONTRE la tendance (les gros piègent) → la vraie direction peut arriver
