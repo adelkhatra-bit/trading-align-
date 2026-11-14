@@ -506,15 +506,35 @@
       cadre.classList.remove('go'); void cadre.offsetWidth; cadre.classList.add('go');
     } catch (e) {}
   }
+  // v6.9 (demande d'Adel) : plus de petits émojis qui s'envolent (on ne comprend pas ce que c'est) → UNE punchline pro
+  // dans une pastille qui monte doucement, en français avec l'anglais dessous. Le contexte choisit la phrase.
+  const PUNCH = [
+    [/🪤|🎣|🪶/, ['🪤 Piège en cours', 'Trap in progress'], ['🎣 Qui va mordre ?', 'Who takes the bait?']],
+    [/🐋|💰/, ['🐋 Les baleines arrivent', 'Whales incoming'], ['👀 Gros volume', 'Big volume']],
+    [/📉|🔴|🌊/, ['📉 La pression vend', 'Sellers in control'], ['🔴 Ça pousse en bas', 'Pushing lower']],
+    [/📈|🟢|🚀/, ['📈 Les acheteurs poussent', 'Buyers in control'], ['🟢 Ça pousse en haut', 'Pushing higher']],
+    [/🔌|📡|🧠/, ['🔌 Branché au marché', 'Plugged into the market'], ['📡 En direct', 'Live']],
+    [/↩️/, ['↩️ Rebond sur zone clé', 'Bounce on key zone'], ['👀 Réaction du marché', 'Market reaction']],
+    [/./, ['❤️ Tapote l\'écran', 'Tap the screen'], ['🔔 Abonne-toi', 'Follow'], ['💪 La team ALIGN', 'Team ALIGN'], ['🎯 Reste concentré', 'Stay focused']]
+  ];
+  const cssPunch = document.createElement('style');
+  cssPunch.textContent = `.align-punch{position:fixed;z-index:9997;pointer-events:none;padding:8px 18px;border-radius:999px;text-align:center;
+    background:linear-gradient(90deg,#ff2d95,#8a2be2,#1e90ff);color:#fff;font:900 24px/1.15 system-ui,Segoe UI,Arial,sans-serif;
+    box-shadow:0 6px 18px rgba(0,0,0,.45);text-shadow:0 2px 3px rgba(0,0,0,.4);animation:punchMonte 3.4s ease-out forwards}
+  .align-punch small{display:block;font:700 14px/1.2 system-ui,Segoe UI,Arial,sans-serif;opacity:.9}
+  @keyframes punchMonte{0%{opacity:0;transform:translateY(20px) scale(.7)}15%{opacity:1;transform:translateY(0) scale(1.05)}
+    25%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-120px)}}`;
+  document.head.appendChild(cssPunch);
+  let punchN = 0;
   function coeurs(n, liste) {
     try {
-      const r = zoneGraphique(), em = liste || ['❤️', '🔥', '✨', '💜', '💙', '👆'];   // pas de fusée par défaut : elle ferait croire que ça monte
-      for (let i = 0; i < (n || 10); i++) setTimeout(() => {
-        const e = document.createElement('span'); e.className = 'align-coeur'; e.textContent = em[(Math.random() * em.length) | 0];
-        e.style.left = (r.left + r.width - 150 - Math.random() * 90) + 'px'; e.style.top = (r.top + (r.height || 600) * 0.62) + 'px';
-        e.style.setProperty('--dx', (Math.random() * 120 - 60) + 'px'); e.style.setProperty('--rot', (Math.random() * 60 - 30) + 'deg');
-        document.body.appendChild(e); setTimeout(() => e.remove(), 3400);
-      }, i * 160);
+      const cle = (liste || []).join(''), g = PUNCH.find(x => x[0].test(cle)) || PUNCH[PUNCH.length - 1];
+      const [fr, en] = g[1 + (punchN++ % (g.length - 1))];
+      const r = zoneGraphique(), e = document.createElement('div'); e.className = 'align-punch';
+      e.innerHTML = esc(fr) + '<small>' + esc(en) + '</small>';
+      document.querySelectorAll('.align-punch').forEach(x => x.remove());
+      e.style.left = (r.left + r.width - 360) + 'px'; e.style.top = (r.top + (r.height || 600) * 0.45) + 'px';
+      document.body.appendChild(e); setTimeout(() => e.remove(), 3500);
     } catch (e) {}
   }
   function choisirPlateforme(v) { PLATEFORME = v; try { localStorage.setItem('alignPlateforme', v); } catch (e) {} remplir(); }
@@ -755,6 +775,6 @@
   window.__ALIGN_BANDE__ = {
     version: VERSION, recu, plateforme: v => choisirPlateforme(v),
     stop() { cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
-      [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur,.align-billet,.align-argent').forEach(x => x.remove()); try { cssBillet.remove(); } catch (e) {} obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
+      [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur,.align-billet,.align-argent,.align-punch').forEach(x => x.remove()); try { cssBillet.remove(); } catch (e) {} obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
   };
 })();
