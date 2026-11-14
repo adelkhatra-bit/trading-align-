@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      5.6
+// @version      5.7
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '5.6';
+  const VERSION = '5.7';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -244,6 +244,24 @@
     } catch (e) {}
   }
   window.__ALIGN_FEU__ = feuArtifice;
+  // v5.7 : TP touché = pluie de billets et de pièces sur l'écran, « ÇA ENCAISSE 💰 »
+  const cssBillet = document.createElement('style');
+  cssBillet.textContent = `.align-billet{position:fixed;z-index:10000;pointer-events:none;font-size:44px;top:-60px;animation:billetTombe var(--t) linear forwards}
+  @keyframes billetTombe{0%{transform:translate(0,0) rotate(0)}100%{transform:translate(var(--dx),var(--h)) rotate(var(--rot));opacity:.2}}`;
+  document.head.appendChild(cssBillet);
+  function pluieBillets(n) {
+    try {
+      const r = zoneGraphique(), H = (r.height || 700) + 120, em = ['💵', '💰', '💸', '🪙', '💶', '🤑'];
+      for (let i = 0; i < (n || 40); i++) setTimeout(() => {
+        const e = document.createElement('span'); e.className = 'align-billet'; e.textContent = em[(Math.random() * em.length) | 0];
+        e.style.left = (r.left + Math.random() * (r.width - 90)) + 'px'; e.style.top = r.top + 'px';
+        e.style.setProperty('--t', (2.2 + Math.random() * 1.6) + 's'); e.style.setProperty('--h', H + 'px');
+        e.style.setProperty('--dx', (Math.random() * 120 - 60) + 'px'); e.style.setProperty('--rot', (Math.random() * 720 - 360) + 'deg');
+        document.body.appendChild(e); setTimeout(() => e.remove(), 4200);
+      }, i * 70);
+    } catch (e) {}
+  }
+  window.__ALIGN_BILLETS__ = pluieBillets;
 
   function recu(txt) {
     txt = String(txt || '').trim(); if (!txt) return;
@@ -254,7 +272,7 @@
     }
     const bulle = txt.startsWith('BULLE:');
     if (bulle) txt = txt.slice(6).trim();
-    if (/TP\d? TOUCH|OBJECTIF FINAL|TP2 TOUCH/i.test(txt)) feuArtifice(/TP2|FINAL/i.test(txt) ? '🏆 TP2 TOUCHÉ !' : '🎯 TP TOUCHÉ !');
+    if (/TP\d? TOUCH|OBJECTIF FINAL|TP2 TOUCH/i.test(txt)) { feuArtifice(/TP2|FINAL/i.test(txt) ? '💰 ÇA ENCAISSE ! TP2' : '💰 ÇA ENCAISSE ! TP'); pluieBillets(45); }
     montrer(txt, bulle, 2);
   }
 
@@ -402,8 +420,8 @@
       if (dirT && (comp || colle) && uneFois('pr' + m + quart)) {
         arme = { d: dirT, quart, m };
         lueur(dirT); coeurs(8, dirT === -1 ? ['📉', '🌊', '⚡'] : ['📈', '🚀', '⚡']);
-        pop('⚡', 'LA PRESSION MONTE sur ' + m + (dirT === -1 ? ' ⬇️' : ' ⬆️'), dirT,
-            'ça peut accélérer dans ⏱ ' + minRest + ' min (clôture 15 min) • la team : abonne-toi, partage • lien en bio 🎁');
+        pop('⏳', 'COMPTE À REBOURS sur ' + m + ' : ' + (dirT === -1 ? 'GROSSE DISTRIBUTION ⬇️' : 'ÇA VA PÉTER EN L\'AIR ⬆️'), dirT,
+            'dans ' + minRest + ' min max 💥 la team : abonne-toi, partage • lien en bio 🎁');
         return;
       }
       // 6) manipulation : grosse mèche CONTRE la tendance (les gros piègent) → la vraie direction peut arriver
@@ -412,7 +430,7 @@
         arme = { d: dirT, quart, m };
         lueur(dirT);
         pop('🌀', 'MANIPULATION sur ' + m, dirT, (dirT === -1 ? 'les gros piègent les acheteurs… la belle distribution 📉' : 'les gros piègent les vendeurs… le rechargement 📈')
-            + ' peut arriver dans ⏱ ' + minRest + ' min • abonne-toi, partage • lien en bio 🎁');
+            + ' dans ' + minRest + ' min max ⏳ • abonne-toi, partage • lien en bio 🎁');
         return;
       }
       // 4) toutes les ~7 min : la bande dit où le marché a l'air d'aller (sans prix) et renvoie vers le lien en bio
@@ -432,9 +450,13 @@
     const enAttente = arme && arme.quart === Math.floor(s / 900);
     if ((reste <= 45 || enAttente) && !retour) {
       chrono.style.display = 'flex'; chrono.classList.toggle('urgent', reste <= (enAttente ? 30 : 10));
-      chrono.style.left = (r.left + 18) + 'px'; chrono.style.top = (r.top + 96) + 'px';
       chrono.innerHTML = Math.floor(reste / 60) + ':' + String(reste % 60).padStart(2, '0') + '<small>'
-        + (enAttente ? (arme.d === -1 ? '📉 ÇA PEUT COULER<br>' : '📈 ÇA PEUT DÉCOLLER<br>') + 'abonne-toi • partage 🎁' : '⏱ CLÔTURE 15 MIN<br>ça va se décider 👀') + '</small>';
+        + (enAttente ? (arme.d === -1 ? '💥 GROSSE DISTRIBUTION ⬇️<br>' : '🚀 ÇA VA PÉTER EN L\'AIR ⬆️<br>') + (reste <= 20 ? 'C\'EST MAINTENANT !' : 'abonne-toi • partage 🎁') : '⏱ CLÔTURE 15 MIN<br>ça va se décider 👀') + '</small>';
+      // v5.7 (demande d'Adel) : en bas à droite, côté prix, juste au-dessus du tableau de bord (TikTok coupe le haut gauche)
+      chrono.style.left = (r.left + r.width - 70 - chrono.offsetWidth - 14) + 'px';
+      // v5.7 : marché qui baisse → en haut à droite juste sous la bande (les bougies descendent, on ne les cache pas) ;
+      //        marché qui monte → en bas à droite, un peu au-dessus du tableau de bord (sans le mordre)
+      chrono.style.top = (enAttente && arme.d === -1 ? r.top + 90 : r.top + (r.height || 700) - 180 - chrono.offsetHeight) + 'px';
       if (reste === 45 && uneFois('cl' + s)) bandeShow('⏱ Clôture 15 min dans 45 s sur ' + nomMarche() + ' • c\'est elle qui décide 👀 • la suite en temps réel : lien en bio 🎁');
     } else if (chrono.style.display !== 'none') {
       chrono.style.display = 'none';
@@ -453,6 +475,6 @@
   window.__ALIGN_BANDE__ = {
     version: VERSION, recu,
     stop() { cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT);
-      [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur').forEach(x => x.remove()); obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
+      [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur,.align-billet').forEach(x => x.remove()); try { cssBillet.remove(); } catch (e) {} obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
   };
 })();
