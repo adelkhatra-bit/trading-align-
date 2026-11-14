@@ -40,6 +40,8 @@
   #align-bande .flash.sl{background:linear-gradient(90deg,#ff1744,#ff8a65);color:#fff;text-shadow:0 2px 3px rgba(0,0,0,.45)}
   #align-bande .flash.membre{background:linear-gradient(90deg,#8a2be2,#ff2d95);color:#fff;text-shadow:0 2px 3px rgba(0,0,0,.45)}
   #align-bande .flash.proche{background:linear-gradient(90deg,#1e90ff,#00e5ff);color:#000}
+  #align-bande .flash.bas{background:linear-gradient(90deg,#ff1744,#ff6d00);color:#fff;text-shadow:0 2px 3px rgba(0,0,0,.45)}
+  #align-bande .flash.haut{background:linear-gradient(90deg,#00c853,#00e5ff);color:#000}
   #align-bande .flash.alerte{background:linear-gradient(90deg,#ff9100,#ffd400);color:#000}
   #align-bande .flash span{display:inline-block;will-change:transform}
   #align-bande.on .piste{visibility:hidden} #align-bande.on .flash{display:flex}
@@ -108,8 +110,8 @@
     if (/prépare-toi|ENTRE EN POSITION|zone clé|pas de panique|revient vers l'entrée|NEWS/i.test(t)) return 'alerte';
     return '';
   }
-  function montrer(texte, bulle, fois) {
-    const g = genre(texte), urgent = g && g !== 'proche' ? 1 : 0;
+  function montrer(texte, bulle, fois, couleur) {
+    const g = couleur || genre(texte), urgent = g && g !== 'proche' ? 1 : 0;
     const items = []; for (let i = 0; i < (fois || 1); i++) items.push({ texte, bulle, g });
     if (urgent) { let k = 0; while (k < file.length && file[k].g && file[k].g !== 'proche') k++; file.splice(k, 0, ...items); }
     else file.push(...items);
@@ -311,7 +313,6 @@
   @keyframes coeurMonte{0%{opacity:0;transform:translate(0,0) scale(.5)}15%{opacity:1}
     100%{opacity:0;transform:translate(var(--dx),-340px) scale(1.3) rotate(var(--rot))}}`;
   document.head.appendChild(cssShow);
-  const show = document.createElement('div'); show.id = 'align-show'; document.body.appendChild(show);
   const cadre = document.createElement('div'); cadre.id = 'align-cadre'; document.body.appendChild(cadre);
   const chrono = document.createElement('div'); chrono.id = 'align-chrono'; document.body.appendChild(chrono);
 
@@ -326,15 +327,9 @@
       return out;                                   // [temps, ouverture, haut, bas, clôture, volume]
     } catch (e) { return []; }
   }
-  function pop(emo, texte, sens) {
-    try {
-      const r = zoneGraphique();
-      show.className = sens === -1 ? 'bas' : sens === 1 ? 'haut' : 'neutre';
-      show.innerHTML = '<span class="emo">' + esc(emo) + '</span><span>' + esc(texte) + '</span>';
-      show.style.left = (r.left + r.width / 2 - 35) + 'px'; show.style.top = (r.top + 96) + 'px';
-      void show.offsetWidth; show.classList.add('go');
-      clearTimeout(pop.t); pop.t = setTimeout(() => show.classList.remove('go'), 2900);
-    } catch (e) {}
+  // v5.5 (demande d'Adel) : le spectacle passe DANS la bande, en défilant comme les autres infos (rouge = ça baisse, vert = ça monte)
+  function pop(emo, texte, sens, suite) {
+    montrer(emo + ' ' + texte + (suite ? ' • ' + suite : ''), false, 1, sens === -1 ? 'bas' : sens === 1 ? 'haut' : 'membre');
   }
   function lueur(sens) {
     try {
@@ -365,8 +360,7 @@
   const deja = {};
   function uneFois(cle) { if (deja[cle]) return false; deja[cle] = 1; return true; }
   const PHRASES = {
-    accel: [['💥', 'ÇA ACCÉLÈRE', ' accélère • jusqu\'où ? la suite en temps réel : lien en bio 🎁']],
-    casseBas: [['🚨', 'ÇA CASSE !', ' casse le dernier plus bas 📉 • ça peut couler encore… infos en temps réel : lien en bio 🎁']],
+        casseBas: [['🚨', 'ÇA CASSE !', ' casse le dernier plus bas 📉 • ça peut couler encore… infos en temps réel : lien en bio 🎁']],
     casseHaut: [['🚀', 'ÇA CASSE !', ' casse le dernier plus haut 📈 • ça peut décoller… infos en temps réel : lien en bio 🎁']],
     volume: [['🐋', 'LES BALEINES BOUGENT', ' : gros volume 👀 quelque chose se prépare • lien en bio 🎁']],
     hausse: ['📈 {m} veut remonter… jusqu\'où ? le coach le sait : lien en bio 🎁',
@@ -389,16 +383,15 @@
       const corps = cur[4] - cur[1], sens = corps < 0 ? -1 : 1, id = m + cur[0];
       // 1) bougie qui accélère (corps > 1,6× la taille moyenne) : explosion visuelle + lueur rouge/verte
       if (Math.abs(corps) > 1.6 * moyR && uneFois('acc' + id)) {
-        pop(sens === -1 ? '📉' : '📈', PHRASES.accel[0][1] + (sens === -1 ? ' ⬇️' : ' ⬆️'), sens); lueur(sens);
-        bandeShow((sens === -1 ? '📉 ' : '📈 ') + m + PHRASES.accel[0][2]);
+        pop(sens === -1 ? '📉' : '📈', 'ÇA ACCÉLÈRE ' + (sens === -1 ? '⬇️ ' : '⬆️ ') + m, sens, 'jusqu\'où ? la suite en temps réel : lien en bio 🎁'); lueur(sens);
         return;
       }
       // 2) cassure du dernier plus haut / plus bas (20 bougies) : on le montre sans donner le prix
       const hh = Math.max(...prev.map(x => x[2])), ll = Math.min(...prev.map(x => x[3]));
-      if (cur[4] < ll && uneFois('cb' + id)) { pop('🚨', 'ÇA CASSE ⬇️', -1); lueur(-1); bandeShow('🚨 ' + m + PHRASES.casseBas[0][2]); return; }
-      if (cur[4] > hh && uneFois('ch' + id)) { pop('🚀', 'ÇA CASSE ⬆️', 1); lueur(1); bandeShow('🚀 ' + m + PHRASES.casseHaut[0][2]); return; }
+      if (cur[4] < ll && uneFois('cb' + id)) { pop('🚨', 'ÇA CASSE ⬇️ ' + m, -1, 'dernier plus bas cassé 📉 ça peut couler encore… infos en temps réel : lien en bio 🎁'); lueur(-1); return; }
+      if (cur[4] > hh && uneFois('ch' + id)) { pop('🚀', 'ÇA CASSE ⬆️ ' + m, 1, 'dernier plus haut cassé 📈 ça peut décoller… infos en temps réel : lien en bio 🎁'); lueur(1); return; }
       // 3) gros volume
-      if (moyV > 0 && (cur[5] || 0) > 2.5 * moyV && uneFois('vol' + id)) { pop('🐋', 'GROS VOLUME', 0); coeurs(8, ['🐋', '💰', '👀']); bandeShow('🐋 ' + m + PHRASES.volume[0][2]); return; }
+      if (moyV > 0 && (cur[5] || 0) > 2.5 * moyV && uneFois('vol' + id)) { pop('🐋', 'LES BALEINES BOUGENT sur ' + m, 0, 'gros volume 👀 quelque chose se prépare • lien en bio 🎁'); coeurs(8, ['🐋', '💰', '👀']); return; }
       // 4) toutes les ~7 min : la bande dit où le marché a l'air d'aller (sans prix) et renvoie vers le lien en bio
       if (Date.now() - derniereTend > 7 * 60000) {
         const c10 = B.slice(-10).map(x => x[4]), pente = (c10[9] - c10[0]) / moyR, larg = (Math.max(...B.slice(-10).map(x => x[2])) - Math.min(...B.slice(-10).map(x => x[3]))) / moyR;
@@ -421,7 +414,7 @@
     } else if (chrono.style.display !== 'none') {
       chrono.style.display = 'none';
       const b = barres(2)[0];                              // la bougie qui vient de clôturer
-      if (b && reste > 880) { const v = b[4] >= b[1] ? 1 : -1; pop(v === 1 ? '🟢' : '🔴', 'BOUGIE CLÔTURÉE ' + (v === 1 ? '⬆️' : '⬇️'), v); }
+      if (b && reste > 880) { const v = b[4] >= b[1] ? 1 : -1; if (!occupe && !file.length) pop(v === 1 ? '🟢' : '🔴', 'BOUGIE 15 MIN CLÔTURÉE ' + (v === 1 ? '⬆️' : '⬇️') + ' ' + nomMarche(), v, 'la suite en temps réel : lien en bio 🎁'); }
     }
   } catch (e) {} }, 1000);
   // de temps en temps des cœurs qui montent : « tapote l'écran »
@@ -430,6 +423,6 @@
   window.__ALIGN_BANDE__ = {
     version: VERSION, recu,
     stop() { cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT);
-      [show, cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur').forEach(x => x.remove()); obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
+      [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur').forEach(x => x.remove()); obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
   };
 })();
