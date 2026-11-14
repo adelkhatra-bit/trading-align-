@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      6.0
+// @version      6.1
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,12 +10,13 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '6.0';
+  const VERSION = '6.1';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
     '👉 ABONNE-TOI • PARTAGE • TAPOTE L\'ÉCRAN',
     '🔗 LIEN EN BIO : COACH EN DIRECT',
+    '🔌 BRANCHE-TOI AU MARCHÉ • chaque bougie expliquée en direct • lien en bio 🎁',
     '📲 Le coach ALIGN en direct • lien en bio 🎁 gratuit',
     '⚠️ Le trading comporte un risque de perte • ceci n\'est pas un conseil financier'
   ];
@@ -393,6 +394,17 @@
     baisse: ['📉 {m} sous pression… va-t-il couler ? réponse en temps réel : lien en bio 🎁',
              '🔴 Les vendeurs tiennent {m} 😬 ça peut encore descendre • plus d\'infos : lien en bio 🎁',
              '🌊 {m} glisse… le coach surveille chaque bougie : lien en bio 🎁'],
+    // v6.1 : où est le prix (sans le donner) + le lien en bio = être BRANCHÉ au marché
+    bas_zone: ['📍 {m} est posé sur une zone clé en bas 👀 rebond ou cassure ? 🔌 branche-toi au marché : lien en bio 🎁',
+               '🧲 {m} teste le bas de sa zone… les acheteurs vont-ils tenir ? 📡 en direct : lien en bio 🎁'],
+    haut_zone: ['📍 {m} touche le haut de sa zone 👀 cassure ou rejet ? 🔌 branche-toi au marché : lien en bio 🎁',
+                '🧱 {m} bute sous un plafond… les vendeurs vont-ils frapper ? 📡 en direct : lien en bio 🎁'],
+    milieu: ['🧭 {m} au milieu de sa zone : il cherche sa direction… le coach te dit quand ça part 📡 lien en bio 🎁',
+             '⚖️ {m} en équilibre : acheteurs et vendeurs se regardent… qui va craquer ? 👀 lien en bio 🎁'],
+    branche: ['🔌 Le lien en bio = ton câble branché sur le marché : chaque bougie expliquée en direct 📡',
+              '📡 Comme si tu étais connecté au marché : le coach lit chaque bougie avec toi • lien en bio 🎁',
+              '🧠 Tu vois les bougies, le coach te dit ce qu\'elles préparent • lien en bio 🎁',
+              '⚡ Ressens le marché en direct : pression, pièges, accélérations… tout est dans le lien en bio 🎁'],
     range: ['😴 {m} se compresse… avant l\'explosion ? 💥 tiens-toi prêt • lien en bio 🎁',
             '🧲 {m} hésite… la prochaine clôture peut tout décider ⏱ lien en bio 🎁']
   };
@@ -442,10 +454,17 @@
         return;
       }
       // 4) toutes les ~7 min : la bande dit où le marché a l'air d'aller (sans prix) et renvoie vers le lien en bio
-      if (Date.now() - derniereTend > 7 * 60000) {
+      // v6.1 : marché calme = on parle plus souvent (toutes les ~3 min) : direction, où est le prix, « branche-toi au marché »
+      if (Date.now() - derniereTend > 3 * 60000) {
         const c10 = B.slice(-10).map(x => x[4]), pente = (c10[9] - c10[0]) / moyR, larg = (Math.max(...B.slice(-10).map(x => x[2])) - Math.min(...B.slice(-10).map(x => x[3]))) / moyR;
-        const L = larg < 3.2 ? PHRASES.range : pente > 1.2 ? PHRASES.hausse : pente < -1.2 ? PHRASES.baisse : PHRASES.range;
-        if (bandeShow(L[tendN++ % L.length].replace('{m}', m))) { derniereTend = Date.now(); coeurs(6); }
+        const pos = (cur[4] - ll) / Math.max(hh - ll, 1e-9), tour = tendN % 3;
+        const L = tour === 2 ? PHRASES.branche
+          : tour === 1 ? (pos < 0.2 ? PHRASES.bas_zone : pos > 0.8 ? PHRASES.haut_zone : PHRASES.milieu)
+          : larg < 3.2 ? PHRASES.range : pente > 1.2 ? PHRASES.hausse : pente < -1.2 ? PHRASES.baisse : PHRASES.range;
+        if (bandeShow(L[Math.floor(tendN / 3) % L.length].replace('{m}', m))) {
+          derniereTend = Date.now(); tendN++;
+          coeurs(8, L === PHRASES.branche ? ['🔌', '📡', '⚡', '🧠'] : L === PHRASES.baisse ? ['🔴', '📉', '🌊'] : L === PHRASES.hausse ? ['🟢', '📈', '🚀'] : ['👀', '❤️', '🔥']);
+        }
       }
     } catch (e) {}
   }
