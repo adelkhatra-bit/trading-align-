@@ -7063,7 +7063,8 @@ def envoyer_prospects(etat, texte, signal, clavier=None):
             if "403" in str(ex) and cid in etat.get("prospects", []):
                 etat["prospects"].remove(cid)
 
-RISQUE_LIGNE = "⚠️ Risque de perte · pas un conseil financier | Risk of loss · not financial advice"
+RISQUE_LIGNE = ("⚠️ Info éducative, pas un conseil en investissement · risque de perte · tu restes seul responsable de tes décisions\n"
+                "⚠️ Educational info, not investment advice · risk of loss · you alone are responsible for your decisions")
 # Avertissement complet (menus épinglés, VIP) : informatif et éducatif, pas un conseil en investissement
 RISQUE_COMPLET = ("⚠️ Le trading comporte un risque élevé de perte en capital. Contenu à caractère informatif et éducatif uniquement : "
                   "il ne constitue ni un conseil en investissement ni une recommandation personnalisée. "
@@ -7075,7 +7076,7 @@ _MOTS_TRADING = re.compile(r"\b(SHORT|LONG|ENTRÉE|ENTRY|SL|TP\d?|STOP|POSITION|
 def avec_risque(texte):
     """Règle d'Adel (15/11) : tout message qui parle de trading rappelle le risque, en français ET en anglais."""
     t = str(texte or "")
-    if not t or "Risk of loss" in t or not _MOTS_TRADING.search(t):
+    if not t or "not investment advice" in t or not _MOTS_TRADING.search(t):
         return texte
     return t + "\n" + RISQUE_LIGNE
 

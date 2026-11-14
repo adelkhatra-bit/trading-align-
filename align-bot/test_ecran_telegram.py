@@ -48,8 +48,8 @@ if __name__ == "__main__":
 class RisqueFrEn(unittest.TestCase):
     def test_message_trading_rappelle_le_risque(self):
         t = ab.avec_risque("🔴 SHORT BTC\nSL au-dessus")
-        self.assertIn("Risque de perte", t)
-        self.assertIn("Risk of loss", t)
+        self.assertIn("pas un conseil en investissement", t)
+        self.assertIn("not investment advice", t)
         self.assertEqual(ab.avec_risque(t), t)                 # jamais deux fois
 
     def test_message_neutre_inchange(self):
