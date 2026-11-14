@@ -8398,7 +8398,6 @@ def alerte_extreme_due(cle, d, t):
 
 # ───────── Pips + SL qui apprend tout seul ─────────
 # 1 pip : BTC = 1 $, GOLD = 0,10 $, NASDAQ = 1 point (convention des brokers CFD)
-PIP = {"BTC": 1.0, "GOLD": 0.1, "NASDAQ": 1.0}
 APRES_SL_DUREE = 6 * 3600          # on regarde 6 h après un stop si le marché est allé au TP1 quand même
 
 def pips(m, ecart):
