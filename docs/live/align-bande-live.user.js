@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      5.3
+// @version      5.4
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '5.3';
+  const VERSION = '5.4';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -32,9 +32,15 @@
   #align-bande .piste{position:absolute;white-space:nowrap;will-change:transform}
   #align-bande .piste span{margin-right:70px}
   #align-bande .flash{position:absolute;inset:0;display:none;align-items:center;justify-content:flex-start;
-    padding:0;white-space:nowrap;overflow:hidden;
-    background:linear-gradient(90deg,#ff4fa3,#ffd400);color:#000;font-size:34px}
-  #align-bande .flash.bulle{background:linear-gradient(90deg,#ffc0dc,#fff);color:#000}
+    padding:0;white-space:nowrap;overflow:hidden;font:900 35px/76px system-ui,Segoe UI,Arial,sans-serif;
+    background:linear-gradient(90deg,#ff4fa3,#ffd400);color:#000;text-shadow:none}
+  /* v5.4 : même taille d'écriture que la bande normale, une couleur par type d'info (plus de bande blanche) */
+  #align-bande .flash.bulle{background:linear-gradient(90deg,#ff7ab8,#ffb3d6);color:#000}
+  #align-bande .flash.tp{background:linear-gradient(90deg,#00c853,#ffd400);color:#000}
+  #align-bande .flash.sl{background:linear-gradient(90deg,#ff1744,#ff8a65);color:#fff;text-shadow:0 2px 3px rgba(0,0,0,.45)}
+  #align-bande .flash.membre{background:linear-gradient(90deg,#8a2be2,#ff2d95);color:#fff;text-shadow:0 2px 3px rgba(0,0,0,.45)}
+  #align-bande .flash.proche{background:linear-gradient(90deg,#1e90ff,#00e5ff);color:#000}
+  #align-bande .flash.alerte{background:linear-gradient(90deg,#ff9100,#ffd400);color:#000}
   #align-bande .flash span{display:inline-block;will-change:transform}
   #align-bande.on .piste{visibility:hidden} #align-bande.on .flash{display:flex}
   [class*="common-tooltip__body"]{background:#ffc0dc!important;color:#000!important;max-width:330px!important;
@@ -93,16 +99,31 @@
   const file = []; let occupe = false;
   // v5.1 : chaque info du bot (TP, SL, entrée, zone, pulsion…) passe 2 fois de suite dans la bande puis disparaît
   // (plus rien n'est ajouté pour toujours à la bande qui défile)
-  function montrer(texte, bulle, fois) { for (let i = 0; i < (fois || 1); i++) file.push({ texte, bulle }); suivant(); }
+  // v5.4 : une couleur par type, et les infos importantes (TP, SL, entrée, nouvel abonné, prépare-toi) passent DEVANT la file
+  function genre(t) {
+    if (/TP\d? TOUCH|OBJECTIF FINAL|BRAVO/i.test(t)) return 'tp';
+    if (/stop touch|SL TOUCH/i.test(t)) return 'sl';
+    if (/REJOINT LA TEAM|BIENVENUE|nouvel abonn/i.test(t)) return 'membre';
+    if (/FRÔLÉ|FROLE|DIRECTION TP|approche du TP|vers le TP/i.test(t)) return 'proche';
+    if (/prépare-toi|ENTRE EN POSITION|zone clé|pas de panique|revient vers l'entrée|NEWS/i.test(t)) return 'alerte';
+    return '';
+  }
+  function montrer(texte, bulle, fois) {
+    const g = genre(texte), urgent = g && g !== 'proche' ? 1 : 0;
+    const items = []; for (let i = 0; i < (fois || 1); i++) items.push({ texte, bulle, g });
+    if (urgent) { let k = 0; while (k < file.length && file[k].g && file[k].g !== 'proche') k++; file.splice(k, 0, ...items); }
+    else file.push(...items);
+    suivant();
+  }
   function suivant() {
     if (occupe || !file.length) return;
     occupe = true;
     const m = file.shift();
     flash.innerHTML = '<span>' + esc(m.texte) + '</span>';   // le message défile vite (lisible sur téléphone, même si TikTok coupe les bords)
-    flash.classList.toggle('bulle', !!m.bulle);
+    flash.className = 'flash' + (m.g ? ' ' + m.g : m.bulle ? ' bulle' : '');
     bande.classList.add('on');
     const sp = flash.firstChild, W = bande.clientWidth, w = sp.offsetWidth;
-    const dur = Math.max(5000, (W + w) / 0.28);
+    const dur = Math.max(4000, (W + w) / 0.38);      // v5.4 : plus rapide (info en temps réel), toujours lisible
     sp.animate([{ transform: 'translateX(' + W + 'px)' }, { transform: 'translateX(' + (-w) + 'px)' }], { duration: dur, easing: 'linear' });
     setTimeout(() => { bande.classList.remove('on'); occupe = false; suivant(); }, dur);
   }
