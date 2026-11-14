@@ -420,8 +420,8 @@
       if (dirT && (comp || colle) && uneFois('pr' + m + quart)) {
         arme = { d: dirT, quart, m };
         lueur(dirT); coeurs(8, dirT === -1 ? ['📉', '🌊', '⚡'] : ['📈', '🚀', '⚡']);
-        pop('⚡', 'LA PRESSION MONTE sur ' + m + (dirT === -1 ? ' ⬇️' : ' ⬆️'), dirT,
-            'ça peut accélérer dans ⏱ ' + minRest + ' min (clôture 15 min) • la team : abonne-toi, partage • lien en bio 🎁');
+        pop('⏳', 'COMPTE À REBOURS sur ' + m + ' : ' + (dirT === -1 ? 'GROSSE DISTRIBUTION ⬇️' : 'ÇA VA PÉTER EN L\'AIR ⬆️'), dirT,
+            'dans ' + minRest + ' min max 💥 la team : abonne-toi, partage • lien en bio 🎁');
         return;
       }
       // 6) manipulation : grosse mèche CONTRE la tendance (les gros piègent) → la vraie direction peut arriver
@@ -430,7 +430,7 @@
         arme = { d: dirT, quart, m };
         lueur(dirT);
         pop('🌀', 'MANIPULATION sur ' + m, dirT, (dirT === -1 ? 'les gros piègent les acheteurs… la belle distribution 📉' : 'les gros piègent les vendeurs… le rechargement 📈')
-            + ' peut arriver dans ⏱ ' + minRest + ' min • abonne-toi, partage • lien en bio 🎁');
+            + ' dans ' + minRest + ' min max ⏳ • abonne-toi, partage • lien en bio 🎁');
         return;
       }
       // 4) toutes les ~7 min : la bande dit où le marché a l'air d'aller (sans prix) et renvoie vers le lien en bio
@@ -451,7 +451,7 @@
     if ((reste <= 45 || enAttente) && !retour) {
       chrono.style.display = 'flex'; chrono.classList.toggle('urgent', reste <= (enAttente ? 30 : 10));
       chrono.innerHTML = Math.floor(reste / 60) + ':' + String(reste % 60).padStart(2, '0') + '<small>'
-        + (enAttente ? (arme.d === -1 ? '📉 ÇA PEUT COULER<br>' : '📈 ÇA PEUT DÉCOLLER<br>') + 'abonne-toi • partage 🎁' : '⏱ CLÔTURE 15 MIN<br>ça va se décider 👀') + '</small>';
+        + (enAttente ? (arme.d === -1 ? '💥 GROSSE DISTRIBUTION ⬇️<br>' : '🚀 ÇA VA PÉTER EN L\'AIR ⬆️<br>') + (reste <= 20 ? 'C\'EST MAINTENANT !' : 'abonne-toi • partage 🎁') : '⏱ CLÔTURE 15 MIN<br>ça va se décider 👀') + '</small>';
       // v5.7 (demande d'Adel) : en bas à droite, côté prix, juste au-dessus du tableau de bord (TikTok coupe le haut gauche)
       chrono.style.left = (r.left + r.width - 70 - chrono.offsetWidth - 14) + 'px';
       chrono.style.top = (r.top + (r.height || 700) - 150 - chrono.offsetHeight) + 'px';
