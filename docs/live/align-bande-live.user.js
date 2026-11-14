@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      5.0
+// @version      5.1
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '5.0';
+  const VERSION = '5.1';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🔴 LIVE ALIGN • BTC • GOLD • NASDAQ',
@@ -91,7 +91,9 @@
 
   // ───── messages (dans la bande, plus de fenêtre au centre) ─────
   const file = []; let occupe = false;
-  function montrer(texte, bulle) { file.push({ texte, bulle }); suivant(); }
+  // v5.1 : chaque info du bot (TP, SL, entrée, zone, pulsion…) passe 2 fois de suite dans la bande puis disparaît
+  // (plus rien n'est ajouté pour toujours à la bande qui défile)
+  function montrer(texte, bulle, fois) { for (let i = 0; i < (fois || 1); i++) file.push({ texte, bulle }); suivant(); }
   function suivant() {
     if (occupe || !file.length) return;
     occupe = true;
@@ -199,8 +201,7 @@
     const bulle = txt.startsWith('BULLE:');
     if (bulle) txt = txt.slice(6).trim();
     if (/TP\d? TOUCH|OBJECTIF FINAL|TP2 TOUCH/i.test(txt)) feuArtifice(/TP2|FINAL/i.test(txt) ? '🏆 TP2 TOUCHÉ !' : '🎯 TP TOUCHÉ !');
-    montrer(txt, bulle);
-    if (!bulle) { extra.push(txt); remplir(); }
+    montrer(txt, bulle, 2);
   }
 
   // ───── écoute du canal ntfy (reconnexion automatique) ─────

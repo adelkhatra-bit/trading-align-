@@ -2816,13 +2816,13 @@ CLAVIER = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "�
                                    [{"text": "📊 Faire une analyse"}, {"text": "📡 Mes marchés"}],
                                    [{"text": "🤖 Mon bot"}, {"text": "📈 Mes résultats"}],
                                    [{"text": "📸 Partager mon gain"}, {"text": "🧩 Indicateur TradingView"}],
-                                   [{"text": "🔴 Live TikTok"}, {"text": "🌐 English"}]],
+                                   [{"text": "🔴 Live"}, {"text": "🌐 English"}]],
                       "resize_keyboard": True, "is_persistent": True, "input_field_placeholder": "Choisis une action ALIGN"})
 CLAVIER_VISITEUR = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}, {"text": "💠 Analyse Nasdaq"}],
                                             [{"text": "📊 Faire une analyse"}, {"text": "📡 Mes marchés"}],
                                             [{"text": "🤖 Mon bot"}, {"text": "💎 Devenir VIP"}],
                                             [{"text": "📸 Partager mon gain"}],
-                                            [{"text": "🔴 Live TikTok"}, {"text": "🌐 English"}]],
+                                            [{"text": "🔴 Live"}, {"text": "🌐 English"}]],
                                "resize_keyboard": True, "is_persistent": True, "input_field_placeholder": "Choisis une action ALIGN"})
 AVERTISSEMENT = ("ℹ️ Ce sont MES positions personnelles, partagées à titre informatif et éducatif. "
                  "Ce n'est pas un conseil en investissement ni une recommandation personnalisée. "
@@ -4643,10 +4643,46 @@ def photo_canal(cid):
 
 def boutons_chaine_marche(etat):
     """Boutons sous chaque message des chaînes : le coach perso dans le bot, et le live s'il tourne."""
-    l = [[{"text": "🧑‍🏫 Mon coach perso (gratuit)", "url": BOT_LIEN}]]
-    if live_actif(etat):
-        l.append([{"text": "🔴 Regarder le live", "url": LIVE_LIEN}])
+    l = [[{"text": "🧑‍🏫 Mon coach perso (gratuit)", "url": BOT_LIEN}],
+         [{"text": "🔴 Live en cours : regarder" if live_actif(etat) else "📺 Le live ALIGN", "url": LIVE_LIEN}]]
     return json.dumps({"inline_keyboard": l})
+
+
+def menu_chaine(etat, m):
+    """Message épinglé en haut de chaque chaîne : à quoi sert la chaîne + les boutons (coach, live, autres marchés)."""
+    autres = [mk for mk in MARCHES if mk != m and LIENS_CHAINES.get(mk)]
+    texte = "\n".join([f"📌 ALIGN {ICONE.get(m, '')} {m}", "━━━━━━━━━━━━━━━", "🎙 Ici : le marché commenté en direct",
+                        "🎯 TP / SL du bot annoncés", "🧑‍🏫 Ton coach perso + niveaux : bouton 👇", "🔴 Le live : bouton 👇",
+                        "⚠️ Pas un conseil financier"])
+    kb = [[{"text": "🧑‍🏫 Mon coach perso (gratuit)", "url": BOT_LIEN}], [{"text": "📺 Le live ALIGN", "url": LIVE_LIEN}]]
+    if autres:
+        kb.append([{"text": f"{ICONE.get(mk, '')} ALIGN {mk}", "url": LIENS_CHAINES[mk]} for mk in autres])
+    return texte, json.dumps({"inline_keyboard": kb})
+
+
+MENU_CHAINE_VERSION = 1
+
+def epingler_menus_chaines(etat):
+    """Une fois par version : le menu de chaque chaîne est publié puis épinglé (échec = nouvel essai dans 1 h)."""
+    if not TOKEN:
+        return
+    for m, canal in (etat.get("canaux_marche") or {}).items():
+        info = etat.setdefault("canal_live", {}).setdefault(m, {})
+        if info.get("menu_v") == MENU_CHAINE_VERSION or time.time() - float(info.get("menu_essai", 0)) < 3600:
+            continue
+        info["menu_essai"] = time.time()
+        texte, kb = menu_chaine(etat, m)
+        res = _envoi_sur(canal, text=texte, reply_markup=kb)
+        try:
+            mid = res["result"]["message_id"]
+        except Exception as ex:
+            print("menu chaîne", m, ex)
+            continue
+        info["menu_v"] = MENU_CHAINE_VERSION       # publié : jamais republié (pas de doublon), même si l'épinglage échoue
+        try:
+            telegram("pinChatMessage", chat_id=canal, message_id=mid, disable_notification="true")
+        except Exception as ex:
+            print("épingler menu chaîne", m, ex)
 
 
 _CACHE_CHAINE = {}
@@ -4684,7 +4720,9 @@ def doublon_chaine(etat, cid, texte):
 
 def accueil_questionnaire(etat, cid):
     """Accueil : le niveau de l'utilisateur, puis le marché qu'il veut suivre (sa chaîne)."""
-    _envoi_sur(cid, text="👋 BIENVENUE DANS ALIGN\n━━━━━━━━━━━━━━━\n❓ Question 1/2\n🎓 Ton niveau en trading ?",
+    _envoi_sur(cid, text="👋 BIENVENUE DANS ALIGN\n━━━━━━━━━━━━━━━\n🎙 Une chaîne par marché : BTC • Gold • NASDAQ\n"
+                         "🧑‍🏫 Ici : ton coach perso (entrées, ta position)\n🔴 Et le live du graphique\n━━━━━━━━━━━━━━━\n"
+                         "❓ Question 1/2\n🎓 Ton niveau en trading ?",
                reply_markup=json.dumps({"inline_keyboard": [
                    [{"text": "🌱 Débutant", "callback_data": "niveau:1"}],
                    [{"text": "📈 Intermédiaire", "callback_data": "niveau:2"}],
@@ -4704,6 +4742,8 @@ def accueil_liens(etat, cid, choix):
     selectionner_marches_suivi(etat, cid, marches)
     liens = {**LIENS_CHAINES, **(etat.get("liens_marche") or {})}
     boutons = [[{"text": f"{ICONE.get(mk, '')} Rejoindre ALIGN {mk}", "url": liens[mk]}] for mk in marches if liens.get(mk)]
+    boutons += [[{"text": f"🧑‍🏫 Coach {mk} : préviens-moi", "callback_data": f"auto:{mk}"}] for mk in marches]
+    boutons.append([{"text": "🔴 Le live", "callback_data": "menulive:x"}])
     _envoi_sur(cid, text="✅ C'EST PARTI\n━━━━━━━━━━━━━━━\n" + "\n".join(f"{ICONE.get(mk, '')} {mk} : suivi activé" for mk in marches)
                + ("\n👇 Rejoins ta chaîne commentateur" if boutons else "") + "\n🔔 Active la cloche de la chaîne : tu ne rates rien"
                + "\n━━━━━━━━━━━━━━━\n🎙 Chaîne = commentateur en direct\n🧑‍🏫 Ici = ton coach perso, positions, live",
@@ -4753,6 +4793,14 @@ def notifier_canal_marche(etat, m, r, cle):
     if flash and time.time() - float(info.get("flash_t", 0)) >= 300:
         if _envoi_sur(canal, text=flash, reply_markup=boutons_chaine_marche(etat)) is not None:
             info["flash_t"] = time.time()
+            live_bande(etat, texte_bande_flash(flash), f"pulse{m}", 600, toujours=True)
+
+
+def texte_bande_flash(flash):
+    """Bande du live : on dit juste qu'il se passe quelque chose (jamais le marché, le sens ni le niveau) → lien en bio."""
+    if "MÈCHE" in flash:
+        return "BULLE:🎣 Grosse mèche en cours 👀 • les infos en temps réel : lien en bio 🎁 gratuit"
+    return "BULLE:⚡ Le marché a une pulsion 🔥 • tu veux les infos en temps réel ? Lien en bio 🎁 gratuit"
 
 
 def canal_resultats(etat, m, textes):
@@ -5123,14 +5171,14 @@ COMMANDES = {"/faire_analyse": "📊 Faire une analyse", "/analyse_btc": "🟠 A
 
 def installer_menu(etat):
     """Bouton « Menu » à gauche du champ + description du bot (une seule fois par version)."""
-    if etat.get("menu") == 8:
+    if etat.get("menu") == 9:
         return
     fr = [("faire_analyse", "📊 Faire une analyse"), ("mon_bot", "🤖 Mon bot ON / OFF"),
           ("resultats", "📈 Mes résultats"), ("gain", "📸 Partager mon gain"), ("vip", "💎 Devenir VIP"),
-          ("boutons", "⌨️ Faire revenir les boutons"), ("english", "🌐 English")]
+          ("live", "🔴 Le live"), ("boutons", "⌨️ Faire revenir les boutons"), ("english", "🌐 English")]
     en = [("faire_analyse", "📊 Run an analysis"), ("mon_bot", "🤖 My bot ON / OFF"),
           ("resultats", "📈 My results"), ("gain", "📸 Share my profit"), ("vip", "💎 Become VIP"),
-          ("boutons", "⌨️ Bring back the buttons"), ("francais", "🌐 Français")]
+          ("live", "🔴 The live"), ("boutons", "⌨️ Bring back the buttons"), ("francais", "🌐 Français")]
     try:
         telegram("setMyCommands", commands=json.dumps([{"command": c, "description": d} for c, d in fr]))
         telegram("setMyCommands", commands=json.dumps([{"command": c, "description": d} for c, d in en]), language_code="en")
@@ -5149,7 +5197,7 @@ def installer_menu(etat):
                                                   "🤖 Les abonnés au suivi sont enregistrés automatiquement à l'ouverture du signal.\n"
                                                   "📍 Suivi personnel : SL, BE, TP et sortie manuelle depuis Telegram.\n\n"
                                                   "ℹ️ Mes positions perso, pas un conseil. Le trading comporte un risque de perte."))
-        etat["menu"] = 8
+        etat["menu"] = 9
     except Exception as ex:
         print("menu", ex)
 
@@ -5761,7 +5809,7 @@ def traiter(etat, chats, updates):
         if tx in INVERSE:
             msg["text"] = tx = INVERSE[tx]
         bas = tx.lower()
-        if "live tiktok" in bas or cmd == "/live":
+        if "live tiktok" in bas or bas.strip() == "🔴 live" or cmd == "/live":
             menu_live(etat, cid)
             continue
         if recevoir_gain(etat, cid, msg):
@@ -8829,12 +8877,10 @@ def live_annonces(etat, m, textes):
             live_bande(etat, f"😤 {ic} {m} : stop touché • on coupe petit, on va se refaire 💪", f"sl{m}", 600, toujours=True)
         elif "TP1 TOUCHÉ" in t:
             if live_bande(etat, f"🎯 TP1 TOUCHÉ sur {ic} {m} ! ✅", f"tp1{m}", 600, toujours=True):
-                live_publier(f"BULLE:🎯 {ic} {m} TP1 touché • bougie qui CLÔTURE AU-DELÀ du TP1 = ça continue vers le TP2 🚀 • "
-                             "bougie qui REVIENT = le SL passe à BE, on protège 🛡")
                 live_publier("BULLE:🎁 Tu veux recevoir les prochaines infos ? Abonne-toi • lien en bio 🎁 gratuit")
         elif "POINT D'ENTRÉE À VENIR" in t:
             # Règle live : aucune info (ni sens, ni niveau, ni marché) ; jamais le mot « Telegram » à l'écran (TikTok réduit la portée des lives qui renvoient ailleurs) → « lien en bio »
-            live_bande(etat, "BULLE:👉 Le coach en direct t'explique tout : lien en bio 🎁 gratuit", f"zone{m}", 900)
+            live_bande(etat, "BULLE:🎯 Le prix arrive dans une zone clé 👀 • les infos en temps réel : lien en bio 🎁 gratuit", f"zone{m}", 900, toujours=True)
         elif "RETOURNEMENT EN PRÉPARATION" in t:
             live_bande(etat, f"BULLE:↩ {ic} {m} : regarde la ligne RETOURNEMENT • le marché peut se retourner", f"ret{m}", 900)
         elif "MANIPULATION" in t or "MÈCHE SUSPECTE" in t:
@@ -8904,9 +8950,12 @@ def live_annoncer_debut(etat, chats):
 
 def live_callback(etat, chats, cb, choix, mk, qui):
     """Boutons du live. Renvoie True si le bouton appartenait au live."""
-    if choix not in ("liveon", "liveoff", "liveboost", "livemain"):
+    if choix not in ("liveon", "liveoff", "liveboost", "livemain", "menulive"):
         return False
     anglais = qui in LANG_EN
+    if choix == "menulive":          # bouton « 🔴 Le live » de l'accueil
+        menu_live(etat, qui)
+        return True
     if choix in ("liveon", "liveoff"):
         if qui not in {str(x) for x in proprio(etat)}:
             return True
@@ -9365,6 +9414,7 @@ def un_tour(etat, chats):
             envoyer_prospects(etat, texte, bool(re.search(r"(?<!\w)\d{1,3}(?: \d{3})*\.\d+", texte)) and (est_entree(texte) or "JE PRÉPARE" in texte), clavier)
         try:
             preparer_chaines(etat)
+            epingler_menus_chaines(etat)
         except Exception as ex:
             print("préparer chaînes", ex)
         for nom_marche in MARCHES:
