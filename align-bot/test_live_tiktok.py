@@ -225,6 +225,15 @@ class TestPrepareToiLive(unittest.TestCase):
         self.assertNotIn("65", pub[0]); self.assertNotIn("Telegram", pub[0])
 
 
+
+class TestBandeRassure(unittest.TestCase):
+    def test_contre_le_bot_rassure_sans_niveau(self):
+        t = ab.texte_bande_flash("🎙 ÇA BOUGE !\n🟠 BTC : 65000\n⚠️ Contre le bot", -1, "BTC")
+        for x in ("pas de panique", "clôture dans", "reprendre la descente", "lien en bio"):
+            self.assertIn(x, t)
+        self.assertNotIn("65000", t); self.assertNotIn("Telegram", t)
+
+
 if __name__ == "__main__":
     unittest.main()
 
