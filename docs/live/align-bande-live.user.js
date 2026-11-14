@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      6.5
+// @version      6.6
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '6.5';
+  const VERSION = '6.6';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -411,7 +411,8 @@
   #align-chrono{position:fixed;z-index:10001;pointer-events:none;display:none;flex-direction:column;align-items:center;
     padding:8px 18px;border-radius:16px;background:rgba(0,0,0,.72);border:3px solid #ffd400;color:#ffd400;
     font:900 46px/1 system-ui,Segoe UI,Arial,sans-serif;text-align:center}
-  #align-chrono small{font:800 17px/1.3 system-ui,Segoe UI,Arial,sans-serif;color:#fff}
+  #align-chrono small{font:800 17px/1.3 system-ui,Segoe UI,Arial,sans-serif;color:#fff;animation:chronoClignote .8s steps(2,start) infinite}
+  @keyframes chronoClignote{to{visibility:hidden}}
   #align-chrono.urgent{border-color:#ff2d95;color:#ff2d95;animation:showBat .4s ease-in-out infinite alternate}
   .align-coeur{position:fixed;z-index:9997;pointer-events:none;font-size:38px;animation:coeurMonte 3.2s ease-out forwards}
   @keyframes coeurMonte{0%{opacity:0;transform:translate(0,0) scale(.5)}15%{opacity:1}
@@ -612,8 +613,13 @@
     // v5.8 (demande d'Adel) : le chrono n'est pas là tout le temps : il surgit dans la DERNIÈRE MINUTE puis disparaît à la clôture
     if ((reste <= 45 || (enAttente && reste <= 60)) && !retour) {
       chrono.style.display = 'flex'; chrono.classList.toggle('urgent', reste <= (enAttente ? 30 : 10));
-      chrono.innerHTML = Math.floor(reste / 60) + ':' + String(reste % 60).padStart(2, '0') + '<small>'
-        + (enAttente ? (arme.d === -1 ? '🔴 GROSSE DISTRIBUTION<br>' : '🟢 ÇA VA PÉTER EN L\'AIR<br>') + (reste <= 20 ? 'C\'EST MAINTENANT !' : 'abonne-toi • partage 🎁') : '⏱ CLÔTURE 15 MIN<br>ça va se décider 👀') + '</small>';
+      // v6.6 : le texte clignote jusqu'à l'explosion et alterne français / anglais toutes les 3 s
+      const fr = Math.floor(reste / 3) % 2 === 0;
+      const lbl = enAttente
+        ? (arme.d === -1 ? (fr ? '🔴 GROSSE DISTRIBUTION<br>' : '🔴 BIG SELL-OFF<br>') : (fr ? '🟢 ÇA VA PÉTER EN L\'AIR<br>' : '🟢 ABOUT TO BLAST OFF<br>'))
+          + (reste <= 20 ? (fr ? 'C\'EST MAINTENANT !' : 'IT\'S NOW!') : (fr ? 'abonne-toi • partage 🎁' : 'follow • share 🎁'))
+        : (fr ? '⏱ CLÔTURE 15 MIN<br>ça va se décider 👀' : '⏱ 15 MIN CLOSE<br>it\'s about to decide 👀');
+      chrono.innerHTML = Math.floor(reste / 60) + ':' + String(reste % 60).padStart(2, '0') + '<small>' + lbl + '</small>';
       // v5.7 (demande d'Adel) : en bas à droite, côté prix, juste au-dessus du tableau de bord (TikTok coupe le haut gauche)
       chrono.style.left = (r.left + r.width - 70 - chrono.offsetWidth - 14) + 'px';
       // v5.7 : marché qui baisse → en haut à droite juste sous la bande (les bougies descendent, on ne les cache pas) ;
