@@ -139,5 +139,10 @@ class TpFrole(unittest.TestCase):
         self.assertEqual(len(env), 1)
 
 
+    def test_ia_jamais_automatique(self):
+        with mock.patch.object(ab, "ia", side_effect=AssertionError("IA appelée")):
+            self.assertEqual(ab.commentaires_ia_temps_reel({}, "BTC", {}, {}, ["🛑 STOP TOUCHÉ — 🟠 BTC"]), [])
+
+
 if __name__ == "__main__":
     unittest.main()

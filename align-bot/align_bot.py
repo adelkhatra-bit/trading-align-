@@ -1881,6 +1881,7 @@ TRAD = {
 "🛑 Ton stop": "🛑 Your SL", "bloqué : prix": "blocked: price",
 # Agent / signaux
 "🔔 JE PRÉPARE UNE POSITION —": "🔔 PREPARING A POSITION —",
+"· 🚦 attends mon feu vert 🟢": "· 🚦 wait for my green light 🟢",
 "⬆️ Le prix remonte vers la zone : c'est normal → 🔴 SHORT seulement au rejet dans la zone": "⬆️ Price is climbing back to the zone: that's normal → 🔴 SHORT only on a rejection in the zone",
 "⬇️ Le prix redescend vers la zone : c'est normal → 🟢 LONG seulement au rebond dans la zone": "⬇️ Price is dropping back to the zone: that's normal → 🟢 LONG only on a bounce in the zone",
 "⏳ Je n'entre pas encore : j'attends que le prix vienne dans la zone 🟨": "⏳ Not entering yet: waiting for price to reach the zone 🟨",
@@ -3278,8 +3279,13 @@ def sens_ia_contradictoire(texte, sens):
     bull = bool(_IA_HAUSSIER.search(t) or re.search(r"\bLONG\b", t))
     return (bear and not bull) if sens == 1 else (bull and not bear)
 
+IA_AUTO = os.environ.get("IA_AUTO", "0") == "1"   # règle d'Adel : l'IA ne part JAMAIS toute seule, seulement sur bouton « 🧠 En savoir plus »
+
 def commentaires_ia_temps_reel(etat, m, r, cle, nouveaux):
-    """La vraie IA revient aux moments clés : préparation de l'entrée, TP touché, turbulence / news (1 fois par moment)."""
+    """La vraie IA revient aux moments clés : préparation de l'entrée, TP touché, turbulence / news (1 fois par moment).
+    Coupé par défaut (IA_AUTO=0) : 1 événement = 1 seul message ; l'avis IA reste derrière le bouton « 🧠 En savoir plus »."""
+    if not IA_AUTO:
+        return []
     out = []
     vus = etat.setdefault("ia_moments", {})
     for t in nouveaux or []:
@@ -8636,11 +8642,8 @@ def agent(m, r, cle, ferme):
                 out.append((f"{SENS_TETE[d]} · 🔔 JE PRÉPARE UNE POSITION — {ICONE.get(m, '')} {m}\n{SENS[d]}   {'monte' if d == 1 else 'descend'} sur 15m, 1h et 4h ✅✅✅\n{qualite(o)}"
                            f"⏳ Je n'entre pas encore : j'attends que le prix vienne dans la zone 🟨\n"
                            f"{ligne_vers_zone(d)}\n"
-                           f"👀 Mets-toi en vue {o.get('sl_ut', '5 min')}\n"
-                           f"🕯 Repère {'le dernier creux (mèche du bas)' if d == 1 else 'le dernier sommet (mèche du haut)'}\n"
-                           f"🟨 L'entrée sera à peu près {'au-dessus de ce creux' if d == 1 else 'sous ce sommet'}\n"
-                           f"🚦 Attends mon feu vert 🟢\n"
-                           f"🅰️ Entrée sur le repli dans la zone 🟨\n{ligne_cassure(r, d)}\n\n"
+                           f"👀 Mets-toi en vue {o.get('sl_ut', '5 min')} · 🚦 attends mon feu vert 🟢\n"
+                           f"{ligne_cassure(r, d)}\n\n"
                            f"{fmt_trade(m, o, p)}\n\n"
                            f"📐 Zone = {o['src']}{ferme}", bouton_auto(m)))
         if (bloque and not cle.get("ordre")) or o["rr"] < GAIN_MIN:
@@ -9485,7 +9488,7 @@ def un_tour(etat, chats):
         if TOKEN and cle.get("trade") and not cle["trade"].get("auto_fait"):
             cle["trade"]["auto_fait"] = True
             trx = cle["trade"]
-            t_ = ia(etat, "Le bot vient d'entrer en position selon le plan de l'indicateur. Analyse ce plan (stratégie, SL, TP1, TP2) : dis si tu le valides en bougies ou si tu le déconseilles (« je déconseille » + raison), sans jamais proposer d'autres niveaux, et rappelle de mettre le SL tout de suite. " + IA_TON_JEUNE,
+            t_ = None if not IA_AUTO else ia(etat, "Le bot vient d'entrer en position selon le plan de l'indicateur. Analyse ce plan (stratégie, SL, TP1, TP2) : dis si tu le valides en bougies ou si tu le déconseilles (« je déconseille » + raison), sans jamais proposer d'autres niveaux, et rappelle de mettre le SL tout de suite. " + IA_TON_JEUNE,
                     dict(donnees_ia(nom_marche, r, cle), position={"sens": "LONG" if trx["d"] == 1 else "SHORT", "entrée": round(trx["e"], 2),
                                                                     "SL": round(trx["sl"], 2), "TP1": round(trx["tp1"], 2), "type": trx.get("src")}), premium=True)
             if t_:
@@ -9516,11 +9519,12 @@ def un_tour(etat, chats):
                 publier_resultat(etat, nom_marche, trf, sortie, motif, gain)
                 pr = trf.get("profil") or {}
                 n_, w_ = stats_profil(pr, ("m", "type", "d")) if pr else (0, 0)
-                envois.append(f"🧠 {ICONE.get(nom_marche, '')} {nom_marche} : je note ce {'TP ✅' if gain > 0 else 'SL ❌'}\n"
+                if IA_AUTO:
+                  envois.append(f"🧠 {ICONE.get(nom_marche, '')} {nom_marche} : je note ce {'TP ✅' if gain > 0 else 'SL ❌'}\n"
                               f"📚 {pr.get('type', 'position')} {'LONG' if pr.get('d') == 1 else 'SHORT'} en session {pr.get('session', '?')}\n"
                               f"🧠 Bilan de ce type : {w_}/{n_} gagnés\n"
                               + ("💡 Leçon : je serai plus prudent sur ce type de position" if gain <= 0 else "💪 Je garde ce type de position"))
-                t_ = ia(etat, "La position est terminée. Tire UNE leçon simple et utile pour la prochaine fois (pourquoi TP ou pourquoi SL). FORMAT : 4 lignes courtes maximum, une info par ligne, chaque ligne commence par un emoji, 12 mots maximum par ligne, aucun paragraphe ni conclusion.",
+                t_ = None if not IA_AUTO else ia(etat, "La position est terminée. Tire UNE leçon simple et utile pour la prochaine fois (pourquoi TP ou pourquoi SL). FORMAT : 4 lignes courtes maximum, une info par ligne, chaque ligne commence par un emoji, 12 mots maximum par ligne, aucun paragraphe ni conclusion.",
                         {"marché": nom_marche, "résultat %": round(gain, 2), "motif": motif, "profil": pr, "bilan de ce type": f"{w_}/{n_}"})
                 if t_:
                     envois.append(taguer(f"🧠 La leçon de l'IA ALIGN\n{compacter_ia(t_)}", nom_marche))
