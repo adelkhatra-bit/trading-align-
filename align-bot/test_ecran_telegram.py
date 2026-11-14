@@ -32,5 +32,14 @@ class EcranVersTelegram(unittest.TestCase):
         self.assertIn("Dernier plus haut", etat["ecran_detail"]["BTC"])
 
 
+class RebondSurLigne(unittest.TestCase):
+    def test_rebond_tp_rassure(self):
+        r = {"m1": [{"c": 95.5}], "b15": [{"t": i, "o": 100, "h": 101, "l": 99, "c": 100} for i in range(10)]}
+        t = ab.texte_ecran("BTC", "rebond", 1, 0, r, {}, "TP1")
+        self.assertIn("REBOND sur le TP1", t)
+        self.assertIn("Pas de panique", t)
+        self.assertIsNone(ab.texte_ecran("BTC", "rebond", 1, 0, r, {}, "XYZ"))
+
+
 if __name__ == "__main__":
     unittest.main()
