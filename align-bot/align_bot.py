@@ -5948,6 +5948,12 @@ def traiter(etat, chats, updates):
                     etat.setdefault("prospects", []).append(cid); refuser(etat, cid)
                 inscrire_auto(etat, cid, charge[5:].upper())
                 continue
+            if charge.startswith("ecran_") and charge[6:].upper() in MARCHES:
+                # « 🧠 En savoir plus » d'un événement vu sur l'écran du live : le détail complet, en privé
+                det = (etat.get("ecran_detail") or {}).get(charge[6:].upper())
+                _envoi_sur(cid, text=det or "🎬 Pas d'événement récent sur ce marché\n🔔 Je te préviens dès que l'écran s'agite",
+                           reply_markup=boutons_menu_rapide(etat))
+                continue
             if "/" + charge in COMMANDES:
                 cmd = "/" + charge
         if cmd in COMMANDES:
@@ -9153,6 +9159,115 @@ def live_bande(etat, texte, cle=None, pause=60, toujours=False):
         _LIVE_DERNIER[cle] = time.time()
     return live_publier(texte)
 
+# ───── Écran du live → Telegram (demande d'Adel, 14/11) ─────
+# La bande du live (onglet TradingView) voit un événement sur les bougies (pression, manipulation, cassure, accélération,
+# baleines) et l'anime à l'écran ; elle l'envoie aussi ici (canal ntfy « …-ecran »). Le bot le publie EN DÉTAIL
+# dans la chaîne du marché : quoi, pourquoi, quand (clôture 15 min), où regarder. Le plan précis reste dans le bot.
+_ECRAN_T = [0.0]
+ECRAN_TITRES = {
+    "pression": ("🔴 GROSSE DISTRIBUTION EN VUE", "🟢 ÇA VA PÉTER EN L'AIR"),
+    "manip": ("🔴 MANIPULATION : les gros piègent les acheteurs", "🟢 MANIPULATION : les gros piègent les vendeurs"),
+    "casse": ("🔴 ÇA CASSE : dernier plus bas cassé", "🟢 ÇA CASSE : dernier plus haut cassé"),
+    "acc": ("🔴 ÇA ACCÉLÈRE vers le bas", "🟢 ÇA ACCÉLÈRE vers le haut"),
+    "volume": ("🐋 GROS VOLUME : les baleines bougent", "🐋 GROS VOLUME : les baleines bougent"),
+    "annonce": ("✅ ANNONCÉ : ça a coulé 🔴", "✅ ANNONCÉ : ça a décollé 🟢"),
+}
+ECRAN_POURQUOI = {
+    "pression": "🕯 Pourquoi : les bougies se compressent et le prix colle à son dernier extrême → la pression monte",
+    "manip": "🕯 Pourquoi : grosse mèche CONTRE la tendance → un piège avant la vraie direction",
+    "casse": "🕯 Pourquoi : la bougie passe au-delà du dernier extrême des 20 dernières bougies",
+    "acc": "🕯 Pourquoi : une bougie bien plus grosse que la moyenne, dans un seul sens",
+    "volume": "🕯 Pourquoi : volume 2,5× plus fort que la moyenne → quelque chose se prépare",
+    "annonce": "🕯 La clôture 15 min a confirmé ce que l'écran annonçait",
+}
+
+def ecran_lire():
+    """Événements envoyés par la bande du live (au plus toutes les 20 s, échec = ignoré)."""
+    if not LIVE_SUJET or time.time() - _ECRAN_T[0] < 20:
+        return []
+    _ECRAN_T[0] = time.time()
+    etat = _ETAT_COURANT.get("etat") or {}
+    depuis = etat.get("ecran_id") or "10m"
+    try:
+        url = "https://ntfy.sh/" + urllib.parse.quote(LIVE_SUJET + "-ecran") + "/json?poll=1&since=" + urllib.parse.quote(str(depuis))
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "align-bot"}), timeout=8) as rep:
+            lignes = rep.read().decode("utf-8", "ignore").splitlines()
+    except Exception as ex:
+        print("écran lire", ex)
+        return []
+    out = []
+    for l in lignes:
+        try:
+            j = json.loads(l)
+        except Exception:
+            continue
+        if j.get("event") == "message":
+            etat["ecran_id"] = j.get("id") or etat.get("ecran_id")
+            out.append(str(j.get("message") or ""))
+    return out
+
+def texte_ecran(m, typ, d, minutes, r, cle):
+    """Message DÉTAILLÉ pour la chaîne du marché, à partir d'un événement vu à l'écran du live."""
+    titre = ECRAN_TITRES.get(typ)
+    if not titre:
+        return None
+    lignes = [f"🎬 EN DIRECT DU LIVE — {ICONE.get(m, '')} {m}", titre[0] if d == -1 else titre[1]]
+    if typ != "annonce":
+        lignes.append(f"⏳ Verdict à la clôture 15 min : dans {max(1, int(minutes or 1))} min")
+    lignes.append(ECRAN_POURQUOI[typ])
+    try:
+        p = r["m1"][-1]["c"]
+        b = (r.get("b15") or [])[-9:-1]
+        lignes.append(f"📍 Prix : {px(p)}")
+        if b:
+            lo, hi = min(x["l"] for x in b), max(x["h"] for x in b)
+            if d == -1:
+                lignes += [f"🔴 Dernier plus bas 15 min : {px(lo)} → clôture dessous = ça peut couler encore",
+                           f"🟢 Au-dessus de {px(hi)} : le scénario baissier tombe"]
+            else:
+                lignes += [f"🟢 Dernier plus haut 15 min : {px(hi)} → clôture au-dessus = ça peut monter encore",
+                           f"🔴 Sous {px(lo)} : le scénario haussier tombe"]
+    except Exception:
+        pass
+    tr = (cle or {}).get("trade")
+    if tr and tr.get("d") in (1, -1):
+        lignes.append(f"📌 Position ALIGN en cours : {'🟢 LONG' if tr['d'] == 1 else '🔴 SHORT'}"
+                      + (" ✅ dans le même sens" if tr["d"] == d else " ⚠️ mouvement contre la position : le SL protège"))
+    else:
+        lignes.append("🙅 Ce n'est pas une entrée : on attend la confirmation du bot")
+    lignes.append("🔔 Entrée, SL et TP précis : dans le bot, au bon moment")
+    return "\n".join(lignes)
+
+def ecran_vers_telegram(etat):
+    """Lit les événements de l'écran du live et les publie en détail dans la chaîne du marché (sans son)."""
+    for brut in ecran_lire():
+        p = brut.split("|")        # EVT|BTC|pression|-1|7
+        if len(p) < 4 or p[0] != "EVT" or p[1] not in MARCHES:
+            continue
+        m, typ = p[1], p[2]
+        try:
+            d = -1 if int(p[3]) < 0 else 1
+            minutes = int(p[4]) if len(p) > 4 and p[4] else 0
+        except ValueError:
+            continue
+        r = DERNIERS.get(m)
+        canal = (etat.get("canaux_marche") or {}).get(m)
+        if not r or not canal:
+            continue
+        cle_vu = f"ecran{m}{typ}{d}"
+        if time.time() - _LIVE_DERNIER.get(cle_vu, 0) < 300:      # au plus 1 fois / 5 min par type : pas de rafale
+            continue
+        _LIVE_DERNIER[cle_vu] = time.time()
+        txt = texte_ecran(m, typ, d, minutes, r, etat.get(m) or {})
+        if not txt:
+            continue
+        # Chaîne : l'info en 4 lignes + bouton « 🧠 En savoir plus » qui ouvre le détail complet (pourquoi, où regarder) dans le bot
+        etat.setdefault("ecran_detail", {})[m] = txt
+        court = "\n".join(txt.split("\n")[:3] + ["🧠 Pourquoi, où regarder : bouton En savoir plus 👇"])
+        kb = json.loads(boutons_chaine_marche(etat) or '{"inline_keyboard": []}')
+        kb.setdefault("inline_keyboard", []).insert(0, [{"text": "🧠 En savoir plus", "url": BOT_LIEN + "?start=ecran_" + m.lower()}])
+        _envoi_sur(canal, text=court, reply_markup=json.dumps(kb), disable_notification="true")
+
 def live_annonces(etat, m, textes):
     """Ce que le bot envoie sur Telegram → la bande (sans aucun niveau)."""
     ic = ICONE.get(m, "")
@@ -9695,6 +9810,11 @@ def un_tour(etat, chats):
                 demandes_servies.add((index, nom_marche))
         print(texte_etat(nom_marche, r, vip=False), "\n")      # journal du run PUBLIC (dépôt public) : jamais les niveaux VIP
 
+    try:
+        if TOKEN:
+            ecran_vers_telegram(etat)          # ce que l'écran du live a vu → détaillé dans la chaîne du marché
+    except Exception as ex:
+        print("écran → telegram", type(ex).__name__, ex)
     try:
         if TOKEN:
             alertes_courtes(etat, chats, derniers)
