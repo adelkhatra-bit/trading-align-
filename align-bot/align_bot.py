@@ -4785,15 +4785,15 @@ def notifier_canal_marche(etat, m, r, cle):
     info = etat.setdefault("canal_live", {}).setdefault(m, {})
     b = bars[-1]
     if int(info.get("dernier_t", 0)) < int(b["t"]):
-        res = _envoi_sur(canal, text=texte_coach_live(m, b, r, cle, None, public=True), reply_markup=boutons_chaine_marche(etat))
-        if res is not None and not (isinstance(res, dict) and res.get("ok") is False):
-            info["dernier_t"] = int(b["t"])
+        # Marqué AVANT l'envoi : une coupure réseau après livraison ne doit jamais donner 4 bilans identiques (vu le 14/11 à 20:24)
+        info["dernier_t"] = int(b["t"])
+        _envoi_sur(canal, text=texte_coach_live(m, b, r, cle, None, public=True), reply_markup=boutons_chaine_marche(etat))
         return
     flash = flash_commentateur(m, r, cle)
     if flash and time.time() - float(info.get("flash_t", 0)) >= 300:
-        if _envoi_sur(canal, text=flash, reply_markup=boutons_chaine_marche(etat)) is not None:
-            info["flash_t"] = time.time()
-            live_bande(etat, texte_bande_flash(flash), f"pulse{m}", 600, toujours=True)
+        info["flash_t"] = time.time()
+        _envoi_sur(canal, text=flash, reply_markup=boutons_chaine_marche(etat))
+        live_bande(etat, texte_bande_flash(flash), f"pulse{m}", 600, toujours=True)
 
 
 def texte_bande_flash(flash):
@@ -4851,9 +4851,8 @@ def notifier_coach_live(etat, m, r, cle):
                 if _envoi_sur(cid, text=flash) is not None:
                     info["flash_t"] = time.time()
             continue
-        res = _envoi_sur(cid, text=texte_coach_live(m, b, r, cle, positions_bot(etat)), reply_markup=markup_analyse(etat, m, r, cid))
-        if res is not None and not (isinstance(res, dict) and res.get("ok") is False):
-            info["dernier_t"] = int(b["t"])
+        info["dernier_t"] = int(b["t"])          # marqué avant l'envoi : jamais de doublon
+        _envoi_sur(cid, text=texte_coach_live(m, b, r, cle, positions_bot(etat)), reply_markup=markup_analyse(etat, m, r, cid))
 
 
 def activer_coach_live(etat, cid, m, actif=True):
