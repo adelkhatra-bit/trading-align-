@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      5.8
+// @version      5.9
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '5.8';
+  const VERSION = '5.9';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -375,6 +375,12 @@
     if (occupe || file.length || Date.now() - dernierShow < 60000) return false;
     dernierShow = Date.now(); montrer(txt, false, 1); return true;
   }
+  // v5.9 : chaque événement vu à l'écran part aussi au bot → message détaillé dans la chaîne Telegram du marché
+  function codeMarche() { const s = String((chart() && chart().symbol()) || ''); return /BTC/i.test(s) ? 'BTC' : /XAU|GOLD/i.test(s) ? 'GOLD' : /NAS|NQ|US100/i.test(s) ? 'NASDAQ' : ''; }
+  function versBot(typ, d, minutes) {
+    const mk = codeMarche(); if (!mk) return;
+    try { fetch('https://ntfy.sh/' + SUJET + '-ecran', { method: 'POST', body: ['EVT', mk, typ, d, minutes || ''].join('|') }); } catch (e) {}
+  }
   const deja = {};
   function uneFois(cle) { if (deja[cle]) return false; deja[cle] = 1; return true; }
   const PHRASES = {
@@ -401,15 +407,15 @@
       const corps = cur[4] - cur[1], sens = corps < 0 ? -1 : 1, id = m + cur[0];
       // 1) bougie qui accélère (corps > 1,6× la taille moyenne) : explosion visuelle + lueur rouge/verte
       if (Math.abs(corps) > 1.6 * moyR && uneFois('acc' + id)) {
-        pop(sens === -1 ? '📉' : '📈', 'ÇA ACCÉLÈRE ' + (sens === -1 ? '⬇️ ' : '⬆️ ') + m, sens, 'jusqu\'où ? la suite en temps réel : lien en bio 🎁'); lueur(sens);
+        pop(sens === -1 ? '📉' : '📈', 'ÇA ACCÉLÈRE ' + (sens === -1 ? '🔴 ' : '🟢 ') + m, sens, 'jusqu\'où ? la suite en temps réel : lien en bio 🎁'); lueur(sens); versBot('acc', sens);
         return;
       }
       // 2) cassure du dernier plus haut / plus bas (20 bougies) : on le montre sans donner le prix
       const hh = Math.max(...prev.map(x => x[2])), ll = Math.min(...prev.map(x => x[3]));
-      if (cur[4] < ll && uneFois('cb' + id)) { pop('🚨', 'ÇA CASSE ⬇️ ' + m, -1, 'dernier plus bas cassé 📉 ça peut couler encore… infos en temps réel : lien en bio 🎁'); lueur(-1); return; }
-      if (cur[4] > hh && uneFois('ch' + id)) { pop('🚀', 'ÇA CASSE ⬆️ ' + m, 1, 'dernier plus haut cassé 📈 ça peut décoller… infos en temps réel : lien en bio 🎁'); lueur(1); return; }
+      if (cur[4] < ll && uneFois('cb' + id)) { pop('🚨', 'ÇA CASSE 🔴 ' + m, -1, 'dernier plus bas cassé 📉 ça peut couler encore… infos en temps réel : lien en bio 🎁'); lueur(-1); versBot('casse', -1); return; }
+      if (cur[4] > hh && uneFois('ch' + id)) { pop('🚀', 'ÇA CASSE 🟢 ' + m, 1, 'dernier plus haut cassé 📈 ça peut décoller… infos en temps réel : lien en bio 🎁'); lueur(1); versBot('casse', 1); return; }
       // 3) gros volume
-      if (moyV > 0 && (cur[5] || 0) > 2.5 * moyV && uneFois('vol' + id)) { pop('🐋', 'LES BALEINES BOUGENT sur ' + m, 0, 'gros volume 👀 quelque chose se prépare • lien en bio 🎁'); coeurs(8, ['🐋', '💰', '👀']); return; }
+      if (moyV > 0 && (cur[5] || 0) > 2.5 * moyV && uneFois('vol' + id)) { pop('🐋', 'LES BALEINES BOUGENT sur ' + m, 0, 'gros volume 👀 quelque chose se prépare • lien en bio 🎁'); coeurs(8, ['🐋', '💰', '👀']); versBot('volume', sens); return; }
       // 5) v5.6 ANTICIPATION (demande d'Adel) : dire AVANT que ça accélère, avec le chrono jusqu'à la clôture 15 min
       //    pression = tendance nette + bougies qui se compressent ou prix collé au dernier plus bas/haut (la mèche va transpercer)
       const c10b = B.slice(-10).map(x => x[4]), pente10 = (c10b[9] - c10b[0]) / moyR;
@@ -420,8 +426,9 @@
       if (dirT && (comp || colle) && uneFois('pr' + m + quart)) {
         arme = { d: dirT, quart, m };
         lueur(dirT); coeurs(8, dirT === -1 ? ['📉', '🌊', '⚡'] : ['📈', '🚀', '⚡']);
-        pop('⏳', 'COMPTE À REBOURS sur ' + m + ' : ' + (dirT === -1 ? 'GROSSE DISTRIBUTION ⬇️' : 'ÇA VA PÉTER EN L\'AIR ⬆️'), dirT,
+        pop('⏳', 'COMPTE À REBOURS sur ' + m + ' : ' + (dirT === -1 ? '🔴 GROSSE DISTRIBUTION' : '🟢 ÇA VA PÉTER EN L\'AIR'), dirT,
             'dans ' + minRest + ' min max 💥 la team : abonne-toi, partage • lien en bio 🎁');
+        versBot('pression', dirT, minRest);
         return;
       }
       // 6) manipulation : grosse mèche CONTRE la tendance (les gros piègent) → la vraie direction peut arriver
@@ -431,6 +438,7 @@
         lueur(dirT);
         pop('🌀', 'MANIPULATION sur ' + m, dirT, (dirT === -1 ? 'les gros piègent les acheteurs… la belle distribution 📉' : 'les gros piègent les vendeurs… le rechargement 📈')
             + ' dans ' + minRest + ' min max ⏳ • abonne-toi, partage • lien en bio 🎁');
+        versBot('manip', dirT, minRest);
         return;
       }
       // 4) toutes les ~7 min : la bande dit où le marché a l'air d'aller (sans prix) et renvoie vers le lien en bio
@@ -452,7 +460,7 @@
     if ((reste <= 45 || (enAttente && reste <= 60)) && !retour) {
       chrono.style.display = 'flex'; chrono.classList.toggle('urgent', reste <= (enAttente ? 30 : 10));
       chrono.innerHTML = Math.floor(reste / 60) + ':' + String(reste % 60).padStart(2, '0') + '<small>'
-        + (enAttente ? (arme.d === -1 ? '💥 GROSSE DISTRIBUTION ⬇️<br>' : '🚀 ÇA VA PÉTER EN L\'AIR ⬆️<br>') + (reste <= 20 ? 'C\'EST MAINTENANT !' : 'abonne-toi • partage 🎁') : '⏱ CLÔTURE 15 MIN<br>ça va se décider 👀') + '</small>';
+        + (enAttente ? (arme.d === -1 ? '🔴 GROSSE DISTRIBUTION<br>' : '🟢 ÇA VA PÉTER EN L\'AIR<br>') + (reste <= 20 ? 'C\'EST MAINTENANT !' : 'abonne-toi • partage 🎁') : '⏱ CLÔTURE 15 MIN<br>ça va se décider 👀') + '</small>';
       // v5.7 (demande d'Adel) : en bas à droite, côté prix, juste au-dessus du tableau de bord (TikTok coupe le haut gauche)
       chrono.style.left = (r.left + r.width - 70 - chrono.offsetWidth - 14) + 'px';
       // v5.7 : marché qui baisse → en haut à droite juste sous la bande (les bougies descendent, on ne les cache pas) ;
@@ -465,7 +473,7 @@
       if (b && reste > 880 && arme && arme.quart === Math.floor((s - 60) / 900)) {
         const a = arme; arme = null; const mv = (b[4] - b[1]) * a.d;
         if (mv > 0) { feuArtifice(a.d === -1 ? '📉 ANNONCÉ !' : '📈 ANNONCÉ !'); coeurs(14);
-          pop('✅', 'ANNONCÉ ! ' + a.m + (a.d === -1 ? ' a coulé 📉' : ' a décollé 📈'), a.d, 'la team ALIGN l\'a vu venir • abonne-toi, partage • lien en bio 🎁'); return; }
+          versBot('annonce', a.d); pop('✅', 'ANNONCÉ ! ' + a.m + (a.d === -1 ? ' a coulé 📉' : ' a décollé 📈'), a.d, 'la team ALIGN l\'a vu venir • abonne-toi, partage • lien en bio 🎁'); return; }
       }
       if (b && reste > 880) { const v = b[4] >= b[1] ? 1 : -1; if (!occupe && !file.length) pop(v === 1 ? '🟢' : '🔴', 'BOUGIE 15 MIN CLÔTURÉE ' + (v === 1 ? '⬆️' : '⬇️') + ' ' + nomMarche(), v, 'la suite en temps réel : lien en bio 🎁'); }
     }
