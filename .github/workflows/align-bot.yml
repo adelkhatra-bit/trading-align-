@@ -132,37 +132,64 @@ jobs:
           retention-days: 1
 
       - name: Vérifier la connexion à Telegram sans envoyer de message
+        # Un simple délai réseau (read timeout sur getMe, vu aux runs 732-736) ne doit JAMAIS tuer le worker :
+        # 3 essais espacés de 15 s (timeout 60 s) ; si Telegram ne répond toujours pas → avertissement seulement,
+        # le bot a ses propres reprises réseau. Seul un secret absent ou un refus explicite de l'API reste bloquant.
         working-directory: align-bot
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         run: |
           python3 - <<'PY'
-          import json, os, urllib.request
+          import json, os, time, urllib.error, urllib.request
           token = os.environ.get("TELEGRAM_TOKEN", "").strip()
           if not token:
               raise SystemExit("ÉCHEC: secret TELEGRAM_TOKEN absent")
-          url = "https://api.telegram.org/bot" + token + "/getMe"
-          req = urllib.request.Request(url)
-          with urllib.request.urlopen(req, timeout=20) as response:
-              payload = json.loads(response.read().decode())
+          API = "https://api.telegram.org/bot" + token + "/"
+          ESSAIS, PAUSE, DELAI = 3, 15, 60
+
+          def appel(methode):
+              """Réponse JSON de l'API, ou None si le réseau ne répond pas (délai, coupure, 5xx) après 3 essais."""
+              derniere = ""
+              for n in range(1, ESSAIS + 1):
+                  try:
+                      with urllib.request.urlopen(urllib.request.Request(API + methode), timeout=DELAI) as r:
+                          return json.loads(r.read().decode())
+                  except urllib.error.HTTPError as ex:
+                      if ex.code in (401, 403, 404):
+                          raise SystemExit(f"ÉCHEC: Telegram refuse le jeton (HTTP {ex.code}) sur {methode}")
+                      derniere = f"HTTP {ex.code}"
+                  except Exception as ex:                      # TimeoutError, URLError, coupure : transitoire
+                      derniere = type(ex).__name__
+                  print(f"TELEGRAM_RETRY {methode} essai {n}/{ESSAIS} : {derniere}")
+                  if n < ESSAIS:
+                      time.sleep(PAUSE)
+              return None
+
+          def avertir(texte):
+              print("::warning title=Telegram injoignable depuis le runner::" + texte)
+              print("TELEGRAM_API_UNREACHABLE le worker démarre quand même (reprises réseau du bot)")
+              raise SystemExit(0)
+
+          payload = appel("getMe")
+          if payload is None:
+              avertir("getMe sans réponse après 3 essais (60 s chacun) : le bot démarre et réessaiera lui-même.")
           if not payload.get("ok"):
               raise SystemExit("ÉCHEC: API Telegram indisponible")
-          info_url = "https://api.telegram.org/bot" + token + "/getWebhookInfo"
-          with urllib.request.urlopen(urllib.request.Request(info_url), timeout=20) as response:
-              info = json.loads(response.read().decode())
+          info = appel("getWebhookInfo")
+          if info is None:
+              avertir("getWebhookInfo sans réponse : webhook non vérifié, le bot démarre quand même.")
           if not info.get("ok"):
               raise SystemExit("ÉCHEC: impossible de vérifier le mode de réception Telegram")
           webhook = (info.get("result") or {}).get("url", "").strip()
           if webhook:
-              delete_url = "https://api.telegram.org/bot" + token + "/deleteWebhook?drop_pending_updates=false"
-              with urllib.request.urlopen(urllib.request.Request(delete_url), timeout=20) as response:
-                  deleted = json.loads(response.read().decode())
+              deleted = appel("deleteWebhook?drop_pending_updates=false")
+              if deleted is None:
+                  avertir("deleteWebhook sans réponse : un webhook est actif, le polling peut être bloqué tant qu'il n'est pas retiré.")
               if not deleted.get("ok"):
                   raise SystemExit("ÉCHEC: webhook Telegram actif et suppression impossible; le polling ne peut pas démarrer.")
               print("TELEGRAM_WEBHOOK_REMOVED pending_updates_preserved=true")
-              with urllib.request.urlopen(urllib.request.Request(info_url), timeout=20) as response:
-                  verified = json.loads(response.read().decode())
-              if not verified.get("ok") or (verified.get("result") or {}).get("url", "").strip():
+              verified = appel("getWebhookInfo")
+              if verified is not None and (not verified.get("ok") or (verified.get("result") or {}).get("url", "").strip()):
                   raise SystemExit("ÉCHEC: le webhook Telegram est toujours actif après suppression.")
           print("TELEGRAM_API_OK bot=@" + payload["result"].get("username", "unknown"))
           print("TELEGRAM_RECEIVE_MODE=polling webhook=none")
