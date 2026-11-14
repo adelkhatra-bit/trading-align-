@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      5.9
+// @version      6.0
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '5.9';
+  const VERSION = '6.0';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -424,7 +424,7 @@
       const colle = dirT === -1 ? (cur[4] - ll) < 0.6 * moyR : dirT === 1 ? (hh - cur[4]) < 0.6 * moyR : false;
       const quart = Math.floor(Date.now() / 900000), minRest = Math.max(1, Math.ceil((900 - Math.floor(Date.now() / 1000) % 900) / 60));
       if (dirT && (comp || colle) && uneFois('pr' + m + quart)) {
-        arme = { d: dirT, quart, m };
+        arme = { d: dirT, quart, m, p: cur[4], r: moyR };
         lueur(dirT); coeurs(8, dirT === -1 ? ['📉', '🌊', '⚡'] : ['📈', '🚀', '⚡']);
         pop('⏳', 'COMPTE À REBOURS sur ' + m + ' : ' + (dirT === -1 ? '🔴 GROSSE DISTRIBUTION' : '🟢 ÇA VA PÉTER EN L\'AIR'), dirT,
             'dans ' + minRest + ' min max 💥 la team : abonne-toi, partage • lien en bio 🎁');
@@ -434,7 +434,7 @@
       // 6) manipulation : grosse mèche CONTRE la tendance (les gros piègent) → la vraie direction peut arriver
       const meche = dirT === -1 ? cur[2] - Math.max(cur[1], cur[4]) : dirT === 1 ? Math.min(cur[1], cur[4]) - cur[3] : 0;
       if (dirT && meche > 1.1 * moyR && uneFois('mn' + id)) {
-        arme = { d: dirT, quart, m };
+        arme = { d: dirT, quart, m, p: cur[4], r: moyR };
         lueur(dirT);
         pop('🌀', 'MANIPULATION sur ' + m, dirT, (dirT === -1 ? 'les gros piègent les acheteurs… la belle distribution 📉' : 'les gros piègent les vendeurs… le rechargement 📈')
             + ' dans ' + minRest + ' min max ⏳ • abonne-toi, partage • lien en bio 🎁');
@@ -471,8 +471,14 @@
       chrono.style.display = 'none';
       const b = barres(2)[0];                              // la bougie qui vient de clôturer
       if (b && reste > 880 && arme && arme.quart === Math.floor((s - 60) / 900)) {
-        const a = arme; arme = null; const mv = (b[4] - b[1]) * a.d;
-        if (mv > 0) { feuArtifice(a.d === -1 ? '📉 ANNONCÉ !' : '📈 ANNONCÉ !'); coeurs(14);
+        // v6.0 : « ANNONCÉ » seulement si le prix a VRAIMENT bougé dans le sens annoncé depuis l'annonce (au moins ½ bougie moyenne) ;
+        // sinon pas de honte : on rassure (« le marché respire, il est comme vous ») et on n'en reparle plus
+        const a = arme; arme = null; const pNow = (barres(1)[0] || b)[4]; const mv = (pNow - a.p) * a.d;
+        if (mv < 0.5 * (a.r || 1)) {
+          montrer('😮‍💨 ' + a.m + ' : pas de panique • le marché respire, il est comme vous 😅 • patience, la suite en temps réel : lien en bio 🎁', true, 1, 'proche');
+          return;
+        }
+        { feuArtifice(a.d === -1 ? '📉 ANNONCÉ !' : '📈 ANNONCÉ !'); coeurs(14);
           versBot('annonce', a.d); pop('✅', 'ANNONCÉ ! ' + a.m + (a.d === -1 ? ' a coulé 📉' : ' a décollé 📈'), a.d, 'la team ALIGN l\'a vu venir • abonne-toi, partage • lien en bio 🎁'); return; }
       }
       if (b && reste > 880) { const v = b[4] >= b[1] ? 1 : -1; if (!occupe && !file.length) pop(v === 1 ? '🟢' : '🔴', 'BOUGIE 15 MIN CLÔTURÉE ' + (v === 1 ? '⬆️' : '⬇️') + ' ' + nomMarche(), v, 'la suite en temps réel : lien en bio 🎁'); }
