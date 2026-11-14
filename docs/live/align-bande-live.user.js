@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      6.2
+// @version      6.3
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '6.2';
+  const VERSION = '6.3';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -112,8 +112,15 @@
     if (/prépare-toi|ENTRE EN POSITION|zone clé|pas de panique|revient vers l'entrée|NEWS/i.test(t)) return 'alerte';
     return '';
   }
+  // v6.3 (règle d'Adel) : AUCUN chiffre de prix sur la bande — on intrigue, le détail est dans le lien en bio
+  // v6.3 : ni prix, ni ENTRÉE / SL / TP / stop sur la bande (risque TikTok + on garde le détail pour le lien en bio)
+  function sansPrix(t) { return String(t)
+    .replace(/ENTRE EN POSITION/gi, 'PASSE À L\'ACTION').replace(/SL (à|a) l['’]entrée/gi, 'risque zéro').replace(/l['’]entrée/gi, 'la zone').replace(/\bTP\s?\d?\b/g, 'objectif').replace(/\bSL\b|\bstop\b/gi, 'protection')
+    .replace(/\bENTRÉE\b|\bentrée\b/g, 'zone').replace(/\(ligne (bleue|rouge|jaune)\)/gi, '').replace(/\d{1,3}(?:[\s\u202f\u00a0]\d{3})+(?:[.,]\d+)?|\d{3,}(?:[.,]\d+)?/g, '').replace(/\(\s*\)|:\s*(?=•)/g, '').replace(/\s{2,}/g, ' ').trim(); }
   function montrer(texte, bulle, fois, couleur) {
-    const g = couleur || genre(texte), urgent = g && g !== 'proche' ? 1 : 0;
+    const g = couleur || genre(texte);
+    texte = sansPrix(texte);
+    const urgent = g && g !== 'proche' ? 1 : 0;
     const items = []; for (let i = 0; i < (fois || 1); i++) items.push({ texte, bulle, g });
     if (urgent) { let k = 0; while (k < file.length && file[k].g && file[k].g !== 'proche') k++; file.splice(k, 0, ...items); }
     else file.push(...items);
@@ -274,7 +281,7 @@
     }
     const bulle = txt.startsWith('BULLE:');
     if (bulle) txt = txt.slice(6).trim();
-    if (/TP\d? TOUCH|OBJECTIF FINAL|TP2 TOUCH/i.test(txt)) { feuArtifice(/TP2|FINAL/i.test(txt) ? '💰 ÇA ENCAISSE ! TP2' : '💰 ÇA ENCAISSE ! TP'); pluieBillets(45); }
+    if (/TP\d? TOUCH|OBJECTIF FINAL|TP2 TOUCH/i.test(txt)) { feuArtifice(/TP2|FINAL/i.test(txt) ? '🏆 ÇA ENCAISSE !' : '💰 ÇA ENCAISSE !'); pluieBillets(45); }
     montrer(txt, bulle, 2);
   }
 
@@ -292,6 +299,12 @@
   // v6.2 (demande d'Adel) : plus de petite fenêtre au survol : l'explication de la ligne (ENTRÉE, SL, TP, ZONE…)
   // passe dans la BANDE qui défile, 2 fois, avec la couleur de la ligne (TP vert/or, SL rouge, entrée orange)
   const vuTT = {};
+  function teaserLigne(t) {
+    const c = couleurLigne(t);
+    return c === 'tp' ? '👀 Zone clé : le marché pourrait y souffler… ce qu\'il prépare : 🔌 lien en bio 🎁'
+      : c === 'sl' ? '👀 Zone clé : le marché teste la patience de tout le monde… 🔌 lien en bio 🎁'
+      : '👀 Zone clé du marché • ce qu\'elle annonce : 🔌 lien en bio 🎁';
+  }
   function couleurLigne(t) { const h = String(t).slice(0, 28); return /\bSL\b|STOP/.test(h) ? 'sl' : /TP/.test(h) ? 'tp' : /ENTR/.test(h) ? 'alerte' : 'membre'; }   // la couleur suit le DÉBUT du texte (le nom de la ligne)
   function texteLigne(t) { return String(t || '').replace(/[━─]+/g, ' ').replace(/\s*\n+\s*/g, ' • ').replace(/(\s•\s)+/g, ' • ').replace(/^\s*•\s*|\s*•\s*$/g, '').trim(); }
   const obs = new MutationObserver(() => {
@@ -300,7 +313,7 @@
       if (!/[━]|ENTRÉE|SL|TP|ZONE|RETOURNEMENT|CONFIRMATION/.test(txt)) return;
       t.style.visibility = 'hidden';                 // la fenêtre ne s'affiche plus : tout passe dans la bande
       const ligne = texteLigne(txt), now = Date.now();
-      if (ligne && now - (vuTT[ligne] || 0) > 45000) { vuTT[ligne] = now; montrer('📌 ' + ligne, false, 2, couleurLigne(ligne)); }
+      if (ligne && now - (vuTT[ligne] || 0) > 45000) { vuTT[ligne] = now; montrer(teaserLigne(ligne), false, 2, couleurLigne(ligne)); }
     });
   });
   obs.observe(document.body, { childList: true, subtree: true });
@@ -379,9 +392,9 @@
   }
   // v5.9 : chaque événement vu à l'écran part aussi au bot → message détaillé dans la chaîne Telegram du marché
   function codeMarche() { const s = String((chart() && chart().symbol()) || ''); return /BTC/i.test(s) ? 'BTC' : /XAU|GOLD/i.test(s) ? 'GOLD' : /NAS|NQ|US100/i.test(s) ? 'NASDAQ' : ''; }
-  function versBot(typ, d, minutes) {
+  function versBot(typ, d, minutes, ligne) {
     const mk = codeMarche(); if (!mk) return;
-    try { fetch('https://ntfy.sh/' + SUJET + '-ecran', { method: 'POST', body: ['EVT', mk, typ, d, minutes || ''].join('|') }); } catch (e) {}
+    try { fetch('https://ntfy.sh/' + SUJET + '-ecran', { method: 'POST', body: ['EVT', mk, typ, d, minutes || '', ligne || ''].join('|') }); } catch (e) {}
   }
   // v6.2 : les lignes ALIGN du graphique (ENTRÉE, SL, TP1, TP2) lues directement dans l'indicateur
   function lignesAlign() {
@@ -445,9 +458,9 @@
       for (const n of ['TP2', 'TP1', 'SL', 'ENTRÉE']) {
         const l = LG[n]; if (!l) continue;
         if (Math.abs(cur[4] - l.y) < 0.3 * moyR && uneFois('ligne' + m + n + Math.round(l.y) + q15)) {
-          const tete = { TP2: '💰 Le prix arrive sur le TP2 (ligne bleue)', TP1: '💰 Le prix arrive sur le TP1 (ligne bleue)',
-                         SL: '🛑 Le prix approche du SL (ligne rouge)', 'ENTRÉE': '🟨 Le prix arrive sur la ligne ENTRÉE (jaune)' }[n];
-          montrer(tete + ' • ' + texteLigne(l.tt) + ' • en direct : lien en bio 🎁', false, 2, couleurLigne(n));
+          const tete = '👀 ' + m + ' arrive sur une zone clé';
+          montrer(tete + ' • le marché prépare quelque chose 👀 pourquoi ? 🔌 lien en bio 🎁', false, 2, couleurLigne(n));
+          versBot('ligne', cur[4] > l.y ? 1 : -1, '', n);
           if (n.startsWith('TP')) coeurs(10, ['💰', '💵', '🎯']);
           return;
         }
@@ -534,6 +547,16 @@
         }
         { feuArtifice(a.d === -1 ? '📉 ANNONCÉ !' : '📈 ANNONCÉ !'); coeurs(14);
           versBot('annonce', a.d); pop('✅', 'ANNONCÉ ! ' + a.m + (a.d === -1 ? ' a coulé 📉' : ' a décollé 📈'), a.d, 'la team ALIGN l\'a vu venir • abonne-toi, partage • lien en bio 🎁'); return; }
+      }
+      if (b && reste > 880) {
+        const LG = lignesAlign(), rg = Math.max(b[2] - b[3], 1e-9);
+        for (const n of ['TP2', 'TP1', 'SL', 'ENTRÉE']) {
+          const l = LG[n]; if (!l || !(b[3] <= l.y && l.y <= b[2]) || Math.abs(b[4] - l.y) < 0.25 * rg) continue;
+          const dr = b[4] > l.y ? 1 : -1;            // touchée puis clôture loin de la ligne = rebond / rejet
+          pop('↩️', 'REBOND sur une ligne clé ' + nomMarche(), dr, 'le marché prépare quelque chose 👀 pas de panique • pourquoi ? 🔌 lien en bio 🎁');
+          versBot('rebond', dr, '', n); coeurs(8, ['👀', '↩️', '⚡']);
+          return;
+        }
       }
       if (b && reste > 880) { const v = b[4] >= b[1] ? 1 : -1; if (!occupe && !file.length) pop(v === 1 ? '🟢' : '🔴', 'BOUGIE 15 MIN CLÔTURÉE ' + (v === 1 ? '⬆️' : '⬇️') + ' ' + nomMarche(), v, 'la suite en temps réel : lien en bio 🎁'); }
     }
