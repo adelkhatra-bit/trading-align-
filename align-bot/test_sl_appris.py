@@ -56,3 +56,28 @@ class SlAppris(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ClotureUnique(unittest.TestCase):
+    def test_cle_et_doublon(self):
+        etat, tr = {}, {"d": -1, "e": 27736.85, "cree": 1000}
+        self.assertFalse(ab.deja_cloture(etat, "NASDAQ", tr))
+        ab.noter_cloture(etat, "NASDAQ", tr)
+        self.assertTrue(ab.deja_cloture(etat, "NASDAQ", dict(tr)))
+        self.assertFalse(ab.deja_cloture(etat, "BTC", tr))
+
+    def test_journal(self):
+        etat = {}
+        ab.journal_trade(etat, "GOLD", {"d": -1, "e": 3891.0}, 3880.0, "TP", 0.28)
+        ab.journal_trade(etat, "BTC", {"d": -1, "e": 65303.25}, 65625.61, "STOP", -0.49)
+        g = ab.texte_journal(etat, True)
+        self.assertIn("110 pips", g)
+        self.assertIn("1 gagnées / 1 perdues", g)
+        p = ab.texte_journal(etat, False)
+        self.assertIn("-322 pips", p)
+        import json
+        kb = json.loads(ab.boutons_menu_rapide({}))["inline_keyboard"]
+        urls = [b["url"] for l in kb for b in l]
+        self.assertIn(ab.BOT_LIEN + "?start=gagnantes", urls)
+        self.assertIn(ab.LIVE_LIEN, urls)
+        self.assertIn("/gagnantes", ab.COMMANDES)
