@@ -58,14 +58,14 @@ class LiveTikTok(unittest.TestCase):
     def test_annonces_sans_aucun_niveau(self):
         self.etat["live_on"] = True
         ab.live_annonces(self.etat, "BTC", ["🟢🟢🟢 J'ENTRE MAINTENANT — BTC\n📌 Entrée 68459,14\n🛑 SL 69105", "🎯 TP1 TOUCHÉ — BTC 67167"])
-        self.assertEqual(len(self.publie), 3)          # entrée + TP1 + « abonne-toi, lien en bio » (plus de stratégie sur le live)
-        self.assertTrue(self.publie[2].startswith("BULLE:"))
+        self.assertEqual(len(self.publie), 2)          # entrée + TP1 (chacun finit par « lien en bio »)
+        self.assertTrue(all("lien en bio" in t for t in self.publie))
         for t in self.publie:
             self.assertIsNone(re.search(r"\d{3,}", t), t)
             self.assertNotIn("SHORT", t)
             self.assertNotIn("LONG", t)
         ab.live_annonces(self.etat, "BTC", ["🟢🟢🟢 J'ENTRE MAINTENANT — BTC"])
-        self.assertEqual(len(self.publie), 3)          # pas de doublon
+        self.assertEqual(len(self.publie), 2)          # pas de doublon
 
     def test_bulle_zone(self):
         self.etat["live_on"] = True
@@ -205,3 +205,25 @@ class BandePulsion(unittest.TestCase):
         self.assertIn(ab.LIVE_LIEN, urls)
         self.assertIn(ab.LIENS_CHAINES["GOLD"], urls)
         self.assertNotIn(ab.LIENS_CHAINES["BTC"], urls)
+
+
+class BandeNews(unittest.TestCase):
+    def test_etapes(self):
+        vus = {}
+        for reste, attendu in ((15 * 60, "n15"), (10 * 60, "n10"), (5 * 60, "n5"), (-5 * 60, "nreac"), (-20 * 60, "nfin"), (40 * 60, None)):
+            e, t = ab.textes_live_news("CPI (inflation)", reste)
+            self.assertEqual(e, attendu)
+            if t:
+                self.assertIn("lien en bio", t)
+                self.assertNotIn("Telegram", t)
+        self.assertIn("SL et ton TP", ab.textes_live_news("CPI", 600)[1])
+
+    def test_une_fois_par_etape(self):
+        envoye = []
+        etat = {}
+        with mock.patch.object(ab, "calendrier", return_value=[{"t": 10_000, "titre": "NFP"}]), \
+             mock.patch.object(ab, "live_publier", side_effect=lambda t: envoye.append(t) or True):
+            ab.live_news(etat, 10_000 - 14 * 60)
+            ab.live_news(etat, 10_000 - 13 * 60)
+            ab.live_news(etat, 10_000 - 9 * 60)
+        self.assertEqual(len(envoye), 2)

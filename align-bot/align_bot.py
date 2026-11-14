@@ -8870,22 +8870,47 @@ def live_annonces(etat, m, textes):
         if "J'ENTRE MAINTENANT" in t:
             live_bande(etat, f"🚀 ALIGN ENTRE EN POSITION sur {ic} {m} ! 👉 Le coach en direct : lien en bio 🎁", f"entre{m}", 600)
         elif "OBJECTIF FINAL ATTEINT" in t or re.search(r"TP[2-9] TOUCHÉ", t):
-            if live_bande(etat, f"🏆 TP TOUCHÉ sur {ic} {m} ! Bravo à ceux qui ont suivi 🔥", f"tp2{m}", 600, toujours=True):
-                live_publier("BULLE:🎁 Tu veux recevoir les prochaines infos ? Abonne-toi • lien en bio 🎁 gratuit")
+            live_bande(etat, f"🏆 TP TOUCHÉ sur {ic} {m} ! Bravo à ceux qui ont suivi 🔥" + FIN_BANDE, f"tp2{m}", 600, toujours=True)
         elif "FRÔLÉ" in t:
-            live_bande(etat, f"BULLE:😅 {ic} {m} : TP frôlé à un cheveu • petit recul, on garde le cap 😎", f"frole{m}", 600)
+            live_bande(etat, f"BULLE:😅 {ic} {m} : TP frôlé à un cheveu • petit recul, on garde le cap 😎" + FIN_BANDE, f"frole{m}", 600, toujours=True)
         elif "STOP TOUCHÉ" in t:
-            live_bande(etat, f"😤 {ic} {m} : stop touché • on coupe petit, on va se refaire 💪", f"sl{m}", 600, toujours=True)
+            live_bande(etat, f"😤 {ic} {m} : stop touché • on coupe petit, on va se refaire 💪" + FIN_BANDE, f"sl{m}", 600, toujours=True)
         elif "TP1 TOUCHÉ" in t:
-            if live_bande(etat, f"🎯 TP1 TOUCHÉ sur {ic} {m} ! ✅", f"tp1{m}", 600, toujours=True):
-                live_publier("BULLE:🎁 Tu veux recevoir les prochaines infos ? Abonne-toi • lien en bio 🎁 gratuit")
+            live_bande(etat, f"🎯 TP1 TOUCHÉ sur {ic} {m} ! ✅ On protège : SL à l'entrée 🛡" + FIN_BANDE, f"tp1{m}", 600, toujours=True)
         elif "POINT D'ENTRÉE À VENIR" in t:
             # Règle live : aucune info (ni sens, ni niveau, ni marché) ; jamais le mot « Telegram » à l'écran (TikTok réduit la portée des lives qui renvoient ailleurs) → « lien en bio »
             live_bande(etat, "BULLE:🎯 Le prix arrive dans une zone clé 👀 • les infos en temps réel : lien en bio 🎁 gratuit", f"zone{m}", 900, toujours=True)
         elif "RETOURNEMENT EN PRÉPARATION" in t:
-            live_bande(etat, f"BULLE:↩ {ic} {m} : regarde la ligne RETOURNEMENT • le marché peut se retourner", f"ret{m}", 900)
+            live_bande(etat, f"BULLE:↩ {ic} {m} : regarde la ligne RETOURNEMENT • le marché peut se retourner" + FIN_BANDE, f"ret{m}", 900, toujours=True)
         elif "MANIPULATION" in t or "MÈCHE SUSPECTE" in t:
-            live_bande(etat, f"BULLE:🎣 {ic} {m} : grosse mèche = chasse aux stops • on attend la clôture", f"meche{m}", 900)
+            live_bande(etat, f"BULLE:🎣 {ic} {m} : grosse mèche = chasse aux stops • on attend la clôture" + FIN_BANDE, f"meche{m}", 900, toujours=True)
+
+FIN_BANDE = " • plus d'infos en temps réel ? Abonne-toi, lien en bio 🎁"
+
+def textes_live_news(titre, reste):
+    """Bande du live autour d'une news : préavis 15 / 10 / 5 min, réaction, fin. Jamais de sens ni de niveau."""
+    t = (titre or "News USA").strip()[:40]
+    for etape in (15, 10, 5):
+        if (etape - 5) * 60 < reste <= etape * 60:
+            return f"n{etape}", (f"📰 NEWS USA DANS {etape} MIN • {t} 💥 ça peut bouger fort • "
+                                 f"en position ? Mets ton SL et ton TP 🛡" + FIN_BANDE)
+    if -8 * 60 <= reste <= -2 * 60:
+        return "nreac", f"📰 NEWS TOMBÉE • {t} ⚡ le marché réagit • on attend la clôture 15 min ⏳" + FIN_BANDE
+    if -25 * 60 <= reste <= -15 * 60:
+        return "nfin", f"✅ NEWS PASSÉE • {t} • le marché se calme, on reprend 🟩" + FIN_BANDE
+    return None, None
+
+
+def live_news(etat, maintenant):
+    """Les news passent aussi sur la bande du live (2 fois puis disparaît), une fois par étape et par news."""
+    vus = etat.setdefault("vus", [])
+    for e in calendrier(etat, maintenant):
+        etape, texte = textes_live_news(e.get("titre"), e["t"] - maintenant)
+        cle = f"live{etape}{e['t']}{e.get('titre')}"
+        if etape and cle not in vus:
+            vus.append(cle)
+            live_bande(etat, texte, toujours=True)
+
 
 def live_suivi(etat, cid, m):
     """Un abonné entre en position avec le bot → la bande l'annonce (prénom seulement)."""
@@ -9368,6 +9393,10 @@ def un_tour(etat, chats):
         print("alerte dxy", ex)
     try:
         envois += annonces_et_sessions(etat, int(time.time()), derniers)
+        try:
+            live_news(etat, int(time.time()))
+        except Exception as ex:
+            print("live news", ex)
         if TOKEN:
             for cid in set(destinataires(etat, chats)) | set(etat.get("prospects", [])):
                 epingler(etat, cid)
