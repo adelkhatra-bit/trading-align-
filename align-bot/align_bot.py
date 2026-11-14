@@ -2488,7 +2488,7 @@ def carte_coach(m, r, cle, genre, tr=None, raison=None, declencheur=None, signal
         if validite:
             l.append(f"⏱ Valide : {validite}")
         try:
-            co = coach_fvg(r, d, r["m1"][-1]["c"], attente=False) if r.get("m1") else []
+            co = coach_fvg(r, d, r["m1"][-1]["c"], attente=False, tr=tr) if r.get("m1") else []
             l += [""] + co if co else []
         except Exception:
             pass
@@ -6201,10 +6201,10 @@ def proximite_marche(m, r, cle, now=None):
     cle = cle or {}
     prix = r["m1"][-1]["c"]
     base = dict(m=m, prix=prix, atr_n=99.0)
+    if m != "BTC" and not cme_ouvert(int(now)):          # marché fermé d'abord : jamais « déjà en position » quand rien ne bouge
+        return dict(base, classe="ferme", rang=6)
     if cle.get("trade"):
         return dict(base, classe="position", rang=-1, d=cle["trade"].get("d"))
-    if m != "BTC" and not cme_ouvert(int(now)):
-        return dict(base, classe="ferme", rang=6)
     o, d = cle.get("ordre"), r.get("dirPlan") or 0
     zp = r.get("zone_pine") if d else None
     if o:
@@ -7632,7 +7632,7 @@ def lecture_tp1(r, d):
     return lignes
 
 
-def coach_fvg(r, d, prix, attente=True):
+def coach_fvg(r, d, prix, attente=True, tr=None):
     """Lignes « coach » d'une entrée sur FVG (mêmes niveaux que l'indicateur sur la vue de validation) : zone, alignement 5 min + 15 min,
     FVG qui bloque, SL protégé, manipulation (mèche qui dépasse puis revient), quand entrer. [] si l'indicateur garde son plan d'origine."""
     try:
@@ -7641,6 +7641,8 @@ def coach_fvg(r, d, prix, attente=True):
         pe = None
     if not pe or not pe.get("fvg_ut"):
         return []
+    if tr and tr.get("sl") is not None:      # carte d'un trade ouvert : les niveaux de l'explication = ceux de la carte (jamais un recalcul en direct)
+        pe = dict(pe, sl=tr["sl"], e=tr.get("e", pe["e"]))
     ut, za, zb = pe["sl_ut"], min(pe["za"], pe["zb"]), max(pe["za"], pe["zb"])
     dirs = r.get("dirs") or []
     l = []
