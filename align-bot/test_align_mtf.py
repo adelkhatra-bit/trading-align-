@@ -1885,7 +1885,7 @@ class AlignSoundAndAiBudgetTest(unittest.TestCase):
                         silencieux.add(f.name)
         # règles/menu épinglés, chrono et jauge modifiés en place, changement de langue : jamais prépare-toi / entrée / TP / SL
         self.assertEqual(silencieux, {"epingler", "epingler_menus_chaines", "menu_canal_vip", "_editer_chrono_ou_recreer", "_lancer_chrono_verrouille", "changer_langue", "maj_jauge",
-                                      "notifier_canal_marche", "renvoyer_claviers"})   # commentaires de chaîne et nouveau clavier : sans son
+                                      "notifier_canal_marche", "renvoyer_claviers", "menu_canal_resultats"})   # commentaires de chaîne et nouveau clavier : sans son
 
     def test_sound_asset_and_menu_button(self):
         from unittest.mock import patch
@@ -1914,6 +1914,7 @@ class AlignSoundAndAiBudgetTest(unittest.TestCase):
             align_bot.LANG_EN.discard("102")
         self.assertIn(b"Save for notifications", uo.call_args.args[0].data)
 
+    @unittest.mock.patch("align_bot.IA_AUTO", True)   # IA automatique coupée en prod (règle d'Adel) : on teste le mécanisme quand on la rallume
     def test_ai_calls_per_hour_measured(self):
         """Une heure simulée (12 cycles de 5 min, 3 marchés) : IA seulement aux moments clés, cachée."""
         from unittest.mock import patch
@@ -2254,6 +2255,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
             align_bot.installer_menu({})
         self.assertNotIn("setMyName", [c.args[0] for c in tg.call_args_list])
 
+    @unittest.mock.patch("align_bot.IA_AUTO", True)   # IA automatique coupée en prod (règle d'Adel) : on teste le mécanisme quand on la rallume
     def test_real_time_ai_comes_back_once_per_key_moment(self):
         from unittest.mock import patch
         st = {}
@@ -2885,9 +2887,14 @@ class TelegramIndependentPollerFastPathTest(unittest.TestCase):
 
     def test_shutdown_signal_requests_state_save_and_stops_poller(self):
         import signal
-        align_bot._demander_arret(signal.SIGTERM, None)
+        from unittest.mock import patch
+        # Le vrai chien de garde ferait os._exit(0) 25 s plus tard : il coupait toute la validation GitHub
+        # « en succès » avant le résumé des tests (des échecs passaient inaperçus). On ne le lance jamais en test.
+        with patch.object(align_bot.threading, "Thread"):
+            align_bot._demander_arret(signal.SIGTERM, None)
         self.assertTrue(align_bot.SHUTDOWN_REQUESTED.is_set())
         self.assertTrue(align_bot.TELEGRAM_POLL_STOP.is_set())
+        align_bot.SHUTDOWN_REQUESTED.clear(); align_bot.TELEGRAM_POLL_STOP.clear()
 
 
 class TestTelegramMarketButtonsJourney(unittest.TestCase):

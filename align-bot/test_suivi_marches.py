@@ -68,6 +68,7 @@ class SuiviMarchesTest(unittest.TestCase):
 
 
 class IaEnPositionTest(unittest.TestCase):
+    @unittest.mock.patch("align_bot.IA_AUTO", True)   # IA automatique coupée en prod (règle d'Adel) : on teste le mécanisme quand on la rallume
     def test_ia_branchee_au_sl_be_et_retournement(self):
         appels = []
         with mock.patch.object(ab, "ia", lambda etat, consigne, data, **kw: appels.append(consigne) or "🧠 test"), \

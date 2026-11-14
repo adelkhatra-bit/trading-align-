@@ -6590,6 +6590,10 @@ def live_prepare_toi(etat, derniers, now=None):
         sens = "ça peut couler 📉" if p["d"] == -1 else "ça peut décoller 📈"
         live_bande(etat, f"BULLE:⚠️ {ic} {p['m']} : prépare-toi, {sens} • ⏱ verdict dans {min_avant_cloture15(now)} min • "
                          "les niveaux en privé : lien en bio 🎁 gratuit", f"prep{p['m']}{p['d']}", 1800, toujours=True)
+        # Jeu du live (idée d'Adel) : les spectateurs tapotent l'écran pour parier sur la suite ; le coach l'a déjà annoncé en privé
+        live_bande(etat, f"BULLE:👆 JEU : tapote l'écran si tu penses que {ic} {p['m']} va {'couler 📉' if p['d'] == -1 else 'monter 📈'} ! "
+                         f"• réponse dans {min_avant_cloture15(now)} min • le coach l'a déjà annoncé : lien en bio 🎁",
+                   f"jeu{p['m']}{p['d']}", 1800, toujours=True)
 
 def radar_tick(etat, chats, derniers, now=None):
     """Un RADAR par personne : édité sur place ; nouveau message (son) seulement quand un marché devient « prépare-toi »
@@ -8031,7 +8035,10 @@ def gerer_stop(etat, m, r, tr, c):
     e = pos["e"]; sl = pos.get("sl_conseil", pos["sl"]); risque = max(abs(e - pos["sl"]), 1e-9)
     # Stop conseillé touché : on clôture le résultat de l'abonné à ce niveau
     if pos.get("sl_conseil") is not None:
-        extreme = min(x["l"] for x in r["m1"][-6:]) if d == 1 else max(x["h"] for x in r["m1"][-6:])
+        recents = [x for x in r["m1"][-6:] if x.get("t", 0) >= time.time() - 420] or r["m1"][-1:]
+        # Seulement les 6 dernières MINUTES réelles : une vieille bougie (mémoire, redémarrage) ne doit jamais sortir
+        # l'abonné à un niveau que le prix n'a pas touché (vu le 14/11 22:46 : SL 65009 « touché », plus haut réel 64941)
+        extreme = min(x["l"] for x in recents) if d == 1 else max(x["h"] for x in recents)
         if m == "GOLD" and r.get("spot_lo") is not None:     # même règle que le bot : le vrai prix spot fait foi
             extreme = min(r["spot_lo"], extreme + 0.3 * a) if d == 1 else max(r["spot_hi"], extreme - 0.3 * a)
         if d * (extreme - sl) <= 0:
