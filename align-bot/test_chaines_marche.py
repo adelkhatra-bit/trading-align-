@@ -154,5 +154,22 @@ class TpFrole(unittest.TestCase):
         self.assertEqual(ab.repli_voir_plus(out), out)
 
 
+    def test_boutons_auto_toutes_les_chaines(self):
+        import json
+        etat = {"canal": "-1", "canal_preuves": "-2", "canaux_marche": {"BTC": "-3"}}
+        vip = json.dumps(json.loads(ab.boutons_auto_chaine(etat, "-1")))
+        self.assertIn("Gagnantes", vip); self.assertNotIn("start=vip", vip)
+        self.assertIn("start=vip", ab.boutons_auto_chaine(etat, "-2"))
+        self.assertIn("start=vip", ab.boutons_auto_chaine(etat, "-3"))
+        self.assertIsNone(ab.boutons_auto_chaine(etat, "123"))       # conversation privée : jamais touchée
+
+    def test_menu_resultats_une_seule_fois(self):
+        vus = []
+        with mock.patch.object(ab, "telegram", side_effect=lambda m, **k: vus.append(m) or {"result": {"message_id": 5}}):
+            etat = {"canal_preuves": "-2"}
+            ab.menu_canal_resultats(etat); ab.menu_canal_resultats(etat)
+        self.assertEqual(vus, ["sendMessage", "pinChatMessage"])
+
+
 if __name__ == "__main__":
     unittest.main()

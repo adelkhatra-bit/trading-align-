@@ -2797,6 +2797,10 @@ def telegram(methode, **params):
             params["caption"] = traduire(params["caption"])
         if params.get("reply_markup"):
             params["reply_markup"] = traduire_clavier(params["reply_markup"])
+    if methode in ("sendMessage", "sendPhoto") and "reply_markup" not in params:
+        kb_ = boutons_auto_chaine(DERNIER_ETAT or {}, params.get("chat_id"))
+        if kb_:
+            params["reply_markup"] = kb_
     if methode in ("sendMessage", "editMessageText", "sendPhoto"):      # traduit d'abord, rangé ensuite
         for k in ("text", "caption"):
             if k in params:
@@ -2993,15 +2997,53 @@ def boutons_canal(etat, texte):
     lignes.append([{"text": "🤖 Ouvrir mon menu ALIGN", "url": lien("boutons")}])
     return json.dumps({"inline_keyboard": lignes})
 
+def boutons_auto_chaine(etat, cid):
+    """Toute publication dans une chaîne ALIGN reçoit des boutons dessous (Telegram interdit le clavier du bas dans une chaîne).
+    VIP : pas de bouton « VIP » (ils le sont déjà) ; Résultats et marchés : les boutons qui vendent tout en bas."""
+    c = str(cid or "")
+    if not c or not etat:
+        return None
+    if c == str(etat.get("canal") or ""):
+        return json.dumps({"inline_keyboard": [
+            [{"text": "🏆 Gagnantes", "url": BOT_LIEN + "?start=gagnantes"}, {"text": "❌ Perdantes", "url": BOT_LIEN + "?start=perdantes"}],
+            [{"text": "🧑‍🏫 Mon coach VIP", "url": BOT_LIEN}, {"text": "🔴 Live" if live_actif(etat) else "📺 Le live", "url": LIVE_LIEN}]]})
+    if c == str(etat.get("canal_preuves") or "") or c in {str(v) for v in (etat.get("canaux_marche") or {}).values()}:
+        return boutons_menu_rapide(etat)
+    return None
+
+
+def menu_canal_resultats(etat):
+    """ALIGN Résultats (gains des membres) : menu épinglé une seule fois — liens des chaînes, gagnantes / perdantes, coach, VIP, live."""
+    canal = etat.get("canal_preuves")
+    if not canal or etat.get("menu_res_v1"):
+        return
+    etat["menu_res_v1"] = 1                  # marqué avant l'envoi : jamais deux menus
+    liens = {**LIENS_CHAINES, **(etat.get("liens_marche") or {})}
+    kb = [[{"text": f"{ICONE.get(mk, '')} ALIGN {mk}", "url": liens[mk]} for mk in MARCHES if liens.get(mk)],
+          [{"text": "🏆 Gagnantes", "url": BOT_LIEN + "?start=gagnantes"}, {"text": "❌ Perdantes", "url": BOT_LIEN + "?start=perdantes"}],
+          [{"text": "🧑‍🏫 Mon coach perso (gratuit)", "url": BOT_LIEN}],
+          [{"text": "💎 VIP", "url": BOT_LIEN + "?start=vip"}, {"text": "📺 Le live ALIGN", "url": LIVE_LIEN}]]
+    texte = "\n".join(["📌 ALIGN RÉSULTATS", "━━━━━━━━━━━━━━━", "🏆 Ici : les gains des membres", "📊 Les TP / SL du bot : dans chaque chaîne",
+                        "📸 Ton gain : bouton Partager mon gain du coach", "⚠️ Pas un conseil financier"])
+    try:
+        res = telegram("sendMessage", chat_id=canal, text=texte, reply_markup=json.dumps({"inline_keyboard": kb}), disable_notification="true")
+        telegram("pinChatMessage", chat_id=canal, message_id=res["result"]["message_id"], disable_notification="true")
+        etat["menu_res_v1"] = res["result"]["message_id"]
+    except Exception as ex:
+        print("menu résultats", ex)
+
+
 def menu_canal_vip(etat):
     """Chaîne VIP : Telegram n'autorise pas le clavier du bas dans une chaîne → menu à boutons épinglé en haut (1 seule fois)."""
-    if not etat.get("canal") or etat.get("menu_vip_v1"):
+    if not etat.get("canal") or etat.get("menu_vip_v2"):
         return
     try:                                  # déjà épinglé (mémoire perdue au redémarrage) : on ne le renvoie pas
         pm = ((telegram("getChat", chat_id=etat["canal"]) or {}).get("result") or {}).get("pinned_message") or {}
-        if "MENU ALIGN VIP" in str(pm.get("text") or ""):
-            etat["menu_vip_v1"] = pm.get("message_id") or 1
+        if "MENU ALIGN VIP" in str(pm.get("text") or "") and "Live" in str(pm.get("reply_markup") or ""):
+            etat["menu_vip_v2"] = pm.get("message_id") or 1
             return
+        if "MENU ALIGN VIP" in str(pm.get("text") or "") and pm.get("message_id"):
+            telegram("unpinChatMessage", chat_id=etat["canal"], message_id=pm["message_id"])      # ancien menu sans Live
     except Exception as ex:
         print("menu VIP getChat", ex)
     bot = etat.get("bot") or "align_mtf_adel_bot"
@@ -3010,11 +3052,13 @@ def menu_canal_vip(etat):
         [{"text": "🥇 Analyse Gold", "url": lien("analyse_gold")}, {"text": "🟠 Analyse BTC", "url": lien("analyse_btc")}],
         [{"text": "📊 Faire une analyse", "url": lien("faire_analyse")}, {"text": "📡 Mes marchés", "url": lien("marches")}],
         [{"text": "🤖 Mon bot", "url": lien("mon_bot")}, {"text": "📈 Mes résultats", "url": lien("resultats")}],
-        [{"text": "📸 Partager mon gain", "url": lien("gain")}, {"text": "🧩 Indicateur TradingView", "url": lien("indicateur")}]]})
+        [{"text": "📸 Partager mon gain", "url": lien("gain")}, {"text": "🧩 Indicateur TradingView", "url": lien("indicateur")}],
+        [{"text": "🏆 Gagnantes", "url": lien("gagnantes")}, {"text": "❌ Perdantes", "url": lien("perdantes")}],
+        [{"text": "🔴 Le live ALIGN", "url": LIVE_LIEN}]]})
     try:
         res = telegram("sendMessage", chat_id=etat["canal"], text="💎 MENU ALIGN VIP\n👇 Touche un bouton : il s'ouvre dans ton bot", reply_markup=kb, disable_notification="true")
         telegram("pinChatMessage", chat_id=etat["canal"], message_id=res["result"]["message_id"], disable_notification="true")
-        etat["menu_vip_v1"] = res["result"]["message_id"]
+        etat["menu_vip_v2"] = res["result"]["message_id"]
     except Exception as ex:
         print("menu VIP", ex)
 
@@ -4850,11 +4894,17 @@ def notifier_canal_marche(etat, m, r, cle):
         if "MÈCHE" in flash:
             info["meche_t15"] = t15
         _envoi_sur(canal, text=flash, reply_markup=boutons_chaine_marche(etat), disable_notification="true")
-        live_bande(etat, texte_bande_flash(flash), f"pulse{m}", 600, toujours=True)
+        tr_ = cle.get("trade") or {}
+        live_bande(etat, texte_bande_flash(flash, tr_.get("d"), m), f"pulse{m}", 600, toujours=True)
 
 
-def texte_bande_flash(flash):
-    """Bande du live : on dit juste qu'il se passe quelque chose (jamais le marché, le sens ni le niveau) → lien en bio."""
+def texte_bande_flash(flash, d=None, m=""):
+    """Bande du live : on dit juste qu'il se passe quelque chose (jamais le niveau) → lien en bio.
+    En position et le prix repart contre nous : on rassure (pas de panique, la clôture décide) — règle d'Adel."""
+    if d in (1, -1) and "Contre le bot" in flash:
+        suite = "ça devrait reprendre la descente 📉" if d == -1 else "ça devrait reprendre la montée 📈"
+        return (f"BULLE:😮‍💨 {ICONE.get(m, '')} {m} {'remonte' if d == -1 else 'redescend'} un peu : pas de panique • "
+                f"⏱ on attend la clôture dans {min_avant_cloture15()} min • {suite} • en temps réel : abonne-toi, lien en bio 🎁")
     if "MÈCHE" in flash:
         return "BULLE:🎣 Grosse mèche en cours 👀 • les infos en temps réel : lien en bio 🎁 gratuit"
     return "BULLE:⚡ Le marché a une pulsion 🔥 • tu veux les infos en temps réel ? Lien en bio 🎁 gratuit"
@@ -9095,6 +9145,9 @@ def live_annonces(etat, m, textes):
             # Règle live : aucune info (ni sens, ni niveau, ni marché) ; jamais le mot « Telegram » à l'écran (TikTok réduit la portée des lives qui renvoient ailleurs) → « lien en bio »
             live_bande(etat, f"BULLE:🎯 Le prix arrive dans une zone clé 👀 • ⏱ verdict dans {min_avant_cloture15()} min (clôture 15 min) • "
                              "les infos en temps réel : lien en bio 🎁 gratuit", f"zone{m}", 900, toujours=True)
+        elif "RETOUR VERS L'ENTRÉE" in t:
+            live_bande(etat, f"BULLE:🔁 {ic} {m} revient vers l'entrée : on respire 😎 • le bot est protégé 🛡 • "
+                             f"⏱ clôture dans {min_avant_cloture15()} min" + FIN_BANDE, f"retour{m}", 900, toujours=True)
         elif "RETOURNEMENT EN PRÉPARATION" in t:
             live_bande(etat, f"BULLE:↩ {ic} {m} : regarde la ligne RETOURNEMENT • le marché peut se retourner" + FIN_BANDE, f"ret{m}", 900, toujours=True)
         elif "MANIPULATION" in t or "MÈCHE SUSPECTE" in t:
@@ -9651,6 +9704,7 @@ def un_tour(etat, chats):
             for cid in set(destinataires(etat, chats)) | set(etat.get("prospects", [])):
                 epingler(etat, cid)
             menu_canal_vip(etat)
+            menu_canal_resultats(etat)
         # Rappel de partage : côté gratuit seulement (jamais dans la chaîne VIP), 1 fois au jour prévu
         if TOKEN and partage_du(etat):
             txt, kb = message_partage(etat)
