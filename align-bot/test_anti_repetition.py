@@ -334,7 +334,7 @@ class CoachDeConcentration(unittest.TestCase):
     def test_message_vip_zone_sens_distance_et_unite(self):
         """« OÙ TE CONCENTRER » remplacé par le RADAR (une seule logique, aussi pour /focus)."""
         txt = ab.texte_radar(self.classer(), self.derniers(), True)
-        self.assertTrue(txt.startswith("🎯 FOCUS : 🟠 BTC"))
+        self.assertIn("🎯 FOCUS : 🟠 BTC", txt.split("\n")[0])
         self.assertIn("LONG", txt); self.assertIn("73010", txt); self.assertIn("73400", txt)                    # zone visée
         self.assertIn("ATR 15 min", txt); self.assertIn("J'attends : clôture 1h au-dessus de 73205", txt)       # unité à surveiller
         self.assertIn("GOLD", txt); self.assertIn("en approche", txt); self.assertIn("NASDAQ", txt); self.assertIn("loin de la zone", txt)

@@ -1881,6 +1881,8 @@ TRAD = {
 "🛑 Ton stop": "🛑 Your SL", "bloqué : prix": "blocked: price",
 # Agent / signaux
 "🔔 JE PRÉPARE UNE POSITION —": "🔔 PREPARING A POSITION —",
+"⬆️ Le prix remonte vers la zone : c'est normal → 🔴 SHORT seulement au rejet dans la zone": "⬆️ Price is climbing back to the zone: that's normal → 🔴 SHORT only on a rejection in the zone",
+"⬇️ Le prix redescend vers la zone : c'est normal → 🟢 LONG seulement au rebond dans la zone": "⬇️ Price is dropping back to the zone: that's normal → 🟢 LONG only on a bounce in the zone",
 "⏳ Je n'entre pas encore : j'attends que le prix vienne dans la zone 🟨": "⏳ Not entering yet: waiting for price to reach the zone 🟨",
 "👀 Mets-toi en vue 15 minutes": "👀 Switch to the 15-minute chart", "⏱ Mets-toi en vue 15 minutes": "⏱ Switch to the 15-minute chart",
 "👀 Vue 15 minutes": "👀 15-minute chart", "⏱ Vue 15 minutes": "⏱ 15-minute chart",
@@ -6295,6 +6297,17 @@ RADAR_REFRESH_SEC = 120       # au plus une édition toutes les 2 min par person
 RADAR_ALERTE_MIN_SEC = 900    # au plus une alerte « prépare-toi » (avec son) toutes les 15 min par personne
 RADAR_ALERTE_RANG = 1         # rang ≤ 1 (dans la zone ou à ≤ 1,5 ATR) : « prépare-toi » → nouveau message avec son
 SENS_COURT = {1: "LONG ⬆️", -1: "SHORT ⬇️"}
+SENS_TETE = {1: "🟢 LONG", -1: "🔴 SHORT"}   # sens en PREMIÈRE ligne de chaque message de préparation (demande d'Adel)
+
+def ligne_vers_zone(d, anglais=False):
+    """Le prix va vers la zone CONTRE le sens du trade (repli) : c'est normal, on n'entre qu'au rejet / rebond dans la zone."""
+    if d == -1:
+        return ("⬆️ Price is climbing back to the zone: that's normal → 🔴 SHORT only on a rejection in the zone" if anglais
+                else "⬆️ Le prix remonte vers la zone : c'est normal → 🔴 SHORT seulement au rejet dans la zone")
+    if d == 1:
+        return ("⬇️ Price is dropping back to the zone: that's normal → 🟢 LONG only on a bounce in the zone" if anglais
+                else "⬇️ Le prix redescend vers la zone : c'est normal → 🟢 LONG seulement au rebond dans la zone")
+    return ""
 
 def _radar_n_ut(r, d):
     return r.get("bull", 0) if d == 1 else r.get("bear", 0) if d == -1 else max(r.get("bull", 0), r.get("bear", 0))
@@ -6337,7 +6350,10 @@ def texte_radar(props, derniers, vip=True, anglais=False, now=None, intro=None):
         etat_t = ("get ready" if anglais else "prépare-toi") if _radar_pret(t, derniers) else \
                  ("close, alignment not reached yet" if anglais else "proche, alignement pas encore atteint") if t["rang"] <= RADAR_ALERTE_RANG else \
                  ("approaching" if anglais else "en approche") if t["rang"] == 2 else ("least far, nothing close" if anglais else "le moins loin, rien de proche")
-        l.append(f"🎯 FOCUS : {ic(t)} {t['m']} — {etat_t}")
+        tete = SENS_TETE.get(t.get("d"))
+        l.append((f"{tete} · " if tete else "") + f"🎯 FOCUS : {ic(t)} {t['m']} — {etat_t}")
+        if vip and t["rang"] != 0:
+            l.append(ligne_vers_zone(t.get("d"), anglais))
         if intro and vip:
             l += [x for x in str(intro).split("\n") if x.strip()][:3]      # phrases de l'IA (jamais les mêmes), niveaux toujours calculés par le bot
         r = (derniers or {}).get(t["m"]) or {}
@@ -6431,13 +6447,16 @@ def intro_ia_radar(etat, m, r, cle, p, es):
         avis = ia(etat, "Un marché approche de son point d'entrée. Écris EXACTEMENT 3 lignes courtes, chacune commence par un emoji, 12 mots max : "
                         "1) dis de se préparer sur ce marché, 2) le niveau visé (entrée) et le sens, 3) l'unité de temps à regarder et ce qu'on attend. "
                         "Utilise uniquement les chiffres fournis, n'invente aucun niveau, varie la formulation à chaque fois. "
-                        "Le sens est UNIQUEMENT celui fourni dans radar.sens (il vient de l'indicateur) : ne le change jamais. " + IA_TON_JEUNE,
+                        "Le sens est UNIQUEMENT celui fourni dans radar.sens (il vient de l'indicateur) : ne le change jamais. "
+                        "N'écris jamais « imminent », « maintenant » ni « go » : le prix doit d'abord venir dans la zone puis rejeter (SHORT) / rebondir (LONG). " + IA_TON_JEUNE,
                   data, cle_cache=cle_c, duree=RADAR_IA_CACHE_SEC, premium=True)
     except Exception as ex:
         print("ia radar", m, type(ex).__name__, ex)
         return None
     if not avis or sens_ia_contradictoire(avis, p.get("d")):
         return None
+    if p.get("rang", 0) != 0 and re.search(r"imminent|maintenant|\bgo\b", avis, re.I):
+        return None                               # le prix n'est pas encore dans la zone : jamais « imminent »
     return compacter_ia(avis)
 
 def radar_tick(etat, chats, derniers, now=None):
@@ -8576,8 +8595,9 @@ def agent(m, r, cle, ferme):
                     out.append(texte_zone_extreme(m, r, d))
             else:
                 cle["ordre"] = o
-                out.append((f"🔔 JE PRÉPARE UNE POSITION — {ICONE.get(m, '')} {m}\n{SENS[d]}   {'monte' if d == 1 else 'descend'} sur 15m, 1h et 4h ✅✅✅\n{qualite(o)}"
+                out.append((f"{SENS_TETE[d]} · 🔔 JE PRÉPARE UNE POSITION — {ICONE.get(m, '')} {m}\n{SENS[d]}   {'monte' if d == 1 else 'descend'} sur 15m, 1h et 4h ✅✅✅\n{qualite(o)}"
                            f"⏳ Je n'entre pas encore : j'attends que le prix vienne dans la zone 🟨\n"
+                           f"{ligne_vers_zone(d)}\n"
                            f"👀 Mets-toi en vue {o.get('sl_ut', '5 min')}\n"
                            f"🕯 Repère {'le dernier creux (mèche du bas)' if d == 1 else 'le dernier sommet (mèche du haut)'}\n"
                            f"🟨 L'entrée sera à peu près {'au-dessus de ce creux' if d == 1 else 'sous ce sommet'}\n"
