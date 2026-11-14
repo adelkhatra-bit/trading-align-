@@ -210,6 +210,21 @@ class TestFinDeTradeBande(unittest.TestCase):
         self.assertEqual(ab.min_avant_cloture15(900 * 10 + 840), 1)
 
 
+
+class TestPrepareToiLive(unittest.TestCase):
+    def test_fenetre_prepare_toi_sans_niveau(self):
+        pub = []
+        props = [{"m": "BTC", "d": -1, "rang": 0, "za": 65717.0, "zb": 65965.0}]
+        with mock.patch.object(ab, "classer_marches", return_value=props), mock.patch.object(ab, "_radar_pret", return_value=True), \
+             mock.patch.object(ab, "live_publier", side_effect=lambda t: pub.append(t) or True):
+            ab._LIVE_DERNIER.clear()
+            ab.live_prepare_toi({}, {}, 1000.0)
+            ab.live_prepare_toi({}, {}, 1060.0)
+        self.assertEqual(len(pub), 1)
+        self.assertIn("couler", pub[0]); self.assertIn("verdict dans", pub[0]); self.assertIn("lien en bio", pub[0])
+        self.assertNotIn("65", pub[0]); self.assertNotIn("Telegram", pub[0])
+
+
 if __name__ == "__main__":
     unittest.main()
 
