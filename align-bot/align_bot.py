@@ -2480,7 +2480,8 @@ def carte_coach(m, r, cle, genre, tr=None, raison=None, declencheur=None, signal
         tps = px(tr["tp1"]) + (f" / {px(tr['tp2'])}" if tr.get("tp2") is not None and tp2_affichable(d, tr["tp1"], tr["tp2"]) else "")
         # Ordre du GRAPHIQUE (du plus haut au plus bas) : SHORT = SL, entrée, TP1, TP2 ; LONG = TP2, TP1, entrée, SL
         vue_ = f" (vue {tr['sl_ut']})" if tr.get("sl_ut") else ""
-        niv = [(f"🛑 SL : {px(tr['sl'])}" + (" (mèche 5 min)" if tr.get("sl_ut") == "5 min" else ""), tr["sl"]),
+        niv = [(f"🛑 SL : {px(tr['sl'])} · {pips_txt(m, tr['e'] - tr['sl'])}" + (" (mèche 5 min)" if tr.get("sl_ut") == "5 min" else "")
+                + (f" (+{pips_txt(m, tr['marge_sl'])} appris)" if tr.get("marge_sl") else ""), tr["sl"]),
                (f"🎯 Entrée : {px(tr['e'])}{vue_}", tr["e"]), (f"💰 TP1 : {px(tr['tp1'])}", tr["tp1"])]
         if tr.get("tp2") is not None and tp2_affichable(d, tr["tp1"], tr["tp2"]):
             niv.append((f"🏁 TP2 : {px(tr['tp2'])}", tr["tp2"]))
@@ -8352,6 +8353,62 @@ def alerte_extreme_due(cle, d, t):
     cle["extreme_sig"] = str(d); cle["extreme_warn_t"] = t
     return True
 
+# ───────── Pips + SL qui apprend tout seul ─────────
+# 1 pip : BTC = 1 $, GOLD = 0,10 $, NASDAQ = 1 point (convention des brokers CFD)
+PIP = {"BTC": 1.0, "GOLD": 0.1, "NASDAQ": 1.0}
+APRES_SL_DUREE = 6 * 3600          # on regarde 6 h après un stop si le marché est allé au TP1 quand même
+
+def pips(m, ecart):
+    return int(round(abs(float(ecart)) / PIP.get(m, 1.0)))
+
+def pips_txt(m, ecart):
+    n = pips(m, ecart)
+    return f"{n} pip{'s' if n > 1 else ''}"
+
+def marge_sl_apprise(cle, atr):
+    """Marge ajoutée au SL d'après les stops « chassés » appris (75 % des cas couverts), jamais plus de 0,5 ATR 15 min."""
+    hist = [float(x) for x in ((cle.get("sl_appris") or {}).get("hist") or []) if float(x) > 0]
+    if not hist:
+        return 0.0
+    hist.sort()
+    marge = hist[int(0.75 * (len(hist) - 1))]
+    return min(marge, 0.5 * float(atr)) if atr else marge
+
+def appliquer_marge_sl(m, cle, tr, r):
+    """Nouveau trade : le SL est reculé de la marge apprise (BTC, Gold, NASDAQ séparés : chaque marché apprend seul)."""
+    marge = marge_sl_apprise(cle, r.get("atr") or 0)
+    if marge <= 0:
+        return
+    tr["sl"] = tr["sl"] - tr["d"] * marge
+    tr["marge_sl"] = marge
+    if tr.get("tp1") is not None:
+        tr["rr"] = abs(tr["tp1"] - tr["e"]) / max(abs(tr["e"] - tr["sl"]), 1e-9)
+
+def suivre_apres_sl(out, m, r, cle, hi, lo):
+    """Après un stop : le prix est-il allé au TP1 quand même ? Si oui, de combien de pips le SL a-t-il été dépassé → on apprend."""
+    a = cle.get("apres_sl")
+    if not a:
+        return
+    d = a["d"]
+    a["pire"] = min(a["pire"], lo) if d == 1 else max(a["pire"], hi)
+    if r["t"] - a["t"] > APRES_SL_DUREE:
+        cle.pop("apres_sl", None)
+        return
+    if not ((hi >= a["tp1"]) if d == 1 else (lo <= a["tp1"])):
+        return
+    cle.pop("apres_sl", None)
+    depasse = d * (a["sl"] - a["pire"])
+    atr = float(r.get("atr") or 0)
+    if depasse <= 0 or (atr and depasse > atr):
+        return                      # dépassement trop grand = vrai retournement, pas une chasse aux stops : on n'apprend rien
+    ap = cle.setdefault("sl_appris", {})
+    ap["hist"] = ([float(x) for x in ap.get("hist") or []] + [depasse])[-10:]
+    marge = marge_sl_apprise(cle, atr)
+    out.append(f"🔍 {ICONE.get(m, '')} {m} : APRÈS LE STOP\n📏 Mon SL a été dépassé de {pips_txt(m, depasse)}\n"
+               f"🎯 Puis le prix est allé au TP1\n🧠 J'apprends : prochain SL {pips_txt(m, marge)} plus loin\n"
+               f"📚 {len(ap['hist'])} cas appris sur {m}")
+
+
 def agent(m, r, cle, ferme):
     """Agent : tendance 4h + confirmation 1h → déclenchement sur bougie 5m clôturée."""
     out = []
@@ -8370,6 +8427,10 @@ def agent(m, r, cle, ferme):
         niveaux_cles(out, m, r, cle)
     except Exception as ex:
         print("manipulation", ex)
+    try:
+        suivre_apres_sl(out, m, r, cle, hi, lo)
+    except Exception as ex:
+        print("après SL", ex)
     try:
         rv_ = retournement_marche(m, r, cle)          # v71 : retournement par marché (même règle que le graphique)
         if rv_ and not (tr and tr.get("d") == (1 if "LONG" in rv_.split("\n")[0] else -1)):
@@ -8412,6 +8473,7 @@ def agent(m, r, cle, ferme):
             tr["profil"] = profil_trade(m, tr, r)
             tr.update(strategie_trade(r, d))
             tr["retour"] = retournement_confirme(cle, d, r)
+            appliquer_marge_sl(m, cle, tr, r)
             non, n_, w_ = memoire_refuse(tr["profil"])
             if non:
                 out.append(f"🧠 {ICONE.get(m, '')} {m} : cassure vue, mais je passe mon tour\n📚 Ce type de position a perdu trop souvent ({w_}/{n_} gagnés)")
@@ -8588,6 +8650,7 @@ def agent(m, r, cle, ferme):
                 tr["profil"] = profil_trade(m, tr, r)
                 tr.update(strategie_trade(r, d))
                 tr["retour"] = retournement_confirme(cle, d, r)
+                appliquer_marge_sl(m, cle, tr, r)
                 non, n_, w_ = memoire_refuse(tr["profil"])
                 if non:
                     cle["prep"] = False; cle.pop("ordre", None)
@@ -8650,8 +8713,10 @@ def agent(m, r, cle, ferme):
                 out.append(cs_(m, "SORTI À BE", [f"🛑 SL : {px(sl)} touché (BE)", "🛡 Aucune perte"], "Hors position", r, "attente"))
             else:
                 inverse = "LONG" if d == -1 else "SHORT"
-                out.append(cs_(m, "STOP TOUCHÉ", [f"🛑 Stop : {px(sl)} touché", "😤 On va se refaire : le marché sera encore là demain", f"↩ Retournement possible : {inverse} si 15 min + 1 h confirment"], "Hors position", r, "attente"))
+                out.append(cs_(m, "STOP TOUCHÉ", [f"🛑 Stop : {px(sl)} touché ({pips_txt(m, e - sl)})", "😤 On va se refaire : le marché sera encore là demain",
+                                                  "🔍 Je regarde si le marché va au TP1 quand même : si oui, j'apprends", f"↩ Retournement possible : {inverse} si 15 min + 1 h confirment"], "Hors position", r, "attente"))
                 cle["retournement"] = {"d": -d, "t": r["t"]}
+                cle["apres_sl"] = {"d": d, "e": e, "sl": sl, "tp1": t1, "t": r["t"], "pire": (lo if d == 1 else hi)}
             cle["fin"] = [tr, sl, "🔒 Sorti à BE" if tr.get("be_dit") else "🛑 Stop touché"]; cle["stop_t"] = r["t"]
             cle.pop("trade"); cle["aligne"] = 0; return out
         if touche_t1:
