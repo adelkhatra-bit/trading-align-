@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      6.7
+// @version      6.8
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '6.7';
+  const VERSION = '6.8';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -363,6 +363,35 @@
     } catch (e) {}
   }
   window.__ALIGN_BILLETS__ = pluieBillets;
+  // v6.8 (demande d'Adel) : prix sur l'objectif = EXPLOSION D'ARGENT dans le sens du marché
+  //   marché qui coule (sens -1) → éclat au niveau du prix puis l'argent retombe en pluie ;
+  //   marché qui monte (sens +1) → éclat puis l'argent s'envole vers le haut. Jamais de fusée quand ça coule.
+  const cssArgent = document.createElement('style');
+  cssArgent.textContent = `.align-argent{position:fixed;z-index:10001;pointer-events:none;font-size:46px;animation:argentVole var(--t) cubic-bezier(.15,.8,.3,1) forwards}
+  @keyframes argentVole{0%{transform:translate(0,0) scale(.3) rotate(0);opacity:1}25%{transform:translate(var(--ex),var(--ey)) scale(1.2)}
+    100%{transform:translate(var(--dx),var(--dy)) scale(1) rotate(var(--rot));opacity:0}}
+  #align-flash-or{position:fixed;inset:0;z-index:9999;pointer-events:none;background:radial-gradient(circle at var(--x) var(--y),rgba(255,215,0,.55),rgba(255,215,0,0) 45%);animation:flashOr 1.2s ease-out forwards}
+  @keyframes flashOr{from{opacity:1}to{opacity:0}}`;
+  document.head.appendChild(cssArgent);
+  function explosionArgent(sens) {
+    try {
+      const r = zoneGraphique(), x0 = r.left + r.width * 0.72, y0 = r.top + (r.height || 700) * 0.55, em = ['💵', '💰', '💸', '🪙', '💶', '🤑', '💎'];
+      const f = document.createElement('div'); f.id = 'align-flash-or'; f.style.setProperty('--x', x0 + 'px'); f.style.setProperty('--y', y0 + 'px');
+      document.getElementById('align-flash-or')?.remove(); document.body.appendChild(f); setTimeout(() => f.remove(), 1300);
+      for (let i = 0; i < 46; i++) {
+        const e = document.createElement('span'); e.className = 'align-argent'; e.textContent = em[i % em.length];
+        const a = Math.random() * Math.PI * 2, rr = 60 + Math.random() * 140;
+        e.style.left = x0 + 'px'; e.style.top = y0 + 'px';
+        e.style.setProperty('--ex', Math.cos(a) * rr + 'px'); e.style.setProperty('--ey', Math.sin(a) * rr + 'px');
+        e.style.setProperty('--dx', (Math.cos(a) * rr * 1.6) + 'px');
+        e.style.setProperty('--dy', (sens === -1 ? 380 + Math.random() * 260 : -(380 + Math.random() * 260)) + 'px');
+        e.style.setProperty('--rot', (Math.random() * 540 - 270) + 'deg'); e.style.setProperty('--t', (2.2 + Math.random() * 1.2) + 's');
+        e.style.animationDelay = (Math.random() * 0.25) + 's';
+        document.body.appendChild(e); setTimeout(() => e.remove(), 3800);
+      }
+    } catch (e) {}
+  }
+  window.__ALIGN_ARGENT__ = explosionArgent;
 
   function recu(txt) {
     txt = String(txt || '').trim(); if (!txt) return;
@@ -470,7 +499,7 @@
   }
   function coeurs(n, liste) {
     try {
-      const r = zoneGraphique(), em = liste || ['❤️', '🔥', '🚀', '💜', '💙', '👆'];
+      const r = zoneGraphique(), em = liste || ['❤️', '🔥', '✨', '💜', '💙', '👆'];   // pas de fusée par défaut : elle ferait croire que ça monte
       for (let i = 0; i < (n || 10); i++) setTimeout(() => {
         const e = document.createElement('span'); e.className = 'align-coeur'; e.textContent = em[(Math.random() * em.length) | 0];
         e.style.left = (r.left + r.width - 150 - Math.random() * 90) + 'px'; e.style.top = (r.top + (r.height || 600) * 0.62) + 'px';
@@ -587,7 +616,7 @@
           const tete = '👀 ' + m + ' arrive sur une zone clé';
           montrer(tete + ' • le marché prépare quelque chose 👀 pourquoi ? 🔌 lien en bio 🎁', false, 2, couleurLigne(n));
           versBot('ligne', cur[4] > l.y ? 1 : -1, '', n);
-          if (n.startsWith('TP')) coeurs(10, ['💰', '💵', '🎯']);
+          if (n.startsWith('TP')) explosionArgent(cur[4] > l.y ? -1 : 1);   // objectif atteint : l'argent suit le sens du marché
           return;
         }
       }
@@ -679,6 +708,7 @@
         // sinon pas de honte : on rassure (« le marché respire, il est comme vous ») et on n'en reparle plus
         const a = arme; arme = null; const pNow = (barres(1)[0] || b)[4]; const mv = (pNow - a.p) * a.d;
         if (mv < 0.5 * (a.r || 1)) {
+          versBot('respire', a.d);                 // Telegram : le verdict honnête, pour que personne ne panique
           montrer('😮‍💨 ' + a.m + ' : pas de panique • le marché respire, il est comme vous 😅 • patience, la suite en temps réel : lien en bio 🎁', true, 1, 'proche');
           return;
         }
@@ -704,6 +734,6 @@
   window.__ALIGN_BANDE__ = {
     version: VERSION, recu, plateforme: v => choisirPlateforme(v),
     stop() { cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
-      [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur,.align-billet').forEach(x => x.remove()); try { cssBillet.remove(); } catch (e) {} obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
+      [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur,.align-billet,.align-argent').forEach(x => x.remove()); try { cssBillet.remove(); } catch (e) {} obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
   };
 })();

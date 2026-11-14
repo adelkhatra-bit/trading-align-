@@ -48,9 +48,27 @@ if __name__ == "__main__":
 class RisqueFrEn(unittest.TestCase):
     def test_message_trading_rappelle_le_risque(self):
         t = ab.avec_risque("🔴 SHORT BTC\nSL au-dessus")
-        self.assertIn("Risque de perte", t)
-        self.assertIn("Risk of loss", t)
+        self.assertIn("pas un conseil en investissement", t)
+        self.assertIn("not investment advice", t)
         self.assertEqual(ab.avec_risque(t), t)                 # jamais deux fois
 
     def test_message_neutre_inchange(self):
         self.assertEqual(ab.avec_risque("⬇️ Tes boutons sont là 👇"), "⬇️ Tes boutons sont là 👇")
+
+
+class UneAnnonceParQuart(unittest.TestCase):
+    def test_pression_une_seule_fois_par_quart_d_heure(self):
+        envois = []
+        r = {"m1": [{"c": 95.5}], "b15": [{"t": i, "o": 100, "h": 101, "l": 99, "c": 100} for i in range(10)]}
+        with mock.patch.object(ab, "ecran_lire", return_value=["EVT|BTC|pression|-1|9", "EVT|BTC|pression|-1|7"]), \
+             mock.patch.dict(ab.DERNIERS, {"BTC": r}), mock.patch.object(ab.time, "time", return_value=900 * 5000 + 10), \
+             mock.patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append(k["text"])), \
+             mock.patch.object(ab, "boutons_chaine_marche", return_value='{"inline_keyboard": []}'):
+            ab.ecran_vers_telegram({"canaux_marche": {"BTC": -5}})
+        self.assertEqual(len(envois), 1)
+
+    def test_respire_rassure(self):
+        r = {"m1": [{"c": 95.5}], "b15": [{"t": i, "o": 100, "h": 101, "l": 99, "c": 100} for i in range(10)]}
+        t = ab.texte_ecran("BTC", "respire", -1, 0, r, {})
+        self.assertIn("le marché respire", t)
+        self.assertIn("pas de panique", t)
