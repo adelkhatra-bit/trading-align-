@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      5.5
+// @version      5.6
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '5.5';
+  const VERSION = '5.6';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -372,7 +372,7 @@
     range: ['😴 {m} se compresse… avant l\'explosion ? 💥 tiens-toi prêt • lien en bio 🎁',
             '🧲 {m} hésite… la prochaine clôture peut tout décider ⏱ lien en bio 🎁']
   };
-  let tendN = 0, derniereTend = Date.now();
+  let tendN = 0, derniereTend = Date.now(), arme = null;   // arme = mouvement annoncé à l'avance (chrono jusqu'à la clôture)
   function regarder() {
     try {
       if (retour) return;                                   // un abonné a la main : on ne parle pas par-dessus
@@ -392,6 +392,29 @@
       if (cur[4] > hh && uneFois('ch' + id)) { pop('🚀', 'ÇA CASSE ⬆️ ' + m, 1, 'dernier plus haut cassé 📈 ça peut décoller… infos en temps réel : lien en bio 🎁'); lueur(1); return; }
       // 3) gros volume
       if (moyV > 0 && (cur[5] || 0) > 2.5 * moyV && uneFois('vol' + id)) { pop('🐋', 'LES BALEINES BOUGENT sur ' + m, 0, 'gros volume 👀 quelque chose se prépare • lien en bio 🎁'); coeurs(8, ['🐋', '💰', '👀']); return; }
+      // 5) v5.6 ANTICIPATION (demande d'Adel) : dire AVANT que ça accélère, avec le chrono jusqu'à la clôture 15 min
+      //    pression = tendance nette + bougies qui se compressent ou prix collé au dernier plus bas/haut (la mèche va transpercer)
+      const c10b = B.slice(-10).map(x => x[4]), pente10 = (c10b[9] - c10b[0]) / moyR;
+      const dirT = pente10 > 0.8 ? 1 : pente10 < -0.8 ? -1 : 0;
+      const comp = B.slice(-4).reduce((a, x) => a + (x[2] - x[3]), 0) / 4 < 0.75 * moyR;
+      const colle = dirT === -1 ? (cur[4] - ll) < 0.6 * moyR : dirT === 1 ? (hh - cur[4]) < 0.6 * moyR : false;
+      const quart = Math.floor(Date.now() / 900000), minRest = Math.max(1, Math.ceil((900 - Math.floor(Date.now() / 1000) % 900) / 60));
+      if (dirT && (comp || colle) && uneFois('pr' + m + quart)) {
+        arme = { d: dirT, quart, m };
+        lueur(dirT); coeurs(8, dirT === -1 ? ['📉', '🌊', '⚡'] : ['📈', '🚀', '⚡']);
+        pop('⚡', 'LA PRESSION MONTE sur ' + m + (dirT === -1 ? ' ⬇️' : ' ⬆️'), dirT,
+            'ça peut accélérer dans ⏱ ' + minRest + ' min (clôture 15 min) • la team : abonne-toi, partage • lien en bio 🎁');
+        return;
+      }
+      // 6) manipulation : grosse mèche CONTRE la tendance (les gros piègent) → la vraie direction peut arriver
+      const meche = dirT === -1 ? cur[2] - Math.max(cur[1], cur[4]) : dirT === 1 ? Math.min(cur[1], cur[4]) - cur[3] : 0;
+      if (dirT && meche > 1.1 * moyR && uneFois('mn' + id)) {
+        arme = { d: dirT, quart, m };
+        lueur(dirT);
+        pop('🌀', 'MANIPULATION sur ' + m, dirT, (dirT === -1 ? 'les gros piègent les acheteurs… la belle distribution 📉' : 'les gros piègent les vendeurs… le rechargement 📈')
+            + ' peut arriver dans ⏱ ' + minRest + ' min • abonne-toi, partage • lien en bio 🎁');
+        return;
+      }
       // 4) toutes les ~7 min : la bande dit où le marché a l'air d'aller (sans prix) et renvoie vers le lien en bio
       if (Date.now() - derniereTend > 7 * 60000) {
         const c10 = B.slice(-10).map(x => x[4]), pente = (c10[9] - c10[0]) / moyR, larg = (Math.max(...B.slice(-10).map(x => x[2])) - Math.min(...B.slice(-10).map(x => x[3]))) / moyR;
@@ -406,14 +429,21 @@
   // compte à rebours de la clôture 15 min : les 45 dernières secondes, gros chrono + « ça va se décider »
   const chronoT = setInterval(() => { try {
     const s = Math.floor(Date.now() / 1000), reste = 900 - (s % 900), r = zoneGraphique();
-    if (reste <= 45 && !retour) {
-      chrono.style.display = 'flex'; chrono.classList.toggle('urgent', reste <= 10);
+    const enAttente = arme && arme.quart === Math.floor(s / 900);
+    if ((reste <= 45 || enAttente) && !retour) {
+      chrono.style.display = 'flex'; chrono.classList.toggle('urgent', reste <= (enAttente ? 30 : 10));
       chrono.style.left = (r.left + 18) + 'px'; chrono.style.top = (r.top + 96) + 'px';
-      chrono.innerHTML = '0:' + String(reste).padStart(2, '0') + '<small>⏱ CLÔTURE 15 MIN<br>ça va se décider 👀</small>';
+      chrono.innerHTML = Math.floor(reste / 60) + ':' + String(reste % 60).padStart(2, '0') + '<small>'
+        + (enAttente ? (arme.d === -1 ? '📉 ÇA PEUT COULER<br>' : '📈 ÇA PEUT DÉCOLLER<br>') + 'abonne-toi • partage 🎁' : '⏱ CLÔTURE 15 MIN<br>ça va se décider 👀') + '</small>';
       if (reste === 45 && uneFois('cl' + s)) bandeShow('⏱ Clôture 15 min dans 45 s sur ' + nomMarche() + ' • c\'est elle qui décide 👀 • la suite en temps réel : lien en bio 🎁');
     } else if (chrono.style.display !== 'none') {
       chrono.style.display = 'none';
       const b = barres(2)[0];                              // la bougie qui vient de clôturer
+      if (b && reste > 880 && arme && arme.quart === Math.floor((s - 60) / 900)) {
+        const a = arme; arme = null; const mv = (b[4] - b[1]) * a.d;
+        if (mv > 0) { feuArtifice(a.d === -1 ? '📉 ANNONCÉ !' : '📈 ANNONCÉ !'); coeurs(14);
+          pop('✅', 'ANNONCÉ ! ' + a.m + (a.d === -1 ? ' a coulé 📉' : ' a décollé 📈'), a.d, 'la team ALIGN l\'a vu venir • abonne-toi, partage • lien en bio 🎁'); return; }
+      }
       if (b && reste > 880) { const v = b[4] >= b[1] ? 1 : -1; if (!occupe && !file.length) pop(v === 1 ? '🟢' : '🔴', 'BOUGIE 15 MIN CLÔTURÉE ' + (v === 1 ? '⬆️' : '⬇️') + ' ' + nomMarche(), v, 'la suite en temps réel : lien en bio 🎁'); }
     }
   } catch (e) {} }, 1000);
