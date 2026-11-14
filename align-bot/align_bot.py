@@ -3024,7 +3024,7 @@ def menu_canal_resultats(etat):
           [{"text": "🧑‍🏫 Mon coach perso (gratuit)", "url": BOT_LIEN}],
           [{"text": "💎 VIP", "url": BOT_LIEN + "?start=vip"}, {"text": "📺 Le live ALIGN", "url": LIVE_LIEN}]]
     texte = "\n".join(["📌 ALIGN RÉSULTATS", "━━━━━━━━━━━━━━━", "🏆 Ici : les gains des membres", "📊 Les TP / SL du bot : dans chaque chaîne",
-                        "📸 Ton gain : bouton Partager mon gain du coach", "⚠️ Pas un conseil financier | Not financial advice"])
+                        "📸 Ton gain : bouton Partager mon gain du coach", "⚠️ Pas un conseil financier | Not financial advice", RISQUE_COMPLET])
     try:
         res = telegram("sendMessage", chat_id=canal, text=texte, reply_markup=json.dumps({"inline_keyboard": kb}), disable_notification="true")
         telegram("pinChatMessage", chat_id=canal, message_id=res["result"]["message_id"], disable_notification="true")
@@ -4725,7 +4725,7 @@ def menu_chaine(etat, m):
     autres = [mk for mk in MARCHES if mk != m and LIENS_CHAINES.get(mk)]
     texte = "\n".join([f"📌 ALIGN {ICONE.get(m, '')} {m}", "━━━━━━━━━━━━━━━", "🎙 Ici : le marché commenté en direct",
                         "🎯 TP / SL et résultats du bot ici", "🔕 Commentaires sans son, TP / SL avec son", "🧑‍🏫 Ton coach perso + niveaux : bouton 👇", "🔴 Le live : bouton 👇",
-                        "⚠️ Pas un conseil financier | Not financial advice"])
+                        "⚠️ Pas un conseil financier | Not financial advice", RISQUE_COMPLET])
     kb = [[{"text": "🧑‍🏫 Mon coach perso (gratuit)", "url": BOT_LIEN}],
           [{"text": "🏆 Gagnantes", "url": BOT_LIEN + "?start=gagnantes"}, {"text": "❌ Perdantes", "url": BOT_LIEN + "?start=perdantes"}]]
     if autres:
@@ -7064,6 +7064,12 @@ def envoyer_prospects(etat, texte, signal, clavier=None):
                 etat["prospects"].remove(cid)
 
 RISQUE_LIGNE = "⚠️ Risque de perte · pas un conseil financier | Risk of loss · not financial advice"
+# Avertissement complet (menus épinglés, VIP) : informatif et éducatif, pas un conseil en investissement
+RISQUE_COMPLET = ("⚠️ Le trading comporte un risque élevé de perte en capital. Contenu à caractère informatif et éducatif uniquement : "
+                  "il ne constitue ni un conseil en investissement ni une recommandation personnalisée. "
+                  "Les performances passées ne préjugent pas des performances futures.\n"
+                  "⚠️ Trading involves a high risk of capital loss. Informational and educational content only: "
+                  "it is neither investment advice nor a personalised recommendation. Past performance is not indicative of future results.")
 _MOTS_TRADING = re.compile(r"\b(SHORT|LONG|ENTRÉE|ENTRY|SL|TP\d?|STOP|POSITION|BE)\b|J'ENTRE|PRÉPARE", re.I)
 
 def avec_risque(texte):
@@ -9185,6 +9191,7 @@ ECRAN_TITRES = {
     "annonce": ("✅ ANNONCÉ : ça a coulé 🔴", "✅ ANNONCÉ : ça a décollé 🟢"),
     "rebond": ("↩️ REJET sur {l} : touchée puis le prix repart vers le bas 🔴", "↩️ REBOND sur {l} : touchée puis le prix repart vers le haut 🟢"),
     "ligne": ("📍 Le prix arrive sur {l} (par le haut) 🔴", "📍 Le prix arrive sur {l} (par le bas) 🟢"),
+    "zone": ("📍 Le prix est sur le BAS de sa zone (support) 🔴", "📍 Le prix est sur le HAUT de sa zone (résistance) 🟢"),
 }
 ECRAN_LIGNES = {"TP1": "le TP1 (ligne bleue)", "TP2": "le TP2 (ligne bleue)", "SL": "le SL (ligne rouge)", "ENTRÉE": "la ligne ENTRÉE (jaune)"}
 ECRAN_CONSEIL = {
@@ -9202,6 +9209,7 @@ ECRAN_POURQUOI = {
     "annonce": "🕯 La clôture 15 min a confirmé ce que l'écran annonçait",
     "rebond": "🕯 Pourquoi : la bougie 15 min a touché la ligne puis a CLÔTURÉ loin d'elle → les acheteurs / vendeurs défendent ce niveau",
     "ligne": "🕯 Pourquoi : le prix est collé à une ligne du plan ALIGN → c'est là que le marché décide",
+    "zone": "🕯 Pourquoi : le prix touche l'extrême de ses 20 dernières bougies → rebond ou cassure, la clôture 15 min tranche",
 }
 
 def ecran_lire():
@@ -9293,7 +9301,7 @@ def ecran_vers_telegram(etat):
         court = "\n".join(txt.split("\n")[:3] + ["🧠 Pourquoi, où regarder : bouton En savoir plus 👇"])
         kb = json.loads(boutons_chaine_marche(etat) or '{"inline_keyboard": []}')
         kb.setdefault("inline_keyboard", []).insert(0, [{"text": "🧠 En savoir plus", "url": BOT_LIEN + "?start=ecran_" + m.lower()}])
-        _envoi_sur(canal, text=court, reply_markup=json.dumps(kb), disable_notification="true")
+        _envoi_sur(canal, text=court, reply_markup=json.dumps(kb))     # AVEC son : l'écran intrigue, le téléphone donne la réponse
 
 def live_annonces(etat, m, textes):
     """Ce que le bot envoie sur Telegram → la bande (sans aucun niveau)."""
