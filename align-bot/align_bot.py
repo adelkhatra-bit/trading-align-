@@ -4815,8 +4815,13 @@ def notifier_canal_marche(etat, m, r, cle):
                    disable_notification="true")      # commentaire = sans son : les abonnés restent tranquilles
         return
     flash = flash_commentateur(m, r, cle)
+    t15 = int(((r.get("b15") or [{}])[-1]).get("t") or 0)
+    if flash and "MÈCHE" in flash and t15 and int(info.get("meche_t15", 0)) == t15:
+        flash = None                              # une seule « GROSSE MÈCHE » par bougie 15 min (vu 3 fois en 11 min le 14/11)
     if flash and time.time() - float(info.get("flash_t", 0)) >= 300:
         info["flash_t"] = time.time()
+        if "MÈCHE" in flash:
+            info["meche_t15"] = t15
         _envoi_sur(canal, text=flash, reply_markup=boutons_chaine_marche(etat), disable_notification="true")
         live_bande(etat, texte_bande_flash(flash), f"pulse{m}", 600, toujours=True)
 
