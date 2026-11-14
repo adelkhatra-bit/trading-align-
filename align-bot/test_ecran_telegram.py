@@ -48,8 +48,8 @@ if __name__ == "__main__":
 class RisqueFrEn(unittest.TestCase):
     def test_message_trading_rappelle_le_risque(self):
         t = ab.avec_risque("🔴 SHORT BTC\nSL au-dessus")
-        self.assertIn("pas un conseil en investissement", t)
-        self.assertIn("not investment advice", t)
+        self.assertIn("pas un conseil en investissement", t); self.assertIn("DYOR", t)
+        self.assertIn("not financial advice", t)
         self.assertEqual(ab.avec_risque(t), t)                 # jamais deux fois
 
     def test_message_neutre_inchange(self):
@@ -72,3 +72,12 @@ class UneAnnonceParQuart(unittest.TestCase):
         t = ab.texte_ecran("BTC", "respire", -1, 0, r, {})
         self.assertIn("le marché respire", t)
         self.assertIn("pas de panique", t)
+
+
+class Feinte(unittest.TestCase):
+    def test_feinte_explique_le_piege(self):
+        r = {"m1": [{"c": 95.5}], "b15": [{"t": i, "o": 100, "h": 101, "l": 99, "c": 100} for i in range(10)]}
+        t = ab.texte_ecran("BTC", "feinte", -1, 6, r, {})
+        self.assertIn("FEINTE", t)
+        self.assertIn("Ne cours pas après ce rebond", t)
+        self.assertIn("dans 6 min", t)

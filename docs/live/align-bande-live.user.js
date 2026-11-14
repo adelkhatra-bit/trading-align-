@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      6.8
+// @version      6.9
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '6.8';
+  const VERSION = '6.9';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -18,6 +18,8 @@
     '🔗 LIEN EN BIO : COACH EN DIRECT',
     '🔌 BRANCHE-TOI AU MARCHÉ • chaque bougie expliquée en direct • lien en bio 🎁',
     '🧭 CHEZ ALIGN ON NE VA JAMAIS CONTRE LA TENDANCE • on suit le marché, on ne le combat pas 💪',
+    '⚠️ CECI N\'EST PAS UN CONSEIL EN INVESTISSEMENT • fais tes propres recherches (DYOR)',
+    '⚠️ NOT FINANCIAL ADVICE • do your own research (DYOR)',
     '📲 Le coach ALIGN en direct • lien en bio 🎁 gratuit',
     '🔔 ACTIVE TES NOTIFICATIONS • lien en bio : on te prévient dès que le marché se prépare 🎁',
     '⚠️ Le trading comporte un risque élevé de perte en capital • Contenu à caractère informatif et éducatif uniquement, qui ne constitue ni un conseil en investissement ni une recommandation personnalisée • Les performances passées ne préjugent pas des performances futures',
@@ -76,6 +78,13 @@
     ['JEU : tapote l\'écran si tu penses que', 'GAME: tap the screen if you think'], ['va couler', 'will drop'], ['va monter', 'will rise'],
     ['réponse dans', 'answer in'], ['les niveaux en privé', 'levels in private'], ['Le coach ALIGN', 'The ALIGN coach'],
     ['risque de perte, pas un conseil', 'risk of loss, not advice'],
+    ['Ceci n\'est pas un conseil en investissement, fais tes propres recherches (DYOR)', 'This is not financial advice, do your own research (DYOR)'],
+    ['risque de perte', 'risk of loss'],
+    ['ATTENTION LA FEINTE sur', 'WATCH THE FAKE-OUT on'],
+    ['le marché fait semblant de remonter… beaucoup vont acheter trop tôt et y laisser des plumes', 'the market is faking a bounce… many will buy too early and lose feathers'],
+    ['le marché fait semblant de chuter… beaucoup vont vendre trop tôt et y laisser des plumes', 'the market is faking a drop… many will sell too early and lose feathers'],
+    ['Ne te fais pas piéger', 'Don\'t get trapped'], ['ne cours pas après la bougie', 'don\'t chase the candle'],
+    ['les gros adorent ce genre de piège', 'big players love this kind of trap'], ['qui va mordre à l\'hameçon ?', 'who\'s going to take the bait?'],
     ['Pfff… on s\'ennuie,', 'Ugh… so boring,'], ['est trop calme', 'is way too calm'], ['pense à tapoter l\'écran', 'remember to tap the screen'],
     ['et à t\'abonner', 'and follow'], ['Marché ennuyant sur', 'Boring market on'], ['allez, tapote l\'écran pour le réveiller', 'come on, tap the screen to wake it up'],
     ['et abonne-toi', 'and follow'],
@@ -212,7 +221,7 @@
     const urgent = g && g !== 'proche' ? 1 : 0;
     // v6.4 : chaque info passe en français PUIS en anglais (au moins 2 passages)
     // v6.5 (règle d'Adel) : chaque info rappelle le risque, en français puis en anglais
-    if (!/risque|risk/i.test(texte)) texte += ' • ⚠️ risque de perte, pas un conseil';
+    if (!/risque|risk/i.test(texte)) texte += ' • ⚠️ Ceci n\'est pas un conseil en investissement, fais tes propres recherches (DYOR) • risque de perte';
     const items = []; for (let i = 0; i < Math.max(2, fois || 1); i++) items.push({ texte: plateforme(i % 2 ? enAnglais(texte) : texte), bulle, g });
     if (urgent) { let k = 0; while (k < file.length && file[k].g && file[k].g !== 'proche') k++; file.splice(k, 0, ...items); }
     else file.push(...items);
@@ -497,15 +506,35 @@
       cadre.classList.remove('go'); void cadre.offsetWidth; cadre.classList.add('go');
     } catch (e) {}
   }
+  // v6.9 (demande d'Adel) : plus de petits émojis qui s'envolent (on ne comprend pas ce que c'est) → UNE punchline pro
+  // dans une pastille qui monte doucement, en français avec l'anglais dessous. Le contexte choisit la phrase.
+  const PUNCH = [
+    [/🪤|🎣|🪶/, ['🪤 Piège en cours', 'Trap in progress'], ['🎣 Qui va mordre ?', 'Who takes the bait?']],
+    [/🐋|💰/, ['🐋 Les baleines arrivent', 'Whales incoming'], ['👀 Gros volume', 'Big volume']],
+    [/📉|🔴|🌊/, ['📉 La pression vend', 'Sellers in control'], ['🔴 Ça pousse en bas', 'Pushing lower']],
+    [/📈|🟢|🚀/, ['📈 Les acheteurs poussent', 'Buyers in control'], ['🟢 Ça pousse en haut', 'Pushing higher']],
+    [/🔌|📡|🧠/, ['🔌 Branché au marché', 'Plugged into the market'], ['📡 En direct', 'Live']],
+    [/↩️/, ['↩️ Rebond sur zone clé', 'Bounce on key zone'], ['👀 Réaction du marché', 'Market reaction']],
+    [/./, ['❤️ Tapote l\'écran', 'Tap the screen'], ['🔔 Abonne-toi', 'Follow'], ['💪 La team ALIGN', 'Team ALIGN'], ['🎯 Reste concentré', 'Stay focused']]
+  ];
+  const cssPunch = document.createElement('style');
+  cssPunch.textContent = `.align-punch{position:fixed;z-index:9997;pointer-events:none;padding:8px 18px;border-radius:999px;text-align:center;
+    background:linear-gradient(90deg,#ff2d95,#8a2be2,#1e90ff);color:#fff;font:900 24px/1.15 system-ui,Segoe UI,Arial,sans-serif;
+    box-shadow:0 6px 18px rgba(0,0,0,.45);text-shadow:0 2px 3px rgba(0,0,0,.4);animation:punchMonte 3.4s ease-out forwards}
+  .align-punch small{display:block;font:700 14px/1.2 system-ui,Segoe UI,Arial,sans-serif;opacity:.9}
+  @keyframes punchMonte{0%{opacity:0;transform:translateY(20px) scale(.7)}15%{opacity:1;transform:translateY(0) scale(1.05)}
+    25%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-120px)}}`;
+  document.head.appendChild(cssPunch);
+  let punchN = 0;
   function coeurs(n, liste) {
     try {
-      const r = zoneGraphique(), em = liste || ['❤️', '🔥', '✨', '💜', '💙', '👆'];   // pas de fusée par défaut : elle ferait croire que ça monte
-      for (let i = 0; i < (n || 10); i++) setTimeout(() => {
-        const e = document.createElement('span'); e.className = 'align-coeur'; e.textContent = em[(Math.random() * em.length) | 0];
-        e.style.left = (r.left + r.width - 150 - Math.random() * 90) + 'px'; e.style.top = (r.top + (r.height || 600) * 0.62) + 'px';
-        e.style.setProperty('--dx', (Math.random() * 120 - 60) + 'px'); e.style.setProperty('--rot', (Math.random() * 60 - 30) + 'deg');
-        document.body.appendChild(e); setTimeout(() => e.remove(), 3400);
-      }, i * 160);
+      const cle = (liste || []).join(''), g = PUNCH.find(x => x[0].test(cle)) || PUNCH[PUNCH.length - 1];
+      const [fr, en] = g[1 + (punchN++ % (g.length - 1))];
+      const r = zoneGraphique(), e = document.createElement('div'); e.className = 'align-punch';
+      e.innerHTML = esc(fr) + '<small>' + esc(en) + '</small>';
+      document.querySelectorAll('.align-punch').forEach(x => x.remove());
+      e.style.left = (r.left + r.width - 360) + 'px'; e.style.top = (r.top + (r.height || 600) * 0.45) + 'px';
+      document.body.appendChild(e); setTimeout(() => e.remove(), 3500);
     } catch (e) {}
   }
   function choisirPlateforme(v) { PLATEFORME = v; try { localStorage.setItem('alignPlateforme', v); } catch (e) {} remplir(); }
@@ -646,6 +675,18 @@
         versBot('pression', dirT, minRest);
         return;
       }
+      // 5b) v6.9 FEINTE : 3 bougies qui repartent contre la tendance → « beaucoup vont y laisser des plumes »
+      const c3 = B.slice(-4).map(x => x[4]), contre = dirT ? (c3[3] - c3[0]) * -dirT / moyR : 0;
+      if (dirT && contre > 1.0 && uneFois('fe' + m + quart)) {
+        const PF = dirT === -1
+          ? ['🪤 ATTENTION LA FEINTE sur ' + m + ' : le marché fait semblant de remonter… beaucoup vont acheter trop tôt et y laisser des plumes 🪶 • lien en bio 🎁',
+             '🎣 ' + m + ' remonte… qui va mordre à l\'hameçon ? les gros adorent ce genre de piège 😏 • Ne te fais pas piéger : lien en bio 🎁']
+          : ['🪤 ATTENTION LA FEINTE sur ' + m + ' : le marché fait semblant de chuter… beaucoup vont vendre trop tôt et y laisser des plumes 🪶 • lien en bio 🎁',
+             '🎣 ' + m + ' recule… qui va mordre à l\'hameçon ? les gros adorent ce genre de piège 😏 • ne cours pas après la bougie : lien en bio 🎁'];
+        montrer(PF[quart % 2], false, 2, 'alerte'); lueur(0); coeurs(8, ['🪤', '🎣', '🪶']);
+        versBot('feinte', dirT, minRest);
+        return;
+      }
       // 6) manipulation : grosse mèche CONTRE la tendance (les gros piègent) → la vraie direction peut arriver
       const meche = dirT === -1 ? cur[2] - Math.max(cur[1], cur[4]) : dirT === 1 ? Math.min(cur[1], cur[4]) - cur[3] : 0;
       if (dirT && meche > 1.1 * moyR && uneFois('mn' + id)) {
@@ -734,6 +775,6 @@
   window.__ALIGN_BANDE__ = {
     version: VERSION, recu, plateforme: v => choisirPlateforme(v),
     stop() { cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
-      [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur,.align-billet,.align-argent').forEach(x => x.remove()); try { cssBillet.remove(); } catch (e) {} obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
+      [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur,.align-billet,.align-argent,.align-punch').forEach(x => x.remove()); try { cssBillet.remove(); } catch (e) {} obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
   };
 })();
