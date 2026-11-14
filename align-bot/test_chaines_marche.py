@@ -125,5 +125,19 @@ class TpFrole(unittest.TestCase):
         self.assertEqual(sorted(env), ["5", "6"])
 
 
+    def test_une_seule_meche_par_bougie_15(self):
+        env = []
+        r = {"b15": [{"t": 1, "o": 1, "h": 2, "l": 0, "c": 1}, {"t": 2, "o": 1, "h": 2, "l": 0, "c": 1}]}
+        etat = {"canaux_marche": {"BTC": -1}, "canal_live": {"BTC": {"dernier_t": 99}}}
+        with mock.patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: env.append(k["text"])), \
+             mock.patch.object(ab, "flash_commentateur", return_value="🎣 GROSSE MÈCHE !"), \
+             mock.patch.object(ab, "live_bande", return_value=None), \
+             mock.patch.object(ab, "boutons_chaine_marche", return_value="{}"):
+            ab.notifier_canal_marche(etat, "BTC", r, {})
+            etat["canal_live"]["BTC"]["flash_t"] = 0
+            ab.notifier_canal_marche(etat, "BTC", r, {})
+        self.assertEqual(len(env), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
