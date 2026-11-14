@@ -7287,6 +7287,22 @@ class Msg(str):
     """Texte de message tagué avec le(s) marché(s) CONNUS à la création : le routage ne devine plus le marché en lisant le texte."""
     marches = frozenset()
 
+SUIVI_POSITION = ("METS-TOI À BE", "MOVE TO BE", "SL À BE", "SL TO BE", "DIRECTION TP", "ON RESTE EN POSITION", "WE STAY IN",
+                  "VÉRIFIE QUE TON SL", "CHECK YOUR SL", "TP FRÔLÉ", "RETOUR VERS L'ENTRÉE", "ON GARDE LE CAP", "ON LAISSE COURIR",
+                  "PRENDS UNE PARTIE DES GAINS", "GARDE LE RESTE")
+
+def deja_sorti(etat, cid, texte):
+    """Vrai si ce message est un SUIVI de position (BE, direction TP…) d'un marché où cet abonné est déjà sorti
+    (stop perso, sortie manuelle) : on ne lui dit plus « mets-toi à BE » sur une position qu'il n'a plus."""
+    haut = str(texte).upper()
+    if not any(k in haut for k in SUIVI_POSITION):
+        return False
+    for m in marches_message(texte) or ():
+        pos = (((etat.get(m) or {}).get("trade") or {}).get("qui") or {}).get(str(cid))
+        if isinstance(pos, dict) and pos.get("fini"):
+            return True
+    return False
+
 def taguer(x, marche):
     """Tague un message (ou un couple message + clavier) avec son marché."""
     def un(t):
@@ -8024,9 +8040,13 @@ def coach(etat, m, r, cle):
             msgs.append(f"📰 {m}\nNews dans   {round(reste / 60)} min\n"
                         + ("🔒 Mets ton SL à BE (prix d'entrée)" if prog > 0.2 else "✂️ Le trade n'avance pas\n✂️ Je coupe avant la news"))
     for c in dedans:
+        # Le stop perso d'abord : s'il vient de sortir l'abonné, il ne reçoit plus aucun suivi (BE, direction TP…)
+        # (vu le 14/11 : Adel sorti à son stop, puis « mets-toi à BE » / « direction TP1 » quand même)
+        gerer_stop(etat, m, r, tr, c)
+        if tr["qui"][c].get("fini"):
+            continue
         for t in msgs:
             _envoi_sur(c, text=humaniser(etat, c, t), reply_markup=markup_position(m))
-        gerer_stop(etat, m, r, tr, c)
 
 def gerer_stop(etat, m, r, tr, c):
     """Vrai agent : monte le stop de l'abonné derrière chaque support (long) / résistance (short) franchi,
@@ -9731,6 +9751,8 @@ def un_tour(etat, chats):
                         continue                                        # déjà dans la chaîne du marché
                 except Exception:
                     pass
+                if deja_sorti(etat, cid, texte):
+                    continue                                            # sorti de cette position : plus de suivi BE / TP
                 if cid != str(etat.get("canal") or "") and etat.get("marches_par_chat", {}).get(str(cid)) is not None:
                     texte_cid = filtrer_texte_par_marches(texte, marches_choisis(etat, cid))
                     if not texte_cid:
