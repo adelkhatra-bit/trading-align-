@@ -4644,9 +4644,7 @@ def photo_canal(cid):
 
 def boutons_chaine_marche(etat):
     """Boutons sous chaque message des chaînes : le coach perso dans le bot, et le live s'il tourne."""
-    l = [[{"text": "🧑‍🏫 Mon coach perso (gratuit)", "url": BOT_LIEN}],
-         [{"text": "🔴 Live en cours : regarder" if live_actif(etat) else "📺 Le live ALIGN", "url": LIVE_LIEN}]]
-    return json.dumps({"inline_keyboard": l})
+    return boutons_menu_rapide(etat)
 
 
 def menu_chaine(etat, m):
@@ -5167,18 +5165,19 @@ def changer_langue(etat, cid, anglais, membre_ok):
 COMMANDES = {"/faire_analyse": "📊 Faire une analyse", "/analyse_btc": "🟠 Analyse BTC", "/analyse_gold": "🥇 Analyse Gold", "/mon_bot": "🤖 Mon bot",
              "/resultats": "📈 Mes résultats", "/gain": "📸 Partager mon gain", "/vip": "💎 Devenir VIP",
              "/english": "🌐 English", "/francais": "🌐 Français", "/rentre": "✅ Je suis rentré", "/sorti": "🚪 Je suis sorti",
-             "/indicateur": "🧩 Indicateur TradingView", "/focus": "🎯 Où me concentrer ?"}
+             "/indicateur": "🧩 Indicateur TradingView", "/focus": "🎯 Où me concentrer ?",
+             "/live": "🔴 Live", "/gagnantes": "🏆 Positions gagnantes", "/perdantes": "❌ Positions perdantes"}
 
 def installer_menu(etat):
     """Bouton « Menu » à gauche du champ + description du bot (une seule fois par version)."""
-    if etat.get("menu") == 9:
+    if etat.get("menu") == 10:
         return
     fr = [("faire_analyse", "📊 Faire une analyse"), ("mon_bot", "🤖 Mon bot ON / OFF"),
           ("resultats", "📈 Mes résultats"), ("gain", "📸 Partager mon gain"), ("vip", "💎 Devenir VIP"),
-          ("live", "🔴 Le live"), ("boutons", "⌨️ Faire revenir les boutons"), ("english", "🌐 English")]
+          ("live", "🔴 Le live"), ("gagnantes", "🏆 Positions gagnantes"), ("perdantes", "❌ Positions perdantes"), ("boutons", "⌨️ Faire revenir les boutons"), ("english", "🌐 English")]
     en = [("faire_analyse", "📊 Run an analysis"), ("mon_bot", "🤖 My bot ON / OFF"),
           ("resultats", "📈 My results"), ("gain", "📸 Share my profit"), ("vip", "💎 Become VIP"),
-          ("live", "🔴 The live"), ("boutons", "⌨️ Bring back the buttons"), ("francais", "🌐 Français")]
+          ("live", "🔴 The live"), ("gagnantes", "🏆 Winning trades"), ("perdantes", "❌ Losing trades"), ("boutons", "⌨️ Bring back the buttons"), ("francais", "🌐 Français")]
     try:
         telegram("setMyCommands", commands=json.dumps([{"command": c, "description": d} for c, d in fr]))
         telegram("setMyCommands", commands=json.dumps([{"command": c, "description": d} for c, d in en]), language_code="en")
@@ -5197,7 +5196,7 @@ def installer_menu(etat):
                                                   "🤖 Les abonnés au suivi sont enregistrés automatiquement à l'ouverture du signal.\n"
                                                   "📍 Suivi personnel : SL, BE, TP et sortie manuelle depuis Telegram.\n\n"
                                                   "ℹ️ Mes positions perso, pas un conseil. Le trading comporte un risque de perte."))
-        etat["menu"] = 9
+        etat["menu"] = 10
     except Exception as ex:
         print("menu", ex)
 
@@ -5257,6 +5256,46 @@ def valider_gain(etat, chats, pid, publier, cb):
             print("publier gain", ex)
     _envoi_sur(ph["cid"], text="✅ Ton gain est publié 🔥\n🙏 Merci, ça motive tout le monde !")
 
+def cle_trade(m, tr):
+    """Identité d'une position : un même trade ne doit être clôturé (bilan, résultats, apprentissage) qu'UNE fois."""
+    return f"{m}|{tr.get('d')}|{round(float(tr.get('e') or 0), 2)}|{int(float(tr.get('cree') or 0))}"
+
+def deja_cloture(etat, m, tr):
+    return cle_trade(m, tr) in (etat.get("fermes") or [])
+
+def noter_cloture(etat, m, tr):
+    f = etat.setdefault("fermes", [])
+    f.append(cle_trade(m, tr))
+    del f[:-300]
+
+
+def journal_trade(etat, m, tr, sortie, motif, gain):
+    j = etat.setdefault("journal_trades", [])
+    j.append({"m": m, "d": tr.get("d"), "e": round(float(tr["e"]), 2), "s": round(float(sortie), 2), "g": round(float(gain), 2),
+              "pips": pips(m, sortie - tr["e"]), "t": int(time.time()), "motif": str(motif)[:40]})
+    del j[:-100]
+
+
+def texte_journal(etat, gagnantes=True, n=10):
+    """Dernières positions du bot, gagnantes ou perdantes (une ligne par position, pips + %)."""
+    j = [x for x in (etat.get("journal_trades") or []) if (x["g"] > 0) == gagnantes][-n:]
+    tous = etat.get("journal_trades") or []
+    w = sum(1 for x in tous if x["g"] > 0)
+    tete = ["🏆 POSITIONS GAGNANTES" if gagnantes else "❌ POSITIONS PERDANTES", "━━━━━━━━━━━━━━━"]
+    if not j:
+        return "\n".join(tete + ["📭 Aucune pour l'instant"])
+    lignes = [f"{ICONE.get(x['m'], '')} {x['m']} {'🟢 LONG' if x['d'] == 1 else '🔴 SHORT'} • {'+' if x['g'] > 0 else '-'}{x['pips']} pips • {x['g']:+.2f} % • "
+              f"{datetime.datetime.fromtimestamp(x['t'], PARIS).strftime('%d/%m %H:%M')}" for x in reversed(j)]
+    return "\n".join(tete + lignes + ["━━━━━━━━━━━━━━━", f"📊 Bilan : {w} gagnées / {len(tous) - w} perdues"])
+
+
+def boutons_menu_rapide(etat):
+    """Boutons sous les messages (chaînes + bot) : positions gagnantes / perdantes, live, coach. Liens vers le bot (marchent depuis une chaîne)."""
+    return json.dumps({"inline_keyboard": [
+        [{"text": "🏆 Gagnantes", "url": BOT_LIEN + "?start=gagnantes"}, {"text": "❌ Perdantes", "url": BOT_LIEN + "?start=perdantes"}],
+        [{"text": "🔴 Live" if live_actif(etat) else "📺 Le live", "url": LIVE_LIEN}, {"text": "🧑‍🏫 Mon coach", "url": BOT_LIEN}]]})
+
+
 def publier_resultat(etat, m, tr, sortie, motif, gain):
     """Chaque TP ou SL du bot part aussi dans ALIGN Résultats (transparence), + invitation à partager sa capture."""
     duree = int((time.time() - tr.get("cree", time.time())) // 60)
@@ -5264,11 +5303,12 @@ def publier_resultat(etat, m, tr, sortie, motif, gain):
     txt = (f"🏁 CLÔTURE CONFIRMÉE — {nature} — {ICONE.get(m, '')} {m}\n"
            f"🚦 {motif}\n{SENS[tr['d']]}\n"
            f"📌 Entrée ≈ {px(tr['e'])}\n🏁 Sortie ≈ {px(sortie)}\n"
+           f"📏 {'+' if gain > 0 else '-'}{pips_txt(m, sortie - tr['e'])}\n"
            f"📈 Résultat : {gain:+.2f} %\n⏱ Durée : {duree // 60} h {duree % 60:02d}\n"
            + ("📸 Tu étais dedans ? Partage ta capture ici avec le bouton 📸 Partager mon gain" if gain > 0 else "🛡 SL respecté, risque maîtrisé"))
     if etat.get("canal_preuves"):
         try:
-            telegram("sendMessage", chat_id=etat["canal_preuves"], text=txt)
+            telegram("sendMessage", chat_id=etat["canal_preuves"], text=txt, reply_markup=boutons_menu_rapide(etat))
         except Exception as ex:
             print("résultat", ex)
     # Le lien du groupe des résultats n'apparaît QUE après un TP ou un SL
@@ -5811,6 +5851,9 @@ def traiter(etat, chats, updates):
         bas = tx.lower()
         if "live tiktok" in bas or bas.strip() == "🔴 live" or cmd == "/live":
             menu_live(etat, cid)
+            continue
+        if bas.strip() in ("🏆 positions gagnantes", "❌ positions perdantes"):
+            _envoi_sur(cid, text=texte_journal(etat, "gagnantes" in bas), reply_markup=boutons_menu_rapide(etat))
             continue
         if recevoir_gain(etat, cid, msg):
             continue
@@ -9366,6 +9409,8 @@ def un_tour(etat, chats):
             continue
         cle["ferme_dit"] = False
         ferme = ""
+        if cle.get("trade") and deja_cloture(etat, nom_marche, cle["trade"]):
+            cle.pop("trade")             # vieille mémoire rechargée : ce trade est déjà clos, on ne le rejoue pas (pas de 2e « STOP TOUCHÉ »)
         nouveaux = [taguer(x, nom_marche) for x in agent(nom_marche, r, cle, ferme)]
         live_annonces(etat, nom_marche, nouveaux)
         try:
@@ -9391,8 +9436,15 @@ def un_tour(etat, chats):
             coach(etat, nom_marche, r, cle)
             if SHUTDOWN_REQUESTED.is_set():
                 return
+            if cle.get("fin") and deja_cloture(etat, nom_marche, cle["fin"][0]):
+                cle.pop("fin")          # déjà clôturé avant un redémarrage (vu le 13/11 : 1 SL NASDAQ publié 4 fois) → rien en double
             if cle.get("fin"):
                 trf, sortie, motif = cle.pop("fin")
+                noter_cloture(etat, nom_marche, trf)
+                try:
+                    sauver_etat(etat, chats)        # mémoire écrite TOUT DE SUITE : un redémarrage ne rejoue jamais cette clôture
+                except Exception as ex:
+                    print("sauver après clôture", ex)
                 cloturer_abonnes(etat, nom_marche, trf, sortie, motif)
                 # Bilan du bot (toutes ses positions, que des abonnés soient rentrés ou non)
                 bil = etat.setdefault("bilan", {"tp": 0, "sl": 0, "pct": 0.0})
@@ -9401,6 +9453,7 @@ def un_tour(etat, chats):
                 bil["pct"] += gain
                 cle["dernier"] = round(gain, 2)
                 apprendre(etat, trf, gain)
+                journal_trade(etat, nom_marche, trf, sortie, motif, gain)
                 publier_resultat(etat, nom_marche, trf, sortie, motif, gain)
                 pr = trf.get("profil") or {}
                 n_, w_ = stats_profil(pr, ("m", "type", "d")) if pr else (0, 0)
