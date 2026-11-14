@@ -20,14 +20,14 @@
     '🧭 CHEZ ALIGN ON NE VA JAMAIS CONTRE LA TENDANCE • on suit le marché, on ne le combat pas 💪',
     '📲 Le coach ALIGN en direct • lien en bio 🎁 gratuit',
     '🔔 ACTIVE TES NOTIFICATIONS • lien en bio : on te prévient dès que le marché se prépare 🎁',
-    '⚠️ Le trading comporte un risque de perte • ceci n\'est pas un conseil financier',
+    '⚠️ Le trading comporte un risque élevé de perte en capital • Contenu à caractère informatif et éducatif uniquement, qui ne constitue ni un conseil en investissement ni une recommandation personnalisée • Les performances passées ne préjugent pas des performances futures',
     // v6.4 : la même bande en anglais (FR + EN pour toucher tout le monde)
     '👉 FOLLOW • SHARE • TAP THE SCREEN',
     '🔗 LINK IN BIO: LIVE COACH',
     '🔔 TURN ON YOUR NOTIFICATIONS • link in bio: we\'ll tell you as soon as the market gets ready 🎁',
     '🔌 PLUG INTO THE MARKET • every candle explained live • link in bio 🎁',
     '🧭 AT ALIGN WE NEVER TRADE AGAINST THE TREND • we follow the market, we don\'t fight it 💪',
-    '⚠️ Trading involves a risk of loss • this is not financial advice'
+    '⚠️ Trading involves a high risk of capital loss • Informational and educational content only, it is neither investment advice nor a personalised recommendation • Past performance is not indicative of future results'
   ];
   // v6.4 : traduction anglaise des messages de la bande (chaque info passe en FR puis en EN)
   const EN = [
@@ -597,6 +597,7 @@
           : tour === 1 ? (pos < 0.2 ? PHRASES.bas_zone : pos > 0.8 ? PHRASES.haut_zone : PHRASES.milieu)
           : larg < 3.2 ? PHRASES.range : pente > 1.2 ? PHRASES.hausse : pente < -1.2 ? PHRASES.baisse : PHRASES.range;
         if (bandeShow(L[Math.floor(tendN / 3) % L.length].replace('{m}', m))) {
+          if (L === PHRASES.bas_zone || L === PHRASES.haut_zone) versBot('zone', L === PHRASES.bas_zone ? -1 : 1);   // la vraie réponse part dans la chaîne du marché
           derniereTend = Date.now(); tendN++;
           coeurs(8, L === PHRASES.branche ? ['🔌', '📡', '⚡', '🧠'] : L === PHRASES.baisse ? ['🔴', '📉', '🌊'] : L === PHRASES.hausse ? ['🟢', '📈', '🚀'] : ['👀', '❤️', '🔥']);
         }
