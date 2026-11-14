@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      5.0
+// @version      5.2
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '5.0';
+  const VERSION = '5.2';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🔴 LIVE ALIGN • BTC • GOLD • NASDAQ',
@@ -25,15 +25,15 @@
   const css = document.createElement('style');
   css.id = 'align-bande-css';
   css.textContent = `
-  #align-bande{position:fixed;z-index:9999;height:62px;overflow:hidden;pointer-events:none;
+  #align-bande{position:fixed;z-index:9999;height:76px;overflow:hidden;pointer-events:none;
     background:linear-gradient(90deg,#ff2d95,#8a2be2 50%,#1e90ff);border-radius:0 0 10px 10px;
-    box-shadow:0 4px 14px rgba(0,0,0,.5);font:900 31px/62px system-ui,Segoe UI,Arial,sans-serif;color:#fff;
+    box-shadow:0 4px 14px rgba(0,0,0,.5);font:900 35px/76px system-ui,Segoe UI,Arial,sans-serif;color:#fff;
     text-shadow:0 2px 3px rgba(0,0,0,.45);transition:opacity .2s}
   #align-bande .piste{position:absolute;white-space:nowrap;will-change:transform}
   #align-bande .piste span{margin-right:70px}
   #align-bande .flash{position:absolute;inset:0;display:none;align-items:center;justify-content:flex-start;
     padding:0;white-space:nowrap;overflow:hidden;
-    background:linear-gradient(90deg,#ff4fa3,#ffd400);color:#000;font-size:30px}
+    background:linear-gradient(90deg,#ff4fa3,#ffd400);color:#000;font-size:34px}
   #align-bande .flash.bulle{background:linear-gradient(90deg,#ffc0dc,#fff);color:#000}
   #align-bande .flash span{display:inline-block;will-change:transform}
   #align-bande.on .piste{visibility:hidden} #align-bande.on .flash{display:flex}
@@ -76,7 +76,7 @@
   function anim(now) {
     const r = zoneGraphique();
     const axe = 70;    // à droite : la bande s'arrête au début des prix
-    const marge = 60;  // à gauche : commence plus à droite pour rester dans la zone filmée par TikTok
+    const marge = 40;  // à gauche : un peu plus large (v5.2) tout en restant dans la zone filmée par TikTok
     bande.style.left = (r.left + marge) + 'px';
     bande.style.top = r.top + 'px';
     bande.style.width = Math.max(200, r.width - axe - marge) + 'px';
@@ -91,7 +91,9 @@
 
   // ───── messages (dans la bande, plus de fenêtre au centre) ─────
   const file = []; let occupe = false;
-  function montrer(texte, bulle) { file.push({ texte, bulle }); suivant(); }
+  // v5.1 : chaque info du bot (TP, SL, entrée, zone, pulsion…) passe 2 fois de suite dans la bande puis disparaît
+  // (plus rien n'est ajouté pour toujours à la bande qui défile)
+  function montrer(texte, bulle, fois) { for (let i = 0; i < (fois || 1); i++) file.push({ texte, bulle }); suivant(); }
   function suivant() {
     if (occupe || !file.length) return;
     occupe = true;
@@ -114,17 +116,29 @@
     const m = document.title.match(/\d[\d\s\u00a0\u202f]*,\d+/);
     return m ? parseFloat(m[0].replace(/[\s\u00a0\u202f]/g, '').replace(',', '.')) : NaN;
   }
+  // v5.2 : si Adel change le zoom / la hauteur des prix, c'est retenu (même après rechargement) et le script ne le défait plus
+  let PREF = { bar: 18, off: 10, manuelPrix: false };
+  try { PREF = Object.assign(PREF, JSON.parse(localStorage.getItem('alignBandePref') || '{}')); } catch (e) {}
+  function sauverPref() { try { localStorage.setItem('alignBandePref', JSON.stringify(PREF)); } catch (e) {} }
+  function memoriser() { try {
+    const c = chart(); if (!c) return;
+    const ts = c.getTimeScale(), b = ts.barSpacing(), o = ts.rightOffset();
+    if (b > 1 && b < 80) PREF.bar = b;
+    if (o >= 0 && o <= 80) PREF.off = o;          // un retour dans l'historique n'est pas une préférence
+    PREF.manuelPrix = !c.getPanes()[0].getMainSourcePriceScale().isAutoScale();
+    sauverPref();
+  } catch (e) {} }
   function cadrerPrix(c) {
     const ps = c.getPanes()[0].getMainSourcePriceScale();
     const k = SPAN[c.resolution()], p = dernierPrix();
     if (k && p > 0) { const e = p * k; ps.setAutoScale(false); ps.setVisiblePriceRange({ from: p - e * 0.55, to: p + e * 0.45 }); }
-    else if (!ps.isAutoScale()) ps.setAutoScale(true);
+    else if (!ps.isAutoScale() && !PREF.manuelPrix) ps.setAutoScale(true);
   }
   function zoom(delai) {
     setTimeout(() => { try {
       const c = chart(); if (!c) return;
       c.applyOverrides({ 'scalesProperties.scaleSeriesOnly': false, 'paneProperties.topMargin': 16, 'paneProperties.bottomMargin': 38 });   // v5.0 : SL / TP inclus dans l'échelle, place pour le tableau en bas
-      const ts = c.getTimeScale(); ts.setBarSpacing(18); ts.setRightOffset(10);
+      const ts = c.getTimeScale(); ts.setBarSpacing(PREF.bar); ts.setRightOffset(PREF.off);
       cadrerPrix(c);
       // l'indicateur ALIGN toujours DEVANT les bougies (étiquettes lisibles)
       const al = c.getAllStudies().filter(x => /^ALIGN/.test(x.name)).map(x => x.id); if (al.length) c.bringToFront(al);
@@ -135,16 +149,19 @@
   // (si Adel bouge le graphique à la souris, on lui laisse la main 20 s puis on recadre)
   let mainUser = 0;
   ['wheel', 'mousedown', 'touchstart'].forEach(ev => document.addEventListener(ev, e => {
-    if (e.target && e.target.closest && e.target.closest('.chart-markup-table')) mainUser = Date.now();
+    if (e.target && e.target.closest && (e.target.closest('.chart-markup-table') || e.target.closest('.price-axis') || e.target.closest('.time-axis'))) {
+      mainUser = Date.now(); clearTimeout(memoriser.t); memoriser.t = setTimeout(memoriser, 1500);
+    }
   }, { passive: true, capture: true }));
-  try { const c0 = chart(); c0.onIntervalChanged().subscribe(null, () => zoom(1200)); c0.onSymbolChanged().subscribe(null, () => zoom(1200)); } catch (e) {}
+  // nouveau marché = autre échelle de prix → prix en automatique ; le zoom des bougies d'Adel est gardé
+  try { const c0 = chart(); c0.onIntervalChanged().subscribe(null, () => zoom(1200)); c0.onSymbolChanged().subscribe(null, () => { PREF.manuelPrix = false; sauverPref(); zoom(1200); }); } catch (e) {}
   const suivi = setInterval(() => { try {
     if (Date.now() - mainUser < 20000) return;
     const c = chart(); if (!c) return;
     cadrerPrix(c);
     const ts = c.getTimeScale();
-    if (Math.abs(ts.barSpacing() - 18) > 0.5) ts.setBarSpacing(18);
-    if (Math.abs(ts.rightOffset() - 10) > 2) { ts.scrollToRealtime(); ts.setRightOffset(10); }
+    if (Math.abs(ts.barSpacing() - PREF.bar) > 0.5) ts.setBarSpacing(PREF.bar);
+    if (Math.abs(ts.rightOffset() - PREF.off) > 2) { ts.scrollToRealtime(); ts.setRightOffset(PREF.off); }
   } catch (e) {} }, 3000);
   function chart() { try { return window.TradingViewApi.activeChart(); } catch (e) { return null; } }
   function commande(sorte, valeur, prenom) {
@@ -199,8 +216,7 @@
     const bulle = txt.startsWith('BULLE:');
     if (bulle) txt = txt.slice(6).trim();
     if (/TP\d? TOUCH|OBJECTIF FINAL|TP2 TOUCH/i.test(txt)) feuArtifice(/TP2|FINAL/i.test(txt) ? '🏆 TP2 TOUCHÉ !' : '🎯 TP TOUCHÉ !');
-    montrer(txt, bulle);
-    if (!bulle) { extra.push(txt); remplir(); }
+    montrer(txt, bulle, 2);
   }
 
   // ───── écoute du canal ntfy (reconnexion automatique) ─────

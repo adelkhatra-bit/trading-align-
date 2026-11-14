@@ -1884,7 +1884,7 @@ class AlignSoundAndAiBudgetTest(unittest.TestCase):
                     if isinstance(n, ast.keyword) and n.arg == "disable_notification":
                         silencieux.add(f.name)
         # règles/menu épinglés, chrono et jauge modifiés en place, changement de langue : jamais prépare-toi / entrée / TP / SL
-        self.assertEqual(silencieux, {"epingler", "menu_canal_vip", "_editer_chrono_ou_recreer", "_lancer_chrono_verrouille", "changer_langue", "maj_jauge"})
+        self.assertEqual(silencieux, {"epingler", "epingler_menus_chaines", "menu_canal_vip", "_editer_chrono_ou_recreer", "_lancer_chrono_verrouille", "changer_langue", "maj_jauge"})
 
     def test_sound_asset_and_menu_button(self):
         from unittest.mock import patch
@@ -2434,7 +2434,7 @@ class TestTradingViewReportRegression(unittest.TestCase):
         state = {"menu": 4}
         with patch.object(align_bot, "telegram") as api:
             align_bot.installer_menu(state)
-        self.assertEqual(state["menu"], 8)
+        self.assertEqual(state["menu"], 9)
         self.assertTrue(any(call.args[0] == "setMyCommands" for call in api.call_args_list))
 
 class TestOneTapMarketAnalysis(unittest.TestCase):

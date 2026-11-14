@@ -32,7 +32,7 @@ class LiveTikTok(unittest.TestCase):
     def test_bouton_live_dans_les_deux_claviers(self):
         for c in (ab.CLAVIER, ab.CLAVIER_VISITEUR):
             textes = [b["text"] for ligne in json.loads(c)["keyboard"] for b in ligne]
-            self.assertIn("🔴 Live TikTok", textes)
+            self.assertIn("🔴 Live", textes)
 
     def test_rien_sur_la_bande_si_live_eteint(self):
         ab.live_annonces(self.etat, "BTC", ["🟢🟢🟢 J'ENTRE MAINTENANT — BTC"])
@@ -58,21 +58,21 @@ class LiveTikTok(unittest.TestCase):
     def test_annonces_sans_aucun_niveau(self):
         self.etat["live_on"] = True
         ab.live_annonces(self.etat, "BTC", ["🟢🟢🟢 J'ENTRE MAINTENANT — BTC\n📌 Entrée 68459,14\n🛑 SL 69105", "🎯 TP1 TOUCHÉ — BTC 67167"])
-        self.assertEqual(len(self.publie), 4)          # entrée + TP1 + bulle d'explication du TP1 + « abonne-toi, lien en bio »
-        self.assertTrue(self.publie[2].startswith("BULLE:"))
+        self.assertEqual(len(self.publie), 2)          # entrée + TP1 (chacun finit par « lien en bio »)
+        self.assertTrue(all("lien en bio" in t for t in self.publie))
         for t in self.publie:
             self.assertIsNone(re.search(r"\d{3,}", t), t)
             self.assertNotIn("SHORT", t)
             self.assertNotIn("LONG", t)
         ab.live_annonces(self.etat, "BTC", ["🟢🟢🟢 J'ENTRE MAINTENANT — BTC"])
-        self.assertEqual(len(self.publie), 4)          # pas de doublon
+        self.assertEqual(len(self.publie), 2)          # pas de doublon
 
     def test_bulle_zone(self):
         self.etat["live_on"] = True
         ab.live_annonces(self.etat, "GOLD", ["🟥🟥 POINT D'ENTRÉE À VENIR — 🥇 GOLD\n🟨 Le prix entre dans la zone\n📍 Zone ≈ 3990 – 4012"])
         self.assertTrue(self.publie[0].startswith("BULLE:"))
         self.assertIsNone(re.search(r"\d{3,}", self.publie[0]))
-        self.assertEqual(self.publie[0], "BULLE:👉 Le coach en direct t'explique tout : lien en bio 🎁 gratuit")
+        self.assertEqual(self.publie[0], "BULLE:🎯 Le prix arrive dans une zone clé 👀 • les infos en temps réel : lien en bio 🎁 gratuit")
         for mot in ("GOLD", "SHORT", "LONG", "ZONE", "position"):
             self.assertNotIn(mot, self.publie[0])
 
@@ -151,7 +151,7 @@ class CartesRelieesAuGraphique(unittest.TestCase):
         self.assertIn("red line", en)
         src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "align_bot.py"), encoding="utf-8").read()
         self.assertIn("🟨 Ligne jaune ENTRÉE : attends la CLÔTURE 15 min", src)
-        self.assertIn("BIENVENUE À", src)
+        self.assertIn("REJOINT LA TEAM ALIGN", src)
 
 
 
@@ -187,3 +187,43 @@ class CartesCouleursGraphique(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BandePulsion(unittest.TestCase):
+    def test_pulsion_sans_info(self):
+        for f in ("🎙 ÇA BOUGE !\n🟠 BTC : 65 560\n🔴 Les vendeurs accélèrent", "🎙 GROSSE MÈCHE !\n🥇 GOLD : 4 012"):
+            t = ab.texte_bande_flash(f)
+            self.assertTrue(t.startswith("BULLE:"))
+            self.assertIn("lien en bio", t.lower())
+            self.assertIsNone(re.search(r"\d{2,}|BTC|GOLD|NASDAQ|LONG|SHORT|Telegram", t))
+
+    def test_menu_chaine(self):
+        texte, kb = ab.menu_chaine({}, "BTC")
+        self.assertIn("ALIGN", texte)
+        urls = [b["url"] for l in json.loads(kb)["inline_keyboard"] for b in l]
+        self.assertIn(ab.BOT_LIEN, urls)
+        self.assertIn(ab.LIVE_LIEN, urls)
+        self.assertIn(ab.LIENS_CHAINES["GOLD"], urls)
+        self.assertNotIn(ab.LIENS_CHAINES["BTC"], urls)
+
+
+class BandeNews(unittest.TestCase):
+    def test_etapes(self):
+        vus = {}
+        for reste, attendu in ((15 * 60, "n15"), (10 * 60, "n10"), (5 * 60, "n5"), (-5 * 60, "nreac"), (-20 * 60, "nfin"), (40 * 60, None)):
+            e, t = ab.textes_live_news("CPI (inflation)", reste)
+            self.assertEqual(e, attendu)
+            if t:
+                self.assertIn("lien en bio", t)
+                self.assertNotIn("Telegram", t)
+        self.assertIn("SL et ton TP", ab.textes_live_news("CPI", 600)[1])
+
+    def test_une_fois_par_etape(self):
+        envoye = []
+        etat = {}
+        with mock.patch.object(ab, "calendrier", return_value=[{"t": 10_000, "titre": "NFP"}]), \
+             mock.patch.object(ab, "live_publier", side_effect=lambda t: envoye.append(t) or True):
+            ab.live_news(etat, 10_000 - 14 * 60)
+            ab.live_news(etat, 10_000 - 13 * 60)
+            ab.live_news(etat, 10_000 - 9 * 60)
+        self.assertEqual(len(envoye), 2)
