@@ -1077,7 +1077,7 @@ class AlignMtfRulesTest(unittest.TestCase):
     def test_main_keyboards_show_gold_btc_and_markets_buttons(self):
         import json
         for keyboard, attendus in ((align_bot.CLAVIER, ("🥇 Analyse Gold", "🟠 Analyse BTC", "📡 Mes marchés", "📊 Faire une analyse")),
-                                   (align_bot.CLAVIER_VISITEUR, ("🥇 Analyse Gold", "🟠 Analyse BTC", "📊 Faire une analyse", "💎 Devenir VIP"))):
+                                   (align_bot.CLAVIER_VISITEUR, ("🥇 Analyse Gold", "🟠 Analyse BTC", "🎙 Mes chaînes", "💎 Devenir VIP", "🔴 Live"))):
             parsed = json.loads(keyboard)
             labels = [b["text"] for row in parsed["keyboard"] for b in row]
             for attendu in attendus:
@@ -1884,7 +1884,8 @@ class AlignSoundAndAiBudgetTest(unittest.TestCase):
                     if isinstance(n, ast.keyword) and n.arg == "disable_notification":
                         silencieux.add(f.name)
         # règles/menu épinglés, chrono et jauge modifiés en place, changement de langue : jamais prépare-toi / entrée / TP / SL
-        self.assertEqual(silencieux, {"epingler", "epingler_menus_chaines", "menu_canal_vip", "_editer_chrono_ou_recreer", "_lancer_chrono_verrouille", "changer_langue", "maj_jauge"})
+        self.assertEqual(silencieux, {"epingler", "epingler_menus_chaines", "menu_canal_vip", "_editer_chrono_ou_recreer", "_lancer_chrono_verrouille", "changer_langue", "maj_jauge",
+                                      "notifier_canal_marche", "renvoyer_claviers"})   # commentaires de chaîne et nouveau clavier : sans son
 
     def test_sound_asset_and_menu_button(self):
         from unittest.mock import patch

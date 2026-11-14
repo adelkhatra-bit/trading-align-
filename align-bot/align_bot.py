@@ -1743,7 +1743,7 @@ TRAD = {
 "🟠 BTC + 🥇 GOLD": "🟠 BTC + 🥇 GOLD", "🏷 Type :": "🏷 Type:", "position de plusieurs jours": "multi-day position", "position dans la journée": "intraday position", "position courte, quelques minutes à 1-2 h": "short position, a few minutes to 1-2 h", "validation clôture": "confirmation close", "SL derrière la zone": "SL behind the zone", "💎 TU ES DÉJÀ VIP": "💎 YOU ARE ALREADY VIP", "✅ Toutes les positions, les niveaux et le coach sont actifs pour toi": "✅ All positions, levels and the coach are active for you", "📲 Le canal ALIGN VIP 💎 est accessible avec le bouton ci-dessous": "📲 Open the ALIGN VIP 💎 channel with the button below", "📲 Ouvrir le canal ALIGN VIP 💎": "📲 Open ALIGN VIP 💎 channel", "📡 Choisir les marchés suivis": "📡 Choose followed markets",
 "✅ Sélection enregistrée": "✅ Selection saved", "🥇 + 🟠 Les deux": "🥇 + 🟠 Both",
 "✅ Je suis rentré": "✅ I'm in", "🚪 Je suis sorti": "🚪 I'm out", "📈 Mes résultats": "📈 My results",
-"🧩 Indicateur TradingView": "🧩 TradingView indicator", "💎 Devenir VIP": "💎 Become VIP",
+"🧩 Indicateur TradingView": "🧩 TradingView indicator", "💎 Devenir VIP": "💎 Become VIP", "🎙 Mes chaînes": "🎙 My channels",
 "Utilise les boutons 👇": "Use the buttons 👇", "❌ Non": "❌ No",
 "📤 Partager à un ami": "📤 Share with a friend", "🎁 Offrir l'accès VIP": "🎁 Gift VIP access",
 "🎁 Offrir l'indicateur": "🎁 Gift the indicator", "⛔ Retirer l'accès": "⛔ Remove access",
@@ -2310,7 +2310,7 @@ TRAD.update({
 })
 _CLES = sorted(TRAD, key=len, reverse=True)
 BOUTONS_FR = ["🤖 Mon bot", "📸 Partager mon gain", "🟠 Analyse BTC", "🥇 Analyse Gold", "💠 Analyse Nasdaq", "✅ Je suis rentré", "🚪 Je suis sorti", "📈 Mes résultats",
-              "🧩 Indicateur TradingView", "💎 Devenir VIP", "📡 Mes marchés", "❌ Non"]
+              "🧩 Indicateur TradingView", "💎 Devenir VIP", "📡 Mes marchés", "❌ Non", "🎙 Mes chaînes"]
 INVERSE = {TRAD[b]: b for b in BOUTONS_FR}        # bouton anglais reçu → même action qu'en français
 
 TRAD.update({
@@ -2816,16 +2816,16 @@ def telegram(methode, **params):
 
 # ───────── Boutons et jauge ─────────
 CLAVIER = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}, {"text": "💠 Analyse Nasdaq"}],
-                                   [{"text": "📊 Faire une analyse"}, {"text": "📡 Mes marchés"}],
-                                   [{"text": "🤖 Mon bot"}, {"text": "📈 Mes résultats"}],
-                                   [{"text": "📸 Partager mon gain"}, {"text": "🧩 Indicateur TradingView"}],
-                                   [{"text": "🔴 Live"}, {"text": "🌐 English"}]],
+                                   [{"text": "📊 Faire une analyse"}, {"text": "📡 Mes marchés"}, {"text": "🎙 Mes chaînes"}],
+                                   [{"text": "🤖 Mon bot"}, {"text": "📈 Mes résultats"}, {"text": "📸 Partager mon gain"}],
+                                   [{"text": "🧩 Indicateur TradingView"}, {"text": "🌐 English"}],
+                                   [{"text": "🔴 Live"}]],
                       "resize_keyboard": True, "is_persistent": True, "input_field_placeholder": "Choisis une action ALIGN"})
+# Bot gratuit = accueil / inscriptions : peu de boutons ; « 🎙 Mes chaînes » donne le lien de la chaîne du marché + le coach.
+# Les boutons qui vendent (VIP, Live) restent tout en bas, comme épinglés.
 CLAVIER_VISITEUR = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}, {"text": "💠 Analyse Nasdaq"}],
-                                            [{"text": "📊 Faire une analyse"}, {"text": "📡 Mes marchés"}],
-                                            [{"text": "🤖 Mon bot"}, {"text": "💎 Devenir VIP"}],
-                                            [{"text": "📸 Partager mon gain"}],
-                                            [{"text": "🔴 Live"}, {"text": "🌐 English"}]],
+                                            [{"text": "🎙 Mes chaînes"}, {"text": "🤖 Mon bot"}, {"text": "🌐 English"}],
+                                            [{"text": "💎 Devenir VIP"}, {"text": "🔴 Live"}]],
                                "resize_keyboard": True, "is_persistent": True, "input_field_placeholder": "Choisis une action ALIGN"})
 AVERTISSEMENT = ("ℹ️ Ce sont MES positions personnelles, partagées à titre informatif et éducatif. "
                  "Ce n'est pas un conseil en investissement ni une recommandation personnalisée. "
@@ -4653,15 +4653,32 @@ def menu_chaine(etat, m):
     """Message épinglé en haut de chaque chaîne : à quoi sert la chaîne + les boutons (coach, live, autres marchés)."""
     autres = [mk for mk in MARCHES if mk != m and LIENS_CHAINES.get(mk)]
     texte = "\n".join([f"📌 ALIGN {ICONE.get(m, '')} {m}", "━━━━━━━━━━━━━━━", "🎙 Ici : le marché commenté en direct",
-                        "🎯 TP / SL du bot annoncés", "🧑‍🏫 Ton coach perso + niveaux : bouton 👇", "🔴 Le live : bouton 👇",
+                        "🎯 TP / SL et résultats du bot ici", "🔕 Commentaires sans son, TP / SL avec son", "🧑‍🏫 Ton coach perso + niveaux : bouton 👇", "🔴 Le live : bouton 👇",
                         "⚠️ Pas un conseil financier"])
-    kb = [[{"text": "🧑‍🏫 Mon coach perso (gratuit)", "url": BOT_LIEN}], [{"text": "📺 Le live ALIGN", "url": LIVE_LIEN}]]
+    kb = [[{"text": "🧑‍🏫 Mon coach perso (gratuit)", "url": BOT_LIEN}],
+          [{"text": "🏆 Gagnantes", "url": BOT_LIEN + "?start=gagnantes"}, {"text": "❌ Perdantes", "url": BOT_LIEN + "?start=perdantes"}]]
     if autres:
         kb.append([{"text": f"{ICONE.get(mk, '')} ALIGN {mk}", "url": LIENS_CHAINES[mk]} for mk in autres])
+    kb.append([{"text": "💎 VIP", "url": BOT_LIEN + "?start=vip"}, {"text": "📺 Le live ALIGN", "url": LIVE_LIEN}])
     return texte, json.dumps({"inline_keyboard": kb})
 
 
-MENU_CHAINE_VERSION = 1
+MENU_CHAINE_VERSION = 2
+CLAVIER_VERSION = 2
+
+def renvoyer_claviers(etat, chats):
+    """Nouveau clavier (moins de boutons, VIP / Live en bas) : envoyé UNE fois à chaque personne, sans son, puis plus jamais."""
+    if not TOKEN:
+        return
+    vus = etat.setdefault("clavier_v", {})
+    for cid in sorted(({str(c) for c in chats} | {str(c) for c in etat.get("prospects", [])}) - {str(etat.get("canal") or "")})[:30]:
+        if vus.get(cid) == CLAVIER_VERSION:
+            continue
+        vus[cid] = CLAVIER_VERSION               # marqué avant l'envoi : jamais 2 fois, même si Telegram répond mal
+        en = cid in LANG_EN
+        kb = CLAVIER if autorise(etat, cid, cid) else CLAVIER_VISITEUR
+        _envoi_sur(cid, text=("⬇️ New buttons, simpler 👇" if en else "⬇️ Nouveaux boutons, plus simples 👇"),
+                   reply_markup=traduire_clavier(kb) if en else kb, disable_notification="true")
 
 def epingler_menus_chaines(etat):
     """Une fois par version : le menu de chaque chaîne est publié puis épinglé (échec = nouvel essai dans 1 h)."""
@@ -4673,13 +4690,19 @@ def epingler_menus_chaines(etat):
             continue
         info["menu_essai"] = time.time()
         texte, kb = menu_chaine(etat, m)
-        res = _envoi_sur(canal, text=texte, reply_markup=kb)
+        res = _envoi_sur(canal, text=texte, reply_markup=kb, disable_notification="true")
         try:
             mid = res["result"]["message_id"]
         except Exception as ex:
             print("menu chaîne", m, ex)
             continue
         info["menu_v"] = MENU_CHAINE_VERSION       # publié : jamais republié (pas de doublon), même si l'épinglage échoue
+        try:
+            if info.get("menu_mid"):
+                telegram("unpinChatMessage", chat_id=canal, message_id=info["menu_mid"])     # l'ancien menu n'est plus épinglé
+        except Exception:
+            pass
+        info["menu_mid"] = mid
         try:
             telegram("pinChatMessage", chat_id=canal, message_id=mid, disable_notification="true")
         except Exception as ex:
@@ -4788,12 +4811,13 @@ def notifier_canal_marche(etat, m, r, cle):
     if int(info.get("dernier_t", 0)) < int(b["t"]):
         # Marqué AVANT l'envoi : une coupure réseau après livraison ne doit jamais donner 4 bilans identiques (vu le 14/11 à 20:24)
         info["dernier_t"] = int(b["t"])
-        _envoi_sur(canal, text=texte_coach_live(m, b, r, cle, None, public=True), reply_markup=boutons_chaine_marche(etat))
+        _envoi_sur(canal, text=texte_coach_live(m, b, r, cle, None, public=True), reply_markup=boutons_chaine_marche(etat),
+                   disable_notification="true")      # commentaire = sans son : les abonnés restent tranquilles
         return
     flash = flash_commentateur(m, r, cle)
     if flash and time.time() - float(info.get("flash_t", 0)) >= 300:
         info["flash_t"] = time.time()
-        _envoi_sur(canal, text=flash, reply_markup=boutons_chaine_marche(etat))
+        _envoi_sur(canal, text=flash, reply_markup=boutons_chaine_marche(etat), disable_notification="true")
         live_bande(etat, texte_bande_flash(flash), f"pulse{m}", 600, toujours=True)
 
 
@@ -4822,9 +4846,11 @@ def canal_resultats(etat, m, textes):
         elif "FRÔLÉ" in t:
             msg = "\n".join(["😅 TP FRÔLÉ !", f"{ic} {m} : à un cheveu", "👀 Petit recul", "😎 T'inquiète, on garde le cap"])
         elif "STOP TOUCHÉ" in t:
-            msg = "\n".join(["😤 STOP TOUCHÉ", f"{ic} {m} : on coupe petit", "💪 On va se refaire", "👀 Je cherche la suite"])
+            continue                     # la fin du trade = UNE carte résultat (publier_resultat) dans cette chaîne, jamais 2 messages
         else:
             continue
+        if n and n.group(1) != "1" or (not n and "OBJECTIF FINAL ATTEINT" in t):
+            continue                     # TP final : même règle, la carte résultat suffit
         _envoi_sur(canal, text=msg, reply_markup=boutons_chaine_marche(etat))
 
 
@@ -5295,7 +5321,8 @@ def boutons_menu_rapide(etat):
     """Boutons sous les messages (chaînes + bot) : positions gagnantes / perdantes, live, coach. Liens vers le bot (marchent depuis une chaîne)."""
     return json.dumps({"inline_keyboard": [
         [{"text": "🏆 Gagnantes", "url": BOT_LIEN + "?start=gagnantes"}, {"text": "❌ Perdantes", "url": BOT_LIEN + "?start=perdantes"}],
-        [{"text": "🔴 Live" if live_actif(etat) else "📺 Le live", "url": LIVE_LIEN}, {"text": "🧑‍🏫 Mon coach", "url": BOT_LIEN}]]})
+        [{"text": "🧑‍🏫 Mon coach (gratuit)", "url": BOT_LIEN}],
+        [{"text": "💎 VIP", "url": BOT_LIEN + "?start=vip"}, {"text": "🔴 Live" if live_actif(etat) else "📺 Le live", "url": LIVE_LIEN}]]})
 
 
 def publier_resultat(etat, m, tr, sortie, motif, gain):
@@ -5307,14 +5334,17 @@ def publier_resultat(etat, m, tr, sortie, motif, gain):
            f"📌 Entrée ≈ {px(tr['e'])}\n🏁 Sortie ≈ {px(sortie)}\n"
            f"📏 {'+' if gain > 0 else '-'}{pips_txt(m, sortie - tr['e'])}\n"
            f"📈 Résultat : {gain:+.2f} %\n⏱ Durée : {duree // 60} h {duree % 60:02d}\n"
-           + ("📸 Tu étais dedans ? Partage ta capture ici avec le bouton 📸 Partager mon gain" if gain > 0 else "🛡 SL respecté, risque maîtrisé"))
-    if etat.get("canal_preuves"):
+           + ("📸 Tu étais dedans ? Partage ta capture : bouton 📸 Partager mon gain dans ton coach" if gain > 0 else "🛡 SL respecté, risque maîtrisé"))
+    # ALIGN Résultats fusionné dans la chaîne du marché (choix d'Adel) : la carte part dans ALIGN BTC / Gold / NASDAQ, avec son
+    cible = (etat.get("canaux_marche") or {}).get(m) or etat.get("canal_preuves")
+    if cible:
+        tete = ("🎆 TP TOUCHÉ ! 🥳 Encaisse et souris\n" if gain > 0 else "😤 STOP TOUCHÉ · 💪 On va se refaire\n")
         try:
-            telegram("sendMessage", chat_id=etat["canal_preuves"], text=txt, reply_markup=boutons_menu_rapide(etat))
+            telegram("sendMessage", chat_id=cible, text=tete + txt, reply_markup=boutons_menu_rapide(etat))
         except Exception as ex:
             print("résultat", ex)
     # Le lien du groupe des résultats n'apparaît QUE après un TP ou un SL
-    lien = lien_validation(etat)
+    lien = (etat.get("liens_marche") or {}).get(m) or LIENS_CHAINES.get(m) or lien_validation(etat)
     kb = json.dumps({"inline_keyboard": [[{"text": "📸 Voir les résultats ALIGN", "url": lien}]]})
     for c, pos in (tr.get("qui") or {}).items():
         if isinstance(pos, dict) and vue_gratuite(etat, c):
@@ -5853,6 +5883,9 @@ def traiter(etat, chats, updates):
         bas = tx.lower()
         if "live tiktok" in bas or bas.strip() == "🔴 live" or cmd == "/live":
             menu_live(etat, cid)
+            continue
+        if bas.strip() == "🎙 mes chaînes":
+            accueil_marches(etat, cid)
             continue
         if bas.strip() in ("🏆 positions gagnantes", "❌ positions perdantes"):
             _envoi_sur(cid, text=texte_journal(etat, "gagnantes" in bas), reply_markup=boutons_menu_rapide(etat))
@@ -9586,6 +9619,7 @@ def un_tour(etat, chats):
         try:
             preparer_chaines(etat)
             epingler_menus_chaines(etat)
+            renvoyer_claviers(etat, chats)
         except Exception as ex:
             print("préparer chaînes", ex)
         for nom_marche in MARCHES:

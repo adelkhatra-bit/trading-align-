@@ -92,5 +92,38 @@ class TpFrole(unittest.TestCase):
         self.assertIn("frôlé", pub[0]); self.assertNotIn("Telegram", pub[0])
 
 
+    def test_fin_de_trade_une_seule_carte_dans_la_chaine(self):
+        env = []
+        with mock.patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: env.append(k["text"])):
+            etat = {"canaux_marche": {"BTC": -1}}
+            ab.canal_resultats(etat, "BTC", ["🛑 STOP TOUCHÉ — 🟠 BTC", "🎯 TP2 TOUCHÉ · OBJECTIF FINAL ATTEINT — 🟠 BTC"])
+        self.assertEqual(env, [])          # la carte résultat (publier_resultat) est le seul message
+
+    def test_resultat_part_dans_la_chaine_du_marche(self):
+        vus = []
+        with mock.patch.object(ab, "telegram", side_effect=lambda meth, **k: vus.append((meth, k.get("chat_id"), k.get("text", ""))) or {}), \
+             mock.patch.object(ab, "_envoi_sur", return_value=None):
+            etat = {"canaux_marche": {"BTC": -7}, "canal_preuves": -9}
+            ab.publier_resultat(etat, "BTC", {"d": -1, "e": 100.0, "cree": 0}, 101.0, "SL", -1.0)
+        envois = [v for v in vus if v[0] == "sendMessage"]
+        self.assertEqual(envois[0][1], -7)
+        self.assertIn("STOP TOUCHÉ", envois[0][2])
+        self.assertFalse(any(v[1] == -9 for v in envois))
+
+    def test_boutons_chaine_vip_et_live_en_bas(self):
+        import json
+        kb = json.loads(ab.boutons_menu_rapide({}))["inline_keyboard"]
+        self.assertIn("VIP", kb[-1][0]["text"])
+        self.assertTrue(any("live" in b["text"].lower() for b in kb[-1]))
+
+    def test_nouveau_clavier_envoye_une_seule_fois(self):
+        env = []
+        with mock.patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: env.append(c)), mock.patch.object(ab, "TOKEN", "x"):
+            etat = {"prospects": ["5"]}
+            ab.renvoyer_claviers(etat, {"5", "6"})
+            ab.renvoyer_claviers(etat, {"5", "6"})
+        self.assertEqual(sorted(env), ["5", "6"])
+
+
 if __name__ == "__main__":
     unittest.main()
