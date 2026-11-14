@@ -17,6 +17,7 @@
     '👉 ABONNE-TOI • PARTAGE • TAPOTE L\'ÉCRAN',
     '🔗 LIEN EN BIO : COACH EN DIRECT',
     '🔌 BRANCHE-TOI AU MARCHÉ • chaque bougie expliquée en direct • lien en bio 🎁',
+    '🧭 CHEZ ALIGN ON NE VA JAMAIS CONTRE LA TENDANCE • on suit le marché, on ne le combat pas 💪',
     '📲 Le coach ALIGN en direct • lien en bio 🎁 gratuit',
     '⚠️ Le trading comporte un risque de perte • ceci n\'est pas un conseil financier'
   ];
@@ -291,7 +292,7 @@
   // v6.2 (demande d'Adel) : plus de petite fenêtre au survol : l'explication de la ligne (ENTRÉE, SL, TP, ZONE…)
   // passe dans la BANDE qui défile, 2 fois, avec la couleur de la ligne (TP vert/or, SL rouge, entrée orange)
   const vuTT = {};
-  function couleurLigne(t) { return /^\W*TP|TP\d/.test(t) ? 'tp' : /^\W*SL\b|\bSL\b/.test(t) ? 'sl' : /ENTR/.test(t) ? 'alerte' : 'membre'; }
+  function couleurLigne(t) { const h = String(t).slice(0, 28); return /\bSL\b|STOP/.test(h) ? 'sl' : /TP/.test(h) ? 'tp' : /ENTR/.test(h) ? 'alerte' : 'membre'; }   // la couleur suit le DÉBUT du texte (le nom de la ligne)
   function texteLigne(t) { return String(t || '').replace(/[━─]+/g, ' ').replace(/\s*\n+\s*/g, ' • ').replace(/(\s•\s)+/g, ' • ').replace(/^\s*•\s*|\s*•\s*$/g, '').trim(); }
   const obs = new MutationObserver(() => {
     document.querySelectorAll('[class*="common-tooltip-"][class*="common-tooltip--"]').forEach(t => {
