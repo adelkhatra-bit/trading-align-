@@ -37,10 +37,12 @@ class LiveTikTok(unittest.TestCase):
     def test_live_24h_toujours_actif_par_defaut(self):
         self.assertTrue(ab.live_actif({}))
 
-    def test_rien_sur_la_bande_si_live_eteint(self):
+    def test_entree_toujours_sur_la_bande_meme_live_eteint(self):
+        # Règle d'Adel (14/11) : l'entrée en position passe toujours sur la bande (elle n'existe que sur l'écran du live)
         with mock.patch.object(ab, "LIVE_24H", False):
             ab.live_annonces(self.etat, "BTC", ["🟢🟢🟢 J'ENTRE MAINTENANT — BTC"])
-        self.assertEqual(self.publie, [])
+        self.assertEqual(len(self.publie), 1)
+        self.assertIn("lien en bio", self.publie[0]); self.assertNotIn("Telegram", self.publie[0])
 
     def test_tp_touche_toujours_sur_la_bande(self):
         ab.live_annonces(self.etat, "BTC", ["🎯 BTC : TP1 TOUCHÉ"])
@@ -76,7 +78,8 @@ class LiveTikTok(unittest.TestCase):
         ab.live_annonces(self.etat, "GOLD", ["🟥🟥 POINT D'ENTRÉE À VENIR — 🥇 GOLD\n🟨 Le prix entre dans la zone\n📍 Zone ≈ 3990 – 4012"])
         self.assertTrue(self.publie[0].startswith("BULLE:"))
         self.assertIsNone(re.search(r"\d{3,}", self.publie[0]))
-        self.assertEqual(self.publie[0], "BULLE:🎯 Le prix arrive dans une zone clé 👀 • les infos en temps réel : lien en bio 🎁 gratuit")
+        self.assertTrue(self.publie[0].startswith("BULLE:🎯 Le prix arrive dans une zone clé 👀 • ⏱ verdict dans "))
+        self.assertTrue(self.publie[0].endswith("les infos en temps réel : lien en bio 🎁 gratuit"))
         for mot in ("GOLD", "SHORT", "LONG", "ZONE", "position"):
             self.assertNotIn(mot, self.publie[0])
 
@@ -220,9 +223,11 @@ class TestPrepareToiLive(unittest.TestCase):
             ab._LIVE_DERNIER.clear()
             ab.live_prepare_toi({}, {}, 1000.0)
             ab.live_prepare_toi({}, {}, 1060.0)
-        self.assertEqual(len(pub), 1)
+        self.assertEqual(len(pub), 2)                # prépare-toi + jeu « tapote l'écran », une seule fois
         self.assertIn("couler", pub[0]); self.assertIn("verdict dans", pub[0]); self.assertIn("lien en bio", pub[0])
-        self.assertNotIn("65", pub[0]); self.assertNotIn("Telegram", pub[0])
+        self.assertIn("tapote", pub[1])
+        for t in pub:
+            self.assertNotIn("65", t); self.assertNotIn("Telegram", t)
 
 
 

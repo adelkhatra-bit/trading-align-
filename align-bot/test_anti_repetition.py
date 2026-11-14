@@ -1,3 +1,4 @@
+import unittest.mock
 """Anti-répétition des messages Telegram : un même message (mêmes informations) n'est envoyé qu'une fois ; une information nouvelle passe toujours."""
 import unittest
 from unittest.mock import patch
@@ -244,6 +245,7 @@ class SensIaCoherent(unittest.TestCase):
             sortie = ab.commentaires_ia_temps_reel({}, "GOLD", r, {}, ["⚡⚡ PRÉPARE-TOI — 🥇 GOLD\nzone"])
         self.assertEqual(sortie, [])
 
+    @unittest.mock.patch("align_bot.IA_AUTO", True)   # IA automatique coupée en prod (règle d'Adel) : on teste le mécanisme quand on la rallume
     def test_commentaire_en_direct_coherent_est_envoye(self):
         r = {"sens": 1}
         with patch.object(ab, "ia", return_value="Mouvement haussier en cours, attends le repli."), patch.object(ab, "donnees_ia", return_value={}):

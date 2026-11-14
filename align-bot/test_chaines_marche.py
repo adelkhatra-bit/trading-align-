@@ -171,5 +171,16 @@ class TpFrole(unittest.TestCase):
         self.assertEqual(vus, ["sendMessage", "pinChatMessage"])
 
 
+    def test_stop_perso_ignore_les_vieilles_bougies(self):
+        now = ab.time.time()
+        vieux = [{"t": now - 3600, "o": 1, "h": 65100.0, "l": 64900.0, "c": 65000.0}]
+        frais = [{"t": now - 60 * k, "o": 1, "h": 64900.0, "l": 64800.0, "c": 64850.0} for k in (5, 4, 3, 2, 1)]
+        r = {"m1": vieux + frais, "atr": 200.0, "b15": [{"c": 64850.0, "t": now}], "niveaux": [], "r5": [50]}
+        tr = {"d": -1, "qui": {"1": {"e": 64991.0, "sl": 65300.0, "sl_conseil": 65009.0, "d": -1}}}
+        with mock.patch.object(ab, "noter") as noter, mock.patch.object(ab, "_envoi_sur"):
+            ab.gerer_stop({}, "BTC", r, tr, "1")
+        noter.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
