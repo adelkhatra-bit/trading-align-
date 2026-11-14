@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      6.1
+// @version      6.2
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '6.1';
+  const VERSION = '6.2';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -288,19 +288,19 @@
   ecouter();
 
   // ───── infobulles : baissier → en haut, haussier → en bas, collées à gauche ─────
+  // v6.2 (demande d'Adel) : plus de petite fenêtre au survol : l'explication de la ligne (ENTRÉE, SL, TP, ZONE…)
+  // passe dans la BANDE qui défile, 2 fois, avec la couleur de la ligne (TP vert/or, SL rouge, entrée orange)
+  const vuTT = {};
+  function couleurLigne(t) { return /^\W*TP|TP\d/.test(t) ? 'tp' : /^\W*SL\b|\bSL\b/.test(t) ? 'sl' : /ENTR/.test(t) ? 'alerte' : 'membre'; }
+  function texteLigne(t) { return String(t || '').replace(/[━─]+/g, ' ').replace(/\s*\n+\s*/g, ' • ').replace(/(\s•\s)+/g, ' • ').replace(/^\s*•\s*|\s*•\s*$/g, '').trim(); }
   const obs = new MutationObserver(() => {
-    let survol = false;
     document.querySelectorAll('[class*="common-tooltip-"][class*="common-tooltip--"]').forEach(t => {
       const txt = t.innerText || '';
       if (!/[━]|ENTRÉE|SL|TP|ZONE|RETOURNEMENT|CONFIRMATION/.test(txt)) return;
-      survol = true;
-      const r = zoneGraphique();
-      // v4.7 : toutes les infobulles (ENTRÉE, SL, TP, unités…) s'ouvrent TOUJOURS au même endroit : en haut à gauche, sous le nom de l'indicateur
-      t.style.left = (r.left + 12) + 'px';
-      t.style.right = 'auto';
-      t.style.top = (r.top + 56) + 'px'; t.style.bottom = 'auto';
+      t.style.visibility = 'hidden';                 // la fenêtre ne s'affiche plus : tout passe dans la bande
+      const ligne = texteLigne(txt), now = Date.now();
+      if (ligne && now - (vuTT[ligne] || 0) > 45000) { vuTT[ligne] = now; montrer('📌 ' + ligne, false, 2, couleurLigne(ligne)); }
     });
-    bande.style.opacity = survol ? '0' : '1';   // la bande s'efface pendant le survol d'une infobulle
   });
   obs.observe(document.body, { childList: true, subtree: true });
 
@@ -369,7 +369,7 @@
       }, i * 160);
     } catch (e) {}
   }
-  window.__ALIGN_SHOW__ = { pop, lueur, coeurs };
+  window.__ALIGN_SHOW__ = { pop, lueur, coeurs, lignes: () => lignesAlign() };
   // une info du spectacle sur la bande : jamais par-dessus une vraie info du bot, et pas plus d'une par minute
   let dernierShow = 0;
   function bandeShow(txt) {
@@ -381,6 +381,28 @@
   function versBot(typ, d, minutes) {
     const mk = codeMarche(); if (!mk) return;
     try { fetch('https://ntfy.sh/' + SUJET + '-ecran', { method: 'POST', body: ['EVT', mk, typ, d, minutes || ''].join('|') }); } catch (e) {}
+  }
+  // v6.2 : les lignes ALIGN du graphique (ENTRÉE, SL, TP1, TP2) lues directement dans l'indicateur
+  function lignesAlign() {
+    const res = {};
+    try {
+      const mod = chart()._chartWidget.model().model();
+      for (const ds of mod.dataSources()) {
+        if (!/ALIGN/.test(String(ds.title && ds.title()))) continue;
+        const vu = new Set();
+        (function walk(o, d, dansData) {
+          if (!o || d > 8 || typeof o !== 'object' || vu.has(o)) return; vu.add(o);
+          if (o instanceof Map) { o.forEach(v => walk(v, d + 1, dansData)); return; }
+          if (dansData && typeof o.t === 'string' && typeof o.y === 'number') {
+            const n = (o.t.match(/^\s*(ENTRÉE|SL|TP1|TP2)\b/) || [])[1];
+            if (n && (!res[n] || o.id > res[n].id)) res[n] = { id: o.id, y: o.y, tt: o.tt || o.t };
+            return;
+          }
+          for (const k of Object.keys(o)) walk(o[k], d + 1, dansData || k === '_primitivesDataById');
+        })(ds.graphics()._primitivesCollection.dwglabels, 0, false);
+      }
+    } catch (e) {}
+    return res;
   }
   const deja = {};
   function uneFois(cle) { if (deja[cle]) return false; deja[cle] = 1; return true; }
@@ -417,6 +439,18 @@
       const moyR = prev.reduce((a, x) => a + (x[2] - x[3]), 0) / prev.length || 1;
       const moyV = prev.reduce((a, x) => a + (x[5] || 0), 0) / prev.length || 0;
       const corps = cur[4] - cur[1], sens = corps < 0 ? -1 : 1, id = m + cur[0];
+      // 0) v6.2 : le prix arrive sur une ligne ALIGN → son explication défile dans la bande (2 fois), une fois par quart d'heure
+      const LG = lignesAlign(), q15 = Math.floor(Date.now() / 900000);
+      for (const n of ['TP2', 'TP1', 'SL', 'ENTRÉE']) {
+        const l = LG[n]; if (!l) continue;
+        if (Math.abs(cur[4] - l.y) < 0.3 * moyR && uneFois('ligne' + m + n + Math.round(l.y) + q15)) {
+          const tete = { TP2: '💰 Le prix arrive sur le TP2 (ligne bleue)', TP1: '💰 Le prix arrive sur le TP1 (ligne bleue)',
+                         SL: '🛑 Le prix approche du SL (ligne rouge)', 'ENTRÉE': '🟨 Le prix arrive sur la ligne ENTRÉE (jaune)' }[n];
+          montrer(tete + ' • ' + texteLigne(l.tt) + ' • en direct : lien en bio 🎁', false, 2, couleurLigne(n));
+          if (n.startsWith('TP')) coeurs(10, ['💰', '💵', '🎯']);
+          return;
+        }
+      }
       // 1) bougie qui accélère (corps > 1,6× la taille moyenne) : explosion visuelle + lueur rouge/verte
       if (Math.abs(corps) > 1.6 * moyR && uneFois('acc' + id)) {
         pop(sens === -1 ? '📉' : '📈', 'ÇA ACCÉLÈRE ' + (sens === -1 ? '🔴 ' : '🟢 ') + m, sens, 'jusqu\'où ? la suite en temps réel : lien en bio 🎁'); lueur(sens); versBot('acc', sens);
