@@ -82,6 +82,11 @@ class PlanFVG(unittest.TestCase):
         self.assertIn("⏳ Patiente : j'entre quand une bougie 5 min clôture sous", txt)
         self.assertIn("📍 Prix DANS la zone d'entrée (vue 5 min)", txt)
         self.assertEqual(ab.coach_fvg(dict(r, struct_ut={}), -1, 106.5), [])        # pas de FVG : rien d'inventé
+        # carte d'un trade ouvert : le SL de l'explication = celui de la carte (65704 vs 65977 vu en direct)
+        tr = dict(d=-1, e=105.8, sl=130.123, tp1=90, tp2=80, statut="entree")
+        ex = "\n".join(ab.coach_fvg(r, -1, 106.5, attente=False, tr=tr))
+        self.assertIn(ab.px(130.123), ex)
+        self.assertNotIn(ab.px(ab.pine_entree(r, -1)["sl"]), ex.replace(ab.px(130.123), ""))
 
     def test_scalp_inverse_vers_l_entree_du_plan(self):
         st = (None, None, 100.0, 99.0, 110.0, 98.0, 1.0, 100.2)                 # FVG verte 99–100, plus bas 98, ATR 1

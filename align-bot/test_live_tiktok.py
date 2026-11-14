@@ -227,3 +227,15 @@ class BandeNews(unittest.TestCase):
             ab.live_news(etat, 10_000 - 13 * 60)
             ab.live_news(etat, 10_000 - 9 * 60)
         self.assertEqual(len(envoye), 2)
+
+
+class MarcheFermeJamaisEnPosition(unittest.TestCase):
+    def test_gold_ferme_avec_trade_perime(self):
+        import datetime
+        from zoneinfo import ZoneInfo
+        samedi = datetime.datetime(2026, 11, 14, 12, 0, tzinfo=ZoneInfo("America/Chicago")).timestamp()
+        r = {"m1": [{"c": 4000.0}]}
+        for m in ("GOLD", "NASDAQ"):
+            p = ab.proximite_marche(m, r, {"trade": {"d": 1}}, samedi)
+            self.assertEqual(p["classe"], "ferme")
+        self.assertEqual(ab.proximite_marche("BTC", r, {"trade": {"d": 1}}, samedi)["classe"], "position")
