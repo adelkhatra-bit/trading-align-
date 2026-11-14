@@ -9171,6 +9171,15 @@ ECRAN_TITRES = {
     "acc": ("🔴 ÇA ACCÉLÈRE vers le bas", "🟢 ÇA ACCÉLÈRE vers le haut"),
     "volume": ("🐋 GROS VOLUME : les baleines bougent", "🐋 GROS VOLUME : les baleines bougent"),
     "annonce": ("✅ ANNONCÉ : ça a coulé 🔴", "✅ ANNONCÉ : ça a décollé 🟢"),
+    "rebond": ("↩️ REJET sur {l} : touchée puis le prix repart vers le bas 🔴", "↩️ REBOND sur {l} : touchée puis le prix repart vers le haut 🟢"),
+    "ligne": ("📍 Le prix arrive sur {l} (par le haut) 🔴", "📍 Le prix arrive sur {l} (par le bas) 🟢"),
+}
+ECRAN_LIGNES = {"TP1": "le TP1 (ligne bleue)", "TP2": "le TP2 (ligne bleue)", "SL": "le SL (ligne rouge)", "ENTRÉE": "la ligne ENTRÉE (jaune)"}
+ECRAN_CONSEIL = {
+    "TP1": "🧘 Pas de panique : un rebond sur le TP est NORMAL, les gros encaissent là\n🛡 En position ? Gains en partie pris + SL à l'entrée (BE) = zéro risque",
+    "TP2": "🧘 Objectif final : le marché souffle souvent ici\n💰 En position ? C'est le moment d'encaisser",
+    "SL": "🧘 Pas de panique : le SL est là pour ça, c'est lui qui décide, pas l'émotion\n🙅 Ne déplace JAMAIS ton SL plus loin",
+    "ENTRÉE": "🧘 Le prix revient sur la zone d'entrée : c'est le retest, souvent normal\n⏳ On attend la clôture 15 min, pas une mèche",
 }
 ECRAN_POURQUOI = {
     "pression": "🕯 Pourquoi : les bougies se compressent et le prix colle à son dernier extrême → la pression monte",
@@ -9179,6 +9188,8 @@ ECRAN_POURQUOI = {
     "acc": "🕯 Pourquoi : une bougie bien plus grosse que la moyenne, dans un seul sens",
     "volume": "🕯 Pourquoi : volume 2,5× plus fort que la moyenne → quelque chose se prépare",
     "annonce": "🕯 La clôture 15 min a confirmé ce que l'écran annonçait",
+    "rebond": "🕯 Pourquoi : la bougie 15 min a touché la ligne puis a CLÔTURÉ loin d'elle → les acheteurs / vendeurs défendent ce niveau",
+    "ligne": "🕯 Pourquoi : le prix est collé à une ligne du plan ALIGN → c'est là que le marché décide",
 }
 
 def ecran_lire():
@@ -9206,13 +9217,16 @@ def ecran_lire():
             out.append(str(j.get("message") or ""))
     return out
 
-def texte_ecran(m, typ, d, minutes, r, cle):
+def texte_ecran(m, typ, d, minutes, r, cle, ligne=""):
     """Message DÉTAILLÉ pour la chaîne du marché, à partir d'un événement vu à l'écran du live."""
     titre = ECRAN_TITRES.get(typ)
-    if not titre:
+    if not titre or (typ in ("rebond", "ligne") and ligne not in ECRAN_LIGNES):
         return None
-    lignes = [f"🎬 EN DIRECT DU LIVE — {ICONE.get(m, '')} {m}", titre[0] if d == -1 else titre[1]]
-    if typ != "annonce":
+    t0 = (titre[0] if d == -1 else titre[1]).replace("{l}", ECRAN_LIGNES.get(ligne, ""))
+    lignes = [f"🎬 EN DIRECT DU LIVE — {ICONE.get(m, '')} {m}", t0]
+    if typ in ("rebond", "ligne"):
+        lignes.append(ECRAN_CONSEIL[ligne])
+    if typ not in ("annonce", "rebond", "ligne"):
         lignes.append(f"⏳ Verdict à la clôture 15 min : dans {max(1, int(minutes or 1))} min")
     lignes.append(ECRAN_POURQUOI[typ])
     try:
@@ -9245,6 +9259,7 @@ def ecran_vers_telegram(etat):
         if len(p) < 4 or p[0] != "EVT" or p[1] not in MARCHES:
             continue
         m, typ = p[1], p[2]
+        ligne = p[5] if len(p) > 5 else ""
         try:
             d = -1 if int(p[3]) < 0 else 1
             minutes = int(p[4]) if len(p) > 4 and p[4] else 0
@@ -9254,11 +9269,11 @@ def ecran_vers_telegram(etat):
         canal = (etat.get("canaux_marche") or {}).get(m)
         if not r or not canal:
             continue
-        cle_vu = f"ecran{m}{typ}{d}"
+        cle_vu = f"ecran{m}{typ}{d}{ligne}"
         if time.time() - _LIVE_DERNIER.get(cle_vu, 0) < 300:      # au plus 1 fois / 5 min par type : pas de rafale
             continue
         _LIVE_DERNIER[cle_vu] = time.time()
-        txt = texte_ecran(m, typ, d, minutes, r, etat.get(m) or {})
+        txt = texte_ecran(m, typ, d, minutes, r, etat.get(m) or {}, ligne)
         if not txt:
             continue
         # Chaîne : l'info en 4 lignes + bouton « 🧠 En savoir plus » qui ouvre le détail complet (pourquoi, où regarder) dans le bot
