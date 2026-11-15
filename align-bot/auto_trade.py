@@ -13,7 +13,7 @@ Sécurité (codée en dur, non modifiable par un message) :
 Secrets GitHub attendus : METAAPI_TOKEN, METAAPI_COMPTES (ids MetaApi séparés par des virgules,
 le 1er = compte maître 12140656), METAAPI_REGION (ex. london).
 """
-import json, os, time, datetime, urllib.request, urllib.error
+import json, os, re, time, datetime, urllib.request, urllib.error
 
 SOLDE_DEPART = 10000.0
 PERTE_JOUR_MAX = 350.0        # marge de 50 $ sous la règle des 400 $
@@ -31,7 +31,13 @@ SYMBOLES = {"BTC": ["BTCUSD", "BTCUSD.", "BTCUSDm"], "GOLD": ["XAUUSD", "XAUUSD.
             "NASDAQ": ["NDX100", "NAS100", "US100", "USTEC", "NDX100."]}
 
 TOKEN = os.environ.get("METAAPI_TOKEN", "")
-COMPTES = [c.strip() for c in os.environ.get("METAAPI_COMPTES", "").split(",") if c.strip()]
+def lire_comptes(brut):
+    """Ids MetaApi (format UUID) lus dans la variable, même collés deux fois ou sans virgule ; sans doublon, ordre gardé."""
+    ids = re.findall(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", brut or "", re.I)
+    return list(dict.fromkeys(ids)) or [c.strip() for c in (brut or "").split(",") if c.strip()]
+
+
+COMPTES = lire_comptes(os.environ.get("METAAPI_COMPTES", ""))
 REGION = os.environ.get("METAAPI_REGION", "london")
 REEL = os.environ.get("AUTO_TRADE", "0") == "1"
 

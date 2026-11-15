@@ -90,5 +90,13 @@ class TestRachats(unittest.TestCase):
         self.assertEqual(quoi, "be"); self.assertAlmostEqual(moy, 97.5)
 
 
+
+class TestComptes(unittest.TestCase):
+    def test_id_colle_deux_fois(self):
+        u = "94844ff0-ddf5-4ec2-8f26-261addf6272c"
+        self.assertEqual(at.lire_comptes(u + u), [u])
+        self.assertEqual(at.lire_comptes(""), [])
+
+
 if __name__ == "__main__":
     unittest.main()
