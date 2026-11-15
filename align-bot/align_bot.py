@@ -9653,7 +9653,9 @@ def texte_compte_finance():
             "🧭 LA MÉTHODE ALIGN POUR BIEN DÉMARRER\n"
             "1️⃣ Regarde d'abord une position ALIGN aller jusqu'au TP1 👀\n"
             "2️⃣ Ensuite prends la suivante, toujours avec ton SL 🛡\n"
-            "3️⃣ Une position peut durer quelques heures à 2-3 jours : on ne court jamais après le prix 😎\n━━━━━━━━━━━━\n"
+            "3️⃣ Une position peut durer quelques heures à 2-3 jours : on ne court jamais après le prix 😎\n"
+            "4️⃣ UN SEUL LOT (petite taille) et UNE SEULE position à la fois, surtout sur FTMO / Topstep 🎯\n"
+            "5️⃣ Pas besoin de rester collé à ton téléphone 📵 : active les notifications, ALIGN te prévient AVANT chaque position 🔔\n━━━━━━━━━━━━\n"
             "⚠️ Ceci n'est pas un conseil en investissement. Le trading comporte un risque de perte en capital. "
             "Fais tes propres recherches (DYOR).\n🤝 Lien de parrainage : ALIGN reçoit un avantage si tu utilises le code.")
 
@@ -10299,7 +10301,7 @@ def un_tour(etat, chats):
         try:
             preparer_chaines(etat)
             epingler_menus_chaines(etat)
-        epingler_compte_finance(etat)          # v8.9 : message « compte financé » épinglé
+            epingler_compte_finance(etat)          # v8.9 : message « compte financé » épinglé
             renvoyer_claviers(etat, chats)
         except Exception as ex:
             print("préparer chaînes", ex)
