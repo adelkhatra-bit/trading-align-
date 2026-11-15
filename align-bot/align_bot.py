@@ -5,6 +5,12 @@ Tourne toutes les 5 minutes (GitHub Actions). Aucune dépendance externe."""
 import json, unicodedata, os, re, time, hashlib, urllib.request, urllib.error, urllib.parse, datetime, threading, queue, signal
 from zoneinfo import ZoneInfo
 import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    import auto_trade, topstep_trade          # robots d'ordres FundedNext (MetaApi) et Topstep (mode test par défaut)
+except Exception as _ex:                      # un robot absent ne doit jamais arrêter le bot
+    auto_trade = topstep_trade = None
+    print("robots d'ordres indisponibles", _ex)
 try:
     sys.stdout.reconfigure(line_buffering=True)   # les logs GitHub s’affichent tout de suite
 except Exception:
@@ -6051,6 +6057,9 @@ def traiter(etat, chats, updates):
         if cid in etat.get("attente_tv", []) and msg.get("text") and not any(k in txt for k in ("analyse", "resultat", "rentre", "sorti", "indicateur")):
             recevoir_pseudo(etat, cid, msg["text"])
             continue
+        if txt.startswith("/auto") and cid in proprio(etat):
+            commande_auto(etat, cid, txt)
+            continue
         if "indicateur" in txt:
             fr = msg.get("from", {})
             nom = (fr.get("first_name", "") + (" @" + fr["username"] if fr.get("username") else "")).strip() or cid
@@ -6107,6 +6116,59 @@ def traiter(etat, chats, updates):
         # (photo de gain ou pseudo TradingView après demande) sont traités.
         # Tout texte libre est ignoré, pour les visiteurs comme pour les abonnés.
     return demandes
+AUTO_MARCHES = ("BTC", "GOLD", "NASDAQ")
+
+
+def commande_auto(etat, cid, txt):
+    """Admin (propriétaire) : /auto = état, /auto_btc /auto_gold /auto_nasdaq = allumer / éteindre le trading automatique."""
+    am = etat.setdefault("auto_marches", {})
+    for m in AUTO_MARCHES:
+        if txt.strip() == f"/auto_{m.lower()}":
+            am[m] = not am.get(m)
+    l = ["🤖 TRADING AUTOMATIQUE (comptes FundedNext + Topstep)"]
+    l += [f"{'🟢' if am.get(m) else '⚫'} {m} : {'ALLUMÉ' if am.get(m) else 'éteint'} → /auto_{m.lower()}" for m in AUTO_MARCHES]
+    l.append("🧪 Mode : " + ("RÉEL" if (auto_trade and auto_trade.REEL) or (topstep_trade and topstep_trade.REEL) else "TEST (aucun vrai ordre)"))
+    _envoi_sur(cid, text="\n".join(l))
+
+
+def auto_entree(etat, m, trx):
+    """Le bot vient d'entrer : il prend la même position sur les comptes (FundedNext puis Topstep) et prévient le propriétaire."""
+    sig = {"marche": m, "sens": "LONG" if trx["d"] == 1 else "SHORT", "e": trx["e"], "sl": trx["sl"], "tp": trx["tp1"]}
+    lignes = []
+    for nom, robot in (("FundedNext", auto_trade), ("Topstep", topstep_trade)):
+        if not robot:
+            continue
+        try:
+            r = robot.executer(etat, sig)
+            r = r if isinstance(r, list) else [r]
+            for x in r:
+                lignes.append(f"{'✅' if x.get('ok') else '⏸'} {nom} : " + ("ordre TEST préparé" if x.get("test") else "ordre envoyé" if x.get("ok") else x.get("raison", "?")))
+        except Exception as ex:
+            lignes.append(f"⚠️ {nom} : erreur {ex}")
+    print("AUTO_TRADE", m, lignes)
+    if any("éteint" not in l_ for l_ in lignes):
+        for p_ in proprio(etat):
+            _envoi_sur(p_, text=f"🤖 {ICONE.get(m, '')} {m} {sig['sens']} — trading automatique\n" + "\n".join(lignes))
+
+
+def topstep_horaires(etat):
+    """Annonces fermeture / réouverture des comptes futures (Topstep) + mise à plat 1 h avant la limite."""
+    if not topstep_trade:
+        return
+    try:
+        for a_ in topstep_trade.annonces(etat):
+            for canal in (etat.get("canaux_marche") or {}).values():
+                if canal and TOKEN:
+                    telegram("sendMessage", chat_id=canal, text=a_["telegram"])   # important : AVEC son
+            live_bande(etat, a_["bande"], "topstep_" + a_["type"], 600, toujours=True)
+        jour = datetime.datetime.now(topstep_trade.CHICAGO).strftime("%Y-%m-%d")
+        if topstep_trade.phase() == "fermeture" and etat.get("topstep_plat") != jour:
+            etat["topstep_plat"] = jour
+            topstep_trade.tout_fermer()
+    except Exception as ex:
+        print("topstep horaires", ex)
+
+
 def proprio(etat):
     return set(etat.get("proprio", []))
 
@@ -10121,6 +10183,8 @@ def un_tour(etat, chats):
                 notifier_erreur_technique(etat, f"analyse {nom_marche}")
             continue
         cle = etat.setdefault(nom_marche, {})
+        if nom_marche == "BTC":
+            topstep_horaires(etat)
         tendance_armee(r, cle)
         r["annonce"] = annonce_proche(etat, int(time.time()))
         if nom_marche == "GOLD":
@@ -10175,6 +10239,7 @@ def un_tour(etat, chats):
         if TOKEN and cle.get("trade") and not cle["trade"].get("auto_fait"):
             cle["trade"]["auto_fait"] = True
             trx = cle["trade"]
+            auto_entree(etat, nom_marche, trx)
             t_ = None if not IA_AUTO else ia(etat, "Le bot vient d'entrer en position selon le plan de l'indicateur. Analyse ce plan (stratégie, SL, TP1, TP2) : dis si tu le valides en bougies ou si tu le déconseilles (« je déconseille » + raison), sans jamais proposer d'autres niveaux, et rappelle de mettre le SL tout de suite. " + IA_TON_JEUNE,
                     dict(donnees_ia(nom_marche, r, cle), position={"sens": "LONG" if trx["d"] == 1 else "SHORT", "entrée": round(trx["e"], 2),
                                                                     "SL": round(trx["sl"], 2), "TP1": round(trx["tp1"], 2), "type": trx.get("src")}), premium=True)

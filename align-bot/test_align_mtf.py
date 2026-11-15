@@ -3235,6 +3235,20 @@ class TestEveryMainButtonAnswers(unittest.TestCase):
         self.assertTrue(envoi and "Indicateur" not in envoi[0]["reply_markup"])
         self.assertEqual(etat["menu_vip_v3"], 8)
 
+    def test_admin_auto_allume_et_eteint_un_marche(self):
+        sent, etat = [], {"proprio": ["1"]}
+        with unittest.mock.patch.object(align_bot, "_envoi_sur", side_effect=lambda c, **k: sent.append(k["text"])):
+            align_bot.commande_auto(etat, "1", "/auto_gold")
+            self.assertTrue(etat["auto_marches"]["GOLD"])
+            align_bot.commande_auto(etat, "1", "/auto_gold")
+        self.assertFalse(etat["auto_marches"]["GOLD"])
+        self.assertIn("TEST", sent[-1])
+
+    def test_entree_du_bot_declenche_les_robots_sans_planter(self):
+        etat = {"proprio": ["1"], "auto_marches": {"BTC": True}}
+        with unittest.mock.patch.object(align_bot, "_envoi_sur"):
+            align_bot.auto_entree(etat, "BTC", {"d": 1, "e": 64000, "sl": 63600, "tp1": 65000})
+
     def test_indicateur_pas_vendu_pour_le_moment(self):
         # Décision d'Adel (15/11) : plus de bouton « 🧩 Indicateur TradingView » ni de prix de l'indicateur
         self.assertFalse(align_bot.INDICATEUR_EN_VENTE)
