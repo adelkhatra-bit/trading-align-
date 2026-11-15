@@ -1036,10 +1036,10 @@
       const cv = document.querySelector('.chart-markup-table .chart-gui-wrapper canvas'); if (!cv) return;
       const R = cv.getBoundingClientRect(), k = cv.width / R.width, W = cv.width, y0 = Math.floor(cv.height * 0.55);
       const d = cv.getContext('2d').getImageData(0, y0, W, cv.height - y0).data; let top = -1, bas = -1, g = 0, dr = 0;
-      for (let y = 0; y < cv.height - y0; y++) { let n = 0, mi = 1e9, ma = -1;
+      for (let y = cv.height - y0 - 1; y >= 0; y--) { let n = 0, mi = 1e9, ma = -1;   // v8.3 : on part du BAS (la ligne SHORT/LONG est la dernière du tableau)
         for (let x = 0; x < W; x += 2) { const j = (y * W + x) * 4; if (Math.abs(d[j] - R0) < 8 && Math.abs(d[j + 1] - G0) < 8 && Math.abs(d[j + 2] - B0) < 8) { n++; if (x < mi) mi = x; if (x > ma) ma = x; } }
-        if (ma - mi > W * 0.3 && n * 2 > 0.35 * (ma - mi)) { if (top < 0) { top = y; g = mi; dr = ma; } bas = y; } else if (top >= 0 && y - bas > 3) break; }   // le texte blanc au milieu ne coupe pas la ligne
-      if (top < 0) { masque.style.display = 'none'; return; }
+        if (ma - mi > W * 0.3 && n * 2 > 0.35 * (ma - mi)) { if (bas < 0) { bas = y; g = mi; dr = ma; } top = y; } else if (bas >= 0 && top - y > 3) break; }   // le texte blanc au milieu ne coupe pas la ligne
+      if (bas < 0) { masque.style.display = 'none'; return; }
       Object.assign(masque.style, { display: 'flex', left: (g / k + R.left) + 'px', top: ((top + y0) / k + R.top) + 'px', width: ((dr - g + 2) / k) + 'px',
         height: ((bas - top + 1) / k) + 'px', background: 'rgb(' + R0 + ',' + G0 + ',' + B0 + ')' });
       const en = langueBande() === 'en', sens = (cel.t.match(/[▼▲]?\s*(SHORT|LONG)[^E\d]*/) || [''])[0].trim();
@@ -1078,15 +1078,16 @@
       const boites = [];
       for (const { n, o } of E) {
         const y = ps.priceToCoordinate(o.y, fv); if (!isFinite(y)) continue;
-        const a = ((o.ci >>> 24) & 255) / 255, col = [o.ci & 255, (o.ci >> 8) & 255, (o.ci >> 16) & 255].map(v => Math.round(a * v + (1 - a) * 15));
+        const fond = ctx.getImageData(Math.round(3 * k), Math.round(y * k), 1, 1).data;   // v8.3 : la vraie couleur de fond de l'écran (plus de tache noire)
+        const a = ((o.ci >>> 24) & 255) / 255, col = [o.ci & 255, (o.ci >> 8) & 255, (o.ci >> 16) & 255].map((v, i) => Math.round(a * v + (1 - a) * fond[i]));
         const y0 = Math.max(0, Math.round((y - 18) * k)), hh = Math.round(36 * k), W = Math.round(cv.width * 0.75), d = ctx.getImageData(0, y0, W, hh).data;
         let mi = 1e9, ma = -1, yt = 1e9, yb = -1;
         for (let yy = 0; yy < hh; yy++) for (let x = 0; x < W; x++) { const j = (yy * W + x) * 4; if (Math.abs(d[j] - col[0]) < 14 && Math.abs(d[j + 1] - col[1]) < 14 && Math.abs(d[j + 2] - col[2]) < 14) { if (x < mi) mi = x; if (x > ma) ma = x; if (yy < yt) yt = yy; if (yy > yb) yb = yy; } }
-        boites.push({ n, o, y, col: 'rgb(' + col.join(',') + ')', tc: (o.tci & 255) > 128 ? '#fff' : '#111', box: ma > mi + 20 ? { l: mi / k + R.left, t: (y0 + yt) / k + R.top, r: (ma + 1) / k + R.left, b: (y0 + yb + 1) / k + R.top } : null });
+        boites.push({ n, o, y, fond: 'rgb(' + fond[0] + ',' + fond[1] + ',' + fond[2] + ')', col: 'rgb(' + col.join(',') + ')', tc: (o.tci & 255) > 128 ? '#fff' : '#111', box: ma > mi + 20 ? { l: mi / k + R.left, t: (y0 + yt) / k + R.top, r: (ma + 1) / k + R.left, b: (y0 + yb + 1) / k + R.top } : null });
       }
       const tp2 = boites.find(x => x.n === 'TP2' && x.box) || boites.find(x => x.box); if (!tp2) { etiqBox.innerHTML = ''; return; }
       const xCol = tp2.box.l, en = langueBande() === 'en';
-      etiqBox.innerHTML = boites.map(x => (x.box ? '<div class="cache" style="left:' + (x.box.l - 2) + 'px;top:' + (x.box.t - 2) + 'px;width:' + (x.box.r - x.box.l + 4) + 'px;height:' + (x.box.b - x.box.t + 4) + 'px"></div>' : '')
+      etiqBox.innerHTML = boites.map(x => (x.box ? '<div class="cache" style="background:' + x.fond + ';left:' + (x.box.l - 2) + 'px;top:' + (x.box.t - 2) + 'px;width:' + (x.box.r - x.box.l + 4) + 'px;height:' + (x.box.b - x.box.t + 4) + 'px"></div>' : '')
         + '<div class="etq" data-y="' + (R.top + x.y) + '" style="left:' + xCol + 'px;top:' + (R.top + x.y + 3) + 'px;background:' + x.col + ';color:' + x.tc + '">' + (x.n === 'ENTRÉE' && en ? 'ENTRY' : x.n) + (/✅/.test(x.o.t) ? ' ✅' : '') + ' <b>❓</b></div>').join('');
       // deux lignes trop proches (SL collé à l'ENTRÉE) : l'étiquette du haut passe AU-DESSUS de sa ligne, jamais l'une sur l'autre
       const els = [...etiqBox.querySelectorAll('.etq')].sort((p, q) => p.getBoundingClientRect().top - q.getBoundingClientRect().top);
