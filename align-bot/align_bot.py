@@ -2,7 +2,7 @@
 """ALIGN MTF BOT — même logique que l'indicateur TradingView ALIGN MTF PRO.
 Prix gratuits : BTC = Kraken XBTUSD, Gold = XAUUSD spot (bougies COMEX Yahoo recalées sur le prix spot Swissquote).
 Tourne toutes les 5 minutes (GitHub Actions). Aucune dépendance externe."""
-import json, unicodedata, os, re, time, hashlib, urllib.request, urllib.error, urllib.parse, datetime, threading, queue, signal
+import json, unicodedata, os, re, time, hashlib, urllib.request, urllib.error, urllib.parse, datetime, threading, queue, signal, email.utils
 from zoneinfo import ZoneInfo
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -9783,6 +9783,75 @@ def live_pnl(etat, m, cle, r, now=None):
     live_publier(f"CMD:pnl:{total:+.2f}:{m}")
     return total
 
+# ───── NEWS DE DERNIÈRE MINUTE (demande d'Adel 15/11) : sources GRATUITES + vraie IA qui juge l'impact ─────
+NEWS_URGENTES_URL = ("https://news.google.com/rss/search?q=" + urllib.parse.quote(
+    "(war OR attack OR missile OR invasion OR sanctions OR ceasefire OR nuclear OR emergency OR Fed OR Powell OR ECB OR tariff OR "
+    "\"rate decision\" OR default OR bankruptcy OR \"bitcoin ETF\" OR SEC OR OPEC OR explosion) when:1h") + "&hl=en-US&gl=US&ceid=US:en")
+MOTS_URGENTS = ("war", "attack", "missile", "invasion", "sanction", "ceasefire", "nuclear", "emergency", "fed ", "powell", "ecb",
+                "tariff", "rate decision", "rate cut", "rate hike", "default", "bankrupt", "etf", "sec ", "opec", "explosion", "strike")
+
+
+def titres_urgents(xml, maintenant, fenetre=1800):
+    """Titres RSS publiés depuis moins de `fenetre` secondes et contenant un mot qui peut faire bouger les marchés."""
+    out = []
+    for item in re.findall(r"<item>(.*?)</item>", xml or "", re.S):
+        t = re.search(r"<title>(.*?)</title>", item, re.S)
+        d = re.search(r"<pubDate>(.*?)</pubDate>", item, re.S)
+        if not t or not d:
+            continue
+        titre = re.sub(r"<!\[CDATA\[|\]\]>", "", t.group(1)).strip()
+        try:
+            dt_ = email.utils.parsedate_to_datetime(d.group(1).strip())
+            quand = (dt_ if dt_.tzinfo else dt_.replace(tzinfo=datetime.timezone.utc)).timestamp()
+        except Exception:
+            continue
+        if maintenant - quand <= fenetre and any(k in (" " + titre.lower() + " ") for k in MOTS_URGENTS):
+            out.append(titre)
+    return out
+
+
+def news_urgentes(etat, maintenant=None, lire=None):
+    """Toutes les 5 min : lit les titres mondiaux (Google News RSS, gratuit), une vraie IA dit s'il y a un impact sur BTC / Gold / NASDAQ.
+    Si oui → message « 🚨 NEWS DE DERNIÈRE MINUTE » dans les chaînes + la bande du live est COUPÉE et passe la news en priorité.
+    Jamais de news inventée : rien n'est publié si l'IA ne répond pas ou si aucun titre récent."""
+    maintenant = maintenant or time.time()
+    if maintenant - float(etat.get("news_urg_t", 0)) < 300:
+        return None
+    etat["news_urg_t"] = maintenant
+    try:
+        xml = (lire or (lambda u: urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"}), timeout=10).read().decode("utf-8", "ignore")))(NEWS_URGENTES_URL)
+    except Exception as ex:
+        print("news urgentes", ex)
+        return None
+    vus = etat.setdefault("news_urg_vus", [])
+    nouveaux = [t for t in titres_urgents(xml, maintenant) if hashlib.md5(t.encode()).hexdigest()[:12] not in vus]
+    if not nouveaux:
+        return None
+    for t in nouveaux:
+        vus.append(hashlib.md5(t.encode()).hexdigest()[:12])
+    del vus[:-300]
+    rep = ia(etat, "Tu es un trader senior. Voici des titres de news publiés il y a moins de 30 minutes. S'il n'y en a AUCUN qui peut faire bouger "
+                   "fortement BTC, l'or ou le NASDAQ dans l'heure, réponds exactement AUCUN. Sinon réponds en 3 lignes : "
+                   "ligne 1 = le titre en français très court (12 mots max) | le même en anglais ; ligne 2 = marchés touchés et sens probable "
+                   "(ex. Gold ↑ refuge, NASDAQ ↓) ; ligne 3 = conseil prudent (ex. resserrer le SL, attendre la clôture 15 min). Pas d'invention.",
+             {"titres": nouveaux[:8]}, cle_cache=None)
+    if not rep or rep.strip().upper().startswith("AUCUN"):
+        return None
+    lignes = [l.strip() for l in rep.strip().splitlines() if l.strip()]
+    if len(lignes) < 2:
+        return None
+    fr, _, en = lignes[0].partition("|")
+    fr, en = fr.strip(" -•*"), (en.strip(" -•*") or fr.strip(" -•*"))
+    texte = ("🚨 NEWS DE DERNIÈRE MINUTE\n📰 " + fr + "\n" + "\n".join("👉 " + l for l in lignes[1:3])
+             + "\n🛡 Vérifie ton SL, le marché peut bouger fort\n⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
+    if TOKEN:
+        for canal in (etat.get("canaux_marche") or {}).values():
+            if canal:
+                _envoi_sur(canal, text=texte)
+    propre = lambda x: re.sub(r"\d|\$|%|€", "", x).strip()
+    live_publier("NEWS:" + propre(fr) + "|" + propre(en))
+    return texte
+
 def live_bande(etat, texte, cle=None, pause=60, toujours=False):
     """Message sur la bande, seulement quand le live tourne ; une même annonce au plus 1 fois / pause.
     toujours=True : TP / SL / entrée partent même si le live n'a pas été déclaré (la bande n'existe que sur l'écran du live)."""
@@ -10805,6 +10874,7 @@ def un_tour(etat, chats):
     try:
         live_agenda(etat, int(time.time()))          # v8.5 : discours / annonces / ouvertures sur la bande
         live_phrases_ia(etat, int(time.time()))      # v8.5 : phrases IA gratuites toujours nouvelles
+        news_urgentes(etat)                          # 🚨 news de dernière minute (RSS gratuit + vraie IA), priorité sur la bande
     except Exception as ex:
         print("live spectacle", ex)
     try:
