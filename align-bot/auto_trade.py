@@ -241,3 +241,17 @@ def gerer(etat, journal=print):
     for x in msgs:
         journal(x)
     return msgs
+
+
+def profit_ouvert(etat, m):
+    """Gain/perte EN COURS (en $) des positions ALIGN réelles sur ce marché, tous comptes MetaApi. None si aucune."""
+    if not (REEL and TOKEN and COMPTES):
+        return None
+    total, vu = 0.0, False
+    for compte in COMPTES:
+        sym = (etat.get("auto_symboles") or {}).get(compte, {}).get(m)
+        for p in _api("GET", f"{compte}/positions") or []:
+            if "ALIGN" in str(p.get("comment", "")) and (not sym or p.get("symbol") == sym):
+                vu = True
+                total += float(p.get("profit", 0)) + float(p.get("swap", 0)) + float(p.get("commission", 0))
+    return round(total, 2) if vu else None

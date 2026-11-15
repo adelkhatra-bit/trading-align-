@@ -9701,6 +9701,41 @@ def live_publier(texte):
         print("live publier", ex)
         return False
 
+def live_pnl(etat, m, cle, r, now=None):
+    """Demande d'Adel (15/11) : fenêtre « 💰 ALIGN EN DIRECT » sur le live avec le gain RÉEL en cours des comptes,
+    affichée seulement quand le prix a fait au moins la moitié du chemin vers le TP1 (trop tard pour entrer → pas de passager clandestin),
+    et seulement s'il y a de VRAIES positions (jamais de chiffre inventé). Mise à jour au plus toutes les 60 s."""
+    now = time.time() if now is None else now
+    tr = cle.get("trade")
+    cle_ = f"pnl{m}"
+    montre = (etat.get("pnl_montre") or {}).get(m)
+    def eteindre():
+        if montre:
+            etat.setdefault("pnl_montre", {})[m] = False
+            live_publier(f"CMD:pnl:off:{m}")
+    if not tr or not r.get("m1"):
+        return eteindre()
+    p, e, t1, d = r["m1"][-1]["c"], tr["e"], tr["tp1"], tr["d"]
+    if abs(t1 - e) <= 0 or d * (p - e) / abs(t1 - e) < 0.5:
+        return eteindre()
+    if now - _LIVE_DERNIER.get(cle_, 0) < 60:
+        return None
+    _LIVE_DERNIER[cle_] = now
+    total, vu = 0.0, False
+    for robot in (auto_trade, topstep_trade):
+        try:
+            x = robot.profit_ouvert(etat, m) if robot else None
+        except Exception as ex:
+            print("pnl", m, ex)
+            x = None
+        if x is not None:
+            total, vu = total + x, True
+    if not vu:
+        return eteindre()
+    etat.setdefault("pnl_montre", {})[m] = True
+    live_publier(f"CMD:pnl:{total:+.2f}:{m}")
+    return total
+
 def live_bande(etat, texte, cle=None, pause=60, toujours=False):
     """Message sur la bande, seulement quand le live tourne ; une même annonce au plus 1 fois / pause.
     toujours=True : TP / SL / entrée partent même si le live n'a pas été déclaré (la bande n'existe que sur l'écran du live)."""
@@ -10614,6 +10649,10 @@ def un_tour(etat, chats):
                 print("prix topstep inscrits", ex)
         if TOKEN:
             coach(etat, nom_marche, r, cle)
+            try:
+                live_pnl(etat, nom_marche, cle, r)       # 💰 gain réel en cours sur le live (après la moitié du chemin vers le TP1)
+            except Exception as ex:
+                print("live pnl", ex)
             if SHUTDOWN_REQUESTED.is_set():
                 return
             if cle.get("fin") and deja_cloture(etat, nom_marche, cle["fin"][0]):

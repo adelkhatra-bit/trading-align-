@@ -291,3 +291,15 @@ def niveaux_futures(m, prix_graphique, niveaux, prix_fut):
     ecart = prix_fut - prix_graphique
     tick = TICKS.get(m, 0.01)
     return {k: arrondi_tick(v + ecart, tick) for k, v in niveaux.items() if v}
+
+
+def profit_ouvert(etat, m):
+    """Gain/perte EN COURS (en $) de la position Topstep réelle du marché (prix du contrat − entrée)."""
+    pos = etat.get("topstep_pos")
+    if not (REEL and pos and pos.get("marche") == m):
+        return None
+    p = prix_futures(m)
+    if p is None:
+        return None
+    restant = pos["n"] - (pos["n"] // 2 if pos.get("etape") else 0)
+    return round((p - pos["e"]) * pos["d"] / TICKS.get(m, 1) * VALEUR_TICK.get(m, 1) * restant, 2)
