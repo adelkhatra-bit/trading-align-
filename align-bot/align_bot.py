@@ -2935,6 +2935,8 @@ def message_partage(etat):
     return txt, json.dumps({"inline_keyboard": [[{"text": "📤 Partager à un ami", "url": url}]]})
 
 OFFERT_JOURS = int(os.environ.get("OFFERT_JOURS", "7"))   # 1 signal complet offert aux visiteurs tous les X jours
+TOUT_GRATUIT = os.environ.get("TOUT_GRATUIT", "1") == "1"   # v7.4 (décision d'Adel, 15/11) : pour le moment TOUT est gratuit ; 0 = modèle essai jusqu'au 1er TP + différé
+DIFFERE_MIN = int(os.environ.get("DIFFERE_MIN", "30"))   # v7.4 : après son 1er TP, le gratuit reçoit les positions en DIFFÉRÉ (le temps réel = VIP)
 POSITIONS_GRATUITES = os.environ.get("POSITIONS_GRATUITES", "0") == "1"   # 0 = positions VIP (49,90 €/mois), 1 position de bienvenue offerte
 LIEN_INDICATEUR = os.environ.get("LIEN_INDICATEUR", "")   # lien du script TradingView « invite-only » (à remplir après publication)
 PRIX_STARS = int(os.environ.get("PRIX_STARS", "2500"))   # abonnement VIP mensuel : 2 500 ⭐ ≈ 49,90 €
@@ -5432,12 +5434,24 @@ def publier_resultat(etat, m, tr, sortie, motif, gain):
         if isinstance(pos, dict) and vue_gratuite(etat, c):
             g_ = pos["d"] * (sortie - pos["e"]) / pos["e"] * 100
             pay = bouton_payer(etat) or kb
-            off = etat.setdefault("bot_off", [])
-            if c not in off:
-                off.append(c)      # position du jour terminée : le bot gratuit s'éteint tout seul
-            _envoi_sur(c, reply_markup=CLAVIER_VISITEUR, text=(
-                "⏸ Position du jour terminée : ton bot s'est éteint\n"
-                "▶️ Pour la prochaine : 🤖 Mon bot → ✅ Oui, je veux des positions"))
+            # v7.4 (modèle d'Adel, 15/11) : le gratuit suit le bot JUSQU'À SON PREMIER TP.
+            # SL → on lui offre une autre position ; TP → essai validé : la suite arrive en DIFFÉRÉ, le temps réel = VIP.
+            if TOUT_GRATUIT:
+                etat.setdefault("bienvenue", {}).pop(c, None)   # tout gratuit pour le moment : le bot reste allumé, la suivante arrivera aussi
+            elif g_ > 0:
+                fini = etat.setdefault("essai_fini", [])
+                if c not in fini:
+                    fini.append(c)
+                off = etat.setdefault("bot_off", [])
+                if c not in off:
+                    off.append(c)
+                _envoi_sur(c, reply_markup=CLAVIER_VISITEUR, text=(
+                    "✅ Ton essai gratuit est validé : premier TP !\n"
+                    f"📬 La suite t'arrive en différé ({DIFFERE_MIN} min)\n⚡ En temps réel : VIP 👇"))
+            else:
+                etat.setdefault("bienvenue", {}).pop(c, None)
+                _envoi_sur(c, reply_markup=CLAVIER_VISITEUR, text=(
+                    "💪 Pas grave : on t'offre une autre position\n🎯 Jusqu'à ton premier TP\n🔔 Reste branché, je te préviens"))
             _envoi_sur(c, reply_markup=pay, text=(
                 f"🎉🎉 BRAVO — {ICONE.get(m, '')} {m}\n💰 Ta position gratuite : {g_:+.2f} %\n🔥 C'est ça, ALIGN\n"
                 "😍 Imagine chaque position comme celle-là\n💎 En VIP : toutes les positions + le sens + le coach (BE, TP)\n🔓 VIP 49,90 € / mois 👇"
@@ -7017,6 +7031,39 @@ def masquer(texte):
     texte = re.sub(r"[+-]\d+,\d+ %", "🔒 %", texte)
     return re.sub(r"(?<!\w)\d{1,3}(?: \d{3})*\.\d+", "🔒🔒🔒", texte).replace("\n\n📍 Si tu prends cette position, active son suivi avec le bouton ci-dessous.", "")
 
+DODO_TXT = ["😴 Tu dors ? Le marché aussi…\n🔔 Je te réveille dès qu'une zone intéressante arrive",
+            "🥱 Marché tout calme… comme toi ?\n🎯 Reste prêt : quand une zone arrive, je te préviens",
+            "😴 Le marché fait la sieste\n🔔 Garde les notifications : une position peut tomber"]
+
+def envoyer_differes(etat, now=None, dodo=True):
+    """v7.4 (modèle d'Adel, 15/11) : les gratuits dont l'essai est validé (1er TP) reçoivent les positions en DIFFÉRÉ ;
+    et une fois par jour, s'il ne se passe rien, un petit « tu dors ? » pour garder le contact."""
+    now = now or time.time()
+    file_ = etat.setdefault("differe", [])
+    prets = [x for x in file_ if x.get("t", 0) <= now]
+    etat["differe"] = [x for x in file_ if x.get("t", 0) > now][-200:]
+    rang = [[{"text": "💎 Devenir VIP", "url": etat["lien"]}]] if etat.get("lien") else []
+    for x in prets[:20]:
+        try:
+            telegram("sendMessage", chat_id=x["c"], text=(
+                f"⏱ EN DIFFÉRÉ ({DIFFERE_MIN} min) — info passée\n🙅 N'entre pas maintenant : le prix a bougé\n━━━━━━━━━━━━\n"
+                + x["txt"] + "\n━━━━━━━━━━━━\n⚡ En temps réel : VIP 49,90 € / mois 👇"),
+                reply_markup=json.dumps({"inline_keyboard": rang}))
+        except Exception as ex:
+            print("différé", x.get("c"), ex)
+    if not dodo:
+        return
+    maint = datetime.datetime.now(PARIS); jour = maint.strftime("%Y-%m-%d")
+    if 14 <= maint.hour < 22 and etat.get("dodo_jour") != jour and not any((etat.get(m_) or {}).get("trade") for m_ in MARCHES):
+        etat["dodo_jour"] = jour
+        txt = DODO_TXT[maint.toordinal() % len(DODO_TXT)]      # jamais le même texte deux jours de suite
+        for cid in destinataires_gratuits(etat):
+            if bot_on(etat, cid):
+                try:
+                    telegram("sendMessage", chat_id=cid, text=txt)
+                except Exception as ex:
+                    print("dodo", cid, ex)
+
 def envoyer_prospects(etat, texte, signal, clavier=None):
     """GRATUIT (visiteurs + propriétaire en vue gratuite) : 1 position proposée par jour si le bot est ON,
     sinon un simple avis masqué quand une position sort. Jamais de news ni d'analyse : c'est le VIP."""
@@ -7038,11 +7085,15 @@ def envoyer_prospects(etat, texte, signal, clavier=None):
     for cid in destinataires_gratuits(etat):
         if not marche_autorise(etat, cid, m):
             continue
-        if bot_on(etat, cid) and cid not in deja:
+        if TOUT_GRATUIT:                   # v7.4 (décision d'Adel) : tout gratuit pour le moment → chaque position en temps réel, une fois
+            if not bot_on(etat, cid) or vus.get(cid) == ref:
+                continue
+            vus[cid] = ref
+        if bot_on(etat, cid) and (TOUT_GRATUIT or (cid not in deja and cid not in etat.get("essai_fini", []))):
             deja[cid] = m      # la position du jour est PROPOSÉE : il choisit de la prendre ou non
-            txt = ("🎁 TA POSITION GRATUITE DU JOUR\n"
+            txt = (("🎁 POSITION GRATUITE\n" if TOUT_GRATUIT else "🎁 TA POSITION GRATUITE DU JOUR\n") +
                    "🙋 Tu la prends ? Bouton 📍 ci-dessous (tu n'es pas obligé)\n━━━━━━━━━━━━\n" + texte
-                   + "\n━━━━━━━━━━━━\n💎 Toutes les autres + le coach : VIP 49,90 € / mois")
+                   + ("\n━━━━━━━━━━━━\n🎁 Tout est gratuit pour le moment" if TOUT_GRATUIT else "\n━━━━━━━━━━━━\n💎 Toutes les autres + le coach : VIP 49,90 € / mois"))
             k = {"reply_markup": json.dumps({"inline_keyboard": [
                 [{"text": "📍 Je la prends", "callback_data": f"in:{m}"}],
                 [{"text": "⏸ Plus de positions", "callback_data": "botoff:x"}]]})}
@@ -7050,9 +7101,13 @@ def envoyer_prospects(etat, texte, signal, clavier=None):
             if vus.get(cid) == ref or (deja.get(cid) == m and tr and isinstance(tr.get("qui", {}).get(cid), dict)):
                 continue
             vus[cid] = ref
+            essai_ok = cid in etat.get("essai_fini", [])
+            if essai_ok:                       # v7.4 : la position complète lui arrivera en différé
+                etat.setdefault("differe", []).append({"t": time.time() + DIFFERE_MIN * 60, "c": cid, "txt": texte})
             txt = (f"🔒 {ICONE.get(m, '')} {m} : une position VIP vient de sortir\n"
                    "🤫 Sens et niveaux : réservés aux VIP\n"
-                   + ("🎁 Ta position du jour est déjà utilisée\n" if cid in deja else "⏸ Ton bot est sur OFF\n")
+                   + (f"📬 Le détail t'arrive en différé dans {DIFFERE_MIN} min\n⚡ En temps réel : VIP\n" if essai_ok
+                      else "🎁 Tu as déjà ta position offerte en cours\n" if cid in deja else "⏸ Ton bot est sur OFF\n")
                    + "💎 VIP 49,90 € / mois 👇")
             rang = [[{"text": "💎 Devenir VIP", "url": etat["lien"]}]] if etat.get("lien") else []
             k = {"reply_markup": json.dumps({"inline_keyboard": rang + [[{"text": "🤖 Mon bot", "callback_data": "botmenu:x"}]]})}
@@ -9943,6 +9998,11 @@ def un_tour(etat, chats):
             ecran_vers_telegram(etat)          # ce que l'écran du live a vu → détaillé dans la chaîne du marché
     except Exception as ex:
         print("écran → telegram", type(ex).__name__, ex)
+    try:
+        if TOKEN:
+            envoyer_differes(etat)             # v7.4 : positions en différé (essai validé) + « tu dors ? » (gratuits)
+    except Exception as ex:
+        print("différé", type(ex).__name__, ex)
     try:
         if TOKEN:
             alertes_courtes(etat, chats, derniers)
