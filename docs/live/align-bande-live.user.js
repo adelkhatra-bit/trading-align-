@@ -240,7 +240,7 @@
     const sp = flash.firstChild, W = bande.clientWidth, w = sp.offsetWidth;
     const dur = Math.max(4000, (W + w) / 0.38);      // v5.4 : plus rapide (info en temps réel), toujours lisible
     sp.animate([{ transform: 'translateX(' + W + 'px)' }, { transform: 'translateX(' + (-w) + 'px)' }], { duration: dur, easing: 'linear' });
-    setTimeout(() => { bande.classList.remove('on'); occupe = false; suivant(); }, dur);
+    setTimeout(() => { bande.classList.remove('on'); occupe = false; if (!file.length) x = 0; suivant(); }, dur);   // v7.4 : après les infos, la bande d'accueil repart du DÉBUT (en français)
   }
 
   // v5.3 : de temps en temps une astuce (2 passages) pour apprendre à lire le graphique, sans aucun prix ni sens
@@ -516,6 +516,7 @@
   // v7.0 (demande d'Adel) : quand le marché se réveille, on remercie les tapotements avec un petit mot qui fait sourire (jamais 2 fois le même d'affilée) ;
   // quand le prix arrive sur une zone clé : « rentrer ou couper ? » + abonne-toi, lien en bio (jamais de prix ni TP/SL sur la bande).
   const PUNCH = [
+    [/💥/, ['💥 Ça a tout éclaté !', '💥 It just blew up!'], ['🚀 Le TP a sauté, gavage !', '🚀 TP smashed, feast time!'], ['🔥 On a encaissé, c\'est le feu', '🔥 Cashed in, it\'s fire']],
     // v7.4 : position en cours dans le bon sens → on fait sourire (sans prix)
     [/😊/, ['😊 Vous êtes contents ? Je vous demande rien…', '😊 Happy? I ask for nothing…'], ['🙏 Juste tapoter l\'écran et partager', '🙏 Just tap the screen and share'], ['😄 Ça roule pour la team ALIGN', '😄 Smooth ride for team ALIGN']],
     [/😏/, ['😏 Je plains ceux en contre-tendance…', '😏 Feeling sorry for the counter-trend crowd…'], ['💪 On continue dans le sens du marché', '💪 We keep riding the trend'], ['🤭 Pendant ce temps, à contre-sens…', '🤭 Meanwhile, the wrong-way crowd…']],
@@ -674,12 +675,13 @@
       const LG = lignesAlign(), q15 = Math.floor(Date.now() / 900000);
       for (const n of ['TP2', 'TP1', 'SL', 'ENTRÉE']) {
         const l = LG[n]; if (!l) continue;
-        if (Math.abs(cur[4] - l.y) < 0.3 * moyR && uneFois('ligne' + m + n + Math.round(l.y) + q15)) {
+        const traverse = B.length > 1 && (B[B.length - 2][4] - l.y) * (cur[4] - l.y) < 0;   // v7.4 : la ligne est traversée d'un coup
+        if ((Math.abs(cur[4] - l.y) < 0.3 * moyR || traverse) && uneFois('ligne' + m + n + Math.round(l.y) + q15)) {
           const tete = '👀 ' + m + ' arrive sur une zone clé';
           montrer(tete + ' • le marché prépare quelque chose 👀 pourquoi ? 🔌 lien en bio 🎁', false, 2, couleurLigne(n));
           versBot('ligne', cur[4] > l.y ? 1 : -1, '', n);
           setTimeout(() => coeurs(1, ['🤔']), 3600);   // v7.0 : « rentrer ou couper ? » + lien en bio
-          if (n.startsWith('TP')) explosionArgent(cur[4] > l.y ? -1 : 1);   // objectif atteint : l'argent suit le sens du marché
+          if (n.startsWith('TP')) { explosionArgent(cur[4] > l.y ? -1 : 1); if (traverse) { feuArtifice('💥 ÇA A TOUT ÉCLATÉ !'); setTimeout(() => coeurs(1, ['💥']), 2500); } }   // v7.4 : TP traversé d'un coup = explosion   // objectif atteint : l'argent suit le sens du marché
           return;
         }
       }
