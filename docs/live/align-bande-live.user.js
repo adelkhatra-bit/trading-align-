@@ -565,7 +565,7 @@
       document.body.appendChild(e);
       // v7.1 : jamais sur l'échelle de prix (≈ 80 px à droite) ni sur le prix en cours : en bas si le prix est en haut, en haut sinon
       let hautPrix = 0.5; try { const B = barres(40); const hi = Math.max(...B.map(x => x[2])), lo = Math.min(...B.map(x => x[3])); hautPrix = (B[B.length - 1][4] - lo) / ((hi - lo) || 1); } catch (er) {}
-      e.style.left = Math.max(r.left + 10, r.left + r.width - 90 - e.offsetWidth) + 'px';
+      e.style.left = Math.max(r.left + 10, r.left + (r.width - 80 - e.offsetWidth) / 2) + 'px';   // v7.4 : au CENTRE du graphique (visible sur téléphone, entre les étiquettes et le prix)
       e.style.top = (r.top + (r.height || 600) * (hautPrix > 0.5 ? 0.6 : 0.2)) + 'px'; setTimeout(() => e.remove(), 5500);   // v7.4 : la pastille reste plus longtemps (lisible sur le live)
       setTimeout(() => { try { const e2 = e.cloneNode(false); e2.className = 'align-punch en'; const m2 = en.split(' '); const em2 = /^\p{Extended_Pictographic}/u.test(m2[0]) ? m2.shift() : emo;
         e2.innerHTML = '<span class="emo">' + esc(em2) + '</span> ' + esc(m2.join(' ')); document.querySelectorAll('.align-punch').forEach(x => x.remove()); document.body.appendChild(e2); setTimeout(() => e2.remove(), 5500); } catch (er) {} }, 5600);
@@ -681,7 +681,7 @@
           montrer(tete + ' • le marché prépare quelque chose 👀 pourquoi ? 🔌 lien en bio 🎁', false, 2, couleurLigne(n));
           versBot('ligne', cur[4] > l.y ? 1 : -1, '', n);
           setTimeout(() => coeurs(1, ['🤔']), 3600);   // v7.0 : « rentrer ou couper ? » + lien en bio
-          if (n.startsWith('TP')) { explosionArgent(cur[4] > l.y ? -1 : 1); if (traverse) { feuArtifice('💥 ÇA A TOUT ÉCLATÉ !'); setTimeout(() => coeurs(1, ['💥']), 2500); } }   // v7.4 : TP traversé d'un coup = explosion   // objectif atteint : l'argent suit le sens du marché
+          if (n.startsWith('TP')) { explosionArgent(cur[4] > l.y ? -1 : 1); feuArtifice(traverse ? '💥 ÇA A TOUT ÉCLATÉ !' : '🍾 ÇA ENCAISSE !'); pluieBillets(35); setTimeout(() => coeurs(1, ['💥']), 2500); }   // v7.4 : ligne bleue touchée = champagne + billets + explosion   // v7.4 : TP traversé d'un coup = explosion   // objectif atteint : l'argent suit le sens du marché
           return;
         }
       }
