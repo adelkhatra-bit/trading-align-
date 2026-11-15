@@ -4586,6 +4586,35 @@ def entrer_inscrits(etat, m, tr, chats=()):
 
 PLATEFORMES = {"tv": "📺 FTMO / FundedNext (prix TradingView)", "topstep": "🏦 Topstep (prix des futures)", "deux": "🔀 Les deux"}
 
+def duree_minutes(r, tr):
+    """Même estimation que la carte d'entrée : (distance au TP1 / taille moyenne des bougies 1 min)² / 2."""
+    bg = [x for x in (r.get("m1") or [])[-120:] if isinstance(x, dict) and x.get("h") is not None and x.get("l") is not None]
+    a1 = sum(x["h"] - x["l"] for x in bg) / max(len(bg), 1)
+    return 0.5 * (abs(tr["tp1"] - tr["e"]) / a1) ** 2 if a1 > 0 else 0
+
+def message_longue_duree(etat, m, tr, r):
+    """Demande d'Adel (15/11) : position estimée à plusieurs jours → message À PART dans la chaîne du marché :
+    comptes CFD (FundedNext / FTMO) = on garde, ça va durer ; Topstep = fermeture obligatoire avant la limite.
+    + rappel tapote / partage / petits cadeaux. Une seule fois par position."""
+    if tr.get("longue_dit") or duree_minutes(r, tr) < 1800:
+        return False
+    tr["longue_dit"] = True
+    canal = (etat.get("canaux_marche") or {}).get(m)
+    if not (canal and TOKEN):
+        return False
+    _envoi_sur(canal, text=(f"📅 POSITION LONGUE DURÉE — {ICONE.get(m, '')} {m}\n"
+                            "⏳ Celle-là peut durer 2 à 3 jours : patience, c'est parti pour encaisser 💰\n"
+                            "🟢 Comptes FundedNext / FTMO (CFD) : tu as le droit de garder la nuit et le week-end → on garde 😎\n"
+                            "🔴 Comptes Topstep (futures) : tout doit être fermé avant la limite du soir, ne la garde pas\n"
+                            "🛡 SL toujours en place, BE dès que le gain = le risque\n"
+                            "👆 Tapote, partage le live et un petit cadeau si ça te plaît 🌹 ça motive la team !\n"
+                            "⚠️ Ceci n'est pas un conseil en investissement (DYOR)"))
+    try:
+        live_bande(etat, f"BULLE:📅 {ICONE.get(m, '')} {m} : position longue durée, on prend notre temps 😎 • tapote, partage et un petit cadeau si le live te plaît 🌹 • lien en bio", f"longue{m}", 3600, toujours=True)
+    except Exception as ex:
+        print("bande longue", ex)
+    return True
+
 def bouton_plateforme(etat, cid):
     return {"text": "💱 Mes prix : " + PLATEFORMES[plateforme(etat, cid)].split(" (")[0] + " → changer", "callback_data": "plateforme:menu"}
 
@@ -10645,6 +10674,10 @@ def un_tour(etat, chats):
             if t_:
                 envois.append(taguer(f"🧠 L'IA ALIGN sur cette entrée — {ICONE.get(nom_marche, '')} {nom_marche}\n{compacter_ia(t_)}", nom_marche))
             entrer_inscrits(etat, nom_marche, cle["trade"], chats)
+            try:
+                message_longue_duree(etat, nom_marche, cle["trade"], r)   # position de plusieurs jours → message à part (CFD on garde, Topstep on ferme)
+            except Exception as ex:
+                print("longue durée", ex)
             try:
                 prix_topstep_inscrits(etat, nom_marche, cle["trade"], r["m1"][-1]["c"] if r.get("m1") else cle["trade"]["e"])
             except Exception as ex:
