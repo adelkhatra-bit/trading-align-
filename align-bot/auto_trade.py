@@ -95,6 +95,29 @@ def symbole(etat, compte, m):
     return cache[m]
 
 
+ECART_MAX = 0.01        # 1 % : au-delà, le prix MT5 ne correspond pas au graphique → on ne trade pas
+AGE_MAX = 120           # secondes : un prix plus vieux = marché fermé ou flux figé (vu le 15/11 : BTC figé à 68 387 le dimanche)
+
+
+def prix_fiable(cotation, prix, prix_graphique, maintenant=None):
+    """Garde-fou demandé par Adel (graphique parfait, zéro latence) : pas d'ordre si le prix FundedNext est figé
+    (marché fermé, week-end) ou trop loin du prix du graphique TradingView qui a donné le signal."""
+    t = cotation.get("time") or cotation.get("brokerTime")
+    if t:
+        try:
+            dt = datetime.datetime.fromisoformat(str(t).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=datetime.timezone.utc)
+            age = ((maintenant or datetime.datetime.now(datetime.timezone.utc)) - dt).total_seconds()
+            if age > AGE_MAX:
+                return False, f"prix FundedNext figé depuis {int(age // 60)} min (marché fermé ?)"
+        except ValueError:
+            pass
+    if prix_graphique and abs(prix - prix_graphique) / prix_graphique > ECART_MAX:
+        return False, f"prix FundedNext {prix:.2f} trop loin du graphique {prix_graphique:.2f} (> 1 %)"
+    return True, "ok"
+
+
 def niveaux_mt5(signal, prix):
     """Le prix MT5 (CFD) n'est pas exactement celui de TradingView : on garde les mêmes DISTANCES
     (SL élargi et TP) mais on les pose à partir du vrai prix d'exécution → aucune confusion de niveaux."""
@@ -133,6 +156,9 @@ def executer(etat, signal, journal=print):
                 res.append({"compte": compte, "ok": False, "raison": "SL trop large pour le risque"}); continue
             px = _api("GET", f"{compte}/symbols/{sym}/current-price")
             prix = float(px["ask"] if signal["sens"] == "LONG" else px["bid"])
+            ok_p, raison_p = prix_fiable(px, prix, signal["e"])
+            if not ok_p:
+                res.append({"compte": compte, "ok": False, "raison": raison_p}); continue
             sl_mt5, tp_mt5 = niveaux_mt5(signal, prix)
             ordre = {"actionType": "ORDER_TYPE_BUY" if signal["sens"] == "LONG" else "ORDER_TYPE_SELL", "symbol": sym,
                      "volume": lots, "stopLoss": sl_mt5, "takeProfit": tp_mt5, "comment": "ALIGN"}
