@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      7.2
+// @version      7.3
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '7.2';  // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
+  const VERSION = '7.3';  // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -22,10 +22,12 @@
     '⚠️ NOT FINANCIAL ADVICE • do your own research (DYOR)',
     '📲 Le coach ALIGN en direct • lien en bio 🎁 gratuit',
     '🔔 ACTIVE TES NOTIFICATIONS • lien en bio : on te prévient dès que le marché se prépare 🎁',
+    '📩 VA DANS LE LIEN EN BIO • tu reçois l\'alerte en temps réel sur le marché, avec les détails et les news 🎁',   // v7.3 : l'avantage de venir chez nous
     '⚠️ Le trading comporte un risque élevé de perte en capital • Contenu à caractère informatif et éducatif uniquement, qui ne constitue ni un conseil en investissement ni une recommandation personnalisée • Les performances passées ne préjugent pas des performances futures',
     // v6.4 : la même bande en anglais (FR + EN pour toucher tout le monde)
     '👉 FOLLOW • SHARE • TAP THE SCREEN',
     '🔗 LINK IN BIO: LIVE COACH',
+    '📩 GO TO THE LINK IN BIO • get real-time market alerts with the details and the news 🎁',
     '🔔 TURN ON YOUR NOTIFICATIONS • link in bio: we\'ll tell you as soon as the market gets ready 🎁',
     '🔌 PLUG INTO THE MARKET • every candle explained live • link in bio 🎁',
     '🧭 AT ALIGN WE NEVER TRADE AGAINST THE TREND • we follow the market, we don\'t fight it 💪',
@@ -222,7 +224,8 @@
     // v6.4 : chaque info passe en français PUIS en anglais (au moins 2 passages)
     // v6.5 (règle d'Adel) : chaque info rappelle le risque, en français puis en anglais
     if (!/risque|risk/i.test(texte)) texte += ' • ⚠️ Ceci n\'est pas un conseil en investissement, fais tes propres recherches (DYOR) • risque de perte';
-    const items = []; for (let i = 0; i < Math.max(2, fois || 1); i++) items.push({ texte: plateforme(i % 2 ? enAnglais(texte) : texte), bulle, g });
+    // v7.3 (règle d'Adel, 15/11) : chaque info passe 2 fois en français PUIS 2 fois en anglais
+    const nPass = Math.max(4, 2 * (fois || 1)), items = []; for (let i = 0; i < nPass; i++) items.push({ texte: plateforme(i >= nPass / 2 ? enAnglais(texte) : texte), bulle, g });
     if (urgent) { let k = 0; while (k < file.length && file[k].g && file[k].g !== 'proche') k++; file.splice(k, 0, ...items); }
     else file.push(...items);
     suivant();
@@ -417,6 +420,7 @@
     if (/TP\d? TOUCH|OBJECTIF FINAL|TP2 TOUCH/i.test(txt)) { feuArtifice(/TP2|FINAL/i.test(txt) ? '🏆 ÇA ENCAISSE !' : '💰 ÇA ENCAISSE !'); pluieBillets(45); }
     if (/\bSL\b[^\n]{0,12}TOUCH|STOP TOUCH/i.test(txt)) setTimeout(() => coeurs(1, ['😢']), 3600);   // v7.1 : smiley triste, on se refait
     montrer(txt, bulle, 2);
+    const em = (txt.slice(0, 4).match(/🔮|🧱|🛏/) || [])[0]; if (em) setTimeout(() => coeurs(1, [em]), 1500);   // v7.3 : animation « le graphique parle »
   }
 
   // ───── écoute du canal ntfy (reconnexion automatique) ─────
@@ -512,6 +516,9 @@
   // v7.0 (demande d'Adel) : quand le marché se réveille, on remercie les tapotements avec un petit mot qui fait sourire (jamais 2 fois le même d'affilée) ;
   // quand le prix arrive sur une zone clé : « rentrer ou couper ? » + abonne-toi, lien en bio (jamais de prix ni TP/SL sur la bande).
   const PUNCH = [
+    // v7.3 : le graphique « parle » quand le coach annonce une zone (🔮 approche, 🧱 / 🛏 contact)
+    [/🔮/, ['🔮 Ça va tester !', 'Testing soon!'], ['👀 Zone en approche', 'Zone incoming'], ['🎯 Le marché vise une zone', 'Market eyeing a zone']],
+    [/🧱|🛏/, ['🧱 Ça bute !', 'Hitting a wall!'], ['🎯 Zone touchée', 'Zone touched'], ['😮 Contact !', 'Contact!']],
     // v7.1 : objectif de protection touché → un smiley triste qui relativise (jamais le mot SL ni de prix sur la bande)
     [/😢/, ['😢 Pas cette fois…', 'Not this time…'], ['😔 Ça arrive, on se refait 💪', 'It happens, we bounce back 💪'],
       ['🥲 Le marché a gagné cette manche', 'The market won this round'], ['🧠 Le bot apprend de chaque trade', 'The bot learns from every trade'],
