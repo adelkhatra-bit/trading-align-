@@ -5917,6 +5917,13 @@ def traiter(etat, chats, updates):
                     pass
                 _envoi_sur(qui, text=texte_compte_finance())
                 continue
+            if choix == "auto" and str(qui) in {str(x) for x in proprio(etat)}:   # boutons admin du trading automatique
+                try:
+                    telegram("answerCallbackQuery", callback_query_id=cb["id"], text="✅ C'est noté")
+                except Exception:
+                    pass
+                commande_auto(etat, qui, {"stop": "/auto_stop", "go": "/auto_go"}.get(mk, f"/auto_{mk.lower()}"))
+                continue
             if choix == "plateforme":
                 try:
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="✅ Enregistré")
@@ -6433,15 +6440,26 @@ AUTO_MARCHES = ("BTC", "GOLD", "NASDAQ")
 
 
 def commande_auto(etat, cid, txt):
-    """Admin (propriétaire) : /auto = état, /auto_btc /auto_gold /auto_nasdaq = allumer / éteindre le trading automatique."""
+    """Admin (propriétaire) : /auto = état + BOUTONS, /auto_btc /auto_gold /auto_nasdaq = allumer / éteindre le trading automatique.
+    Demande d'Adel (15/11) : boutons pour tout arrêter / tout relancer depuis Telegram (en plus de l'arrêt automatique sur pertes)."""
     am = etat.setdefault("auto_marches", {})
     for m in AUTO_MARCHES:
         if txt.strip() == f"/auto_{m.lower()}":
             am[m] = not am.get(m)
+    if txt.strip() == "/auto_stop":
+        for m in AUTO_MARCHES:
+            am[m] = False
+    if txt.strip() == "/auto_go":
+        for m in AUTO_MARCHES:
+            am[m] = True
     l = ["🤖 TRADING AUTOMATIQUE (comptes FundedNext + Topstep)"]
-    l += [f"{'🟢' if am.get(m) else '⚫'} {m} : {'ALLUMÉ' if am.get(m) else 'éteint'} → /auto_{m.lower()}" for m in AUTO_MARCHES]
-    l.append("🧪 Mode : " + ("RÉEL" if (auto_trade and auto_trade.REEL) or (topstep_trade and topstep_trade.REEL) else "TEST (aucun vrai ordre)"))
-    _envoi_sur(cid, text="\n".join(l))
+    l += [f"{'🟢' if am.get(m) else '⚫'} {m} : {'ALLUMÉ' if am.get(m) else 'éteint'}" for m in AUTO_MARCHES]
+    reel = (auto_trade and auto_trade.REEL) or (topstep_trade and topstep_trade.REEL)
+    l.append("💰 Mode : RÉEL (vrais ordres)" if reel else "🧪 Mode : TEST (aucun vrai ordre)")
+    l.append("🛡 Arrêt automatique : -350 $/jour, -750 $ au total, 100 $ max par plan")
+    boutons = [[{"text": f"{'⏸ Éteindre' if am.get(m) else '▶️ Allumer'} {m}", "callback_data": f"auto:{m}"}] for m in AUTO_MARCHES]
+    boutons += [[{"text": "🛑 TOUT ARRÊTER", "callback_data": "auto:stop"}, {"text": "▶️ TOUT RELANCER", "callback_data": "auto:go"}]]
+    _envoi_sur(cid, text="\n".join(l), reply_markup=json.dumps({"inline_keyboard": boutons}))
 
 
 def auto_entree(etat, m, trx):
