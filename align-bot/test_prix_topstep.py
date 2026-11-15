@@ -21,6 +21,8 @@ class TestNiveaux(unittest.TestCase):
         self.assertIn("PRIX TOPSTEP", t); self.assertIn("MNQ", t)
         self.assertIn("20120", t); self.assertIn("20070", t); self.assertIn("20220", t)
         self.assertIn("DYOR", t)
+        self.assertIn("Risque 1 micro-contrat ≈ 100 $", t)         # SL 50 pts MNQ = 200 ticks × 0,5 $
+        self.assertNotIn("trop large", t)
 
 
 class TestEnvoi(unittest.TestCase):

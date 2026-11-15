@@ -243,6 +243,13 @@ def tout_fermer(journal=print):
 # le même prix (écart de base). Le bot lit le VRAI dernier prix du micro-contrat et décale les niveaux du plan
 # du même écart : l'utilisateur qui a choisi « Topstep » reçoit des niveaux directement utilisables.
 TICKS = {"NASDAQ": 0.25, "GOLD": 0.1, "BTC": 5.0}
+VALEUR_TICK = {"NASDAQ": 0.5, "GOLD": 1.0, "BTC": 0.5}   # $ par tick pour 1 micro-contrat (MNQ / MGC / MBT)
+RISQUE_MAX_CONSEILLE = 100.0                              # règle d'Adel (15/11) : jamais plus de 100 $ de SL par position (compte 100K)
+
+
+def risque_dollars(m, e, sl, contrats=1):
+    """Perte en $ si le SL est touché, pour N micro-contrats."""
+    return abs(e - sl) / TICKS.get(m, 1) * VALEUR_TICK.get(m, 1) * contrats
 _CACHE_PRIX = {}
 
 

@@ -2009,7 +2009,7 @@ TRAD = {
 "⏸ Arrêter mon bot": "⏸ Stop my bot", "▶️ Relancer mon bot": "▶️ Restart my bot", "▶️ Ton bot est relancé": "▶️ Your bot is restarted",
 "🤖 Il entre tout seul dans la prochaine position": "🤖 It will enter the next position by itself", "⏸ Ton bot est arrêté": "⏸ Your bot is stopped",
 "🔔 Tu reçois toujours les positions": "🔔 You still get the positions", "▶️ Relance-le avec 🤖 Mon bot": "▶️ Restart it with 🤖 My bot",
-": POSITION SUIVIE AUTOMATIQUEMENT": ": POSITION AUTOMATICALLY TRACKED", "📍 Repère prix : entrée ≈": "📍 Price guide: entry ≈", "🎯 Je rentre dans la prochaine position": "🎯 I'm in for the next position",
+": POSITION SUIVIE AUTOMATIQUEMENT": ": POSITION AUTOMATICALLY TRACKED", "📍 Repère prix : entrée ≈": "📍 Price guide: entry ≈", "💵 Risque max : 100 $ par position (compte 100K) : adapte ta taille": "💵 Max risk: $100 per position (100K account): adjust your size", "🎯 Je rentre dans la prochaine position": "🎯 I'm in for the next position",
 "✅ Noté ! Prochaine position": "✅ Got it! Next position", "📲 Place ton ordre limite dans la zone 🟨 (vue 15 min)": "📲 Place your limit order in the zone 🟨 (15-min chart)",
 "🤖 Dès que j'entre, tu es compté dedans automatiquement": "🤖 As soon as I enter, you're counted in automatically", "🎯 Le coach te suit : SL à BE, SL remonté, TP": "🎯 The coach follows you: SL to BE, raised SL, TP",
 "ℹ️ Le bot ne passe pas d'ordre à ta place sur ta plateforme": "ℹ️ The bot doesn't place orders on your platform for you", ": TU ES DEDANS": ": YOU'RE IN",
@@ -4580,6 +4580,7 @@ def entrer_inscrits(etat, m, tr, chats=()):
             f"🛑 SL un peu {meche_sl(tr)}\n"
             + ("🏦 Tes prix Topstep arrivent juste après 👇\n" if plateforme(etat, cid) == "topstep" else
                f"📍 Repère prix : entrée ≈ {px(tr['e'])} • SL ≈ {px(tr['sl'])} • TP1 ≈ {px(tr['tp1'])}\n") +
+            "💵 Risque max : 100 $ par position (compte 100K) : adapte ta taille\n"
             "🛑 Mets ton SL TOUT DE SUITE\n🎯 Coach activé jusqu'au TP\n📈 Résultat compté dans Mes résultats"),
             )
 
@@ -4619,6 +4620,9 @@ def texte_prix_topstep(m, tr, prix_graphique, prix_fut):
          f"📍 Entrée ≈ {px(n['e'])}", f"🛑 SL ≈ {px(n['sl'])}", f"🎯 TP1 ≈ {px(n['tp1'])}"]
     if n.get("tp2"):
         l.append(f"🎯 TP2 ≈ {px(n['tp2'])}")
+    rq = topstep_trade.risque_dollars(m, n["e"], n["sl"])
+    l.append(f"💵 Risque 1 micro-contrat ≈ {rq:.0f} $ • max conseillé {topstep_trade.RISQUE_MAX_CONSEILLE:.0f} $"
+             + (" ⚠️ trop large : passe ton tour" if rq > topstep_trade.RISQUE_MAX_CONSEILLE else ""))
     l += [f"📏 Écart contrat / graphique : {'+' if prix_fut >= prix_graphique else ''}{px(prix_fut - prix_graphique)}",
           "🛑 Mets ton SL TOUT DE SUITE", "⚠️ Ceci n'est pas un conseil en investissement (DYOR)"]
     return "\n".join(l)
