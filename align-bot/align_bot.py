@@ -5842,6 +5842,13 @@ def traiter(etat, chats, updates):
                 _envoi_sur(qui, text=("👁 VUE GRATUITE ACTIVÉE\n🎁 Tu reçois maintenant exactement ce que reçoit un gratuit\n💎 Retour : 🤖 Mon bot → Revenir en vue VIP"
                                       if mk == "on" else "💎 VUE VIP RÉTABLIE\n📲 Tout le flux complet est dans la chaîne ALIGN VIP"))
                 continue
+            if choix == "financeplus":                  # « En savoir plus » du message compte financé
+                try:
+                    telegram("answerCallbackQuery", callback_query_id=cb["id"])
+                except Exception:
+                    pass
+                _envoi_sur(qui, text=texte_compte_finance())
+                continue
             if choix == "plateforme":
                 try:
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="✅ Enregistré")
@@ -6336,8 +6343,10 @@ def traiter(etat, chats, updates):
             if any(k in txt for k in ("btc", "bitcoin", "gold", "xau", "nasdaq", "nas100")):
                 premier_choix_marche(etat, cid, md_)
             demandes.append((cid, md_))
-        elif "topstep" in txt or "compte finance" in txt:   # v8.9 (demande d'Adel) : parrainage compte financé
+        elif "financeplus" in txt:                       # « 📖 En savoir plus » du message compte financé
             _envoi_sur(cid, text=texte_compte_finance())
+        elif "topstep" in txt or "compte finance" in txt:   # v8.9 (demande d'Adel) : parrainage compte financé
+            _envoi_sur(cid, text=texte_compte_finance_court(), reply_markup=markup_compte_finance())
         elif "start present" in txt or txt.strip() == "present":   # v8.9 : « je regarde le live » → l'écran le dit
             live_present(etat, cid)
         elif "pasrentre" in txt or "pas rentre" in txt:   # v8.7 (demande d'Adel) : « pas rentré cette fois » → on le garde connecté
@@ -9926,6 +9935,10 @@ def live_annonces(etat, m, textes):
             live_bande(etat, f"BULLE:😅 {ic} {m} : TP frôlé à un cheveu • petit recul, on garde le cap 😎" + FIN_BANDE, f"frole{m}", 600, toujours=True)
         elif "STOP TOUCHÉ" in t:
             live_bande(etat, f"😤 {ic} {m} : stop touché • on coupe petit, on va se refaire 💪" + FIN_BANDE, f"sl{m}", 600, toujours=True)
+        elif "🚀 DIRECTION TP" in t:          # demande d'Adel : le marché prend de la vitesse vers le TP → « waouh » + chrono (jamais de prix ni de sens)
+            live_bande(etat, f"BULLE:🤩 WAOUH, ÇA ACCÉLÈRE sur {ic} {m} ! le marché prend de la vitesse 🏎️ • ⏱ prochaine clôture dans {max(1, 5 - int(time.time() // 60) % 5)} min" + FIN_BANDE,
+                       f"waouh{m}", 900, toujours=True)
+            live_bande(etat, f"CMD:chrono:{300 - int(time.time()) % 300}:{m}", f"chronowaouh{m}", 900, toujours=True)
         elif "COUPE ET REPRENDS" in t:      # demande d'Adel : spectacle quand on encaisse avant le retour
             live_bande(etat, f"BULLE:✂️ {ic} {m} : on encaisse TOUT, le gain est dans la poche 💰 • le marché veut revenir… on l'attend au tournant 😏" + FIN_BANDE, f"coupe{m}", 900, toujours=True)
         elif "REPRISE À L'ENTRÉE" in t:
@@ -9996,7 +10009,7 @@ TOPSTEP_CODE = os.environ.get("TOPSTEP_CODE", "TS-K3VLYHY9EORJ2")   # code de pa
 
 FUNDEDNEXT_CODE = os.environ.get("FUNDEDNEXT_CODE", "REFZLZJA3")   # code de parrainage FundedNext d'Adel (7 % de commission)
 TOPSTEP_FIN = "13/02/2027"          # le code expire : à régénérer sur le tableau de bord Topstep (Referrals)
-COMPTE_PROMO_VERSION = "topstep-1"  # changer la valeur = republier + réépingler le message dans les chaînes
+COMPTE_PROMO_VERSION = "topstep-2"  # changer la valeur = republier + réépingler le message dans les chaînes
 
 
 def texte_compte_finance():
@@ -10024,6 +10037,26 @@ def texte_compte_finance():
             "Fais tes propres recherches (DYOR).\n🤝 Liens de parrainage : ALIGN reçoit un avantage si tu utilises ces codes.")
 
 
+FTMO_LIEN = os.environ.get("FTMO_LIEN", "")   # lien d'affiliation FTMO d'Adel (à ajouter dans les variables GitHub quand il l'aura)
+
+def texte_compte_finance_court():
+    """Version courte (demande d'Adel : pas trop de texte d'un coup) : l'essentiel + boutons, la suite sur « En savoir plus »."""
+    return ("🏦 TRADE AVEC LE CAPITAL D'UNE PROP FIRM 🚀\n"
+            f"🎟 Topstep : -15 % avec le code 👉 {TOPSTEP_CODE}\n"
+            f"🎟 FundedNext : -5 % avec le code 👉 {FUNDEDNEXT_CODE}\n"
+            "🆓 Commence par le COMPTE DÉMO gratuit pour te faire la main 😉\n"
+            "🎁 Toutes les positions ALIGN sont gratuites\n"
+            "⚠️ Ceci n'est pas un conseil en investissement (DYOR)\n"
+            "🤝 Liens de parrainage : ALIGN reçoit un avantage si tu les utilises")
+
+def markup_compte_finance():
+    l = [[{"text": "🏦 Topstep -15 %", "url": "https://www.topstep.com/"}],
+         [{"text": "🟢 FundedNext -5 %", "url": "https://fundednext.com/"}]]
+    if FTMO_LIEN:
+        l.append([{"text": "🔵 FTMO", "url": FTMO_LIEN}])
+    l.append([{"text": "📖 En savoir plus", "url": BOT_LIEN + "?start=financeplus"}])   # lien vers le bot : marche aussi depuis les chaînes
+    return json.dumps({"inline_keyboard": l})
+
 def epingler_compte_finance(etat):
     """v8.9 : le message « compte financé » est publié puis épinglé une seule fois par version dans chaque chaîne (sans retirer le menu)."""
     if not TOKEN:
@@ -10033,7 +10066,7 @@ def epingler_compte_finance(etat):
         if info.get("promo_v") == COMPTE_PROMO_VERSION or time.time() - float(info.get("promo_essai", 0)) < 3600:
             continue
         info["promo_essai"] = time.time()
-        res = _envoi_sur(canal, text=texte_compte_finance(), disable_notification="true")
+        res = _envoi_sur(canal, text=texte_compte_finance_court(), reply_markup=markup_compte_finance(), disable_notification="true")
         try:
             mid = res["result"]["message_id"]
         except Exception as ex:
