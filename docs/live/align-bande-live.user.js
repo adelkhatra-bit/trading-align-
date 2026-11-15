@@ -24,6 +24,7 @@
     '📲 Le coach ALIGN en direct • lien en bio 🎁 gratuit',
     '🎁 TOUTES LES POSITIONS SONT GRATUITES • les annonces arrivent en temps réel sur ton portable • lien en bio',   // v7.6 (demande d'Adel)
     '📢 ANNONCE À VENIR… 😏 tu veux savoir avant que ça parte ? • lien en bio 🎁',
+    '⚡ DÉPÊCHE-TOI : UNE ENTRÉE SE PRÉPARE • ABONNE-TOI, LIEN EN BIO • LES RETARDATAIRES ONT TOUJOURS TORT 😉',
     '🔔 ACTIVE TES NOTIFICATIONS • lien en bio : on te prévient dès que le marché se prépare 🎁',
     '📩 VA DANS LE LIEN EN BIO • tu reçois l\'alerte en temps réel sur le marché, avec les détails et les news 🎁',   // v7.3 : l'avantage de venir chez nous
     '⚠️ Le trading comporte un risque élevé de perte en capital • Contenu à caractère informatif et éducatif uniquement, qui ne constitue ni un conseil en investissement ni une recommandation personnalisée • Les performances passées ne préjugent pas des performances futures',
@@ -32,6 +33,7 @@
     '🔗 LINK IN BIO: LIVE COACH',
     '🎁 ALL POSITIONS ARE FREE • announcements land in real time on your phone • link in bio',
     '📢 ANNOUNCEMENT COMING… 😏 want to know before it moves? • link in bio 🎁',
+    '⚡ HURRY: AN ENTRY IS GETTING READY • FOLLOW, LINK IN BIO • LATECOMERS ARE ALWAYS WRONG 😉',
     '📩 GO TO THE LINK IN BIO • get real-time market alerts with the details and the news 🎁',
     '🔔 TURN ON YOUR NOTIFICATIONS • link in bio: we\'ll tell you as soon as the market gets ready 🎁',
     '📲 CONNECTED TO THE MARKET IN REAL TIME FROM YOUR PHONE • every candle explained live • link in bio 🎁',
@@ -193,7 +195,7 @@
   let x = 0, last = performance.now(), raf;
   function anim(now) {
     const r = zoneGraphique();
-    const axe = 70;    // à droite : la bande s'arrête au début des prix
+    const axe = 0;     // v7.6 (demande d'Adel) : la bande couvre aussi l'échelle de prix en haut (plus propre)
     const marge = 40;  // à gauche : un peu plus large (v5.2) tout en restant dans la zone filmée par TikTok
     bande.style.left = (r.left + marge) + 'px';
     bande.style.top = r.top + 'px';
@@ -553,7 +555,7 @@
     [/🏦/, ['🏦 Les gros sont là', '🏦 Big players here'], ['👀 Zone des gros', '👀 Smart-money zone']],
     [/🧲/, ['🧲 Le marché comble le trou', '🧲 Filling the gap'], ['👀 Zone aimant', '👀 Magnet zone']],
     // v7.6 (demande d'Adel) : on nargue avec humour quand une annonce se prépare (pro, sûr de lui)
-    [/📢/, ['📢 Annonce à venir… 😏', '📢 Announcement coming… 😏'], ['🤫 Le coach sait déjà où ça va', '🤫 The coach already knows'], ['😎 Toi tu regardes, eux ils sont prévenus', '😎 You watch, they get the alert'], ['🧐 Décision prise. Lien en bio', '🧐 Decision made. Link in bio']],
+    [/📢/, ['📢 Annonce à venir… 😏', '📢 Announcement coming… 😏'], ['🤫 Le coach sait déjà où ça va', '🤫 The coach already knows'], ['😎 Toi tu regardes, eux ils sont prévenus', '😎 You watch, they get the alert'], ['🧐 Décision prise. Lien en bio', '🧐 Decision made. Link in bio'], ['🏃 Les retardataires ont toujours tort 😉', '🏃 Latecomers are always wrong 😉'], ['⚡ Dépêche-toi, une entrée arrive', '⚡ Hurry, an entry is coming']],
     [/↩️/, ['↩️ Rebond sur zone clé', 'Bounce on key zone'], ['👀 Réaction du marché', 'Market reaction']],
     [/./, ['❤️ Tapote l\'écran', 'Tap the screen'], ['🔔 Abonne-toi', 'Follow'], ['💪 La team ALIGN', 'Team ALIGN'], ['🎯 Reste concentré', 'Stay focused']]
   ];
@@ -701,6 +703,17 @@
     } catch (e) {}
     return res;
   }
+  function infosAlign() {   // v7.6 : les marqueurs ⓘ de l'indicateur (le plus récent de chaque sorte)
+    const res = {};
+    try { const mod = chart()._chartWidget.model().model();
+      for (const ds of mod.dataSources()) { if (!/ALIGN/.test(String(ds.title && ds.title()))) continue; const vu = new Set();
+        (function walk(o, d, dansData) { if (!o || d > 8 || typeof o !== 'object' || vu.has(o)) return; vu.add(o);
+          if (o instanceof Map) { o.forEach(v => walk(v, d + 1, dansData)); return; }
+          if (dansData && typeof o.t === 'string' && typeof o.y === 'number') { const e = (o.t.match(/^(✂️|↩️|✅)\s*ⓘ/) || [])[1]; if (e && (!res[e] || o.id > res[e].id)) res[e] = { e, id: o.id, y: o.y }; return; }
+          for (const k of Object.keys(o)) walk(o[k], d + 1, dansData || k === '_primitivesDataById');
+        })(ds.graphics()._primitivesCollection.dwglabels, 0, false); } } catch (e) {}
+    return Object.values(res);
+  }
   function texteZone(t, m) {
     return /FVG/i.test(t) ? '🧲 ' + m + ' • ZONE FVG : un trou laissé par le marché… il adore revenir le combler 👀 rebond ou cassure ? 📲 en temps réel sur ton portable : lien en bio 🎁'
       : /ORDER|OB\b/i.test(t) ? '🏦 ' + m + ' • ORDER BLOCK : la zone où les gros ont passé leurs ordres… ils la défendent souvent 👀 📲 en temps réel sur ton portable : lien en bio 🎁'
@@ -718,6 +731,11 @@
     const q = prixA(yPage); if (!q || !isFinite(q.p)) return false;
     const m = nomMarche(), LG = lignesAlign(); let cle = null, txt = null, coul = 'alerte', emo = '👀';
     for (const n of ['ENTRÉE', 'SL', 'TP1', 'TP2']) { const l = LG[n]; if (l && Math.abs(l.y - q.p) <= q.tol) { cle = 'l' + n + Math.round(l.y); txt = teaserLigne(n); coul = couleurLigne(n); emo = n.startsWith('TP') ? '🎯' : n === 'SL' ? '🧱' : '🔮'; break; } }
+    // v7.6 (demande d'Adel) : les petits ⓘ du graphique (✂️ trait de décision, ↩️ retournement, ✅ confirmation) sont expliqués aussi
+    if (!cle) for (const o of infosAlign()) { if (Math.abs(o.y - q.p) <= q.tol * 1.5) { cle = 'i' + o.e + Math.round(o.y); emo = o.e === '↩️' ? '🔄' : o.e === '✂️' ? '🧱' : '🔮';
+      txt = o.e === '✂️' ? '✂️ ' + m + ' • TRAIT BLANC = LIGNE DE DÉCISION : c\'est la clôture 15 min de l\'autre côté qui décide du sens 👀 • une mèche ne compte pas • 📲 lien en bio 🎁'
+        : o.e === '↩️' ? '↩️ ' + m + ' • LIGNE DE RETOURNEMENT : si une bougie 15 min clôture de l\'autre côté, le plan s\'inverse 🔄 • le coach te prévient • 📲 lien en bio 🎁'
+        : '✅ ' + m + ' • CONFIRMATION : les petites unités doivent aller dans le même sens avant d\'entrer 👀 • 📲 lien en bio 🎁'; break; } }
     if (!cle) for (const z of zonesAlign()) { if (q.p <= z.hi + q.tol / 2 && q.p >= z.lo - q.tol / 2) { cle = 'z' + z.id; txt = texteZone(z.t, m); emo = /FVG/i.test(z.t) ? '🧲' : /ORDER/i.test(z.t) ? '🏦' : '👀'; break; } }
     if (!cle) return false;
     const now = Date.now(); window.__alignExpl = now; if (now - (vuClic[cle] || 0) < (clic ? 4000 : 45000)) return true; vuClic[cle] = now;
@@ -858,7 +876,7 @@
       }
       // 4) toutes les ~7 min : la bande dit où le marché a l'air d'aller (sans prix) et renvoie vers le lien en bio
       // v6.1 : marché calme = on parle plus souvent (toutes les ~3 min) : direction, où est le prix, « branche-toi au marché »
-      if (Date.now() - derniereTend > 3 * 60000) {
+      if (Date.now() - derniereTend > 2.7 * 60000) {   // v7.6 : spectacle +10 %
         const c10 = B.slice(-10).map(x => x[4]), pente = (c10[9] - c10[0]) / moyR, larg = (Math.max(...B.slice(-10).map(x => x[2])) - Math.min(...B.slice(-10).map(x => x[3]))) / moyR;
         const pos = (cur[4] - ll) / Math.max(hh - ll, 1e-9), tour = tendN % 3;
         // marché très calme (bougies récentes bien plus petites que d'habitude) → message « va te faire un café » selon l'heure
@@ -929,7 +947,7 @@
     }
   } catch (e) {} }, 1000);
   // de temps en temps des cœurs qui montent : « tapote l'écran »
-  const coeurT = setInterval(() => { if (!retour) coeurs(10); }, 100000);
+  const coeurT = setInterval(() => { if (!retour) coeurs(10); }, 90000);   // v7.6 : +10 %
 
   // v7.4 (demande d'Adel) : position en cours dans le bon sens → petits mots qui font sourire, toutes les 4 min (sans prix)
   const posT = setInterval(() => { try {
@@ -937,7 +955,7 @@
     const B = barres(3); if (!B.length) return; const p = B[B.length - 1][4], sens = S.y > E.y ? -1 : 1;
     if (sens * (p - E.y) <= 0) return;
     coeurs(1, ['😊']); setTimeout(() => coeurs(1, ['😏']), 16600);
-  } catch (e) {} }, 240000);
+  } catch (e) {} }, 216000);   // v7.6 : +10 %
   window.__ALIGN_BANDE__ = {
     version: VERSION, recu, punch: c => coeurs(1, [c]), plateforme: v => choisirPlateforme(v),
     stop() { cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
