@@ -9638,15 +9638,46 @@ def live_news(etat, maintenant):
 TOPSTEP_CODE = os.environ.get("TOPSTEP_CODE", "TS-K3VLYHY9EORJ2")   # code de parrainage Topstep d'Adel (valable 90 j, à régénérer)
 
 
+TOPSTEP_FIN = "13/02/2027"          # le code expire : à régénérer sur le tableau de bord Topstep (Referrals)
+COMPTE_PROMO_VERSION = "topstep-1"  # changer la valeur = republier + réépingler le message dans les chaînes
+
+
 def texte_compte_finance():
-    """v8.9 (demande d'Adel) : compte financé (prop firm) + conseil aux nouveaux + avertissement + transparence sur le parrainage."""
-    return ("🏦 COMPTE FINANCÉ (prop firm)\n━━━━━━━━━━━━\n"
-            f"🎟 Code Topstep : {TOPSTEP_CODE}\n💸 -15 % sur ton 1er Trading Combine\n🔗 topstep.com\n━━━━━━━━━━━━\n"
-            "👀 Nouveau ? Ne rentre pas tout de suite : regarde d'abord une position ALIGN aller jusqu'au TP1, pour comprendre.\n"
-            "✅ Ensuite tu prends la suivante, toujours avec ton SL.\n"
-            "⏳ Une position peut durer de quelques heures à 2-3 jours, et revenir vers l'entrée avant de partir.\n━━━━━━━━━━━━\n"
+    """v8.9 (demande d'Adel) : message commercial « compte financé » (épinglé dans les chaînes + bouton du menu).
+    Conseil aux nouveaux + avertissement + transparence sur le parrainage (obligatoire)."""
+    return ("🏦 TRADE AVEC LE CAPITAL D'UNE PROP FIRM 🚀\n━━━━━━━━━━━━\n"
+            "💡 Pourquoi risquer tes économies ? Réussis le challenge, trade avec le capital de la prop firm "
+            "et garde l'essentiel des gains 💰\n"
+            f"🎟 -15 % sur ton 1er Trading Combine Topstep avec le code :\n👉 {TOPSTEP_CODE}\n"
+            f"⏳ Réservé aux 5 premiers nouveaux traders • valable jusqu'au {TOPSTEP_FIN}\n🔗 topstep.com\n━━━━━━━━━━━━\n"
+            "🧭 LA MÉTHODE ALIGN POUR BIEN DÉMARRER\n"
+            "1️⃣ Regarde d'abord une position ALIGN aller jusqu'au TP1 👀\n"
+            "2️⃣ Ensuite prends la suivante, toujours avec ton SL 🛡\n"
+            "3️⃣ Une position peut durer quelques heures à 2-3 jours : on ne court jamais après le prix 😎\n━━━━━━━━━━━━\n"
             "⚠️ Ceci n'est pas un conseil en investissement. Le trading comporte un risque de perte en capital. "
-            "Fais tes propres recherches (DYOR).\n🤝 Code de parrainage : ALIGN reçoit un avantage si tu l'utilises.")
+            "Fais tes propres recherches (DYOR).\n🤝 Lien de parrainage : ALIGN reçoit un avantage si tu utilises le code.")
+
+
+def epingler_compte_finance(etat):
+    """v8.9 : le message « compte financé » est publié puis épinglé une seule fois par version dans chaque chaîne (sans retirer le menu)."""
+    if not TOKEN:
+        return
+    for m, canal in (etat.get("canaux_marche") or {}).items():
+        info = etat.setdefault("canal_live", {}).setdefault(m, {})
+        if info.get("promo_v") == COMPTE_PROMO_VERSION or time.time() - float(info.get("promo_essai", 0)) < 3600:
+            continue
+        info["promo_essai"] = time.time()
+        res = _envoi_sur(canal, text=texte_compte_finance(), disable_notification="true")
+        try:
+            mid = res["result"]["message_id"]
+        except Exception as ex:
+            print("promo chaîne", m, ex)
+            continue
+        info["promo_v"] = COMPTE_PROMO_VERSION
+        try:
+            telegram("pinChatMessage", chat_id=canal, message_id=mid, disable_notification="true")
+        except Exception as ex:
+            print("épinglage promo", m, ex)
 
 
 LIVE_ECRAN_PAUSE = 20          # v8.9 : au plus 1 message de membre toutes les 20 s sur l'écran (pas d'encombrement)
@@ -10268,6 +10299,7 @@ def un_tour(etat, chats):
         try:
             preparer_chaines(etat)
             epingler_menus_chaines(etat)
+        epingler_compte_finance(etat)          # v8.9 : message « compte financé » épinglé
             renvoyer_claviers(etat, chats)
         except Exception as ex:
             print("préparer chaînes", ex)
