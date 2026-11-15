@@ -40,7 +40,7 @@ class TestAutoTrade(unittest.TestCase):
             return next(v for k, v in rep.items() if chemin.endswith(k))
         with unittest.mock.patch.object(at, "TOKEN", "x"), unittest.mock.patch.object(at, "COMPTES", ["c1"]), \
              unittest.mock.patch.object(at, "REEL", False), unittest.mock.patch.object(at, "_api", side_effect=faux), \
-             unittest.mock.patch.object(at.time, "sleep"):
+             unittest.mock.patch.object(at.time, "sleep"), unittest.mock.patch.object(at, "assurer_deploye", return_value=True):
             r = at.executer({"auto_marches": {"BTC": True}}, {"marche": "BTC", "sens": "SHORT", "e": 64000, "sl": 64400, "tp": 63000},
                             journal=lambda *_: None)
         self.assertTrue(r[0]["ok"] and r[0]["test"])
@@ -52,7 +52,7 @@ class TestAutoTrade(unittest.TestCase):
         rep = {"account-information": {"equity": 10000}, "positions": [{"symbol": "BTCUSD", "type": "POSITION_TYPE_BUY"}], "/symbols": ["BTCUSD"]}
         with unittest.mock.patch.object(at, "TOKEN", "x"), unittest.mock.patch.object(at, "COMPTES", ["c1"]), \
              unittest.mock.patch.object(at, "_api", side_effect=lambda m, c, b=None: next(v for k, v in rep.items() if c.endswith(k))), \
-             unittest.mock.patch.object(at.time, "sleep"):
+             unittest.mock.patch.object(at.time, "sleep"), unittest.mock.patch.object(at, "assurer_deploye", return_value=True):
             r = at.executer({"auto_marches": {"BTC": True}}, {"marche": "BTC", "sens": "SHORT", "e": 1, "sl": 2, "tp": 0},
                             journal=lambda *_: None)
         self.assertEqual(r[0]["raison"], "position opposée interdite")
@@ -127,6 +127,26 @@ class TestRR(unittest.TestCase):
         plan = {"sens": "LONG", "e": 100.0, "sl": 90.0, "tp": 120.0, "taille": 1.0, "pas": 0.01, "be": False, "rachats": 0, "budget": 60.0}
         quoi, lots = at.decision(plan, [{"openPrice": 100.0, "stopLoss": 90.0, "volume": 3.0}], 95.0)   # 30 $ déjà
         self.assertEqual(quoi, "rachat"); self.assertLessEqual(lots * 5, 30.0001)
+
+
+
+class TestDeploiement(unittest.TestCase):
+    """Économies MetaApi : en service seulement quand une entrée approche, retiré après 45 min sans besoin."""
+    def test_deploy_puis_retrait(self):
+        appels, etats = [], {"A": "UNDEPLOYED"}
+        def prov(m, chemin):
+            appels.append((m, chemin))
+            if m == "POST":
+                etats["A"] = "DEPLOYED" if chemin.endswith("/deploy") else "UNDEPLOYED"
+                return {}
+            return {"state": etats["A"]}
+        with unittest.mock.patch.object(at, "_prov", prov), unittest.mock.patch.object(at, "TOKEN", "t"), \
+             unittest.mock.patch.object(at, "COMPTES", ["A"]):
+            etat = {}
+            self.assertEqual(at.gerer_deploiement(etat, True, 1000, journal=lambda *_: None), "deploy")
+            self.assertIsNone(at.gerer_deploiement(etat, False, 1000 + 600, journal=lambda *_: None))      # pas encore 45 min
+            self.assertEqual(at.gerer_deploiement(etat, False, 1000 + 3000, journal=lambda *_: None), "undeploy")
+        self.assertIn(("POST", "A/deploy"), appels); self.assertIn(("POST", "A/undeploy"), appels)
 
 
 if __name__ == "__main__":

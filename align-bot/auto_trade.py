@@ -148,6 +148,9 @@ def executer(etat, signal, journal=print):
     res = []
     for compte in COMPTES:
         try:
+            if not assurer_deploye(compte, journal=journal):
+                res.append({"compte": compte, "ok": False, "raison": "compte MetaApi pas encore en service"}); continue
+            etat.setdefault("metaapi_deploy", {}).update(deploye=True, besoin_t=time.time())
             info = _api("GET", f"{compte}/account-information")
             ok, raison = garde_fou(etat, compte, float(info.get("equity", 0)))
             if not ok:
@@ -268,3 +271,70 @@ def profit_ouvert(etat, m):
                 vu = True
                 total += float(p.get("profit", 0)) + float(p.get("swap", 0)) + float(p.get("commission", 0))
     return round(total, 2) if vu else None
+
+
+# ── Économies MetaApi (inquiétude d'Adel sur la consommation) ────────────────────────────────────────────────────
+# MetaApi facture à l'heure tant que le compte est « Deployed ». Le bot le met en service seulement quand une entrée
+# approche (ou qu'une position est ouverte) et le retire après 45 min sans besoin. Une entrée surprise attend la mise en service (≤ 90 s).
+PROVISIONING = "https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/"
+RETRAIT_APRES = 45 * 60
+
+
+def _prov(methode, chemin):
+    req = urllib.request.Request(PROVISIONING + chemin, method=methode, data=b"" if methode == "POST" else None,
+                                 headers={"auth-token": TOKEN, "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        txt = r.read().decode() or "{}"
+    return json.loads(txt) if txt.strip().startswith("{") else {}
+
+
+def etat_compte(compte):
+    return (_prov("GET", compte) or {}).get("state", "")
+
+
+def assurer_deploye(compte, attendre=90, pause=5, journal=print):
+    """Met le compte en service si besoin et attend qu'il soit DEPLOYED (au plus `attendre` secondes)."""
+    st = etat_compte(compte)
+    if st == "DEPLOYED":
+        return True
+    if st in ("UNDEPLOYED", "UNDEPLOYING", ""):
+        _prov("POST", f"{compte}/deploy")
+        journal(f"METAAPI mise en service du compte {compte}")
+    fin = time.time() + attendre
+    while time.time() < fin:
+        time.sleep(pause)
+        if etat_compte(compte) == "DEPLOYED":
+            return True
+    return False
+
+
+def gerer_deploiement(etat, besoin, maintenant=None, journal=print):
+    """besoin = une entrée approche ou une position / un plan est en cours sur un marché allumé.
+    Besoin → mise en service (sans attendre). Plus de besoin depuis 45 min → retrait (plus de facturation horaire)."""
+    if not (TOKEN and COMPTES):
+        return None
+    maintenant = maintenant or time.time()
+    d = etat.setdefault("metaapi_deploy", {})
+    if besoin or etat.get("mt5_plan"):
+        d["besoin_t"] = maintenant
+        if not d.get("deploye"):
+            for c in COMPTES:
+                try:
+                    if etat_compte(c) != "DEPLOYED":
+                        _prov("POST", f"{c}/deploy")
+                except Exception as ex:
+                    journal(f"METAAPI deploy {c} : {ex}")
+            d["deploye"] = True
+            return "deploy"
+        return None
+    if d.get("deploye", True) and maintenant - float(d.get("besoin_t", 0)) > RETRAIT_APRES:
+        for c in COMPTES:
+            try:
+                if etat_compte(c) == "DEPLOYED":
+                    _prov("POST", f"{c}/undeploy")
+            except Exception as ex:
+                journal(f"METAAPI undeploy {c} : {ex}")
+        d["deploye"] = False
+        journal("METAAPI comptes retirés (aucune entrée en vue) : plus de facturation horaire")
+        return "undeploy"
+    return None
