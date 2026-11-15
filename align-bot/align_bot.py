@@ -2489,6 +2489,16 @@ def carte_coach(m, r, cle, genre, tr=None, raison=None, declencheur=None, signal
         if tr.get("tp2") is not None and tp2_affichable(d, tr["tp1"], tr["tp2"]):
             niv.append((f"🏁 TP2 : {px(tr['tp2'])}", tr["tp2"]))
         l += [x for x, _ in sorted(niv, key=lambda z: -z[1])] + [f"⚖️ R:R : 1:{rr:.1f}".replace(".", ",")]
+        # v8.7 (demande d'Adel) : durée estimée de la position + « le prix peut revenir vers l'entrée », pour ne pas paniquer
+        try:
+            bg = [x for x in (r.get("m1") or [])[-120:] if isinstance(x, dict) and x.get("h") is not None and x.get("l") is not None]
+            a1 = sum(x["h"] - x["l"] for x in bg) / max(len(bg), 1)
+            mins = 0.5 * (abs(tr["tp1"] - tr["e"]) / a1) ** 2 if a1 > 0 else 0
+            if mins > 0:
+                duree = "moins d'1 h" if mins < 60 else "quelques heures" if mins < 360 else "environ 1 journée" if mins < 1800 else "2 à 3 jours"
+                l.append(f"⏳ Durée estimée : {duree} • le prix peut revenir vers l'entrée avant de partir, garde ton SL")
+        except Exception:
+            pass
         if validite:
             l.append(f"⏱ Valide : {validite}")
         try:
