@@ -9562,15 +9562,32 @@ def ecran_vers_telegram(etat):
         kb.setdefault("inline_keyboard", []).insert(0, [{"text": "🧠 En savoir plus", "url": BOT_LIEN + "?start=ecran_" + m.lower()}])
         _envoi_sur(canal, text=court, reply_markup=json.dumps(kb))     # AVEC son : l'écran intrigue, le téléphone donne la réponse
 
+def sondage_tp(etat, m):
+    """v8.9 (demande d'Adel) : TP touché → sondage « tu as encaissé ? » dans la chaîne du marché + la bande renvoie vers le mobile."""
+    if time.time() - _LIVE_DERNIER.get(f"sondage{m}", 0) < 1800:
+        return False
+    _LIVE_DERNIER[f"sondage{m}"] = time.time()
+    canal = (etat.get("canaux_marche") or {}).get(m)
+    if canal and TOKEN:
+        try:
+            telegram("sendPoll", chat_id=canal, question=f"🏆 TP touché sur {ICONE.get(m, '')} {m} ! Tu as encaissé avec la team ?",
+                     options=json.dumps(["✅ OUI, encaissé 💰", "🙅 Pas cette fois", "👀 Je regardais le spectacle"]))
+        except Exception as ex:
+            print("sondage tp", m, ex)
+    live_publier("BULLE:🏆 ALORS LA TEAM, QUI A ENCAISSÉ ? 💰 réponds au petit sondage sur ton mobile 📲 • lien en bio")
+    return True
+
+
 def live_annonces(etat, m, textes):
     """Ce que le bot envoie sur Telegram → la bande (sans aucun niveau)."""
     ic = ICONE.get(m, "")
     for t in textes or []:
         t = t if isinstance(t, str) else str(t)
-        if "J'ENTRE MAINTENANT" in t:
+        if "J'ENTRE MAINTENANT" in t or est_entree(t):   # v8.9 : le nouveau modèle « 🟢 GOLD - LONG » n'était pas vu → l'écran ne savait pas qu'ALIGN était dedans
             live_bande(etat, f"🚀 ALIGN ENTRE EN POSITION sur {ic} {m} ! 👉 Le coach en direct : lien en bio 🎁", f"entre{m}", 600, toujours=True)
         elif "OBJECTIF FINAL ATTEINT" in t or re.search(r"TP[2-9] TOUCHÉ", t):
             live_bande(etat, f"🏆 TP TOUCHÉ sur {ic} {m} ! Bravo à ceux qui ont suivi 🔥" + FIN_BANDE, f"tp2{m}", 600, toujours=True)
+            sondage_tp(etat, m)
         elif "FRÔLÉ" in t:
             live_bande(etat, f"BULLE:😅 {ic} {m} : TP frôlé à un cheveu • petit recul, on garde le cap 😎" + FIN_BANDE, f"frole{m}", 600, toujours=True)
         elif "STOP TOUCHÉ" in t:
@@ -9639,6 +9656,7 @@ def live_news(etat, maintenant):
 TOPSTEP_CODE = os.environ.get("TOPSTEP_CODE", "TS-K3VLYHY9EORJ2")   # code de parrainage Topstep d'Adel (valable 90 j, à régénérer)
 
 
+FUNDEDNEXT_CODE = os.environ.get("FUNDEDNEXT_CODE", "REFZLZJA3")   # code de parrainage FundedNext d'Adel (7 % de commission)
 TOPSTEP_FIN = "13/02/2027"          # le code expire : à régénérer sur le tableau de bord Topstep (Referrals)
 COMPTE_PROMO_VERSION = "topstep-1"  # changer la valeur = republier + réépingler le message dans les chaînes
 
@@ -9651,6 +9669,9 @@ def texte_compte_finance():
             "et garde l'essentiel des gains 💰\n"
             f"🎟 -15 % sur ton 1er Trading Combine Topstep avec le code :\n👉 {TOPSTEP_CODE}\n"
             f"⏳ Réservé aux 5 premiers nouveaux traders • valable jusqu'au {TOPSTEP_FIN}\n🔗 topstep.com\n━━━━━━━━━━━━\n"
+            f"🎟 -5 % chez FundedNext avec le code : 👉 {FUNDEDNEXT_CODE}\n🔗 fundednext.com\n"
+            "🆓 Pas prêt ? Commence par l'ESSAI GRATUIT / le compte démo : zéro risque pour apprendre 😉\n"
+            "🧠 Topstep = futures (contrats) • FundedNext = CFD (lots) : ce n'est pas la même façon de trader, demande-nous si tu hésites\n━━━━━━━━━━━━\n"
             "🧭 LA MÉTHODE ALIGN POUR BIEN DÉMARRER\n"
             "1️⃣ Regarde d'abord une position ALIGN aller jusqu'au TP1 👀\n"
             "2️⃣ Ensuite prends la suivante, toujours avec ton SL 🛡\n"
@@ -9658,7 +9679,7 @@ def texte_compte_finance():
             "4️⃣ UN SEUL LOT (petite taille) et UNE SEULE position à la fois, surtout sur FTMO / Topstep 🎯\n"
             "5️⃣ Pas besoin de rester collé à ton téléphone 📵 : active les notifications, ALIGN te prévient AVANT chaque position 🔔\n━━━━━━━━━━━━\n"
             "⚠️ Ceci n'est pas un conseil en investissement. Le trading comporte un risque de perte en capital. "
-            "Fais tes propres recherches (DYOR).\n🤝 Lien de parrainage : ALIGN reçoit un avantage si tu utilises le code.")
+            "Fais tes propres recherches (DYOR).\n🤝 Liens de parrainage : ALIGN reçoit un avantage si tu utilises ces codes.")
 
 
 def epingler_compte_finance(etat):
