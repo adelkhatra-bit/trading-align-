@@ -967,10 +967,13 @@
         : (fr ? '⏱ CLÔTURE 15 MIN<br>ça va se décider 👀' : '⏱ 15 MIN CLOSE<br>it\'s about to decide 👀');
       chrono.innerHTML = Math.floor(reste / 60) + ':' + String(reste % 60).padStart(2, '0') + '<small>' + lbl + '</small>';
       // v5.7 (demande d'Adel) : en bas à droite, côté prix, juste au-dessus du tableau de bord (TikTok coupe le haut gauche)
-      chrono.style.left = (r.left + r.width - 70 - chrono.offsetWidth - 14) + 'px';
+      // v8.3 (demande d'Adel) : le chrono se met en bas à GAUCHE du tableau, à côté de l'unité 1 min (plus jamais sur un message)
+      const mq = masque.style.display === 'flex' ? masque.getBoundingClientRect() : null;
+      if (!mq) chrono.style.left = (r.left + r.width - 70 - chrono.offsetWidth - 14) + 'px';
       // v5.7 : marché qui baisse → en haut à droite juste sous la bande (les bougies descendent, on ne les cache pas) ;
       //        marché qui monte → en bas à droite, un peu au-dessus du tableau de bord (sans le mordre)
-      chrono.style.top = (enAttente && arme.d === -1 ? r.top + 82 : r.top + (r.height || 700) - 205 - chrono.offsetHeight) + 'px';
+      if (!mq) chrono.style.top = (enAttente && arme.d === -1 ? r.top + 82 : r.top + (r.height || 700) - 205 - chrono.offsetHeight) + 'px';
+      else { chrono.style.left = Math.max(r.left + 10, mq.left - chrono.offsetWidth - 12) + 'px'; chrono.style.top = (mq.bottom - chrono.offsetHeight) + 'px'; }
       if (reste === 45 && uneFois('cl' + s)) bandeShow('⏱ Clôture 15 min dans 45 s sur ' + nomMarche() + ' • c\'est elle qui décide 👀 • la suite en temps réel : lien en bio 🎁');
     } else if (chrono.style.display !== 'none') {
       chrono.style.display = 'none';
@@ -1038,7 +1041,7 @@
       const d = cv.getContext('2d').getImageData(0, y0, W, cv.height - y0).data; let top = -1, bas = -1, g = 0, dr = 0;
       for (let y = cv.height - y0 - 1; y >= 0; y--) { let n = 0, mi = 1e9, ma = -1;   // v8.3 : on part du BAS (la ligne SHORT/LONG est la dernière du tableau)
         for (let x = 0; x < W; x += 2) { const j = (y * W + x) * 4; if (Math.abs(d[j] - R0) < 8 && Math.abs(d[j + 1] - G0) < 8 && Math.abs(d[j + 2] - B0) < 8) { n++; if (x < mi) mi = x; if (x > ma) ma = x; } }
-        if (ma - mi > W * 0.3 && n * 2 > 0.35 * (ma - mi)) { if (bas < 0) { bas = y; g = mi; dr = ma; } top = y; } else if (bas >= 0 && top - y > 1) break; }   // s'arrête au trait entre deux lignes du tableau   // le texte blanc au milieu ne coupe pas la ligne
+        if (ma - mi > W * 0.3 && n * 2 > 0.6 * (ma - mi)) { if (bas < 0) { bas = y; g = mi; dr = ma; } top = y; } else if (bas >= 0 && top - y > 1) break; }   // s'arrête au trait entre deux lignes du tableau   // le texte blanc au milieu ne coupe pas la ligne
       if (bas < 0) { masque.style.display = 'none'; return; }
       Object.assign(masque.style, { display: 'flex', left: (g / k + R.left) + 'px', top: ((top + y0) / k + R.top) + 'px', width: ((dr - g + 2) / k) + 'px',
         height: ((bas - top + 1) / k) + 'px', background: 'rgb(' + R0 + ',' + G0 + ',' + B0 + ')' });
@@ -1053,8 +1056,12 @@
   // et remplacées par des étiquettes courtes « ❓ », toutes de la même taille, alignées sur la colonne du TP2, juste sous leur ligne
   const etiqBox = document.createElement('div'); etiqBox.id = 'align-etiq'; document.body.appendChild(etiqBox);
   cssPunch.textContent += `
-  #align-etiq .cache{position:fixed;z-index:139;pointer-events:none;background:rgb(15,15,15)}
-  #align-etiq .etq{position:fixed;z-index:139;pointer-events:none;min-width:104px;padding:3px 10px;border-radius:6px;text-align:center;
+  #align-etiq .cache{position:fixed;z-index:139;pointer-events:none;background:rgb(15,15,15);display:flex;align-items:center;justify-content:center;overflow:hidden;
+    white-space:nowrap;border-radius:6px;font:900 13px/1 system-ui,Segoe UI,Arial,sans-serif}
+  #align-etiq .etq span{display:inline-block;animation:emoDanse .9s ease-in-out infinite alternate}
+  #align-etiq .etq.chaud{animation:chaud .6s ease-in-out infinite alternate}
+  @keyframes chaud{from{filter:brightness(1)}to{filter:brightness(1.7) saturate(1.4)}}
+  #align-etiq .etq{position:fixed;z-index:139;pointer-events:none;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;overflow:hidden;padding:0 8px;border-radius:6px;
     font:900 14px/1.15 system-ui,Segoe UI,Arial,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.45)}
   #align-etiq .etq b{display:inline-block;animation:emoDanse .7s ease-in-out infinite alternate}
   html.align-cache #align-etiq{visibility:hidden!important}`;
@@ -1069,6 +1076,7 @@
         })(ds.graphics()._primitivesCollection.dwglabels, 0, false); } } catch (e) {}
     return res;
   }
+  let etiqN = 0;
   function poserEtiquettes() {
     try {
       const E = grossesEtiquettes(); if (!E.length) { etiqBox.innerHTML = ''; return; }
@@ -1085,17 +1093,21 @@
         for (let yy = 0; yy < hh; yy++) for (let x = 0; x < W; x++) { const j = (yy * W + x) * 4; if (Math.abs(d[j] - col[0]) < 14 && Math.abs(d[j + 1] - col[1]) < 14 && Math.abs(d[j + 2] - col[2]) < 14) { if (x < mi) mi = x; if (x > ma) ma = x; if (yy < yt) yt = yy; if (yy > yb) yb = yy; } }
         boites.push({ n, o, y, fond: 'rgb(' + fond[0] + ',' + fond[1] + ',' + fond[2] + ')', col: 'rgb(' + col.join(',') + ')', tc: (o.tci & 255) > 128 ? '#fff' : '#111', box: ma > mi + 20 ? { l: mi / k + R.left, t: (y0 + yt) / k + R.top, r: (ma + 1) / k + R.left, b: (y0 + yb + 1) / k + R.top } : null });
       }
-      const tp2 = boites.find(x => x.n === 'TP2' && x.box) || boites.find(x => x.box); if (!tp2) { etiqBox.innerHTML = ''; return; }
-      const xCol = tp2.box.l, en = langueBande() === 'en';
-      etiqBox.innerHTML = boites.map(x => (x.box ? '<div class="cache" style="background:' + x.fond + ';left:' + (x.box.l - 2) + 'px;top:' + (x.box.t - 2) + 'px;width:' + (x.box.r - x.box.l + 4) + 'px;height:' + (x.box.b - x.box.t + 4) + 'px"></div>' : '')
-        + '<div class="etq" data-y="' + (R.top + x.y) + '" style="left:' + xCol + 'px;top:' + (R.top + x.y + 3) + 'px;background:' + x.col + ';color:' + x.tc + '">' + (x.n === 'ENTRÉE' && en ? 'ENTRY' : x.n) + (/✅/.test(x.o.t) ? ' ✅' : '') + ' <b>❓</b></div>').join('');
-      // deux lignes trop proches (SL collé à l'ENTRÉE) : l'étiquette du haut passe AU-DESSUS de sa ligne, jamais l'une sur l'autre
-      const els = [...etiqBox.querySelectorAll('.etq')].sort((p, q) => p.getBoundingClientRect().top - q.getBoundingClientRect().top);
-      for (let i = 1; i < els.length; i++) { const p = els[i - 1].getBoundingClientRect(), q = els[i].getBoundingClientRect(); if (q.top < p.bottom + 2) els[i - 1].style.top = (+els[i - 1].dataset.y - p.height - 3) + 'px'; }
+      // v8.3 (demande d'Adel : « j'ai l'impression que tu en as mis deux » + « petites bandes noires ») : UNE seule étiquette par ligne,
+      // posée exactement sur l'étiquette d'origine (plus de doublon, plus de cache noir), toutes alignées et de la même largeur,
+      // le prix remplacé par « ❓ » + un petit défi qui change, qui clignote quand le prix s'approche
+      const vis = boites.filter(x => x.box); if (!vis.length) { etiqBox.innerHTML = ''; return; }
+      const xCol = Math.min(...vis.map(x => x.box.l)), larg = Math.max(...vis.map(x => x.box.r)) - xCol, en = langueBande() === 'en';
+      const pNow = ((barres(1)[0]) || [])[4] || 0; etiqN++;
+      const proche = x => pNow && Math.abs(pNow - x.o.y) / pNow < 0.002;
+      const defi = x => { const L = proche(x) ? (en ? ['⚡ GETTING CLOSE!', '👉 LINK IN BIO, HURRY!'] : ['⚡ ÇA APPROCHE !', '👉 LIEN EN BIO, VITE !'])
+        : (en ? ['👀 LINK IN BIO', '🤔 WANNA KNOW?', '😏 DARE YOU?'] : ['👀 LIEN EN BIO', '🤔 T\'AS ENVIE DE SAVOIR ?', '😏 CAP OU PAS CAP ?']); return L[Math.floor(etiqN / 12) % L.length]; };
+      etiqBox.innerHTML = vis.map(x => '<div class="etq' + (proche(x) ? ' chaud' : '') + '" style="left:' + (xCol - 2) + 'px;top:' + (x.box.t - 2) + 'px;width:' + (larg + 4) + 'px;height:' + (x.box.b - x.box.t + 4) + 'px;background:' + x.col + ';color:' + x.tc + '">'
+        + (x.n === 'ENTRÉE' && en ? 'ENTRY' : x.n) + ' <b>❓</b> <span>' + defi(x) + '</span></div>').join('');
     } catch (e) {}
   }
-  const etiqT = setInterval(poserEtiquettes, 1500); poserEtiquettes();
-  const masqueT = setInterval(poserMasque, 1500); poserMasque();
+  const etiqT = setInterval(poserEtiquettes, 300);   // v8.3 : suit le graphique quand tu bouges la souris poserEtiquettes();
+  const masqueT = setInterval(poserMasque, 300); poserMasque();
   window.__ALIGN_BANDE__ = {
     version: VERSION, recu, punch: c => coeurs(1, [c]), plateforme: v => choisirPlateforme(v),
     stop() { vivant = false; clearTimeout(survolT); cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); clearInterval(masqueT); masque.remove(); clearInterval(etiqT); etiqBox.remove(); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
