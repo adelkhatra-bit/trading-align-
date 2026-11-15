@@ -7082,29 +7082,18 @@ def envoyer_prospects(etat, texte, signal, clavier=None):
         return
     vus = etat.setdefault("masque_vu", {})
     ref = f"{m}:{(tr or {}).get('cree') or int(time.time() // 1800)}"
-    if TOUT_GRATUIT:                       # v7.4 : tout gratuit pour le moment → chaque position part en temps réel
-        for cid in destinataires_gratuits(etat):
-            if not marche_autorise(etat, cid, m) or not bot_on(etat, cid) or vus.get(cid) == ref:
-                continue
-            vus[cid] = ref
-            deja[cid] = m
-            k = {"reply_markup": json.dumps({"inline_keyboard": [
-                [{"text": "📍 Je la prends", "callback_data": f"in:{m}"}],
-                [{"text": "⏸ Plus de positions", "callback_data": "botoff:x"}]]})}
-            try:
-                telegram("sendMessage", chat_id=cid, text=("🎁 POSITION GRATUITE\n🙋 Tu la prends ? Bouton 📍 ci-dessous (tu n'es pas obligé)\n━━━━━━━━━━━━\n"
-                                                            + texte + "\n━━━━━━━━━━━━\n🎁 Tout est gratuit pour le moment"), **k)
-            except Exception as ex:
-                print("prospect", cid, ex)
-        return
     for cid in destinataires_gratuits(etat):
         if not marche_autorise(etat, cid, m):
             continue
-        if bot_on(etat, cid) and cid not in deja and cid not in etat.get("essai_fini", []):
+        if TOUT_GRATUIT:                   # v7.4 (décision d'Adel) : tout gratuit pour le moment → chaque position en temps réel, une fois
+            if not bot_on(etat, cid) or vus.get(cid) == ref:
+                continue
+            vus[cid] = ref
+        if bot_on(etat, cid) and (TOUT_GRATUIT or (cid not in deja and cid not in etat.get("essai_fini", []))):
             deja[cid] = m      # la position du jour est PROPOSÉE : il choisit de la prendre ou non
-            txt = ("🎁 TA POSITION GRATUITE DU JOUR\n"
+            txt = (("🎁 POSITION GRATUITE\n" if TOUT_GRATUIT else "🎁 TA POSITION GRATUITE DU JOUR\n")
                    "🙋 Tu la prends ? Bouton 📍 ci-dessous (tu n'es pas obligé)\n━━━━━━━━━━━━\n" + texte
-                   + "\n━━━━━━━━━━━━\n💎 Toutes les autres + le coach : VIP 49,90 € / mois")
+                   + ("\n━━━━━━━━━━━━\n🎁 Tout est gratuit pour le moment" if TOUT_GRATUIT else "\n━━━━━━━━━━━━\n💎 Toutes les autres + le coach : VIP 49,90 € / mois"))
             k = {"reply_markup": json.dumps({"inline_keyboard": [
                 [{"text": "📍 Je la prends", "callback_data": f"in:{m}"}],
                 [{"text": "⏸ Plus de positions", "callback_data": "botoff:x"}]]})}
