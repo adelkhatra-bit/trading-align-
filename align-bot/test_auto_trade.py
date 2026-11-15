@@ -98,5 +98,22 @@ class TestComptes(unittest.TestCase):
         self.assertEqual(at.lire_comptes(""), [])
 
 
+
+class TestPrixFiable(unittest.TestCase):
+    import datetime as _d
+    N = _d.datetime(2026, 11, 15, 19, 0, tzinfo=_d.timezone.utc)
+
+    def test_prix_fige_refuse(self):
+        ok, r = at.prix_fiable({"time": "2026-11-15T10:00:00.000Z"}, 64900, 64900, self.N)
+        self.assertFalse(ok); self.assertIn("figé", r)
+
+    def test_ecart_trop_grand_refuse(self):
+        ok, r = at.prix_fiable({"time": "2026-11-15T18:59:30Z"}, 68387, 64900, self.N)
+        self.assertFalse(ok); self.assertIn("trop loin", r)
+
+    def test_prix_frais_et_proche_ok(self):
+        self.assertTrue(at.prix_fiable({"time": "2026-11-15T18:59:30Z"}, 64950, 64900, self.N)[0])
+
+
 if __name__ == "__main__":
     unittest.main()
