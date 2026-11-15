@@ -16,8 +16,11 @@ def _tr():
 
 
 class EssaiGratuit(unittest.TestCase):
+    tout = False
+
     def _fin(self, etat, sortie, motif, gain):
-        with patch.object(ab, "telegram", MagicMock(return_value={})), patch.object(ab, "_envoi_sur", MagicMock()) as env:
+        with patch.object(ab, "telegram", MagicMock(return_value={})), patch.object(ab, "_envoi_sur", MagicMock()) as env, \
+                patch.object(ab, "TOUT_GRATUIT", self.tout):
             try:
                 ab.publier_resultat(etat, "BTC", _tr(), sortie, motif, gain)
             except Exception:
@@ -38,6 +41,23 @@ class EssaiGratuit(unittest.TestCase):
         self.assertIn("111", etat.get("essai_fini", []))
         self.assertIn("111", etat.get("bot_off", []))
         self.assertIn("différé", txt)
+
+
+class ToutGratuit(EssaiGratuit):
+    """Décision d'Adel (15/11) : pour le moment tout est gratuit, le bot reste allumé après un TP."""
+    tout = True
+
+    def test_sl_on_offre_une_autre_position(self):
+        etat = _etat()
+        self._fin(etat, 99.0, "SL touché", -1.0)
+        self.assertNotIn("111", etat.get("bot_off", []))
+
+    def test_tp_essai_valide(self):
+        etat = _etat()
+        self._fin(etat, 101.0, "TP1 touché", 1.0)
+        self.assertNotIn("111", etat.get("essai_fini", []))
+        self.assertNotIn("111", etat.get("bot_off", []))
+        self.assertNotIn("111", etat.get("bienvenue", {}))
 
 
 class Differe(unittest.TestCase):
