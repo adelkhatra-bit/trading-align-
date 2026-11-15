@@ -49,6 +49,18 @@ class ResistanceFvg(unittest.TestCase):
         lp.assert_not_called()
 
 
+    def test_approche_prevenue_avant(self):
+        out = []
+        r = _r(64000.0, 64010.0, 63995.0, 64070.0, niveaux=[(64100.0, "1h")])
+        with patch.object(ab, "live_publier", return_value=True) as lp:
+            ab.resistance_fvg(out, "BTC", r, {})
+        self.assertEqual(len(out), 1)
+        self.assertIn("ÇA VA TESTER", out[0])
+        self.assertIn("argent comptant", out[0])
+        self.assertIn("VALIDÉ", out[0])
+        self.assertIsNone(re.search(r"\d{3}", lp.call_args[0][0]))
+
+
 class CoachContreTendance(unittest.TestCase):
     def test_explosion_contre_la_tendance_deconseillee(self):
         r = {"confirme": -1, "m1": [{"t": 1, "o": 1, "h": 1, "l": 1, "c": 64000.0}], "b15": []}
