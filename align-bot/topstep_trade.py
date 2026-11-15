@@ -9,7 +9,7 @@ Différences voulues par Adel (15/11) avec FundedNext :
 Sécurité (codée en dur) : 1 micro-contrat, perte max 75 $ par position, arrêt à -150 $ dans la journée,
 arrêt définitif si le solde passe sous le plancher du compte + 100 $. Mode TEST par défaut (TOPSTEP_REEL=1 pour le réel).
 """
-import json, os, datetime, urllib.request
+import json, os, time, datetime, urllib.request
 from zoneinfo import ZoneInfo
 
 BASE = "https://api.topstepx.com/api"
@@ -161,3 +161,51 @@ def tout_fermer(journal=print):
         fait.append(p["contractId"])
     journal(f"TOPSTEP fermeture avant la limite : {fait} ({'réel' if REEL else 'test'})")
     return fait
+
+
+# ── Prix Topstep pour les utilisateurs (demande d'Adel 15/11) ──────────────────────────────────────────
+# Le graphique TradingView (CFD : BTCUSD / XAUUSD / NAS100) et les futures Topstep (MBT / MGC / MNQ) n'ont pas
+# le même prix (écart de base). Le bot lit le VRAI dernier prix du micro-contrat et décale les niveaux du plan
+# du même écart : l'utilisateur qui a choisi « Topstep » reçoit des niveaux directement utilisables.
+TICKS = {"NASDAQ": 0.25, "GOLD": 0.1, "BTC": 5.0}
+_CACHE_PRIX = {}
+
+
+def prix_futures(m, maintenant=None):
+    """Dernier prix du micro-contrat Topstep du marché (cache 60 s). None si Topstep n'est pas branché."""
+    t = maintenant or time.time()
+    c = _CACHE_PRIX.get(m)
+    if c and t - c[0] < 60:
+        return c[1]
+    if m not in SYMBOLES or not os.environ.get("TOPSTEP_API_KEY"):
+        return None
+    jeton = connexion()
+    if not jeton:
+        return None
+    k = contrat(jeton, m)
+    if not k:
+        return None
+    fin = datetime.datetime.now(datetime.timezone.utc)
+    r = _api("/History/retrieveBars", {"contractId": k["id"], "live": False, "unit": 2, "unitNumber": 1, "limit": 5,
+                                        "includePartialBar": True,
+                                        "startTime": (fin - datetime.timedelta(minutes=30)).isoformat(),
+                                        "endTime": fin.isoformat()}, jeton)
+    barres = r.get("bars") or []
+    if not barres:
+        return None
+    p = float(max(barres, key=lambda b: str(b.get("t", "")))["c"])
+    _CACHE_PRIX[m] = (t, p)
+    return p
+
+
+def arrondi_tick(v, tick):
+    return round(round(v / tick) * tick, 4)
+
+
+def niveaux_futures(m, prix_graphique, niveaux, prix_fut):
+    """Décale chaque niveau {nom: prix TradingView} de l'écart futures − graphique, arrondi au tick du contrat."""
+    if not prix_fut or not prix_graphique:
+        return None
+    ecart = prix_fut - prix_graphique
+    tick = TICKS.get(m, 0.01)
+    return {k: arrondi_tick(v + ecart, tick) for k, v in niveaux.items() if v}

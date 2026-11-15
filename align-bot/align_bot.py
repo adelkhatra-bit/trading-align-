@@ -4350,7 +4350,8 @@ def menu_bot_gratuit(etat, cid):
         [{"text": "⏸ Non, plus de positions", "callback_data": "botoff:x"} if on else
          {"text": "✅ Oui, je veux des positions", "callback_data": "boton:x"}],
         [{"text": "📡 Choisir mes marchés", "callback_data": "marketsmenu:x"}],
-        [{"text": "🔔 Son pièce", "callback_data": "son:piece"}]]
+        [{"text": "🔔 Son pièce", "callback_data": "son:piece"}],
+        [bouton_plateforme(etat, cid)]]
         + ([[{"text": "💎 Revenir en vue VIP (propriétaire)", "callback_data": "vuegratuit:off"}]] if str(cid) in {str(x) for x in proprio(etat)} else [])}))
 
 def menu_bot(etat, cid):
@@ -4367,7 +4368,8 @@ def menu_bot(etat, cid):
                reply_markup=json.dumps({"inline_keyboard": [[{"text": "⏸ Arrêter mon bot", "callback_data": "botoff:x"} if on
                                                             else {"text": "▶️ Relancer mon bot", "callback_data": "boton:x"}],
                                                            [{"text": "📡 Choisir mes marchés", "callback_data": "marketsmenu:x"}],
-                                                           [{"text": "🔔 Son pièce", "callback_data": "son:piece"}]]
+                                                           [{"text": "🔔 Son pièce", "callback_data": "son:piece"}],
+                                                           [bouton_plateforme(etat, cid)]]
                                        + ([[{"text": "👁 Tester la version gratuite", "callback_data": "vuegratuit:on"}]] if str(cid) in {str(x) for x in proprio(etat)} else [])}))
 
 def regler_bot(etat, cid, on):
@@ -4410,6 +4412,54 @@ def entrer_inscrits(etat, m, tr, chats=()):
             f"📍 Repère prix : entrée ≈ {px(tr['e'])} • SL ≈ {px(tr['sl'])} • TP1 ≈ {px(tr['tp1'])}\n"
             "🛑 Mets ton SL TOUT DE SUITE\n🎯 Coach activé jusqu'au TP\n📈 Résultat compté dans Mes résultats"),
             )
+
+def bouton_plateforme(etat, cid):
+    return ({"text": "📺 Mes prix : Topstep → passer à TradingView", "callback_data": "plateforme:tv"} if plateforme(etat, cid) == "topstep"
+            else {"text": "🏦 Je trade sur Topstep : recevoir ses prix", "callback_data": "plateforme:topstep"})
+
+def plateforme(etat, cid):
+    """Où l'utilisateur trade : 'tv' (graphique TradingView / CFD, par défaut) ou 'topstep' (futures MNQ / MGC / MBT)."""
+    return (etat.get("plateforme") or {}).get(str(cid), "tv")
+
+def regler_plateforme(etat, cid, choix):
+    etat.setdefault("plateforme", {})[str(cid)] = "topstep" if choix == "topstep" else "tv"
+    _envoi_sur(cid, text=("🏦 PRIX TOPSTEP ACTIVÉS\n📈 À chaque entrée, tu reçois EN PLUS les niveaux au vrai prix du contrat Topstep\n"
+                          "🟣 NASDAQ = MNQ • 🥇 GOLD = MGC • 🟠 BTC = MBT\n⚠️ Ceci n'est pas un conseil en investissement (DYOR)"
+                          if choix == "topstep" else
+                          "📺 PRIX TRADINGVIEW\n📈 Tu reçois les niveaux du graphique (CFD : FundedNext, FTMO…)"))
+
+def texte_prix_topstep(m, tr, prix_graphique, prix_fut):
+    """Deuxième notification : les mêmes niveaux, décalés au vrai prix du micro-contrat Topstep."""
+    if not topstep_trade:
+        return None
+    n = topstep_trade.niveaux_futures(m, prix_graphique, {"e": tr["e"], "sl": tr["sl"], "tp1": tr["tp1"], "tp2": tr.get("tp2")}, prix_fut)
+    if not n:
+        return None
+    sym = topstep_trade.SYMBOLES.get(m, m)
+    l = [f"🏦 PRIX TOPSTEP — {ICONE.get(m, '')} {m} ({sym})", SENS[tr["d"]],
+         f"📍 Entrée ≈ {px(n['e'])}", f"🛑 SL ≈ {px(n['sl'])}", f"🎯 TP1 ≈ {px(n['tp1'])}"]
+    if n.get("tp2"):
+        l.append(f"🎯 TP2 ≈ {px(n['tp2'])}")
+    l += [f"📏 Écart contrat / graphique : {'+' if prix_fut >= prix_graphique else ''}{px(prix_fut - prix_graphique)}",
+          "🛑 Mets ton SL TOUT DE SUITE", "⚠️ Ceci n'est pas un conseil en investissement (DYOR)"]
+    return "\n".join(l)
+
+def prix_topstep_inscrits(etat, m, tr, prix_graphique):
+    """Envoie les niveaux Topstep à ceux qui ont choisi « Topstep » (le prix du contrat est lu en direct sur l'API)."""
+    qui = [c for c, v in (etat.get("plateforme") or {}).items() if v == "topstep" and marche_autorise(etat, c, m)]
+    if not qui or not topstep_trade:
+        return 0
+    try:
+        fut = topstep_trade.prix_futures(m)
+    except Exception as ex:
+        print("prix topstep", ex)
+        fut = None
+    t_ = texte_prix_topstep(m, tr, prix_graphique, fut)
+    if not t_:
+        return 0
+    for cid in qui:
+        _envoi_sur(cid, text=t_)
+    return len(qui)
 
 def signature_analyse(m, r, cle):
     """Ce qui compte pour l'utilisateur : verdict, sens, zone. Si rien de tout ça n'a changé, inutile de tout renvoyer."""
@@ -5612,6 +5662,13 @@ def traiter(etat, chats, updates):
                 etat["proprio_gratuit"] = mk == "on"
                 _envoi_sur(qui, text=("👁 VUE GRATUITE ACTIVÉE\n🎁 Tu reçois maintenant exactement ce que reçoit un gratuit\n💎 Retour : 🤖 Mon bot → Revenir en vue VIP"
                                       if mk == "on" else "💎 VUE VIP RÉTABLIE\n📲 Tout le flux complet est dans la chaîne ALIGN VIP"))
+                continue
+            if choix == "plateforme":
+                try:
+                    telegram("answerCallbackQuery", callback_query_id=cb["id"], text="✅ Enregistré")
+                except Exception:
+                    pass
+                regler_plateforme(etat, qui, mk)
                 continue
             if choix == "botmenu":
                 try:
@@ -10246,6 +10303,10 @@ def un_tour(etat, chats):
             if t_:
                 envois.append(taguer(f"🧠 L'IA ALIGN sur cette entrée — {ICONE.get(nom_marche, '')} {nom_marche}\n{compacter_ia(t_)}", nom_marche))
             entrer_inscrits(etat, nom_marche, cle["trade"], chats)
+            try:
+                prix_topstep_inscrits(etat, nom_marche, cle["trade"], r["m1"][-1]["c"] if r.get("m1") else cle["trade"]["e"])
+            except Exception as ex:
+                print("prix topstep inscrits", ex)
         if TOKEN:
             coach(etat, nom_marche, r, cle)
             if SHUTDOWN_REQUESTED.is_set():
