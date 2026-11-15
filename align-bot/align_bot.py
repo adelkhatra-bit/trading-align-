@@ -2390,7 +2390,9 @@ TRAD.update({   # cartes reliées au graphique (mêmes mots que l'indicateur)
     " » : c'est LÀ qu'on entre": " »: THAT's when we enter",
     "🛑 Stop = étiquette « STOP » du graphique": "🛑 Stop = « STOP » label on the chart",
     "⏱ La bougie": "⏱ The", " qui décide clôture dans": " candle that decides closes in",
-    "(étiquette ENTRÉE)": "(« ENTRÉE » label)", "🧲 La zone est une ": "🧲 The zone is a ", "order block + ": "order block + ",
+    "(étiquette ENTRÉE)": "(« ENTRÉE » label)", "🍽 Zone intacte (0 % mangée) : toute la réaction est encore à venir": "🍽 Untouched zone (0 % eaten): the whole reaction is still ahead",
+    "🍽 Zone mangée à": "🍽 Zone eaten", ": il reste de la place pour rebondir": ": still room to bounce", ": elle s'use, prudence": ": it's wearing out, be careful",
+    "🍽 Zone mangée à 100 % : traversée en entier, on attend la clôture": "🍽 Zone 100 % eaten: fully crossed, we wait for the close", "· mangée à": "· eaten", "· intacte": "· untouched", "🧲 La zone est une ": "🧲 The zone is a ", "order block + ": "order block + ",
     "FVG : le prix rebondit souvent dessus, on attend le rejet": "FVG: price often bounces there, we wait for the rejection", "l'étiquette ENTRÉE": "the « ENTRÉE » label",
 })
 _CLES = sorted(TRAD, key=len, reverse=True)
@@ -4934,7 +4936,8 @@ def ce_qui_bloque(r, p, d):
         for lo, hi, _, dd in fvgs((r.get(champ) or [])[:-1], ut):
             bord = hi if d == -1 else lo
             if d * (bord - p) > 0:
-                cands.append((abs(bord - p), f"🧱 Freins : FVG {ut} {px(lo)} – {px(hi)}"))
+                pc = zone_mangee((r.get(champ) or [])[:-1], lo, hi)
+                cands.append((abs(bord - p), f"🧱 Freins : FVG {ut} {px(lo)} – {px(hi)}" + (f" · mangée à {pc} %" if pc else " · intacte" if pc == 0 else "")))
     for v, n in (r.get("niveaux") or []):
         if v is not None and d * (v - p) > 0:
             cands.append((abs(v - p), f"🧱 Freins : niveau {n} à {px(v)}"))
@@ -9089,6 +9092,34 @@ def retour_entree(m, r, tr, d, e, t1, p):
                       risque_retour(r, d), "😎 T'inquiète, je surveille chaque clôture"])
 
 
+def zone_mangee(bars, a, b, n=25):
+    """% de la zone [a, b] déjà « mangé » par les n dernières bougies — MÊME calcul que l'indicateur (v87, demande d'Adel) :
+    partie de la zone traversée entre le plus bas et le plus haut des 25 dernières bougies. None si pas de données."""
+    if not bars or a is None or b is None:
+        return None
+    lo, hi = min(a, b), max(a, b)
+    if hi <= lo:
+        return None
+    z = bars[-n:]
+    hh, ll = max(x["h"] for x in z), min(x["l"] for x in z)
+    if hh < lo or ll > hi:
+        return 0
+    return max(0, min(100, round(100 * (min(hh, hi) - max(ll, lo)) / (hi - lo))))
+
+
+def texte_mangee(pc):
+    """Une ligne claire pour l'utilisateur (même lecture que le graphique : la partie vide de la zone = mangée)."""
+    if pc is None:
+        return None
+    if pc == 0:
+        return "🍽 Zone intacte (0 % mangée) : toute la réaction est encore à venir"
+    if pc < 50:
+        return f"🍽 Zone mangée à {pc} % : il reste de la place pour rebondir"
+    if pc < 100:
+        return f"🍽 Zone mangée à {pc} % : elle s'use, prudence"
+    return "🍽 Zone mangée à 100 % : traversée en entier, on attend la clôture"
+
+
 TF_NOM = {"1m": "1 min", "5m": "5 min", "15m": "15 min", "1h": "1 h", "4h": "4 h"}
 
 
@@ -9108,6 +9139,9 @@ def avant_entree(m, r, cle, o, d):
          "🙅 Une mèche seule ne suffit pas", "🛑 Stop = étiquette « STOP » du graphique"]
     if o.get("za") or o.get("e"):
         l += ["", f"📍 Zone ≈ {px(o.get('za', o.get('e')))} – {px(o.get('zb', o.get('e')))}"]
+        tm = texte_mangee(zone_mangee((r.get("b5") or [])[:-1], o.get("za", o.get("e")), o.get("zb", o.get("e"))))
+        if tm:
+            l.append(tm)
     if o.get("tp1"):
         l.append(f"💰 TP visé ≈ {px(o['tp1'])} ({o.get('n1', 'TP1')})")
     try:

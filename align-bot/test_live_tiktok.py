@@ -341,3 +341,23 @@ class CarteEntreeClaire(unittest.TestCase):
         self.assertIn("bougie 5 min CLÔTURE SOUS l'étiquette « ENTRÉE »", t)
         self.assertIn("on n'entre PAS encore", t); self.assertIn("VALIDÉ 🔴 SHORT", t)
         self.assertIn("CLOSE BELOW", ab.traduire(t))
+
+
+class ZoneMangee(unittest.TestCase):
+    """Même lecture que l'indicateur v87 : la partie vide de la zone = mangée par les bougies."""
+    def b(self, h, l):
+        return {"h": h, "l": l, "o": l, "c": h}
+
+    def test_pourcentages(self):
+        self.assertEqual(ab.zone_mangee([self.b(95, 90)], 100, 110), 0)            # pas encore touchée
+        self.assertEqual(ab.zone_mangee([self.b(105, 90)], 100, 110), 50)          # la moitié du bas mangée (SHORT)
+        self.assertEqual(ab.zone_mangee([self.b(120, 90)], 110, 100), 100)         # traversée (ordre des bornes indifférent)
+        self.assertIsNone(ab.zone_mangee([], 100, 110))
+
+    def test_carte_entree_affiche_le_pourcentage(self):
+        o = {"e": 100.0, "za": 100.0, "zb": 110.0}
+        r = {"b5": [self.b(104, 95)] * 3 + [self.b(1, 1)]}                         # la dernière bougie (en formation) est ignorée
+        with unittest.mock.patch.object(ab, "timeframe_attendu", return_value="5m"):
+            t = ab.avant_entree("BTC", r, {}, o, -1)
+        self.assertIn("🍽 Zone mangée à 40 %", t)
+        self.assertIn("Zone eaten 40 %", ab.traduire(t))
