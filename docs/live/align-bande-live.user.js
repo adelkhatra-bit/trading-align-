@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      7.1
+// @version      7.2
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '7.1';
+  const VERSION = '7.2';  // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -107,14 +107,14 @@
   const css = document.createElement('style');
   css.id = 'align-bande-css';
   css.textContent = `
-  #align-bande{position:fixed;z-index:9999;height:76px;overflow:hidden;pointer-events:none;
+  #align-bande{position:fixed;z-index:9999;height:86px;overflow:hidden;pointer-events:none;
     background:linear-gradient(90deg,#ff2d95,#8a2be2 50%,#1e90ff);border-radius:0 0 10px 10px;
-    box-shadow:0 4px 14px rgba(0,0,0,.5);font:900 35px/76px system-ui,Segoe UI,Arial,sans-serif;color:#fff;
+    box-shadow:0 4px 14px rgba(0,0,0,.5);font:900 40px/86px system-ui,Segoe UI,Arial,sans-serif;color:#fff;
     text-shadow:0 2px 3px rgba(0,0,0,.45);transition:opacity .2s}
   #align-bande .piste{position:absolute;white-space:nowrap;will-change:transform}
   #align-bande .piste span{margin-right:70px}
   #align-bande .flash{position:absolute;inset:0;display:none;align-items:center;justify-content:flex-start;
-    padding:0;white-space:nowrap;overflow:hidden;font:900 35px/76px system-ui,Segoe UI,Arial,sans-serif;
+    padding:0;white-space:nowrap;overflow:hidden;font:900 40px/86px system-ui,Segoe UI,Arial,sans-serif;
     background:linear-gradient(90deg,#ff4fa3,#ffd400);color:#000;text-shadow:none}
   /* v5.4 : même taille d'écriture que la bande normale, une couleur par type d'info (plus de bande blanche) */
   #align-bande .flash.bulle{background:linear-gradient(90deg,#ff7ab8,#ffb3d6);color:#000}
