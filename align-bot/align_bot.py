@@ -8391,6 +8391,56 @@ def niveaux_cles(out, m, r, cle):
                 vu[f"a{n}{jour}"] = 1
             out.append(f"🧲 NIVEAU CLÉ — {ICONE.get(m, '')} {m}\n📍 Le prix approche le {nom_aff} ≈ {px(v)}\n🕯 Vue 15 min : ça peut rebondir OU casser\n⏳ J'attends la clôture de la bougie 15 min")
 
+def resistance_fvg(out, m, r, cle):
+    """v7.2 (demande d'Adel, 15/11) : le prix TOUCHE une résistance / un support (1h, 4h, Daily) ou une FVG 15 min / 1h.
+    Le détail part dans la chaîne du marché (niveau, prix, ce qu'on attend à la clôture 15 min) ;
+    le live ne reçoit qu'un indice SANS prix + « lien en bio ». 1 fois par niveau et par jour, au plus 1 message / 15 min / marché."""
+    if not r.get("m1") or not r.get("atr"):
+        return
+    a = r["atr"]; x = r["m1"][-1]; p = x["c"]
+    pc = r["m1"][-2]["c"] if len(r["m1"]) > 1 else p
+    if time.time() - cle.get("rsfvg_t", 0) < 900:
+        return
+    jour = datetime.datetime.now(PARIS).strftime("%Y-%m-%d")
+    vu = cle.setdefault("rsfvg", {})
+    for k in [k for k in vu if not k.endswith(jour)]:
+        vu.pop(k)
+    zones = []
+    for v, n in (r.get("niveaux") or []):
+        if v is not None and n in ("1h", "4h", "Daily", "D"):
+            zones.append((v, v, "Daily" if n == "D" else n, "niv"))
+    for lo, hi, ut, dd in (r.get("fvg") or []):
+        zones.append((lo, hi, ut.replace("m", " min"), "fvg"))
+    for lo, hi, ut, sorte in zones:
+        if not (x["h"] >= lo - 0.05 * a and x["l"] <= hi + 0.05 * a):
+            continue                                   # pas touché sur la dernière minute
+        if pc < lo:
+            plafond = True                             # on arrive par le bas : ça bute dessous
+        elif pc > hi:
+            plafond = False                            # on arrive par le haut : ça tape dessus
+        else:
+            continue                                   # déjà dedans : ce n'est pas un nouveau contact
+        cle_ = f"{sorte}{ut}{round(lo, 2)}{jour}"
+        if cle_ in vu:
+            continue
+        vu[cle_] = 1
+        cle["rsfvg_t"] = time.time()
+        niveau = px(lo) if lo == hi else f"{px(lo)} – {px(hi)}"
+        if sorte == "fvg":
+            titre = "🕳 FVG TOUCHÉE"; quoi = f"la FVG {ut}"
+        else:
+            titre = "🧱 RÉSISTANCE TOUCHÉE" if plafond else "🛏 SUPPORT TOUCHÉ"; quoi = f"la {'résistance' if plafond else 'zone de support'} {ut}"
+        rejet, casse = ("sous", "au-dessus") if plafond else ("au-dessus", "sous")
+        out.append(f"{titre} — {ICONE.get(m, '')} {m}\n📍 Le prix tape {quoi} ≈ {niveau}\n💰 Prix : {px(p)}\n"
+                   f"{'⬇️' if plafond else '⬆️'} Rejet si la bougie 15 min clôture {rejet}\n{'⬆️' if plafond else '⬇️'} Cassure si elle clôture {casse}\n"
+                   f"⏳ Verdict à la clôture 15 min\nℹ️ Info, pas une entrée")
+        try:
+            live_publier(f"{'🧱' if plafond else '🛏'} {ICONE.get(m, '')} {m} {'bute sous un plafond' if plafond else 'tape sur un plancher'}… rejet ou cassure ? "
+                         f"le détail en temps réel : lien en bio 🎁")
+        except Exception as ex:
+            print("bande résistance", ex)
+        return
+
 def manipulation(out, m, r, cle):
     """MANIPULATION (chasse aux stops) vue 15 min : une grosse bougie pique AU-DELÀ du dernier plus bas / plus haut
     des 20 bougies 15 min (elle prend les stops) puis CLÔTURE en revenant à l'intérieur. 1 message par bougie."""
@@ -8674,6 +8724,7 @@ def agent(m, r, cle, ferme):
         manipulation(out, m, r, cle)
         meche_suspecte(out, m, r, cle)
         niveaux_cles(out, m, r, cle)
+        resistance_fvg(out, m, r, cle)              # v7.2 : résistance / support / FVG touché → chaîne + indice live
     except Exception as ex:
         print("manipulation", ex)
     try:
@@ -9274,6 +9325,11 @@ def texte_ecran(m, typ, d, minutes, r, cle, ligne=""):
                            f"🔴 Sous {px(lo)} : le scénario haussier tombe"]
     except Exception:
         pass
+    # v7.2 (demande d'Adel, 15/11) : le marché explose CONTRE la tendance → vrai coach : tentable, mais déconseillé ; on attend le retrace dans le sens du marché
+    tend = (r or {}).get("confirme")
+    if tend in (1, -1) and d in (1, -1) and d != tend and typ not in ("respire", "rebond", "feinte"):
+        lignes += [f"🧭 Contre-tendance : un {'🟢 LONG' if d == 1 else '🔴 SHORT'} est tentable, mais on le DÉCONSEILLE",
+                   f"⏳ Mieux vaut attendre le retrace et viser un {'🔴 SHORT' if tend == -1 else '🟢 LONG'} dans le sens du marché"]
     tr = (cle or {}).get("trade")
     if tr and tr.get("d") in (1, -1):
         lignes.append(f"📌 Position ALIGN en cours : {'🟢 LONG' if tr['d'] == 1 else '🔴 SHORT'}"
