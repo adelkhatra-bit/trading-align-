@@ -1,0 +1,16 @@
+name: ALIGN Topstep vérification
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [align-bot/topstep_check.py, .github/workflows/topstep-check.yml]
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Connexion à l'API TopstepX (aucun ordre)
+        env:
+          TOPSTEP_USERNAME: ${{ secrets.TOPSTEP_USERNAME }}
+          TOPSTEP_API_KEY: ${{ secrets.TOPSTEP_API_KEY }}
+        run: python3 align-bot/topstep_check.py
