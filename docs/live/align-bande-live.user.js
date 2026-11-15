@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '7.9';  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
+  const VERSION = '8.1';  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
   // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
@@ -62,6 +62,13 @@
     ['ANNONCÉ !', 'CALLED IT!'], [' a coulé ', ' dropped '], [' a décollé ', ' took off '], ['la team ALIGN l\'a vu venir', 'team ALIGN saw it coming'],
     ['REBOND sur une ligne clé', 'BOUNCE on a key level'], ['arrive sur une zone clé', 'reaches a key zone'], ['Zone clé du marché', 'Key market zone'],
     ['ce qu\'elle annonce', 'what it means'],
+    ['À toi de jouer :', 'Your turn:'], ['va MONTER 📈 ou DESCENDRE 📉 ? Écris-le en commentaire, on verra qui a raison 😏', 'going UP 📈 or DOWN 📉? Write it in the comments, we\'ll see who\'s right 😏'],
+    ['Sondage express :', 'Quick poll:'], ['⬆️ ou ⬇️ dans 15 min ? Commente « haut » ou « bas »', '⬆️ or ⬇️ in 15 min? Comment "up" or "down"'],
+    ['Les meilleurs pronostics en commentaire…', 'Best predictions in the comments…'], ['continue ou retrace ? Montre que t\'as le flair', 'keeps going or pulls back? Show your instinct'],
+    ['Celui qui devine la prochaine bougie de', 'Whoever guesses the next candle of'], ['gagne… notre respect éternel', 'wins… our eternal respect'], ['commente !', 'comment!'],
+    ['touche son dernier plus haut', 'hits its last high'], ['touche son dernier plus bas', 'hits its last low'], ['t\'as envie de rentrer là ?', 'tempted to jump in here?'],
+    ['Ça continue ou ça retrace ?', 'Keeps going or pulls back?'], ['dis-le en commentaire', 'say it in the comments'], ['le scénario complet est déjà prêt', 'the full scenario is already set'],
+    ['MERCI', 'THANKS'], ['BOOSTE LE LIVE', 'BOOSTS THE LIVE'], ['ABONNE-TOI • PARTAGE', 'FOLLOW • SHARE'],
     ['Au lieu de regarder sans rien faire… le marché n\'a pas encore de point d\'entrée 😅 tapote l\'écran pour le réveiller', 'Instead of just watching… the market has no entry point yet 😅 tap the screen to wake it up'],
     ['Pas d\'entrée pour l\'instant : la team patiente… toi tu tapotes, nous on surveille', 'No entry for now: the team waits… you tap, we watch'], ['Zone clé : le marché pourrait y souffler… ce qu\'il prépare', 'Key zone: the market may pause here… what\'s next'],
     ['Zone clé : le marché teste la patience de tout le monde…', 'Key zone: the market is testing everyone\'s patience…'],
@@ -441,6 +448,8 @@
     }
     const bulle = txt.startsWith('BULLE:');
     if (bulle) txt = txt.slice(6).trim();
+    // v8.0 (demande d'Adel) : un abonné booste le live depuis le bot → son prénom passe TOUT DE SUITE, avec feu d'artifice et merci
+    if (/BOOSTE LE LIVE/i.test(txt)) { const pr = ((txt.match(/MERCI\s+([^!]+)!/i) || [])[1] || '').trim(); montrer(txt, false, 1, 'membre', true); feuArtifice('🚀 MERCI ' + pr.toUpperCase() + ' !'); setTimeout(() => coeurs(1, ['🙏']), 2500); return; }
     if (/TP\d? TOUCH|OBJECTIF FINAL|TP2 TOUCH/i.test(txt)) { feuArtifice(/TP2|FINAL/i.test(txt) ? '🏆 ÇA ENCAISSE !' : '💰 ÇA ENCAISSE !'); pluieBillets(45); }
     if (/\bSL\b[^\n]{0,12}TOUCH|STOP TOUCH/i.test(txt)) setTimeout(() => coeurs(1, ['😢']), 3600);   // v7.1 : smiley triste, on se refait
     montrer(txt, bulle, 2);
@@ -560,6 +569,9 @@
     [/🪤|🎣|🪶/, ['🪤 Piège en cours', 'Trap in progress'], ['🎣 Qui va mordre ?', 'Who takes the bait?']],
     [/🐋|💰/, ['🐋 Les baleines arrivent', 'Whales incoming'], ['👀 Gros volume', 'Big volume']],
     [/📉|🔴|🌊/, ['📉 La pression vend', 'Sellers in control'], ['🔴 Ça pousse en bas', 'Pushing lower']],
+    [/🙏/, ['🙏 Merci pour le boost !', '🙏 Thanks for the boost!'], ['🚀 Le live décolle grâce à toi', '🚀 The live takes off thanks to you'], ['💜 Toi t\'es un vrai', '💜 You\'re a real one']],
+    // v8.0 : on fait parler le public (commentaires)
+    [/💬/, ['💬 Tu rentres ou t\'attends ?', '💬 In or wait?'], ['😏 Envie de rentrer là ?', '😏 Tempted to jump in?'], ['📝 Ça monte ou ça descend ? Commente !', '📝 Up or down? Comment!'], ['🎯 Le plan est déjà prêt 😉', '🎯 The plan is already set 😉']],
     [/📈|🟢|🚀/, ['📈 Les acheteurs poussent', 'Buyers in control'], ['🟢 Ça pousse en haut', 'Pushing higher']],
     [/📲|🔌|📡|🧠/, ['📲 Connecté en temps réel', '📲 Connected in real time'], ['📡 En direct sur ton portable', '📡 Live on your phone']],
     [/🔄/, ['🔄 Changement de programme !', '🔄 Change of plan!'], ['🧭 On suit le marché', '🧭 We follow the market']],
@@ -620,6 +632,7 @@
     if (P && P.x > r.left + 60 && P.x < r.left + r.width - 70) left = Math.max(r.left + 10, Math.min(P.x - w + 70, r.left + r.width - 70 - w - 14));   // la pointe vise la dernière bougie
     let top = P ? (sens < 0 ? P.y - 46 - h : P.y + 46) : (sens < 0 ? haut : bas);
     if (top < haut) top = P ? P.y + 46 : haut; if (top > bas) top = P ? P.y - 46 - h : bas;   // pas de place d'un côté → de l'autre côté du prix
+    if (e.dataset.bas) { top = bas; left = Math.max(r.left + 10, r.left + r.width - 70 - w - 14); }   // v8.1 (demande d'Adel) : motivation = en bas, juste au-dessus du tableau des unités, côté prix
     top = Math.max(haut, Math.min(top, bas));
     const obst = [chrono, document.getElementById('align-show')].filter(o => o && getComputedStyle(o).display !== 'none').map(o => o.getBoundingClientRect());
     for (let k = 0; k < 4; k++) { const box = { left, right: left + w, top, bottom: top + h }, o = obst.find(c => chevauche(box, c)); if (!o) break;
@@ -644,6 +657,7 @@
       const cle = (liste || []).join(''), g = PUNCH.find(x => x[0].test(cle)) || PUNCH[PUNCH.length - 1];
       const [fr, en] = g[1 + (punchN++ % (g.length - 1))], tok = ++punchTok;
       const e = document.createElement('div'); e.className = 'align-punch';
+      if (g === PUNCH[PUNCH.length - 1] || /😊|😏|⏰|👆|🙏|💬|📢/.test(cle)) e.dataset.bas = '1';   // v8.1 : pastille de motivation → en bas vers le tableau de bord
       // v7.8 (demande d'Adel) : la pastille parle la MÊME langue que la bande du haut (FR avec FR, EN avec EN) pour éviter les confusions
       const parts = (txt, defEmo) => { const m = txt.split(' '); const em = /^\p{Extended_Pictographic}/u.test(m[0]) ? m.shift() : defEmo; return [em, m.join(' ')]; };
       const [emoFr, txtFr] = parts(fr, '💬'), [emoEn, txtEn] = parts(en, emoFr);
@@ -816,6 +830,11 @@
             '😎 Pas d\'entrée pour l\'instant : la team patiente… toi tu tapotes, nous on surveille 😉 • lien en bio 🎁',
             '🥱 Pfff… on s\'ennuie, {m} est trop calme 😴 pense à tapoter l\'écran ❤️ et à t\'abonner • lien en bio 🎁',
             '😴 Marché ennuyant sur {m}… allez, tapote l\'écran pour le réveiller 👆❤️ et abonne-toi • lien en bio 🎁'],
+    // v8.0 (demande d'Adel) : on pousse les gens à commenter, avec des vannes différentes
+    commente: ['💬 À toi de jouer : {m} va MONTER 📈 ou DESCENDRE 📉 ? Écris-le en commentaire, on verra qui a raison 😏 • lien en bio 🎁',
+               '📝 Sondage express : {m} ⬆️ ou ⬇️ dans 15 min ? Commente « haut » ou « bas » 👇 • lien en bio 🎁',
+               '🧠 Les meilleurs pronostics en commentaire… {m} continue ou retrace ? Montre que t\'as le flair 😎 • lien en bio 🎁',
+               '😂 Celui qui devine la prochaine bougie de {m} gagne… notre respect éternel 🙏 commente ! • lien en bio 🎁'],
     range: ['😴 {m} se compresse… avant le gros mouvement ? ⚡ tiens-toi prêt • lien en bio 🎁',
             '🧲 {m} hésite… la prochaine clôture peut tout décider ⏱ lien en bio 🎁']
   };
@@ -855,6 +874,11 @@
         const dedans = cur[4] <= z.hi && cur[4] >= z.lo, avant = B[B.length - 2][4] > z.hi || B[B.length - 2][4] < z.lo;
         if (dedans && avant && uneFois('zone' + z.id + q15)) { montrer(texteZone(z.t, m), false, 1, 'alerte'); coeurs(1, [/FVG/i.test(z.t) ? '🧲' : '🏦'], cur[4] > B[B.length - 2][4] ? 1 : -1); lueur(0); versBot('ligne', cur[4] > B[B.length - 2][4] ? 1 : -1, '', /FVG/i.test(z.t) ? 'FVG' : 'OB'); return; }
       }
+      // 0c) v8.0 (demande d'Adel) : le prix touche son dernier plus haut / plus bas alors que le plan attend ailleurs → on taquine + on fait commenter
+      { const hh0 = Math.max(...prev.map(x => x[2])), ll0 = Math.min(...prev.map(x => x[3])), versHaut = (hh0 - cur[4]) < 0.4 * moyR, versBas = (cur[4] - ll0) < 0.4 * moyR;
+        if (LG['ENTRÉE'] && (versHaut || versBas) && uneFois('tente' + m + q15)) {
+          montrer('🤔 ' + m + (versHaut ? ' touche son dernier plus haut' : ' touche son dernier plus bas') + '… t\'as envie de rentrer là ? 😏 Ça continue ou ça retrace ? 💬 dis-le en commentaire • le scénario complet est déjà prêt : lien en bio 🎁', false, 1, 'alerte');
+          setTimeout(() => coeurs(1, ['💬'], versHaut ? 1 : -1), 1500); return; } }
       // 1) bougie qui accélère (corps > 1,6× la taille moyenne) : explosion visuelle + lueur rouge/verte
       if (Math.abs(corps) > 1.6 * moyR && uneFois('acc' + id)) {
         pop(sens === -1 ? '📉' : '📈', 'ÇA ACCÉLÈRE ' + (sens === -1 ? '🔴 ' : '🟢 ') + m, sens, 'jusqu\'où ? la suite en temps réel : lien en bio 🎁'); lueur(sens); versBot('acc', sens); setTimeout(() => coeurs(1, ['⏰']), 3600);
@@ -908,19 +932,19 @@
       // v6.1 : marché calme = on parle plus souvent (toutes les ~3 min) : direction, où est le prix, « branche-toi au marché »
       if (Date.now() - derniereTend > 2.4 * 60000) {   // v7.6 : spectacle +10 %
         const c10 = B.slice(-10).map(x => x[4]), pente = (c10[9] - c10[0]) / moyR, larg = (Math.max(...B.slice(-10).map(x => x[2])) - Math.min(...B.slice(-10).map(x => x[3]))) / moyR;
-        const pos = (cur[4] - ll) / Math.max(hh - ll, 1e-9), tour = tendN % 3;
+        const pos = (cur[4] - ll) / Math.max(hh - ll, 1e-9), tour = tendN % 4;   // v8.0 : 4e tour = on fait commenter
         // marché très calme (bougies récentes bien plus petites que d'habitude) → message « va te faire un café » selon l'heure
         const r10 = B.slice(-10).reduce((a, x) => a + (x[2] - x[3]), 0) / 10, r40 = B.reduce((a, x) => a + (x[2] - x[3]), 0) / B.length;
         const h = new Date().getHours(), calme = r10 < 0.6 * r40 && tour !== 2;
         const CAL = h < 6 || h >= 23 ? PHRASES.calme_nuit : h < 11 ? PHRASES.calme_matin : h < 14 ? PHRASES.calme_midi : h < 19 ? PHRASES.calme_aprem : PHRASES.calme_soir;
-        const L = calme ? (tendN % 2 ? PHRASES.ennui : CAL) : tour === 2 ? PHRASES.branche
+        const L = calme ? (tendN % 2 ? PHRASES.ennui : CAL) : tour === 3 ? PHRASES.commente : tour === 2 ? PHRASES.branche
           : tour === 1 ? (pos < 0.2 ? PHRASES.bas_zone : pos > 0.8 ? PHRASES.haut_zone : PHRASES.milieu)
           : larg < 3.2 ? PHRASES.range : pente > 1.2 ? PHRASES.hausse : pente < -1.2 ? PHRASES.baisse : PHRASES.range;
         if (bandeShow(L[Math.floor(tendN / 3) % L.length].replace('{m}', m))) {
           if (L === PHRASES.ennui) teteEnnui();
           if (L === PHRASES.bas_zone || L === PHRASES.haut_zone) versBot('zone', L === PHRASES.bas_zone ? -1 : 1);   // la vraie réponse part dans la chaîne du marché
           derniereTend = Date.now(); tendN++;
-          coeurs(8, L === PHRASES.branche ? ['📲', '📡', '⚡', '🧠'] : L === PHRASES.baisse ? ['🔴', '📉', '🌊'] : L === PHRASES.hausse ? ['🟢', '📈', '🚀'] : ['👀', '❤️', '🔥']);
+          coeurs(8, L === PHRASES.commente ? ['💬'] : L === PHRASES.branche ? ['📲', '📡', '⚡', '🧠'] : L === PHRASES.baisse ? ['🔴', '📉', '🌊'] : L === PHRASES.hausse ? ['🟢', '📈', '🚀'] : ['👀', '❤️', '🔥']);
         }
       }
     } catch (e) {}
