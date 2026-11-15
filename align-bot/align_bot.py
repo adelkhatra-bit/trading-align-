@@ -2996,6 +2996,7 @@ def boutons_canal(etat, texte):
     # → 1 seul bouton sous chaque message : il ouvre le bot, où le VIP retrouve le MÊME menu que le gratuit.
     if position and est_entree(texte):
         lignes.append([{"text": "📍 Je prends cette position", "url": lien("rentre")}])
+        lignes.append([{"text": "🙅 Pas rentré cette fois", "url": lien("pasrentre")}])
     lignes.append([{"text": "🤖 Ouvrir mon menu ALIGN", "url": lien("boutons")}])
     return json.dumps({"inline_keyboard": lignes})
 
@@ -6072,6 +6073,8 @@ def traiter(etat, chats, updates):
             if any(k in txt for k in ("btc", "bitcoin", "gold", "xau", "nasdaq", "nas100")):
                 premier_choix_marche(etat, cid, md_)
             demandes.append((cid, md_))
+        elif "pasrentre" in txt or "pas rentre" in txt:   # v8.7 (demande d'Adel) : « pas rentré cette fois » → on le garde connecté
+            pas_rentre(etat, cid)
         elif "rentre" in txt or txt.strip() == "oui":
             repondre(etat, cid, True)
         elif "sorti" in txt or "non" in txt:
@@ -9609,6 +9612,15 @@ def live_news(etat, maintenant):
         if etape and cle not in vus:
             vus.append(cle)
             live_bande(etat, texte, toujours=True)
+
+
+def pas_rentre(etat, cid):
+    """v8.7 (demande d'Adel) : un membre n'est pas rentré → on le rassure en privé et l'écran du live le dit (prénom seulement)."""
+    p = (etat.get("prenoms", {}).get(str(cid)) or "Un membre").split(" ")[0][:16]
+    _envoi_sur(cid, text=("😉 Pas grave, " + p + " !\n🔔 Reste connecté : active la cloche du live et de Telegram\n"
+                          "🍿 Regarde le spectacle, la prochaine position arrive\n🙏 Partage le live avec un ami 😄"))
+    live_bande(etat, f"BULLE:😉 {p.upper()} N'EST PAS RENTRÉ CETTE FOIS • pas grave : reste connecté, active la cloche 🔔 • "
+                     "regarde le spectacle et partage le live 🙏😄", f"pasrentre{cid}", 900, toujours=True)
 
 
 def live_suivi(etat, cid, m):
