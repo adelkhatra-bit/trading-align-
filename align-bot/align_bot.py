@@ -837,7 +837,7 @@ def calculer_analyse(S, stable=None, comp_prev=None):
         pass
     atr5 = atr(m5, 14)[-1] if len(m5) >= 15 else a
     return dict(fvg=fvg, niv_cles=niv_cles, asie=asie, distrib=distrib, accum=accum, div4h=div4h,
-                b5=m5[-30:], b15=m15[-30:], b1h=h1[-30:], b4h=h4[-30:], bd=d1[-30:], bw=w1[-30:],
+                b5=m5[-30:], b15=m15[-30:], b15_long=m15[-90:], b1h=h1[-30:], b4h=h4[-30:], bd=d1[-30:], bw=w1[-30:],
                 atr5=atr5, ema5=ema([x["c"] for x in m5], 20)[-1], m1=m1, confirme=confirme, atr=a, r5=r5[-3:], r15=rC, posD=posD, posW=posW, hautD=hautD, basD=basD, hautW=hautW, basW=basW,
                 grosses=grosses, ema15=ema(c, 20)[-1], niveaux=[(v, n) for v, n in zip(niv, noms) if v is not None], t=b[-1]["t"], prix=cl, dirs=dirs, sqzs=sqzs, rsis=rsis, bull=bull, bear=bear, comp=comp, rsiOB=rsiOB, rsiOS=rsiOS,
                 pctH=pctH, sens=sens, retHaut=retHaut, retBas=retBas, sigHaut=sigHaut, sigBas=sigBas, nom=nom,
@@ -4000,7 +4000,8 @@ def radar_climax(m, r, cle):
     3) confirmation : la dernière clôture 15 min repasse au-dessus (au-dessous) de l'EMA9.
     → position CONTRE-TENDANCE « prenable, risquée », SL sous la mèche du balayage ; le bot ne la prend pas lui-même.
     Une alerte par sens toutes les 2 h ; mémorise l'heure (radar_t) pour ne pas envoyer « FEINTE » juste après."""
-    b = (r.get("b15") or [])[:-1]                      # la dernière est en formation
+    # 16/11 : le radar lisait « b15 » coupé à 30 bougies alors qu'il en faut 66 → il ne se déclenchait JAMAIS en réel (LONG raté).
+    b = (r.get("b15_long") or r.get("b15") or [])[:-1]  # la dernière est en formation
     if len(b) < 66:
         return None
     vols = [x.get("v") or 0 for x in b]
@@ -4047,7 +4048,7 @@ def retournement_marche(m, r, cle):
     Cibles : haut/bas des 6 dernières bougies 1h puis 4h ; SL : dernier creux/sommet 5 min ; BE dès que le gain = le risque.
     Une alerte par nouveau sens (comme alert() du Pine), jamais deux fois de suite."""
     dirs = r.get("dirs") or []
-    b5, b15 = (r.get("b5") or [])[:-1], (r.get("b15") or [])[:-1]
+    b5, b15 = (r.get("b5") or [])[:-1], (r.get("b15_long") or r.get("b15") or [])[:-1]   # 16/11 : 41 bougies 15 min nécessaires (b15 = 30 → muet)
     b1, b4 = r.get("b1h") or [], r.get("b4h") or []
     if len(dirs) < 10 or len(b5) < 6 or len(b15) < 41 or len(b1) < 6 or len(b4) < 6:
         return None
