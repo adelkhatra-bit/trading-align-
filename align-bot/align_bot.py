@@ -3822,6 +3822,56 @@ def alerte_retournement(m, r, tr):
             "🙅 Aucune entrée en sens inverse avant cette confirmation")
 
 
+def coupe_et_reprends(m, r, cle, tr, p):
+    """Demande d'Adel (15/11) : après le TP1, si les indicateurs annoncent un retour vers l'entrée (4/5 petites unités
+    contre la position + dernière bougie 15 min clôturée contre nous), mieux vaut TOUT encaisser maintenant, puis reprendre
+    la même position quand le prix revient à l'entrée (max de profit). Une seule fois par position."""
+    if tr.get("coupe_dit") or int(tr.get("n_tp") or 2) != 2:
+        return None
+    dirs, b = r.get("dirs") or [], (r.get("b15") or [])[:-1]
+    d, e, atr = tr["d"], tr["e"], r.get("atr") or 0
+    if len(dirs) < 5 or not b or atr <= 0:
+        return None
+    contre = sum(1 for k in range(5) if dirs[k] == -d)
+    bougie_contre = (b[-1]["c"] - b[-1]["o"]) * d < 0
+    if contre < 4 or not bougie_contre or d * (p - e) < 0.3 * atr:
+        return None
+    tr["coupe_dit"] = True
+    cle["reprise"] = {"d": d, "e": e, "sl": tr.get("sl0") or tr.get("sl_init") or (e - d * atr), "tp1": tr["tp1"], "tp2": tr.get("tp2"), "t": r.get("t", 0)}
+    return [f"⚠️ {contre}/5 petites unités ont tourné + clôture 15 min contre nous",
+            f"🧲 Le marché a l'air de vouloir revenir vers l'entrée {px(e)}",
+            "✂️ Conseil : encaisse TOUT maintenant, le gain est dans la poche 💰",
+            f"🔁 Je te préviens si le prix revient sur {px(e)} pour reprendre la même position",
+            "⚠️ Ceci n'est pas un conseil en investissement (DYOR)"]
+
+def reprise_entree(m, r, cle):
+    """Suite de « COUPE ET REPRENDS » : le prix revient sur l'entrée et la bougie 5 min clôture de nouveau dans notre sens
+    → on reprend la même position (même entrée, SL d'origine). Valable 6 h, une seule fois."""
+    rp = cle.get("reprise")
+    if not rp:
+        return None
+    if r.get("t", 0) - rp["t"] > 6 * 3600:
+        cle.pop("reprise", None)
+        return None
+    b5 = (r.get("b5") or [])[:-1]
+    atr = r.get("atr") or 0
+    p = r["m1"][-1]["c"] if r.get("m1") else None
+    if not b5 or p is None or atr <= 0:
+        return None
+    d, e = rp["d"], rp["e"]
+    if (p - rp["sl"]) * d <= 0:
+        cle.pop("reprise", None)                       # le plan est cassé : on ne reprend pas
+        return None
+    if abs(p - e) > 0.25 * atr or (b5[-1]["c"] - b5[-1]["o"]) * d <= 0:
+        return None
+    cle.pop("reprise", None)
+    return (f"🔁 REPRISE À L'ENTRÉE : {'LONG' if d == 1 else 'SHORT'} — {ICONE.get(m, '')} {m}\n"
+            f"🧲 Le prix est revenu sur l'entrée {px(e)}, comme prévu 😎\n"
+            "🕯 La bougie 5 min reclôture dans notre sens\n"
+            f"📍 Entrée ≈ {px(e)} • 🛑 SL ≈ {px(rp['sl'])} • 🎯 TP1 ≈ {px(rp['tp1'])}\n"
+            "💰 Deuxième passage sur le même mouvement : c'est comme ça qu'on fait le max\n"
+            "⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
+
 def entree_retest(m, r, cle):
     """ENTRÉE SUR RETEST (règle d'Adel 15/11) : une résistance cassée à la CLÔTURE devient support (et inversement) ;
     quand le prix revient dessus, que le marché bloque (mèche de rejet + clôture 15 min du bon côté) et que les unités
@@ -4528,24 +4578,34 @@ def entrer_inscrits(etat, m, tr, chats=()):
             f"🤖 {ICONE.get(m, '')} {m} : POSITION SUIVIE AUTOMATIQUEMENT\n{SENS[tr['d']]}\n"
             "👀 Mets-toi en vue 15 minutes\n"
             f"🛑 SL un peu {meche_sl(tr)}\n"
-            f"📍 Repère prix : entrée ≈ {px(tr['e'])} • SL ≈ {px(tr['sl'])} • TP1 ≈ {px(tr['tp1'])}\n"
+            + ("🏦 Tes prix Topstep arrivent juste après 👇\n" if plateforme(etat, cid) == "topstep" else
+               f"📍 Repère prix : entrée ≈ {px(tr['e'])} • SL ≈ {px(tr['sl'])} • TP1 ≈ {px(tr['tp1'])}\n") +
             "🛑 Mets ton SL TOUT DE SUITE\n🎯 Coach activé jusqu'au TP\n📈 Résultat compté dans Mes résultats"),
             )
 
+PLATEFORMES = {"tv": "📺 FTMO / FundedNext (prix TradingView)", "topstep": "🏦 Topstep (prix des futures)", "deux": "🔀 Les deux"}
+
 def bouton_plateforme(etat, cid):
-    return ({"text": "📺 Mes prix : Topstep → passer à TradingView", "callback_data": "plateforme:tv"} if plateforme(etat, cid) == "topstep"
-            else {"text": "🏦 Je trade sur Topstep : recevoir ses prix", "callback_data": "plateforme:topstep"})
+    return {"text": "💱 Mes prix : " + PLATEFORMES[plateforme(etat, cid)].split(" (")[0] + " → changer", "callback_data": "plateforme:menu"}
 
 def plateforme(etat, cid):
-    """Où l'utilisateur trade : 'tv' (graphique TradingView / CFD, par défaut) ou 'topstep' (futures MNQ / MGC / MBT)."""
-    return (etat.get("plateforme") or {}).get(str(cid), "tv")
+    """Où l'utilisateur trade : 'tv' (FTMO / FundedNext / CFD, prix du graphique, par défaut), 'topstep' (futures MNQ / MGC / MBT) ou 'deux'."""
+    v = (etat.get("plateforme") or {}).get(str(cid), "tv")
+    return v if v in PLATEFORMES else "tv"
+
+def menu_plateforme(etat, cid):
+    _envoi_sur(cid, text="💱 OÙ TU TRADES ?\n📺 FTMO / FundedNext = prix du graphique TradingView\n🏦 Topstep = prix des futures (MNQ / MGC / MBT)\n🔀 Les deux = tu reçois les deux",
+               reply_markup=json.dumps({"inline_keyboard": [[{"text": ("✅ " if plateforme(etat, cid) == k else "") + v, "callback_data": "plateforme:" + k}]
+                                                            for k, v in PLATEFORMES.items()]}))
 
 def regler_plateforme(etat, cid, choix):
-    etat.setdefault("plateforme", {})[str(cid)] = "topstep" if choix == "topstep" else "tv"
-    _envoi_sur(cid, text=("🏦 PRIX TOPSTEP ACTIVÉS\n📈 À chaque entrée, tu reçois EN PLUS les niveaux au vrai prix du contrat Topstep\n"
-                          "🟣 NASDAQ = MNQ • 🥇 GOLD = MGC • 🟠 BTC = MBT\n⚠️ Ceci n'est pas un conseil en investissement (DYOR)"
-                          if choix == "topstep" else
-                          "📺 PRIX TRADINGVIEW\n📈 Tu reçois les niveaux du graphique (CFD : FundedNext, FTMO…)"))
+    if choix not in PLATEFORMES:
+        return menu_plateforme(etat, cid)
+    etat.setdefault("plateforme", {})[str(cid)] = choix
+    _envoi_sur(cid, text={"topstep": "🏦 PRIX TOPSTEP UNIQUEMENT\n📈 À chaque entrée : les niveaux au vrai prix du contrat Topstep\n🟣 NASDAQ = MNQ • 🥇 GOLD = MGC • 🟠 BTC = MBT",
+                          "deux": "🔀 LES DEUX\n📺 Les prix du graphique (FTMO / FundedNext)\n🏦 + les prix Topstep (MNQ / MGC / MBT)",
+                          "tv": "📺 PRIX FTMO / FUNDEDNEXT\n📈 Tu reçois les niveaux du graphique TradingView"}[choix]
+                          + "\n⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
 
 def texte_prix_topstep(m, tr, prix_graphique, prix_fut):
     """Deuxième notification : les mêmes niveaux, décalés au vrai prix du micro-contrat Topstep."""
@@ -4565,7 +4625,7 @@ def texte_prix_topstep(m, tr, prix_graphique, prix_fut):
 
 def prix_topstep_inscrits(etat, m, tr, prix_graphique):
     """Envoie les niveaux Topstep à ceux qui ont choisi « Topstep » (le prix du contrat est lu en direct sur l'API)."""
-    qui = [c for c, v in (etat.get("plateforme") or {}).items() if v == "topstep" and marche_autorise(etat, c, m)]
+    qui = [c for c, v in (etat.get("plateforme") or {}).items() if v in ("topstep", "deux") and marche_autorise(etat, c, m)]
     if not qui or not topstep_trade:
         return 0
     try:
@@ -9084,6 +9144,9 @@ def agent(m, r, cle, ferme):
     except Exception as ex:
         print("après SL", ex)
     try:
+        re_ = reprise_entree(m, r, cle) if not tr else None   # après « COUPE ET REPRENDS » : retour à l'entrée → on reprend
+        if re_:
+            out.append(re_)
         er_ = entree_retest(m, r, cle) if not tr else None   # résistance cassée qui devient support (règle d'Adel)
         if er_:
             out.append(er_)
@@ -9133,7 +9196,7 @@ def agent(m, r, cle, ferme):
         pc = plan_cassure(r, d)
         if pc and pc["t15"] != cle.get("cassure_t") and not r.get("annonce"):
             cle["cassure_t"] = pc["t15"]
-            tr = dict(pc, statut="entree", cree=r["t"], encore=0, atr_e=r["atr"])
+            tr = dict(pc, statut="entree", cree=r["t"], encore=0, atr_e=r["atr"], sl0=pc.get("sl"))
             tr["profil"] = profil_trade(m, tr, r)
             tr.update(strategie_trade(r, d))
             tr["retour"] = retournement_confirme(cle, d, r)
@@ -9308,7 +9371,7 @@ def agent(m, r, cle, ferme):
                     return out
                 o = dict(o, e=p, sl=sl_m, za=p, zb=p, rr=abs(o["tp1"] - p) / max(abs(p - sl_m), 1e-9), rejet=True,
                          sl_h=bougie_protegee((r["b5"][:-1][-4:] if sl_ut_ == "5 min" else r["b15"][-3:]), d, sl_m), sl_ut=sl_ut_)
-                tr = dict(o, statut="entree", cree=r["t"], encore=0, atr_e=a_)
+                tr = dict(o, statut="entree", cree=r["t"], encore=0, atr_e=a_, sl0=o.get("sl"))
                 tr["profil"] = profil_trade(m, tr, r)
                 tr.update(strategie_trade(r, d))
                 tr["retour"] = retournement_confirme(cle, d, r)
@@ -9427,6 +9490,10 @@ def agent(m, r, cle, ferme):
 
     if tr["statut"] == "tp1":
         n_tp = int(tr.get("n_tp") or 2)                  # numéro du TP visé (TP2, puis TP3, TP4…) : la course continue tant que la tendance tient
+        cr_ = coupe_et_reprends(m, r, cle, tr, p)        # demande d'Adel : TP1 touché + retour annoncé vers l'entrée → on encaisse tout et on reprend à l'entrée
+        if cr_:
+            out.append(cs_(m, "COUPE ET REPRENDS", cr_, "Encaisser maintenant, reprendre à l'entrée", r))
+            return out
         if t2 is not None and not touche_t2:
             fr_ = frole_tp(m, r, tr, d, t1, t2, f"TP{n_tp}", p)
             if fr_:
@@ -9859,6 +9926,10 @@ def live_annonces(etat, m, textes):
             live_bande(etat, f"BULLE:😅 {ic} {m} : TP frôlé à un cheveu • petit recul, on garde le cap 😎" + FIN_BANDE, f"frole{m}", 600, toujours=True)
         elif "STOP TOUCHÉ" in t:
             live_bande(etat, f"😤 {ic} {m} : stop touché • on coupe petit, on va se refaire 💪" + FIN_BANDE, f"sl{m}", 600, toujours=True)
+        elif "COUPE ET REPRENDS" in t:      # demande d'Adel : spectacle quand on encaisse avant le retour
+            live_bande(etat, f"BULLE:✂️ {ic} {m} : on encaisse TOUT, le gain est dans la poche 💰 • le marché veut revenir… on l'attend au tournant 😏" + FIN_BANDE, f"coupe{m}", 900, toujours=True)
+        elif "REPRISE À L'ENTRÉE" in t:
+            live_bande(etat, f"BULLE:🔁 {ic} {m} : il est revenu, comme prévu 😎 • deuxième service, on reprend la même 🍽️ • lien en bio" + FIN_BANDE, f"reprise{m}", 900, toujours=True)
         elif "TP1 TOUCHÉ" in t:
             live_bande(etat, f"🎯 TP1 TOUCHÉ sur {ic} {m} ! ✅ On protège : SL à l'entrée 🛡" + FIN_BANDE, f"tp1{m}", 600, toujours=True)
         elif "POINT D'ENTRÉE À VENIR" in t:
