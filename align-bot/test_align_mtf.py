@@ -3217,6 +3217,24 @@ class TestEveryMainButtonAnswers(unittest.TestCase):
             out, _ = self._run(t)
             self.assertTrue(out and "DÉJÀ VIP" in out[0]["text"])
 
+    def test_menu_vip_epingle_sans_indicateur_est_republie(self):
+        # l'ancien menu VIP épinglé (avec « 🧩 Indicateur ») doit être retiré et republié sans le bouton
+        appels = []
+        def faux(meth, **k):
+            appels.append((meth, k))
+            if meth == "getChat":
+                return {"result": {"pinned_message": {"message_id": 7, "text": "💎 MENU ALIGN VIP",
+                        "reply_markup": {"inline_keyboard": [[{"text": "🧩 Indicateur TradingView"}], [{"text": "🔴 Le live ALIGN"}]]}}}}
+            return {"result": {"message_id": 8}}
+        etat = {"canal": "-100"}
+        with unittest.mock.patch.object(align_bot, "telegram", side_effect=faux):
+            align_bot.menu_canal_vip(etat)
+        meths = [m for m, _ in appels]
+        self.assertIn("unpinChatMessage", meths)
+        envoi = [k for m, k in appels if m == "sendMessage"]
+        self.assertTrue(envoi and "Indicateur" not in envoi[0]["reply_markup"])
+        self.assertEqual(etat["menu_vip_v3"], 8)
+
     def test_indicateur_pas_vendu_pour_le_moment(self):
         # Décision d'Adel (15/11) : plus de bouton « 🧩 Indicateur TradingView » ni de prix de l'indicateur
         self.assertFalse(align_bot.INDICATEUR_EN_VENTE)

@@ -3050,12 +3050,14 @@ def menu_canal_resultats(etat):
 
 def menu_canal_vip(etat):
     """Chaîne VIP : Telegram n'autorise pas le clavier du bas dans une chaîne → menu à boutons épinglé en haut (1 seule fois)."""
-    if not etat.get("canal") or etat.get("menu_vip_v2"):
+    if not etat.get("canal") or etat.get("menu_vip_v3"):
         return
     try:                                  # déjà épinglé (mémoire perdue au redémarrage) : on ne le renvoie pas
         pm = ((telegram("getChat", chat_id=etat["canal"]) or {}).get("result") or {}).get("pinned_message") or {}
-        if "MENU ALIGN VIP" in str(pm.get("text") or "") and "Live" in str(pm.get("reply_markup") or ""):
-            etat["menu_vip_v2"] = pm.get("message_id") or 1
+        # v3 (décision d'Adel 15/11) : l'ancien menu épinglé qui montre encore « Indicateur » est remplacé
+        if "MENU ALIGN VIP" in str(pm.get("text") or "") and "Live" in str(pm.get("reply_markup") or "") \
+                and (INDICATEUR_EN_VENTE or "Indicateur" not in str(pm.get("reply_markup") or "")):
+            etat["menu_vip_v3"] = pm.get("message_id") or 1
             return
         if "MENU ALIGN VIP" in str(pm.get("text") or "") and pm.get("message_id"):
             telegram("unpinChatMessage", chat_id=etat["canal"], message_id=pm["message_id"])      # ancien menu sans Live
@@ -3073,7 +3075,7 @@ def menu_canal_vip(etat):
     try:
         res = telegram("sendMessage", chat_id=etat["canal"], text="💎 MENU ALIGN VIP\n👇 Touche un bouton : il s'ouvre dans ton bot", reply_markup=kb, disable_notification="true")
         telegram("pinChatMessage", chat_id=etat["canal"], message_id=res["result"]["message_id"], disable_notification="true")
-        etat["menu_vip_v2"] = res["result"]["message_id"]
+        etat["menu_vip_v3"] = res["result"]["message_id"]
     except Exception as ex:
         print("menu VIP", ex)
 
