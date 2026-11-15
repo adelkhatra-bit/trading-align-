@@ -140,7 +140,7 @@ def executer(etat, signal, journal=print):
     rr = abs((signal.get("tp2") or signal["tp"]) - signal["e"]) / r_ if r_ else 0
     if rr < 2:
         return {"ok": False, "raison": "gain visé < 2 × le risque : on n'entre pas"}   # règle d'Adel : 100 $ seulement pour 1:3, 60 $ pour 1:2
-    plafond = PERTE_POSITION_MAX if rr >= 3 else 60.0
+    plafond = PERTE_POSITION_MAX if rr >= 3 and not signal.get("contre") else 60.0   # contre-tendance : 60 $ max (16/11)
     tk = min(ticks(signal["e"] - signal["sl"], ts, tv), int(plafond / tv))
     n = nb_contrats(tk, tv) if 2 * tk * tv <= plafond else CONTRATS
     # Demande d'Adel (15/11) : sur Topstep une seule position → pas de TP posé d'avance. Le bot GARDE la position :

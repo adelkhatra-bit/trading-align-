@@ -2391,7 +2391,7 @@ TRAD.update({   # cartes reliées au graphique (mêmes mots que l'indicateur)
     "🛑 Stop = étiquette « STOP » du graphique": "🛑 Stop = « STOP » label on the chart",
     "⏱ La bougie": "⏱ The", " qui décide clôture dans": " candle that decides closes in",
     "(étiquette ENTRÉE)": "(« ENTRÉE » label)", "🍽 Zone intacte (0 % mangée) : toute la réaction est encore à venir": "🍽 Untouched zone (0 % eaten): the whole reaction is still ahead",
-    "🍽 Zone mangée à": "🍽 Zone eaten", ": il reste de la place pour rebondir": ": still room to bounce", ": elle s'use, prudence": ": it's wearing out, be careful",
+    "🍽 Zone mangée à": "🍽 Zone eaten", "↩ contre-tendance (60 $ max)": "↩ counter-trend ($60 max)", ": il reste de la place pour rebondir": ": still room to bounce", ": elle s'use, prudence": ": it's wearing out, be careful",
     "🍽 Zone mangée à 100 % : traversée en entier, on attend la clôture": "🍽 Zone 100 % eaten: fully crossed, we wait for the close", "· mangée à": "· eaten", "· intacte": "· untouched", "🧲 La zone est une ": "🧲 The zone is a ", "order block + ": "order block + ",
     "FVG : le prix rebondit souvent dessus, on attend le rejet": "FVG: price often bounces there, we wait for the rejection", "l'étiquette ENTRÉE": "the « ENTRÉE » label",
 })
@@ -6478,9 +6478,11 @@ def commande_auto(etat, cid, txt):
     _envoi_sur(cid, text="\n".join(l), reply_markup=json.dumps({"inline_keyboard": boutons}))
 
 
-def auto_entree(etat, m, trx):
-    """Le bot vient d'entrer : il prend la même position sur les comptes (FundedNext puis Topstep) et prévient le propriétaire."""
-    sig = {"marche": m, "sens": "LONG" if trx["d"] == 1 else "SHORT", "e": trx["e"], "sl": trx["sl"], "tp": trx["tp1"], "tp2": trx.get("tp2")}
+def auto_entree(etat, m, trx, contre=False):
+    """Le bot vient d'entrer : il prend la même position sur les comptes (FundedNext puis Topstep) et prévient le propriétaire.
+    contre=True : ↩ scalp contre-tendance vers l'entrée du plan principal (risque plafonné à 60 $)."""
+    sig = {"marche": m, "sens": "LONG" if trx["d"] == 1 else "SHORT", "e": trx["e"], "sl": trx["sl"], "tp": trx["tp1"], "tp2": trx.get("tp2"),
+           "contre": contre}
     lignes = []
     for nom, robot in (("FundedNext", auto_trade), ("Topstep", topstep_trade)):
         if not robot:
@@ -6495,7 +6497,7 @@ def auto_entree(etat, m, trx):
     print("AUTO_TRADE", m, lignes)
     if any("éteint" not in l_ for l_ in lignes):
         for p_ in proprio(etat):
-            _envoi_sur(p_, text=f"🤖 {ICONE.get(m, '')} {m} {sig['sens']} — trading automatique\n" + "\n".join(lignes))
+            _envoi_sur(p_, text=f"🤖 {ICONE.get(m, '')} {m} {sig['sens']}{' ↩ contre-tendance (60 $ max)' if contre else ''} — trading automatique\n" + "\n".join(lignes))
 
 
 def topstep_horaires(etat):
@@ -7318,6 +7320,9 @@ def alertes_courtes(etat, chats, derniers, now=None):
             if ev["kind"] == "scalp_inv":              # carte complète à part (jamais coupée à 4 lignes par le regroupement)
                 if TOKEN:
                     diffuser_alerte(etat, chats, texte_scalp(m, ev["si"], ev["dp"]), texte_scalp(m, ev["si"], ev["dp"], True))
+                if scalp_vaut_le_coup(ev["si"]) and (etat.get("auto_marches") or {}).get(m):   # le bot prend le contre-tendance (60 $ max)
+                    si_ = ev["si"]
+                    auto_entree(etat, m, {"d": si_["d"], "e": si_["e"], "sl": si_["sl"], "tp1": si_["tp"]}, contre=True)
                 continue
             evts.append(({m}, texte_pine(etat, ev), texte_pine(etat, ev, True)))
     if evts and TOKEN:
@@ -8340,7 +8345,19 @@ def scalp_inverse(r, d):
     risque = abs(e - s_)
     if di * (cible - e) < 1.2 * risque or di * (e - s_) <= 0:
         return None
-    return dict(d=di, e=e, sl=s_, tp=cible, rr=abs(cible - e) / max(risque, 1e-9), voy=sum(1 for k in range(5) if dirs[k] == -d))
+    return dict(d=di, e=e, sl=s_, tp=cible, rr=abs(cible - e) / max(risque, 1e-9), voy=sum(1 for k in range(5) if dirs[k] == -d), atr=aS)
+
+
+SCALP_AUTO_RR = 2.0      # demande d'Adel (16/11) : le contre-tendance vers l'entrée du plan principal, le bot le PREND s'il vaut le coup
+SCALP_AUTO_ATR = 2.0     # longueur minimum : le TP doit être à au moins 2 ATR (5 min) de l'entrée, sinon c'est du bruit
+
+
+def scalp_vaut_le_coup(si):
+    """Le ↩ SCALP INVERSE vaut-il une vraie position ? Gain ≥ 2 × le risque ET longueur ≥ 2 ATR 5 min (pas de décision incertaine)."""
+    if not si:
+        return False
+    long_ = abs(si["tp"] - si["e"])
+    return si.get("rr", 0) >= SCALP_AUTO_RR and (not si.get("atr") or long_ >= SCALP_AUTO_ATR * si["atr"])
 
 def texte_scalp(m, si, dp, anglais=False):
     """Carte ↩ SCALP INVERSE : même présentation que la carte d'entrée (sens en couleur en premier, niveaux dans l'ordre du graphique)."""
@@ -8354,6 +8371,11 @@ def texte_scalp(m, si, dp, anglais=False):
     l += ["", (f"⚠️ {si['voy']}/5 small timeframes turned: against the trend, small size" if anglais else
                f"⚠️ {si['voy']}/5 petites UT retournées : contre la tendance, petite position"),
           (f"🧭 At TP we go back {sensp} (main plan)" if anglais else f"🧭 Au TP on reprend le {sensp} (plan principal)")]
+    if scalp_vaut_le_coup(si):
+        l.append(f"🤖 Worth it (≥ 1:2, long enough): the bot takes it, then flips {sensp} at the TP" if anglais else
+                 f"🤖 Ça vaut le coup (≥ 1:2, assez long) : le bot le prend, puis demi-tour {sensp} au TP")
+    else:
+        l.append("⏸ Too short to be worth it: the bot doesn't take it" if anglais else "⏸ Trop court pour valoir le coup : le bot ne le prend pas")
     return l
 
 def lecture_tp1(r, d):
