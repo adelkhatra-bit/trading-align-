@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '7.7';  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
+  const VERSION = '7.8';  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
   // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
@@ -185,8 +185,9 @@
   }
   function remplir() {
     const v = vueTxt();
-    const items = (v ? [v] : []).concat(BASE, extra.slice(-3)).map(plateforme);
-    const html = items.map(t => '<span>' + esc(t) + '</span>').join('');
+    const iEN = BASE.indexOf('👉 FOLLOW • SHARE • TAP THE SCREEN');   // v7.8 : on repère les phrases anglaises de la bande d'accueil
+    const items = (v ? [[v, 0]] : []).concat(BASE.map((t, i) => [t, iEN >= 0 && i >= iEN]), extra.slice(-3).map(t => [t, 0]));
+    const html = items.map(([t, en]) => '<span' + (en ? ' class="en"' : '') + '>' + esc(plateforme(t)) + '</span>').join('');
     piste.innerHTML = html + html;
   }
   function esc(s) { return String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
@@ -623,18 +624,31 @@
     const P = pointPrix(); if (!P) return; document.querySelectorAll('.align-ping').forEach(x => x.remove());
     const d = document.createElement('div'); d.className = 'align-ping'; d.style.left = P.x + 'px'; d.style.top = P.y + 'px'; document.body.appendChild(d); setTimeout(() => d.remove(), 3500);
   }
+  // v7.8 : langue de la bande du haut en ce moment (l'info qui défile, sinon la phrase d'accueil au milieu de la bande)
+  function langueBande() {
+    try { if (bande.classList.contains('on')) return flash.classList.contains('en') ? 'en' : 'fr';
+      const b = bande.getBoundingClientRect(), cx = b.left + b.width * 0.35;
+      for (const sp of piste.children) { const q = sp.getBoundingClientRect(); if (q.left <= cx && q.right >= cx) return sp.classList.contains('en') ? 'en' : 'fr'; } } catch (e) {}
+    return 'fr';
+  }
   function coeurs(n, liste, sensForce) {
     try {
       const cle = (liste || []).join(''), g = PUNCH.find(x => x[0].test(cle)) || PUNCH[PUNCH.length - 1];
       const [fr, en] = g[1 + (punchN++ % (g.length - 1))], tok = ++punchTok;
-      const r = zoneGraphique(), e = document.createElement('div'); e.className = 'align-punch';
-      const mots = fr.split(' '), emo = mots.shift();   // v7.1 : le smiley bouge dans la pastille
-      e.innerHTML = '<span class="qui">🗣️ LE MARCHÉ TE PARLE</span><span class="emo">' + esc(emo) + '</span> <span class="txt">' + esc(mots.join(' ')) + '</span>';   // v7.6 : c'est le marché qui parle ; v7.4 : la pastille passe en FR, PUIS en EN (jamais mélangées)
+      const e = document.createElement('div'); e.className = 'align-punch';
+      // v7.8 (demande d'Adel) : la pastille parle la MÊME langue que la bande du haut (FR avec FR, EN avec EN) pour éviter les confusions
+      const parts = (txt, defEmo) => { const m = txt.split(' '); const em = /^\p{Extended_Pictographic}/u.test(m[0]) ? m.shift() : defEmo; return [em, m.join(' ')]; };
+      const [emoFr, txtFr] = parts(fr, '💬'), [emoEn, txtEn] = parts(en, emoFr);
+      let lgCour = null;
+      const affiche = lg => { lgCour = lg; e.classList.toggle('en', lg === 'en'); const [em, tx] = lg === 'en' ? [emoEn, txtEn] : [emoFr, txtFr];
+        e.innerHTML = '<span class="qui">' + (lg === 'en' ? '🗣️ THE MARKET IS TALKING' : '🗣️ LE MARCHÉ TE PARLE') + '</span><span class="emo">' + esc(em) + '</span> <span class="txt">' + esc(tx) + '</span>';
+        e.style.animation = 'none'; void e.offsetWidth; e.style.animation = ''; };
       document.querySelectorAll('.align-punch').forEach(x => x.remove());
-      document.body.appendChild(e);
-      const sensP = sensForce || sensPastille(cle); placerPastille(e, sensP); ping(); setTimeout(() => e.remove(), 8000);   // v7.4 : la pastille reste plus longtemps (lisible sur le live)
-      setTimeout(() => { try { if (tok !== punchTok) return; const e2 = e.cloneNode(false); e2.className = 'align-punch en'; const m2 = en.split(' '); const em2 = /^\p{Extended_Pictographic}/u.test(m2[0]) ? m2.shift() : emo;
-        e2.innerHTML = '<span class="qui">🗣️ THE MARKET IS TALKING</span><span class="emo">' + esc(em2) + '</span> <span class="txt">' + esc(m2.join(' ')) + '</span>'; document.querySelectorAll('.align-punch').forEach(x => x.remove()); document.body.appendChild(e2); placerPastille(e2, sensP); setTimeout(() => e2.remove(), 8000); } catch (er) {} }, 8100);
+      affiche(langueBande()); document.body.appendChild(e);
+      const sensP = sensForce || sensPastille(cle); placerPastille(e, sensP); ping();
+      const debut = Date.now(), veille = setInterval(() => { try {
+        if (tok !== punchTok || Date.now() - debut > 16000) { clearInterval(veille); e.remove(); return; }
+        const lg = langueBande(); if (lg !== lgCour) { affiche(lg); placerPastille(e, sensP); } } catch (er) { clearInterval(veille); } }, 700);
     } catch (e) {}
   }
   function choisirPlateforme(v) { PLATEFORME = v; try { localStorage.setItem('alignPlateforme', v); } catch (e) {} remplir(); }
