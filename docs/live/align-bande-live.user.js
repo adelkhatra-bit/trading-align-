@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '7.8';  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
+  const VERSION = '7.9';  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
   // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
@@ -210,6 +210,12 @@
     const demi = piste.scrollWidth / 2;
     if (demi > 0 && -x >= demi) x += demi;
     piste.style.transform = 'translateX(' + x + 'px)';
+    // v7.9 (demande d'Adel : « je n'arrive pas à fermer la fenêtre à cause de la bande ») : toutes les 0,4 s,
+    // si une fenêtre / un menu TradingView est ouvert, la bande et les pastilles se cachent ; la pub « Go Pro » est fermée toute seule
+    if (now - (anim.vu || 0) > 400) { anim.vu = now; try {
+      const pub = document.querySelector('[data-dialog-name="gopro"] button[aria-label="Fermeture"]'); if (pub) pub.click();
+      document.documentElement.classList.toggle('align-cache', !!document.querySelector('[role="dialog"], [data-dialog-name], [data-name="menu-inner"]'));
+    } catch (e) {} }
     raf = requestAnimationFrame(anim);
   }
   raf = requestAnimationFrame(anim);
@@ -589,6 +595,8 @@
   .align-ping{position:fixed;z-index:9996;pointer-events:none;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;
     border:4px solid #ffd400;box-shadow:0 0 18px #ffd400;animation:pingPrix 1.1s ease-out 3 forwards}
   @keyframes pingPrix{0%{transform:scale(.4);opacity:1}100%{transform:scale(2.6);opacity:0}}`;
+  cssPunch.textContent += `
+  html.align-cache #align-bande,html.align-cache .align-punch,html.align-cache .align-ping,html.align-cache #align-chrono,html.align-cache #align-show,html.align-cache #align-cadre{visibility:hidden!important}`;   // v7.9
   document.head.appendChild(cssPunch);
   let punchN = 0, punchTok = 0;   // v7.5 : l'anglais d'une ancienne pastille n'efface plus la nouvelle
   // v7.5 (demande d'Adel) : sens de la pastille = celui de l'info (📉 baisse → en HAUT, 📈 hausse → en BAS), sinon la pente récente
