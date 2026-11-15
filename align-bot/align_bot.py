@@ -9318,6 +9318,7 @@ def phrases_bande_propres(brut):
     """Lignes « FR | EN » de l'IA → paires propres : jamais de chiffre, prix, ENTRÉE / SL / TP, ni le mot Telegram."""
     paires = []
     for ligne in str(brut or "").splitlines():
+        ligne = re.sub(r"^\s*(?:\d+\s*[.)\-:]|[-•*#>]+)\s*", "", ligne).replace("**", "")   # v8.8 : « 1. … » / « - … » / gras markdown
         if "|" not in ligne:
             continue
         fr, en = [x.strip(" -•*\"'\t") for x in ligne.split("|", 1)]
@@ -9347,9 +9348,11 @@ def live_phrases_ia(etat, maintenant):
                 "INTERDIT : aucun chiffre, aucun prix, pas les mots entrée, SL, TP, stop, Telegram ; aucune promesse de gain. "
                 "Réponds uniquement avec les 6 lignes.")
     donnees = {"moment": moment, "deja_dites": [p[0] for p in etat.get("live_ia_paires", [])][:6]}
-    paires = phrases_bande_propres(ia(etat, consigne, donnees))
-    print(f"LIVE_IA {len(paires)} phrases via {etat.get('ia_dernier_fournisseur')} {etat.get('ia_dernier_statut')}")
+    brut = ia(etat, consigne, donnees)
+    paires = phrases_bande_propres(brut)
+    print(f"LIVE_IA {len(paires)} phrases via {etat.get('ia_dernier_fournisseur')} {etat.get('ia_dernier_statut')} : {str(brut)[:160]!r}")
     if not paires:
+        etat["live_ia_t"] = maintenant - LIVE_IA_INTERVALLE + 300     # v8.8 : échec → on réessaie dans 5 min (pas 30)
         return False
     etat["live_ia_paires"] = paires
     return live_publier("IA:" + json.dumps(paires, ensure_ascii=False))
