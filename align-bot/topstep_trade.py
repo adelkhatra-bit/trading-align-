@@ -130,21 +130,96 @@ def executer(etat, signal, journal=print):
     ok, raison = garde_fou(etat, float(acc.get("balance", 0)))
     if not ok:
         return {"ok": False, "raison": raison}
-    if _api("/Position/searchOpen", {"accountId": int(COMPTE)}, jeton).get("positions"):
+    if etat.get("topstep_pos") or _api("/Position/searchOpen", {"accountId": int(COMPTE)}, jeton).get("positions"):
         return {"ok": False, "raison": "une position est déjà ouverte"}
     c = contrat(jeton, m)
     if not c:
         return {"ok": False, "raison": "contrat introuvable"}
     ts, tv = float(c["tickSize"]), float(c["tickValue"])
+    tk = ticks(signal["e"] - signal["sl"], ts, tv)
+    n = nb_contrats(tk, tv)
+    # Demande d'Adel (15/11) : sur Topstep une seule position → pas de TP posé d'avance. Le bot GARDE la position :
+    # 2 contrats si le risque tient dans 75 $ → 50 % coupés au TP1 + SL à l'entrée (BE), le reste vise le TP2 ;
+    # sinon 1 contrat → au TP1 le SL passe à BE et on garde jusqu'au TP2.
     ordre = {"accountId": int(COMPTE), "contractId": c["id"], "type": 2, "side": 0 if signal["sens"] == "LONG" else 1,
-             "size": CONTRATS, "stopLossBracket": {"ticks": ticks(signal["e"] - signal["sl"], ts, tv), "type": 4},
-             "takeProfitBracket": {"ticks": max(1, int(abs(signal["tp"] - signal["e"]) / ts)), "type": 1}}
+             "size": n, "stopLossBracket": {"ticks": tk, "type": 4}}
+    try:
+        fut = dernier_prix(jeton, c["id"])
+    except Exception:
+        fut = None
+    ecart = (fut - signal["e"]) if fut else 0.0
+    d = 1 if signal["sens"] == "LONG" else -1
+    etat["topstep_pos"] = {"marche": m, "d": d, "n": n, "etape": 0, "contractId": c["id"], "tick": ts,
+                           "e": arrondi_tick(signal["e"] + ecart, ts), "sl": arrondi_tick(signal["e"] + ecart - d * tk * ts, ts),
+                           "tp1": arrondi_tick(signal["tp"] + ecart, ts),
+                           "tp2": arrondi_tick((signal.get("tp2") or signal["tp"] + (signal["tp"] - signal["e"])) + ecart, ts),
+                           "test": not REEL}
     if not REEL:
-        journal(f"TOPSTEP TEST {ordre}")
+        journal(f"TOPSTEP TEST {ordre} plan {etat['topstep_pos']}")
         return {"ok": True, "test": True, "ordre": ordre}
     r = _api("/Order/place", ordre, jeton)
     journal(f"TOPSTEP {m} {signal['sens']} → {r}")
+    if not r.get("success"):
+        etat.pop("topstep_pos", None)
     return {"ok": bool(r.get("success")), "reponse": r, "ordre": ordre}
+
+
+def nb_contrats(tk, valeur_tick):
+    """2 micro-contrats seulement si le risque total (2 × SL) reste dans les 75 $ par position, sinon 1."""
+    return 2 if 2 * tk * valeur_tick <= PERTE_POSITION_MAX else CONTRATS
+
+
+def dernier_prix(jeton, contrat_id):
+    fin = datetime.datetime.now(datetime.timezone.utc)
+    r = _api("/History/retrieveBars", {"contractId": contrat_id, "live": False, "unit": 2, "unitNumber": 1, "limit": 5,
+                                        "includePartialBar": True,
+                                        "startTime": (fin - datetime.timedelta(minutes=30)).isoformat(),
+                                        "endTime": fin.isoformat()}, jeton)
+    barres = r.get("bars") or []
+    return float(max(barres, key=lambda b: str(b.get("t", "")))["c"]) if barres else None
+
+
+def _stop_ouvert(jeton, contrat_id):
+    for o in _api("/Order/searchOpen", {"accountId": int(COMPTE)}, jeton).get("orders") or []:
+        if o.get("contractId") == contrat_id and o.get("type") == 4:
+            return o
+    return None
+
+
+def gerer(etat, prix=None, journal=print):
+    """À chaque tour du bot : gère la position Topstep ouverte (TP1 → 50 % coupés + BE, TP2 → tout fermé, SL → fin).
+    Renvoie les messages à envoyer au propriétaire. En mode TEST, rien n'est envoyé à Topstep, on suit seulement le plan."""
+    pos = etat.get("topstep_pos")
+    if not pos:
+        return []
+    p = prix if prix is not None else prix_futures(pos["marche"])
+    if p is None:
+        return []
+    d, m, msgs = pos["d"], pos["marche"], []
+    jeton = connexion() if REEL else None
+    if REEL and jeton and not _api("/Position/searchOpen", {"accountId": int(COMPTE)}, jeton).get("positions"):
+        etat.pop("topstep_pos", None)
+        return [f"🏁 Topstep {m} : position terminée (SL / BE touché ou fermée)"]
+    if (p - pos["sl"]) * d <= 0:
+        etat.pop("topstep_pos", None)
+        return [f"🛑 Topstep {m} : {'BE touché, 0 risque' if pos['etape'] else 'SL touché'} ({'test' if not REEL else 'réel'})"]
+    if pos["etape"] == 0 and (p - pos["tp1"]) * d >= 0:
+        if REEL and jeton:
+            if pos["n"] > 1:
+                _api("/Position/partialCloseContract", {"accountId": int(COMPTE), "contractId": pos["contractId"], "size": pos["n"] // 2}, jeton)
+            o = _stop_ouvert(jeton, pos["contractId"])
+            if o:
+                _api("/Order/modify", {"accountId": int(COMPTE), "orderId": o["id"], "stopPrice": pos["e"]}, jeton)
+        pos.update(etape=1, sl=pos["e"])
+        msgs.append(f"🎯 Topstep {m} : TP1 touché → " + ("50 % encaissés + " if pos["n"] > 1 else "") + f"SL à l'entrée (BE), on vise le TP2 ({'test' if not REEL else 'réel'})")
+    elif pos["etape"] == 1 and (p - pos["tp2"]) * d >= 0:
+        if REEL and jeton:
+            _api("/Position/closeContract", {"accountId": int(COMPTE), "contractId": pos["contractId"]}, jeton)
+        etat.pop("topstep_pos", None)
+        msgs.append(f"🏆 Topstep {m} : TP2 touché, tout est encaissé ({'test' if not REEL else 'réel'})")
+    for x in msgs:
+        journal(x)
+    return msgs
 
 
 def tout_fermer(journal=print):
