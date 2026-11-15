@@ -2499,9 +2499,6 @@ def carte_coach(m, r, cle, genre, tr=None, raison=None, declencheur=None, signal
                 l.append(f"⏳ Durée estimée : {duree} • le prix peut revenir vers l'entrée avant de partir, garde ton SL")
         except Exception:
             pass
-        # v8.9 (demande d'Adel) : conseils aux retardataires + jamais renforcer
-        l.append("👀 Retardataire ? Fais comme sur le graphique : le prix peut être un peu différent selon ta plateforme")
-        l.append("🚫 Ne renforce JAMAIS une position (même si ALIGN le fait) : mieux vaut attendre la suivante")
         if validite:
             l.append(f"⏱ Valide : {validite}")
         try:
@@ -9680,7 +9677,9 @@ def texte_compte_finance():
             "2️⃣ Ensuite prends la suivante, toujours avec ton SL 🛡\n"
             "3️⃣ Une position peut durer quelques heures à 2-3 jours : on ne court jamais après le prix 😎\n"
             "4️⃣ UN SEUL LOT (petite taille) et UNE SEULE position à la fois, surtout sur FTMO / Topstep 🎯\n"
-            "5️⃣ Pas besoin de rester collé à ton téléphone 📵 : active les notifications, ALIGN te prévient AVANT chaque position 🔔\n━━━━━━━━━━━━\n"
+            "5️⃣ Retardataire ? Fais comme sur le graphique : le prix peut être un peu différent selon ta plateforme 👀\n"
+            "6️⃣ Ne renforce JAMAIS une position (même si ALIGN le fait) : mieux vaut attendre la suivante 🚫\n"
+            "7️⃣ Pas besoin de rester collé à ton téléphone 📵 : active les notifications, ALIGN te prévient AVANT chaque position 🔔\n━━━━━━━━━━━━\n"
             "⚠️ Ceci n'est pas un conseil en investissement. Le trading comporte un risque de perte en capital. "
             "Fais tes propres recherches (DYOR).\n🤝 Liens de parrainage : ALIGN reçoit un avantage si tu utilises ces codes.")
 
