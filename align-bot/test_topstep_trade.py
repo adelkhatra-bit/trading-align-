@@ -65,5 +65,36 @@ class TestRisque(unittest.TestCase):
         self.assertFalse(r["ok"])
 
 
+class TestGestion(unittest.TestCase):
+    """Demande d'Adel (15/11) : sur Topstep, TP1 → 50 % coupés + SL à BE, puis TP2 ; ou 1 contrat gardé avec SL à BE."""
+    def pos(self, n=2):
+        return {"topstep_pos": {"marche": "NASDAQ", "d": 1, "n": n, "etape": 0, "contractId": "X", "tick": 0.25,
+                                "e": 100.0, "sl": 90.0, "tp1": 110.0, "tp2": 120.0, "test": True}}
+
+    def test_deux_contrats_si_le_risque_tient(self):
+        self.assertEqual(ts.nb_contrats(50, 0.5), 2)     # 2 × 25 $ = 50 $ ≤ 75 $
+        self.assertEqual(ts.nb_contrats(100, 0.5), 1)    # 2 × 50 $ = 100 $ > 75 $
+
+    def test_tp1_puis_be_puis_tp2(self):
+        etat = self.pos()
+        self.assertEqual(ts.gerer(etat, 105, journal=lambda *_: None), [])
+        m = ts.gerer(etat, 110.5, journal=lambda *_: None)
+        self.assertIn("50 %", m[0]); self.assertIn("BE", m[0])
+        self.assertEqual(etat["topstep_pos"]["sl"], 100.0)
+        m = ts.gerer(etat, 120, journal=lambda *_: None)
+        self.assertIn("TP2", m[0]); self.assertNotIn("topstep_pos", etat)
+
+    def test_un_contrat_garde_avec_be(self):
+        etat = self.pos(1)
+        m = ts.gerer(etat, 111, journal=lambda *_: None)
+        self.assertNotIn("50 %", m[0]); self.assertIn("BE", m[0])
+        m = ts.gerer(etat, 99.5, journal=lambda *_: None)
+        self.assertIn("BE touché", m[0]); self.assertNotIn("topstep_pos", etat)
+
+    def test_sl_touche(self):
+        etat = self.pos()
+        self.assertIn("SL touché", ts.gerer(etat, 89, journal=lambda *_: None)[0])
+
+
 if __name__ == "__main__":
     unittest.main()

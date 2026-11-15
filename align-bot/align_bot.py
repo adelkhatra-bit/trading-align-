@@ -3822,6 +3822,54 @@ def alerte_retournement(m, r, tr):
             "🙅 Aucune entrée en sens inverse avant cette confirmation")
 
 
+def radar_climax(m, r, cle):
+    """RADAR RETOURNEMENT (validé par Adel le 15/11, « oui radar ») — le LONG raté 62 → 65,5 k BTC :
+    1) volume climax : une des 4 dernières bougies 15 min CLÔTURÉES a un volume ≥ 3 × la moyenne des 40 d'avant (épuisement) ;
+    2) balayage : une de ces bougies est passée sous le plus bas (sur le plus haut) des 20 bougies d'avant, puis la clôture est revenue au-dessus ;
+    3) confirmation : la dernière clôture 15 min repasse au-dessus (au-dessous) de l'EMA9.
+    → position CONTRE-TENDANCE « prenable, risquée », SL sous la mèche du balayage ; le bot ne la prend pas lui-même.
+    Une alerte par sens toutes les 2 h ; mémorise l'heure (radar_t) pour ne pas envoyer « FEINTE » juste après."""
+    b = (r.get("b15") or [])[:-1]                      # la dernière est en formation
+    if len(b) < 66:
+        return None
+    vols = [x.get("v") or 0 for x in b]
+    cl = [x["c"] for x in b]
+    e9 = ema(cl, 9)[-1]
+    if e9 is None:
+        return None
+    for sens in (1, -1):
+        for k in range(1, 5):                          # bougie climax / balayage parmi les 4 dernières clôturées
+            i = len(b) - k
+            moy = sum(vols[i - 40:i]) / 40
+            if moy <= 0 or vols[i] < 3 * moy:
+                continue
+            avant = b[i - 20:i]
+            if sens == 1:
+                ref = min(x["l"] for x in avant)
+                ok = b[i]["l"] < ref and cl[-1] > ref and cl[-1] > e9
+                sl = min(x["l"] for x in b[i:])
+            else:
+                ref = max(x["h"] for x in avant)
+                ok = b[i]["h"] > ref and cl[-1] < ref and cl[-1] < e9
+                sl = max(x["h"] for x in b[i:])
+            if not ok:
+                continue
+            t = r.get("t", 0)
+            if t - cle.setdefault("radar_t", {}).get(str(sens), -10 ** 9) < 7200:
+                return None
+            cle["radar_t"][str(sens)] = t
+            cle["radar_dernier"] = t
+            e = cl[-1]
+            mot = "plus bas" if sens == 1 else "plus haut"
+            return (f"🔄 RETOURNEMENT : {'LONG' if sens == 1 else 'SHORT'} prenable — {ICONE.get(m, '')} {m}\n"
+                    f"📊 Volume ×{vols[i] / moy:.1f} : le marché s'est épuisé\n"
+                    f"🧹 Le {mot} des 20 dernières bougies 15 min a été balayé, puis la clôture est revenue\n"
+                    f"✅ Clôture 15 min {'au-dessus' if sens == 1 else 'au-dessous'} de l'EMA9\n"
+                    f"📍 Entrée ≈ {px(e)}\n🛑 Petit SL {'sous' if sens == 1 else 'au-dessus de'} la mèche : {px(sl)}\n"
+                    "⚠️ Contre-tendance = RISQUÉ : petite taille, BE dès que le gain = le risque\n"
+                    "🤖 Le bot ne la prend pas lui-même\n⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
+    return None
+
 def retournement_marche(m, r, cle):
     """v71 = Pine « RETOURNEMENT PAR MARCHÉ » (mesuré sur 60 jours de bougies 5 min) :
     GOLD : 5m + 15m retournés contre le 1h • NASDAQ : idem + gros volume 15 min • BTC : 5m + 15m + 1h retournés contre le 4h.
@@ -6190,7 +6238,7 @@ def commande_auto(etat, cid, txt):
 
 def auto_entree(etat, m, trx):
     """Le bot vient d'entrer : il prend la même position sur les comptes (FundedNext puis Topstep) et prévient le propriétaire."""
-    sig = {"marche": m, "sens": "LONG" if trx["d"] == 1 else "SHORT", "e": trx["e"], "sl": trx["sl"], "tp": trx["tp1"]}
+    sig = {"marche": m, "sens": "LONG" if trx["d"] == 1 else "SHORT", "e": trx["e"], "sl": trx["sl"], "tp": trx["tp1"], "tp2": trx.get("tp2")}
     lignes = []
     for nom, robot in (("FundedNext", auto_trade), ("Topstep", topstep_trade)):
         if not robot:
@@ -6222,6 +6270,10 @@ def topstep_horaires(etat):
         if topstep_trade.phase() == "fermeture" and etat.get("topstep_plat") != jour:
             etat["topstep_plat"] = jour
             topstep_trade.tout_fermer()
+            etat.pop("topstep_pos", None)
+        for msg_ in topstep_trade.gerer(etat):             # TP1 → 50 % + BE, TP2 → tout encaissé (demande d'Adel)
+            for p_ in proprio(etat):
+                _envoi_sur(p_, text="🤖 " + msg_)
     except Exception as ex:
         print("topstep horaires", ex)
 
@@ -8961,6 +9013,12 @@ def agent(m, r, cle, ferme):
     except Exception as ex:
         print("après SL", ex)
     try:
+        rc_ = radar_climax(m, r, cle)                 # radar retournement (volume climax + balayage + EMA9)
+        if rc_ and not tr:
+            out.append(rc_)
+    except Exception as ex:
+        print("radar_climax", ex)
+    try:
         rv_ = retournement_marche(m, r, cle)          # v71 : retournement par marché (même règle que le graphique)
         if rv_ and not (tr and tr.get("d") == (1 if "LONG" in rv_.split("\n")[0] else -1)):
             out.append(rv_)
@@ -9619,6 +9677,8 @@ def texte_ecran(m, typ, d, minutes, r, cle, ligne=""):
     titre = ECRAN_TITRES.get(typ)
     if not titre or (typ in ("rebond", "ligne") and ligne not in ECRAN_LIGNES):
         return None
+    if typ == "feinte" and r.get("t", 0) - (cle or {}).get("radar_dernier", -10 ** 9) < 3600:
+        return None                                   # le radar vient d'annoncer un retournement : pas de « FEINTE » contradictoire
     t0 = (titre[0] if d == -1 else titre[1]).replace("{l}", ECRAN_LIGNES.get(ligne, ""))
     lignes = [f"🎬 EN DIRECT DU LIVE — {ICONE.get(m, '')} {m}", t0]
     if typ in ("rebond", "ligne"):
