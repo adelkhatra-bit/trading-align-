@@ -2499,6 +2499,9 @@ def carte_coach(m, r, cle, genre, tr=None, raison=None, declencheur=None, signal
                 l.append(f"⏳ Durée estimée : {duree} • le prix peut revenir vers l'entrée avant de partir, garde ton SL")
         except Exception:
             pass
+        # v8.9 (demande d'Adel) : conseils aux retardataires + jamais renforcer
+        l.append("👀 Retardataire ? Fais comme sur le graphique : le prix peut être un peu différent selon ta plateforme")
+        l.append("🚫 Ne renforce JAMAIS une position (même si ALIGN le fait) : mieux vaut attendre la suivante")
         if validite:
             l.append(f"⏱ Valide : {validite}")
         try:
