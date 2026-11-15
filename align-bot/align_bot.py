@@ -3822,6 +3822,42 @@ def alerte_retournement(m, r, tr):
             "🙅 Aucune entrée en sens inverse avant cette confirmation")
 
 
+def entree_retest(m, r, cle):
+    """ENTRÉE SUR RETEST (règle d'Adel 15/11) : une résistance cassée à la CLÔTURE devient support (et inversement) ;
+    quand le prix revient dessus, que le marché bloque (mèche de rejet + clôture 15 min du bon côté) et que les unités
+    5 min / 15 min / 1h sont toutes d'accord (4h pas contre), on propose l'entrée à la clôture, SL un tout petit peu
+    sous (sur) la mèche de la dernière bougie. Une alerte par niveau toutes les 2 h ; le bot ne la prend pas lui-même."""
+    b = (r.get("b15") or [])[:-1]
+    dirs = r.get("dirs") or []
+    atr = r.get("atr") or 0
+    if len(b) < 30 or len(dirs) < 10 or atr <= 0:
+        return None
+    x = b[-1]
+    for d in (1, -1):
+        if not (dirs[2] == d and dirs[4] == d and dirs[7] == d and dirs[9] != -d):
+            continue
+        avant = b[-26:-6]
+        niveau = max(y["h"] for y in avant) if d == 1 else min(y["l"] for y in avant)
+        casse = any((y["c"] - niveau) * d > 0 for y in b[-6:-1])
+        touche = (x["l"] <= niveau + 0.15 * atr) if d == 1 else (x["h"] >= niveau - 0.15 * atr)
+        tient = (x["c"] - niveau) * d > 0 and (x["c"] - x["o"]) * d > 0
+        if not (casse and touche and tient):
+            continue
+        k = f"{d}|{round(niveau / atr)}"
+        vu = cle.setdefault("retest_vu", {})
+        if r.get("t", 0) - vu.get(k, -10 ** 9) < 7200:
+            return None
+        vu[k] = r.get("t", 0)
+        sl = (x["l"] - 0.1 * atr) if d == 1 else (x["h"] + 0.1 * atr)
+        ancien, nouveau = ("résistance", "support") if d == 1 else ("support", "résistance")
+        return (f"🎯 ENTRÉE SUR RETEST : {'LONG' if d == 1 else 'SHORT'} — {ICONE.get(m, '')} {m}\n"
+                f"🧱 L'ancienne {ancien} {px(niveau)} a été cassée à la clôture : elle devient {nouveau}\n"
+                "🛑 Le prix est revenu dessus et le marché bloque (clôture 15 min du bon côté)\n"
+                "✅ 5 min + 15 min + 1h d'accord\n"
+                f"📍 Entrée ≈ {px(x['c'])}\n🛑 SL {'juste sous' if d == 1 else 'juste au-dessus de'} la mèche : {px(sl)}\n"
+                "🛡 BE dès que le gain = le risque\n🤖 Le bot ne la prend pas lui-même\n⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
+    return None
+
 FIBO_UT = (("15 min", "b15", 48), ("1h", "b1h", 48), ("4h", "b4h", 30))
 
 def fibo_zones(m, r, cle):
@@ -9048,6 +9084,9 @@ def agent(m, r, cle, ferme):
     except Exception as ex:
         print("après SL", ex)
     try:
+        er_ = entree_retest(m, r, cle) if not tr else None   # résistance cassée qui devient support (règle d'Adel)
+        if er_:
+            out.append(er_)
         fz_ = fibo_zones(m, r, cle)                   # Fibonacci en temps réel 15 min / 1h / 4h (demande d'Adel)
         if fz_:
             out.append(fz_)
