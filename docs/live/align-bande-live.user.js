@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '7.5';  // v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
+  const VERSION = '7.7';  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
   // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
@@ -22,12 +22,20 @@
     '⚠️ CECI N\'EST PAS UN CONSEIL EN INVESTISSEMENT • fais tes propres recherches (DYOR)',
     '⚠️ NOT FINANCIAL ADVICE • do your own research (DYOR)',
     '📲 Le coach ALIGN en direct • lien en bio 🎁 gratuit',
+    '📲 RESTE CONNECTÉ • CONNECTE-TOI : LIEN EN BIO 🎁',
+    '🎁 TOUTES LES POSITIONS SONT GRATUITES • les annonces arrivent en temps réel sur ton portable • lien en bio',   // v7.6 (demande d'Adel)
+    '📢 ANNONCE À VENIR… 😏 tu veux savoir avant que ça parte ? • lien en bio 🎁',
+    '⚡ DÉPÊCHE-TOI : UNE ENTRÉE SE PRÉPARE • ABONNE-TOI, LIEN EN BIO • LES RETARDATAIRES ONT TOUJOURS TORT 😉',
     '🔔 ACTIVE TES NOTIFICATIONS • lien en bio : on te prévient dès que le marché se prépare 🎁',
     '📩 VA DANS LE LIEN EN BIO • tu reçois l\'alerte en temps réel sur le marché, avec les détails et les news 🎁',   // v7.3 : l'avantage de venir chez nous
     '⚠️ Le trading comporte un risque élevé de perte en capital • Contenu à caractère informatif et éducatif uniquement, qui ne constitue ni un conseil en investissement ni une recommandation personnalisée • Les performances passées ne préjugent pas des performances futures',
     // v6.4 : la même bande en anglais (FR + EN pour toucher tout le monde)
     '👉 FOLLOW • SHARE • TAP THE SCREEN',
     '🔗 LINK IN BIO: LIVE COACH',
+    '📲 STAY CONNECTED • CONNECT: LINK IN BIO 🎁',
+    '🎁 ALL POSITIONS ARE FREE • announcements land in real time on your phone • link in bio',
+    '📢 ANNOUNCEMENT COMING… 😏 want to know before it moves? • link in bio 🎁',
+    '⚡ HURRY: AN ENTRY IS GETTING READY • FOLLOW, LINK IN BIO • LATECOMERS ARE ALWAYS WRONG 😉',
     '📩 GO TO THE LINK IN BIO • get real-time market alerts with the details and the news 🎁',
     '🔔 TURN ON YOUR NOTIFICATIONS • link in bio: we\'ll tell you as soon as the market gets ready 🎁',
     '📲 CONNECTED TO THE MARKET IN REAL TIME FROM YOUR PHONE • every candle explained live • link in bio 🎁',
@@ -44,7 +52,7 @@
     ['Connecté au marché depuis ton portable : le coach lit chaque bougie avec toi', 'Connected to the market from your phone: the coach reads every candle with you'],
     ['CHANGEMENT DE PROGRAMME', 'CHANGE OF PLAN'], ['le marché a changé d\'avis', 'the market changed its mind'], ['on suit le marché, on ne le combat pas', 'we follow the market, we don\'t fight it'], ['lien en bio', 'link in bio'], ['abonne-toi, partage', 'follow, share'],
     ['abonne-toi', 'follow'], ['partage', 'share'], ['la team', 'team'], ['pas de panique', 'don\'t panic'], ['pourquoi ?', 'why?'],
-    ['COMPTE À REBOURS sur', 'COUNTDOWN on'], ['GROSSE DISTRIBUTION', 'BIG SELL-OFF'], ['ÇA VA PÉTER EN L\'AIR', 'IT\'S ABOUT TO BLAST OFF'],
+    ['COMPTE À REBOURS sur', 'COUNTDOWN on'], ['GROSSE DISTRIBUTION', 'BIG SELL-OFF'], ['GROSSE ACCUMULATION', 'BIG ACCUMULATION'],
     ['min max', 'min max'], ['dans', 'in'], ['ÇA ACCÉLÈRE', 'IT\'S SPEEDING UP'], ['jusqu\'où ?', 'how far?'], ['ÇA CASSE', 'BREAKOUT'],
     ['dernier plus bas cassé', 'last low broken'], ['dernier plus haut cassé', 'last high broken'], ['ça peut couler encore…', 'it can drop further…'],
     ['ça peut décoller…', 'it can take off…'], ['LES BALEINES BOUGENT sur', 'WHALES ARE MOVING on'], ['gros volume', 'big volume'],
@@ -53,7 +61,9 @@
     ['les gros piègent les vendeurs… le rechargement', 'big players trap the sellers… the reload'],
     ['ANNONCÉ !', 'CALLED IT!'], [' a coulé ', ' dropped '], [' a décollé ', ' took off '], ['la team ALIGN l\'a vu venir', 'team ALIGN saw it coming'],
     ['REBOND sur une ligne clé', 'BOUNCE on a key level'], ['arrive sur une zone clé', 'reaches a key zone'], ['Zone clé du marché', 'Key market zone'],
-    ['ce qu\'elle annonce', 'what it means'], ['Zone clé : le marché pourrait y souffler… ce qu\'il prépare', 'Key zone: the market may pause here… what\'s next'],
+    ['ce qu\'elle annonce', 'what it means'],
+    ['Au lieu de regarder sans rien faire… le marché n\'a pas encore de point d\'entrée 😅 tapote l\'écran pour le réveiller', 'Instead of just watching… the market has no entry point yet 😅 tap the screen to wake it up'],
+    ['Pas d\'entrée pour l\'instant : la team patiente… toi tu tapotes, nous on surveille', 'No entry for now: the team waits… you tap, we watch'], ['Zone clé : le marché pourrait y souffler… ce qu\'il prépare', 'Key zone: the market may pause here… what\'s next'],
     ['Zone clé : le marché teste la patience de tout le monde…', 'Key zone: the market is testing everyone\'s patience…'],
     ['BOUGIE 15 MIN CLÔTURÉE', '15 MIN CANDLE CLOSED'], ['Clôture 15 min dans', '15 min close in'], ['c\'est elle qui décide', 'it decides everything'],
     ['veut remonter… jusqu\'où ? le coach le sait', 'wants to bounce… how far? the coach knows'], ['reprend des forces', 'is regaining strength'],
@@ -61,7 +71,7 @@
     ['sous pression… va-t-il couler ? réponse en temps réel', 'under pressure… will it drop? live answer'],
     ['Les vendeurs tiennent', 'Sellers are holding'], ['ça peut encore descendre', 'it can still go down'],
     ['glisse… le coach surveille chaque bougie', 'is sliding… the coach watches every candle'],
-    ['se compresse… avant l\'explosion ? 💥 tiens-toi prêt', 'is squeezing… before the explosion? 💥 get ready'],
+    ['se compresse… avant le gros mouvement ? ⚡ tiens-toi prêt', 'is squeezing… before the big move? ⚡ get ready'],
     ['hésite… la prochaine clôture peut tout décider', 'hesitates… the next close can decide everything'],
     ['est posé sur une zone clé en bas', 'sits on a key zone below'], ['rebond ou cassure ?', 'bounce or break?'],
     ['teste le bas de sa zone… les acheteurs vont-ils tenir ?', 'tests the bottom of its zone… will buyers hold?'],
@@ -99,7 +109,7 @@
     ['fait la sieste… va manger un bout, le coach surveille pour toi', 'is napping… go grab a bite, the coach is watching for you'],
     ['Pause déj :', 'Lunch break:'], ['bouge pas d\'un poil… on te ping dès que ça part', 'isn\'t moving an inch… we\'ll ping you when it goes'],
     ['chill grave… prends une pause, le marché te fera signe', 'is chilling hard… take a break, the market will let you know'],
-    ['Café de l\'aprèm ?', 'Afternoon coffee?'], ['est en mode tranquille… le coach reste branché', 'is in chill mode… the coach stays plugged in'],
+    ['Café de l\'aprèm ?', 'Afternoon coffee?'], ['est en mode tranquille… le coach reste connecté', 'is in chill mode… the coach stays connected'],
     ['est calme ce soir… va dîner, le coach garde un œil', 'is calm tonight… go have dinner, the coach keeps an eye on it'],
     ['Soirée chill :', 'Chill evening:'], ['ne fait rien de fou… on te prévient si ça s\'énerve', 'isn\'t doing anything crazy… we\'ll tell you if it heats up'],
     ['Il est tard et', 'It\'s late and'], ['dort à moitié… va te reposer, le coach veille', 'is half asleep… go get some rest, the coach is on watch'],
@@ -189,7 +199,7 @@
   let x = 0, last = performance.now(), raf;
   function anim(now) {
     const r = zoneGraphique();
-    const axe = 70;    // à droite : la bande s'arrête au début des prix
+    const axe = 0;     // v7.6 (demande d'Adel) : la bande couvre aussi l'échelle de prix en haut (plus propre)
     const marge = 40;  // à gauche : un peu plus large (v5.2) tout en restant dans la zone filmée par TikTok
     bande.style.left = (r.left + marge) + 'px';
     bande.style.top = r.top + 'px';
@@ -446,9 +456,9 @@
   const vuTT = {};
   function teaserLigne(t) {
     const c = couleurLigne(t);
-    return c === 'tp' ? '👀 Zone clé : le marché pourrait y souffler… ce qu\'il prépare : 🔌 lien en bio 🎁'
-      : c === 'sl' ? '👀 Zone clé : le marché teste la patience de tout le monde… 🔌 lien en bio 🎁'
-      : '👀 Zone clé du marché • ce qu\'elle annonce : 🔌 lien en bio 🎁';
+    return c === 'tp' ? '👀 Zone clé : le marché pourrait y souffler… ce qu\'il prépare : 📲 lien en bio 🎁'
+      : c === 'sl' ? '👀 Zone clé : le marché teste la patience de tout le monde… 📲 lien en bio 🎁'
+      : '👀 Zone clé du marché • ce qu\'elle annonce : 📲 lien en bio 🎁';
   }
   function couleurLigne(t) { const h = String(t).slice(0, 28); return /\bSL\b|STOP/.test(h) ? 'sl' : /TP/.test(h) ? 'tp' : /ENTR/.test(h) ? 'alerte' : 'membre'; }   // la couleur suit le DÉBUT du texte (le nom de la ligne)
   function texteLigne(t) { return String(t || '').replace(/[━─]+/g, ' ').replace(/\s*\n+\s*/g, ' • ').replace(/(\s•\s)+/g, ' • ').replace(/^\s*•\s*|\s*•\s*$/g, '').trim(); }
@@ -523,7 +533,7 @@
   // v7.0 (demande d'Adel) : quand le marché se réveille, on remercie les tapotements avec un petit mot qui fait sourire (jamais 2 fois le même d'affilée) ;
   // quand le prix arrive sur une zone clé : « rentrer ou couper ? » + abonne-toi, lien en bio (jamais de prix ni TP/SL sur la bande).
   const PUNCH = [
-    [/💥/, ['💥 Ça a tout éclaté !', '💥 It just blew up!'], ['🚀 Le TP a sauté, gavage !', '🚀 TP smashed, feast time!'], ['🔥 On a encaissé, c\'est le feu', '🔥 Cashed in, it\'s fire']],
+    [/💥/, ['🎯 Objectif atteint d\'un coup !', '🎯 Target hit in one go!'], ['🚀 Objectif pris, la team encaisse !', '🚀 Target taken, the team cashes in!'], ['🔥 On a encaissé, c\'est le feu', '🔥 Cashed in, it\'s fire']],
     // v7.4 : position en cours dans le bon sens → on fait sourire (sans prix)
     [/😊/, ['😊 Vous êtes contents ? Je vous demande rien…', '😊 Happy? I ask for nothing…'], ['🙏 Juste tapoter l\'écran et partager', '🙏 Just tap the screen and share'], ['😄 Ça roule pour la team ALIGN', '😄 Smooth ride for team ALIGN']],
     [/😏/, ['😏 Je plains ceux en contre-tendance…', '😏 Feeling sorry for the counter-trend crowd…'], ['💪 On continue dans le sens du marché', '💪 We keep riding the trend'], ['🤭 Pendant ce temps, à contre-sens…', '🤭 Meanwhile, the wrong-way crowd…']],
@@ -537,7 +547,7 @@
     [/⏰/, ['⏰ Vos tapotements ont réveillé le marché 😄', 'Your taps woke up the market'], ['👆 Continuez de tapoter, ça le réveille 😜', 'Keep tapping, it wakes it up'],
       ['😳 Le marché s\'est réveillé !', 'The market just woke up!'], ['⚡ La team ALIGN a remis le courant 😎', 'Team ALIGN turned the power back on'],
       ['🥁 Ça bouge enfin ! Merci les tapoteurs 😁', 'Finally moving! Thanks, tappers'], ['☕ Le marché a bu son café 😅', 'The market had its coffee'],
-      ['🔔 Debout là-dedans ! 🤣', 'Wakey wakey! 🤣'], ['💥 Vous l\'avez secoué 😏', 'You shook it up 😏']],
+      ['🔔 Debout là-dedans ! 🤣', 'Wakey wakey! 🤣'], ['😏 Vous l\'avez secoué !', 'You shook it up 😏']],
     [/🤔/, ['🤔 Rentrer ou couper ? 😏', 'In or out? • abonne-toi / follow : lien en bio 🎁'], ['👀 Tu dois couper ta position ? 😬', 'Cut or hold? • abonne-toi / follow : lien en bio 🎁'],
       ['🎯 Rentrer maintenant ou attendre ? 🤫', 'Enter now or wait? • abonne-toi / follow : lien en bio 🎁'], ['😅 Garder ou couper ? Le coach sait 😉', 'Hold or cut? The coach knows • lien en bio 🎁']],
     [/🪤|🎣|🪶/, ['🪤 Piège en cours', 'Trap in progress'], ['🎣 Qui va mordre ?', 'Who takes the bait?']],
@@ -548,11 +558,14 @@
     [/🔄/, ['🔄 Changement de programme !', '🔄 Change of plan!'], ['🧭 On suit le marché', '🧭 We follow the market']],
     [/🏦/, ['🏦 Les gros sont là', '🏦 Big players here'], ['👀 Zone des gros', '👀 Smart-money zone']],
     [/🧲/, ['🧲 Le marché comble le trou', '🧲 Filling the gap'], ['👀 Zone aimant', '👀 Magnet zone']],
+    // v7.6 (demande d'Adel) : on nargue avec humour quand une annonce se prépare (pro, sûr de lui)
+    [/📢/, ['📢 Annonce à venir… 😏', '📢 Announcement coming… 😏'], ['🤫 Le coach sait déjà où ça va', '🤫 The coach already knows'], ['😎 Toi tu regardes, eux ils sont prévenus', '😎 You watch, they get the alert'], ['🧐 Décision prise. Lien en bio', '🧐 Decision made. Link in bio'], ['🏃 Les retardataires ont toujours tort 😉', '🏃 Latecomers are always wrong 😉'], ['⚡ Dépêche-toi, une entrée arrive', '⚡ Hurry, an entry is coming']],
     [/↩️/, ['↩️ Rebond sur zone clé', 'Bounce on key zone'], ['👀 Réaction du marché', 'Market reaction']],
+    [/👆/, ['👆 Tapote, le marché dort encore 😴', '👆 Tap, the market is still asleep 😴'], ['😅 Pas d\'entrée ? Tapote en attendant', '😅 No entry yet? Tap meanwhile'], ['🫵 Toi là, tapote un peu 😄', '🫵 Hey you, give it a tap 😄']],
     [/./, ['❤️ Tapote l\'écran', 'Tap the screen'], ['🔔 Abonne-toi', 'Follow'], ['💪 La team ALIGN', 'Team ALIGN'], ['🎯 Reste concentré', 'Stay focused']]
   ];
   const cssPunch = document.createElement('style');
-  cssPunch.textContent = `.align-punch{position:fixed;z-index:9997;pointer-events:none;padding:10px 22px;border-radius:999px;text-align:center;white-space:nowrap;
+  cssPunch.textContent = `.align-punch{position:fixed;z-index:9997;pointer-events:none;padding:10px 22px;border-radius:999px;text-align:center;white-space:normal;max-width:min(430px,62vw);box-sizing:border-box;
     background:linear-gradient(90deg,#ff2d95,#8a2be2,#1e90ff);color:#fff;font:900 30px/1.15 system-ui,Segoe UI,Arial,sans-serif;
     box-shadow:0 6px 18px rgba(0,0,0,.45);text-shadow:0 2px 3px rgba(0,0,0,.4);animation:punchMonte 7.9s ease-out forwards}
   .align-punch.en{background:linear-gradient(90deg,#0d47a1,#1e88e5,#00bcd4)}
@@ -561,7 +574,20 @@
   @keyframes emoDanse{0%{transform:rotate(-14deg) scale(1)}100%{transform:rotate(14deg) scale(1.3)}}
   .align-punch small{display:block;font:700 17px/1.2 system-ui,Segoe UI,Arial,sans-serif;opacity:.9}
   @keyframes punchMonte{0%{opacity:0;transform:translateY(20px) scale(.7)}15%{opacity:1;transform:translateY(0) scale(1.05)}
-    25%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-120px)}}`;
+    25%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-12px)}}
+  /* v7.6 (demande d'Adel) : on a l'impression de PARLER avec le marché : bulle de BD qui pointe vers le prix, le texte s'écrit */
+  .align-punch{border-radius:22px;animation:punchMonte 7.9s ease-out forwards,bulleRespire 1.6s ease-in-out .9s infinite alternate}
+  .align-punch .qui{display:block;font:900 15px/1.2 system-ui,Segoe UI,Arial,sans-serif;letter-spacing:1px;opacity:.95;margin-bottom:2px}
+  .align-punch .txt{display:inline-block;animation:sEcrit 1.1s steps(26,end) both}
+  @keyframes sEcrit{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+  @keyframes bulleRespire{from{filter:brightness(1)}to{filter:brightness(1.18)}}
+  .align-punch::after{content:'';position:absolute;right:var(--q,60px);border:14px solid transparent}
+  .align-punch.dessus::after{top:100%;border-top-color:#1e90ff}
+  .align-punch.dessous::after{bottom:100%;border-bottom-color:#1e90ff}
+  .align-punch.en.dessus::after{border-top-color:#00bcd4} .align-punch.en.dessous::after{border-bottom-color:#00bcd4}
+  .align-ping{position:fixed;z-index:9996;pointer-events:none;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;
+    border:4px solid #ffd400;box-shadow:0 0 18px #ffd400;animation:pingPrix 1.1s ease-out 3 forwards}
+  @keyframes pingPrix{0%{transform:scale(.4);opacity:1}100%{transform:scale(2.6);opacity:0}}`;
   document.head.appendChild(cssPunch);
   let punchN = 0, punchTok = 0;   // v7.5 : l'anglais d'une ancienne pastille n'efface plus la nouvelle
   // v7.5 (demande d'Adel) : sens de la pastille = celui de l'info (📉 baisse → en HAUT, 📈 hausse → en BAS), sinon la pente récente
@@ -569,12 +595,33 @@
     if (/📉|🔴|🌊|😢|🚨/.test(cle)) return -1; if (/📈|🟢|🚀|💥|😊/.test(cle)) return 1;
     try { const B = barres(10); return B[B.length - 1][4] >= B[0][4] ? 1 : -1; } catch (e) { return 1; }
   }
+  // v7.6 (demande d'Adel) : la pastille se met DANS la zone du prix (pas sur le côté, coupé sur téléphone) :
+  // ça baisse → juste AU-DESSUS du prix (les bougies descendent), ça monte → juste EN DESSOUS ; jamais sur le chrono ni sur une autre info
+  function pointPrix() {
+    try { const r = zoneGraphique(), ser = chart()._chartWidget.model().mainSeries(), ps = ser.priceScale(), fv = ser.firstValue(), b = ser.bars();
+      const last = b.valueAt(b.lastIndex()); let x = null;
+      try { x = r.left + chart()._chartWidget.model().timeScale().indexToCoordinate(b.lastIndex()); } catch (er) {}
+      return { x: isFinite(x) ? x : r.left + r.width - 220, y: r.top + ps.priceToCoordinate(last[4], fv) }; } catch (e) { return null; }
+  }
+  function chevauche(a, b) { return a.left < b.right + 8 && a.right > b.left - 8 && a.top < b.bottom + 8 && a.bottom > b.top - 8; }
   function placerPastille(e, sens) {
-    const r = zoneGraphique(), H = r.height || 600, w = e.offsetWidth, h = e.offsetHeight;
-    e.style.left = Math.max(r.left + 10, r.left + r.width - 70 - w - 14) + 'px';   // v7.5 : alignée côté prix (comme le chrono), jamais sur l'échelle de prix
-    let top = sens < 0 ? r.top + 100 : r.top + H - 205 - h;                       // ça baisse → en haut sous la bande ; ça monte → en bas au-dessus du tableau
-    try { if (chrono.style.display === 'flex') { const c = chrono.getBoundingClientRect(); if (top < c.bottom + 8 && top + h > c.top - 8) top = sens < 0 ? c.bottom + 10 : c.top - h - 10; } } catch (er) {}   // jamais sur le chrono
-    e.style.top = Math.max(r.top + 92, Math.min(top, r.top + H - 120 - h)) + 'px';
+    const r = zoneGraphique(), H = r.height || 600, w = e.offsetWidth, h = e.offsetHeight, haut = r.top + 96, bas = r.top + H - 205 - h;
+    const P = pointPrix();
+    let left = Math.max(r.left + 10, r.left + r.width - 70 - w - 14);
+    if (P && P.x > r.left + 60 && P.x < r.left + r.width - 70) left = Math.max(r.left + 10, Math.min(P.x - w + 70, r.left + r.width - 70 - w - 14));   // la pointe vise la dernière bougie
+    let top = P ? (sens < 0 ? P.y - 46 - h : P.y + 46) : (sens < 0 ? haut : bas);
+    if (top < haut) top = P ? P.y + 46 : haut; if (top > bas) top = P ? P.y - 46 - h : bas;   // pas de place d'un côté → de l'autre côté du prix
+    top = Math.max(haut, Math.min(top, bas));
+    const obst = [chrono, document.getElementById('align-show')].filter(o => o && getComputedStyle(o).display !== 'none').map(o => o.getBoundingClientRect());
+    for (let k = 0; k < 4; k++) { const box = { left, right: left + w, top, bottom: top + h }, o = obst.find(c => chevauche(box, c)); if (!o) break;
+      top = sens < 0 ? o.top - h - 10 : o.bottom + 10; if (top < haut || top > bas) { left = Math.max(r.left + 10, o.left - w - 12); top = Math.max(haut, Math.min(top, bas)); } }
+    e.style.left = left + 'px'; e.style.top = top + 'px';
+    const dessus = P ? top + h / 2 < P.y : sens < 0; e.classList.toggle('dessus', dessus); e.classList.toggle('dessous', !dessus);
+    if (P) e.style.setProperty('--q', Math.max(18, Math.min(w - 46, left + w - P.x - 14)) + 'px');
+  }
+  function ping() {   // v7.6 : un cercle jaune « bat » sur le prix quand le marché parle
+    const P = pointPrix(); if (!P) return; document.querySelectorAll('.align-ping').forEach(x => x.remove());
+    const d = document.createElement('div'); d.className = 'align-ping'; d.style.left = P.x + 'px'; d.style.top = P.y + 'px'; document.body.appendChild(d); setTimeout(() => d.remove(), 3500);
   }
   function coeurs(n, liste, sensForce) {
     try {
@@ -582,12 +629,12 @@
       const [fr, en] = g[1 + (punchN++ % (g.length - 1))], tok = ++punchTok;
       const r = zoneGraphique(), e = document.createElement('div'); e.className = 'align-punch';
       const mots = fr.split(' '), emo = mots.shift();   // v7.1 : le smiley bouge dans la pastille
-      e.innerHTML = '<span class="emo">' + esc(emo) + '</span> ' + esc(mots.join(' '));   // v7.4 : la pastille passe en FR, PUIS en EN (jamais mélangées)
+      e.innerHTML = '<span class="qui">🗣️ LE MARCHÉ TE PARLE</span><span class="emo">' + esc(emo) + '</span> <span class="txt">' + esc(mots.join(' ')) + '</span>';   // v7.6 : c'est le marché qui parle ; v7.4 : la pastille passe en FR, PUIS en EN (jamais mélangées)
       document.querySelectorAll('.align-punch').forEach(x => x.remove());
       document.body.appendChild(e);
-      const sensP = sensForce || sensPastille(cle); placerPastille(e, sensP); setTimeout(() => e.remove(), 8000);   // v7.4 : la pastille reste plus longtemps (lisible sur le live)
+      const sensP = sensForce || sensPastille(cle); placerPastille(e, sensP); ping(); setTimeout(() => e.remove(), 8000);   // v7.4 : la pastille reste plus longtemps (lisible sur le live)
       setTimeout(() => { try { if (tok !== punchTok) return; const e2 = e.cloneNode(false); e2.className = 'align-punch en'; const m2 = en.split(' '); const em2 = /^\p{Extended_Pictographic}/u.test(m2[0]) ? m2.shift() : emo;
-        e2.innerHTML = '<span class="emo">' + esc(em2) + '</span> ' + esc(m2.join(' ')); document.querySelectorAll('.align-punch').forEach(x => x.remove()); document.body.appendChild(e2); placerPastille(e2, sensP); setTimeout(() => e2.remove(), 8000); } catch (er) {} }, 8100);
+        e2.innerHTML = '<span class="qui">🗣️ THE MARKET IS TALKING</span><span class="emo">' + esc(em2) + '</span> <span class="txt">' + esc(m2.join(' ')) + '</span>'; document.querySelectorAll('.align-punch').forEach(x => x.remove()); document.body.appendChild(e2); placerPastille(e2, sensP); setTimeout(() => e2.remove(), 8000); } catch (er) {} }, 8100);
     } catch (e) {}
   }
   function choisirPlateforme(v) { PLATEFORME = v; try { localStorage.setItem('alignPlateforme', v); } catch (e) {} remplir(); }
@@ -611,7 +658,7 @@
   // une info du spectacle sur la bande : jamais par-dessus une vraie info du bot, et pas plus d'une par minute
   let dernierShow = 0;
   function bandeShow(txt) {
-    if (occupe || file.length || Date.now() - dernierShow < 60000) return false;
+    if (occupe || file.length || Date.now() - dernierShow < 52000) return false;
     dernierShow = Date.now(); montrer(txt, false, 1); return true;
   }
   // v5.9 : chaque événement vu à l'écran part aussi au bot → message détaillé dans la chaîne Telegram du marché
@@ -661,6 +708,17 @@
     } catch (e) {}
     return res;
   }
+  function infosAlign() {   // v7.6 : les marqueurs ⓘ de l'indicateur (le plus récent de chaque sorte)
+    const res = {};
+    try { const mod = chart()._chartWidget.model().model();
+      for (const ds of mod.dataSources()) { if (!/ALIGN/.test(String(ds.title && ds.title()))) continue; const vu = new Set();
+        (function walk(o, d, dansData) { if (!o || d > 8 || typeof o !== 'object' || vu.has(o)) return; vu.add(o);
+          if (o instanceof Map) { o.forEach(v => walk(v, d + 1, dansData)); return; }
+          if (dansData && typeof o.t === 'string' && typeof o.y === 'number') { const e = (o.t.match(/^(✂️|↩️|✅)\s*ⓘ/) || [])[1]; if (e && (!res[e] || o.id > res[e].id)) res[e] = { e, id: o.id, y: o.y }; return; }
+          for (const k of Object.keys(o)) walk(o[k], d + 1, dansData || k === '_primitivesDataById');
+        })(ds.graphics()._primitivesCollection.dwglabels, 0, false); } } catch (e) {}
+    return Object.values(res);
+  }
   function texteZone(t, m) {
     return /FVG/i.test(t) ? '🧲 ' + m + ' • ZONE FVG : un trou laissé par le marché… il adore revenir le combler 👀 rebond ou cassure ? 📲 en temps réel sur ton portable : lien en bio 🎁'
       : /ORDER|OB\b/i.test(t) ? '🏦 ' + m + ' • ORDER BLOCK : la zone où les gros ont passé leurs ordres… ils la défendent souvent 👀 📲 en temps réel sur ton portable : lien en bio 🎁'
@@ -678,19 +736,24 @@
     const q = prixA(yPage); if (!q || !isFinite(q.p)) return false;
     const m = nomMarche(), LG = lignesAlign(); let cle = null, txt = null, coul = 'alerte', emo = '👀';
     for (const n of ['ENTRÉE', 'SL', 'TP1', 'TP2']) { const l = LG[n]; if (l && Math.abs(l.y - q.p) <= q.tol) { cle = 'l' + n + Math.round(l.y); txt = teaserLigne(n); coul = couleurLigne(n); emo = n.startsWith('TP') ? '🎯' : n === 'SL' ? '🧱' : '🔮'; break; } }
+    // v7.6 (demande d'Adel) : les petits ⓘ du graphique (✂️ trait de décision, ↩️ retournement, ✅ confirmation) sont expliqués aussi
+    if (!cle) for (const o of infosAlign()) { if (Math.abs(o.y - q.p) <= q.tol * 1.5) { cle = 'i' + o.e + Math.round(o.y); emo = o.e === '↩️' ? '🔄' : o.e === '✂️' ? '🧱' : '🔮';
+      txt = o.e === '✂️' ? '✂️ ' + m + ' • TRAIT BLANC = LIGNE DE DÉCISION : c\'est la clôture 15 min de l\'autre côté qui décide du sens 👀 • une mèche ne compte pas • 📲 lien en bio 🎁'
+        : o.e === '↩️' ? '↩️ ' + m + ' • LIGNE DE RETOURNEMENT : si une bougie 15 min clôture de l\'autre côté, le plan s\'inverse 🔄 • le coach te prévient • 📲 lien en bio 🎁'
+        : '✅ ' + m + ' • CONFIRMATION : les petites unités doivent aller dans le même sens avant d\'entrer 👀 • 📲 lien en bio 🎁'; break; } }
     if (!cle) for (const z of zonesAlign()) { if (q.p <= z.hi + q.tol / 2 && q.p >= z.lo - q.tol / 2) { cle = 'z' + z.id; txt = texteZone(z.t, m); emo = /FVG/i.test(z.t) ? '🧲' : /ORDER/i.test(z.t) ? '🏦' : '👀'; break; } }
     if (!cle) return false;
     const now = Date.now(); window.__alignExpl = now; if (now - (vuClic[cle] || 0) < (clic ? 4000 : 45000)) return true; vuClic[cle] = now;
     montrer(txt, false, 1, coul, true); coeurs(1, [emo]); lueur(0);   // pastille : en haut si le marché baisse, en bas s'il monte
     return true;
   }
-  let posDown = null, survolT = null;
+  let posDown = null, survolT = null, vivant = true;   // v7.7 : une ancienne bande arrêtée ne réagit plus aux clics (plus de pastilles en double)
   document.addEventListener('pointerdown', e => { posDown = { x: e.clientX, y: e.clientY, t: Date.now() }; }, { passive: true, capture: true });
-  document.addEventListener('pointerup', e => { try {
+  document.addEventListener('pointerup', e => { try { if (!vivant) return;
     if (!posDown || Math.hypot(e.clientX - posDown.x, e.clientY - posDown.y) > 8 || Date.now() - posDown.t > 700) return;   // un glisser n'est pas un clic
     if (e.target && e.target.closest && e.target.closest('.chart-markup-table')) expliquerSous(e.clientX, e.clientY, true);
   } catch (er) {} }, { passive: true, capture: true });
-  document.addEventListener('pointermove', e => { if (e.pointerType !== 'mouse') return; clearTimeout(survolT); const x0 = e.clientX, y0 = e.clientY;
+  document.addEventListener('pointermove', e => { if (!vivant || e.pointerType !== 'mouse') return; clearTimeout(survolT); const x0 = e.clientX, y0 = e.clientY;
     survolT = setTimeout(() => { try { expliquerSous(x0, y0, false); } catch (er) {} }, 600); }, { passive: true, capture: true });   // souris posée 0,6 s sur ENTRÉE / SL / TP ou une zone
   const deja = {};
   function uneFois(cle) { if (deja[cle]) return false; deja[cle] = 1; return true; }
@@ -716,19 +779,22 @@
               '🧠 Tu vois les bougies, le coach te dit ce qu\'elles préparent • lien en bio 🎁',
               '⚡ Ressens le marché en direct : pression, pièges, accélérations… tout est dans le lien en bio 🎁'],
     // v6.5 : marché tout calme → on parle comme un pote, selon l'heure
-    calme_matin: ['☕ {m} est tout calme… va te faire un café tranquille, on te prévient quand ça bouge 🔌 lien en bio 🎁',
+    calme_matin: ['☕ {m} est tout calme… va te faire un café tranquille, on te prévient quand ça bouge 📲 lien en bio 🎁',
                   '🥐 Petit-déj time : {m} se réveille doucement… le coach veille pour toi • lien en bio 🎁'],
     calme_midi: ['🍔 {m} fait la sieste… va manger un bout, le coach surveille pour toi 👀 lien en bio 🎁',
                  '🥗 Pause déj : {m} bouge pas d\'un poil… on te ping dès que ça part • lien en bio 🎁'],
     calme_aprem: ['🧃 {m} chill grave… prends une pause, le marché te fera signe 😎 lien en bio 🎁',
-                  '☕ Café de l\'aprèm ? {m} est en mode tranquille… le coach reste branché • lien en bio 🎁'],
+                  '☕ Café de l\'aprèm ? {m} est en mode tranquille… le coach reste connecté • lien en bio 🎁'],
     calme_soir: ['🍕 {m} est calme ce soir… va dîner, le coach garde un œil 👀 lien en bio 🎁',
                  '🎮 Soirée chill : {m} ne fait rien de fou… on te prévient si ça s\'énerve • lien en bio 🎁'],
     calme_nuit: ['😴 Il est tard et {m} dort à moitié… va te reposer, le coach veille 🌙 lien en bio 🎁',
                  '🌙 {m} roupille… recharge les batteries, le marché sera encore là demain 💤 lien en bio 🎁'],
-    ennui: ['🥱 Pfff… on s\'ennuie, {m} est trop calme 😴 pense à tapoter l\'écran ❤️ et à t\'abonner • lien en bio 🎁',
+    // v7.7 (demande d'Adel) : marché calme = on taquine poliment, style jeune
+    ennui: ['👀 Au lieu de regarder sans rien faire… le marché n\'a pas encore de point d\'entrée 😅 tapote l\'écran pour le réveiller 👆 • lien en bio 🎁',
+            '😎 Pas d\'entrée pour l\'instant : la team patiente… toi tu tapotes, nous on surveille 😉 • lien en bio 🎁',
+            '🥱 Pfff… on s\'ennuie, {m} est trop calme 😴 pense à tapoter l\'écran ❤️ et à t\'abonner • lien en bio 🎁',
             '😴 Marché ennuyant sur {m}… allez, tapote l\'écran pour le réveiller 👆❤️ et abonne-toi • lien en bio 🎁'],
-    range: ['😴 {m} se compresse… avant l\'explosion ? 💥 tiens-toi prêt • lien en bio 🎁',
+    range: ['😴 {m} se compresse… avant le gros mouvement ? ⚡ tiens-toi prêt • lien en bio 🎁',
             '🧲 {m} hésite… la prochaine clôture peut tout décider ⏱ lien en bio 🎁']
   };
   let tendN = 0, derniereTend = Date.now(), arme = null;   // arme = mouvement annoncé à l'avance (chrono jusqu'à la clôture)
@@ -755,10 +821,10 @@
         const traverse = B.length > 1 && (B[B.length - 2][4] - l.y) * (cur[4] - l.y) < 0;   // v7.4 : la ligne est traversée d'un coup
         if ((Math.abs(cur[4] - l.y) < 0.3 * moyR || traverse) && uneFois('ligne' + m + n + Math.round(l.y) + q15)) {
           const tete = '👀 ' + m + ' arrive sur une zone clé';
-          montrer(tete + ' • le marché prépare quelque chose 👀 pourquoi ? 🔌 lien en bio 🎁', false, 2, couleurLigne(n));
+          montrer(tete + ' • le marché prépare quelque chose 👀 pourquoi ? 📲 lien en bio 🎁', false, 2, couleurLigne(n));
           versBot('ligne', cur[4] > l.y ? 1 : -1, '', n);
           setTimeout(() => coeurs(1, ['🤔']), 3600);   // v7.0 : « rentrer ou couper ? » + lien en bio
-          if (n.startsWith('TP')) { explosionArgent(cur[4] > l.y ? -1 : 1); feuArtifice(traverse ? '💥 ÇA A TOUT ÉCLATÉ !' : '🍾 ÇA ENCAISSE !'); pluieBillets(35); setTimeout(() => coeurs(1, ['💥']), 2500); }   // v7.4 : ligne bleue touchée = champagne + billets + explosion   // v7.4 : TP traversé d'un coup = explosion   // objectif atteint : l'argent suit le sens du marché
+          if (n.startsWith('TP')) { explosionArgent(cur[4] > l.y ? -1 : 1); feuArtifice(traverse ? '🎯 OBJECTIF ATTEINT D\'UN COUP !' : '🍾 ÇA ENCAISSE !'); pluieBillets(35); setTimeout(() => coeurs(1, ['💥']), 2500); }   // v7.4 : ligne bleue touchée = champagne + billets + explosion   // v7.4 : TP traversé d'un coup = explosion   // objectif atteint : l'argent suit le sens du marché
           return;
         }
       }
@@ -789,9 +855,9 @@
       if (daccord && (comp || colle) && uneFois('pr' + m + quart)) {
         arme = { d: dirT, quart, m, p: cur[4], r: moyR };
         lueur(dirT); coeurs(8, dirT === -1 ? ['📉', '🌊', '⚡'] : ['📈', '🚀', '⚡']);
-        pop('⏳', 'COMPTE À REBOURS sur ' + m + ' : ' + (dirT === -1 ? '🔴 GROSSE DISTRIBUTION' : '🟢 ÇA VA PÉTER EN L\'AIR'), dirT,
-            'dans ' + minRest + ' min max 💥 la team : abonne-toi, partage • lien en bio 🎁');
-        versBot('pression', dirT, minRest);
+        pop('⏳', 'COMPTE À REBOURS sur ' + m + ' : ' + (dirT === -1 ? '🔴 GROSSE DISTRIBUTION' : '🟢 GROSSE ACCUMULATION'), dirT,
+            'dans ' + minRest + ' min max ⏳ la team : abonne-toi, partage • lien en bio 🎁');
+        versBot('pression', dirT, minRest); setTimeout(() => coeurs(1, ['📢'], dirT), 9000);   // v7.6 : « annonce à venir » en pastille, après la punchline
         return;
       }
       // 5b) v6.9 FEINTE : 3 bougies qui repartent contre la tendance → « beaucoup vont y laisser des plumes »
@@ -818,7 +884,7 @@
       }
       // 4) toutes les ~7 min : la bande dit où le marché a l'air d'aller (sans prix) et renvoie vers le lien en bio
       // v6.1 : marché calme = on parle plus souvent (toutes les ~3 min) : direction, où est le prix, « branche-toi au marché »
-      if (Date.now() - derniereTend > 3 * 60000) {
+      if (Date.now() - derniereTend > 2.4 * 60000) {   // v7.6 : spectacle +10 %
         const c10 = B.slice(-10).map(x => x[4]), pente = (c10[9] - c10[0]) / moyR, larg = (Math.max(...B.slice(-10).map(x => x[2])) - Math.min(...B.slice(-10).map(x => x[3]))) / moyR;
         const pos = (cur[4] - ll) / Math.max(hh - ll, 1e-9), tour = tendN % 3;
         // marché très calme (bougies récentes bien plus petites que d'habitude) → message « va te faire un café » selon l'heure
@@ -850,7 +916,7 @@
       // v6.6 : le texte clignote jusqu'à l'explosion et alterne français / anglais toutes les 3 s
       const fr = Math.floor(reste / 3) % 2 === 0;
       const lbl = enAttente
-        ? (arme.d === -1 ? (fr ? '🔴 GROSSE DISTRIBUTION<br>' : '🔴 BIG SELL-OFF<br>') : (fr ? '🟢 ÇA VA PÉTER EN L\'AIR<br>' : '🟢 ABOUT TO BLAST OFF<br>'))
+        ? (arme.d === -1 ? (fr ? '🔴 GROSSE DISTRIBUTION<br>' : '🔴 BIG SELL-OFF<br>') : (fr ? '🟢 GROSSE ACCUMULATION<br>' : '🟢 BIG ACCUMULATION<br>'))
           + (reste <= 20 ? (fr ? 'C\'EST MAINTENANT !' : 'IT\'S NOW!') : (fr ? 'abonne-toi • partage 🎁' : 'follow • share 🎁'))
         : (fr ? '⏱ CLÔTURE 15 MIN<br>ça va se décider 👀' : '⏱ 15 MIN CLOSE<br>it\'s about to decide 👀');
       chrono.innerHTML = Math.floor(reste / 60) + ':' + String(reste % 60).padStart(2, '0') + '<small>' + lbl + '</small>';
@@ -880,7 +946,7 @@
         for (const n of ['TP2', 'TP1', 'SL', 'ENTRÉE']) {
           const l = LG[n]; if (!l || !(b[3] <= l.y && l.y <= b[2]) || Math.abs(b[4] - l.y) < 0.25 * rg) continue;
           const dr = b[4] > l.y ? 1 : -1;            // touchée puis clôture loin de la ligne = rebond / rejet
-          pop('↩️', 'REBOND sur une ligne clé ' + nomMarche(), dr, 'le marché prépare quelque chose 👀 pas de panique • pourquoi ? 🔌 lien en bio 🎁');
+          pop('↩️', 'REBOND sur une ligne clé ' + nomMarche(), dr, 'le marché prépare quelque chose 👀 pas de panique • pourquoi ? 📲 lien en bio 🎁');
           versBot('rebond', dr, '', n); coeurs(8, ['👀', '↩️', '⚡']);
           return;
         }
@@ -889,7 +955,7 @@
     }
   } catch (e) {} }, 1000);
   // de temps en temps des cœurs qui montent : « tapote l'écran »
-  const coeurT = setInterval(() => { if (!retour) coeurs(10); }, 100000);
+  const coeurT = setInterval(() => { if (!retour) coeurs(10); }, 80000);   // v7.7 : +12 %
 
   // v7.4 (demande d'Adel) : position en cours dans le bon sens → petits mots qui font sourire, toutes les 4 min (sans prix)
   const posT = setInterval(() => { try {
@@ -897,10 +963,10 @@
     const B = barres(3); if (!B.length) return; const p = B[B.length - 1][4], sens = S.y > E.y ? -1 : 1;
     if (sens * (p - E.y) <= 0) return;
     coeurs(1, ['😊']); setTimeout(() => coeurs(1, ['😏']), 16600);
-  } catch (e) {} }, 240000);
+  } catch (e) {} }, 190000);   // v7.7 : +12 %
   window.__ALIGN_BANDE__ = {
     version: VERSION, recu, punch: c => coeurs(1, [c]), plateforme: v => choisirPlateforme(v),
-    stop() { cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
-      [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur,.align-billet,.align-argent,.align-punch').forEach(x => x.remove()); try { cssBillet.remove(); } catch (e) {} obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
+    stop() { vivant = false; clearTimeout(survolT); cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
+      [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur,.align-billet,.align-argent,.align-punch,.align-ping').forEach(x => x.remove()); try { cssBillet.remove(); } catch (e) {} obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
   };
 })();
