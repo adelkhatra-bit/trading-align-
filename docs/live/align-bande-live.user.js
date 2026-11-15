@@ -563,7 +563,7 @@
   @keyframes punchMonte{0%{opacity:0;transform:translateY(20px) scale(.7)}15%{opacity:1;transform:translateY(0) scale(1.05)}
     25%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-120px)}}`;
   document.head.appendChild(cssPunch);
-  let punchN = 0;
+  let punchN = 0, punchTok = 0;   // v7.5 : l'anglais d'une ancienne pastille n'efface plus la nouvelle
   // v7.5 (demande d'Adel) : sens de la pastille = celui de l'info (📉 baisse → en HAUT, 📈 hausse → en BAS), sinon la pente récente
   function sensPastille(cle) {
     if (/📉|🔴|🌊|😢|🚨/.test(cle)) return -1; if (/📈|🟢|🚀|💥|😊/.test(cle)) return 1;
@@ -579,14 +579,14 @@
   function coeurs(n, liste, sensForce) {
     try {
       const cle = (liste || []).join(''), g = PUNCH.find(x => x[0].test(cle)) || PUNCH[PUNCH.length - 1];
-      const [fr, en] = g[1 + (punchN++ % (g.length - 1))];
+      const [fr, en] = g[1 + (punchN++ % (g.length - 1))], tok = ++punchTok;
       const r = zoneGraphique(), e = document.createElement('div'); e.className = 'align-punch';
       const mots = fr.split(' '), emo = mots.shift();   // v7.1 : le smiley bouge dans la pastille
       e.innerHTML = '<span class="emo">' + esc(emo) + '</span> ' + esc(mots.join(' '));   // v7.4 : la pastille passe en FR, PUIS en EN (jamais mélangées)
       document.querySelectorAll('.align-punch').forEach(x => x.remove());
       document.body.appendChild(e);
       const sensP = sensForce || sensPastille(cle); placerPastille(e, sensP); setTimeout(() => e.remove(), 8000);   // v7.4 : la pastille reste plus longtemps (lisible sur le live)
-      setTimeout(() => { try { const e2 = e.cloneNode(false); e2.className = 'align-punch en'; const m2 = en.split(' '); const em2 = /^\p{Extended_Pictographic}/u.test(m2[0]) ? m2.shift() : emo;
+      setTimeout(() => { try { if (tok !== punchTok) return; const e2 = e.cloneNode(false); e2.className = 'align-punch en'; const m2 = en.split(' '); const em2 = /^\p{Extended_Pictographic}/u.test(m2[0]) ? m2.shift() : emo;
         e2.innerHTML = '<span class="emo">' + esc(em2) + '</span> ' + esc(m2.join(' ')); document.querySelectorAll('.align-punch').forEach(x => x.remove()); document.body.appendChild(e2); placerPastille(e2, sensP); setTimeout(() => e2.remove(), 8000); } catch (er) {} }, 8100);
     } catch (e) {}
   }
