@@ -544,7 +544,7 @@
   const cssPunch = document.createElement('style');
   cssPunch.textContent = `.align-punch{position:fixed;z-index:9997;pointer-events:none;padding:8px 18px;border-radius:999px;text-align:center;
     background:linear-gradient(90deg,#ff2d95,#8a2be2,#1e90ff);color:#fff;font:900 24px/1.15 system-ui,Segoe UI,Arial,sans-serif;
-    box-shadow:0 6px 18px rgba(0,0,0,.45);text-shadow:0 2px 3px rgba(0,0,0,.4);animation:punchMonte 5.4s ease-out forwards}
+    box-shadow:0 6px 18px rgba(0,0,0,.45);text-shadow:0 2px 3px rgba(0,0,0,.4);animation:punchMonte 7.9s ease-out forwards}
   .align-punch.en{background:linear-gradient(90deg,#0d47a1,#1e88e5,#00bcd4)}
   #align-bande .flash.en{filter:hue-rotate(35deg) saturate(1.15)}
   .align-punch .emo{display:inline-block;animation:emoDanse .45s ease-in-out infinite alternate}
@@ -566,9 +566,12 @@
       // v7.1 : jamais sur l'échelle de prix (≈ 80 px à droite) ni sur le prix en cours : en bas si le prix est en haut, en haut sinon
       let hautPrix = 0.5; try { const B = barres(40); const hi = Math.max(...B.map(x => x[2])), lo = Math.min(...B.map(x => x[3])); hautPrix = (B[B.length - 1][4] - lo) / ((hi - lo) || 1); } catch (er) {}
       e.style.left = Math.max(r.left + 10, r.left + (r.width - 80 - e.offsetWidth) / 2) + 'px';   // v7.4 : au CENTRE du graphique (visible sur téléphone, entre les étiquettes et le prix)
-      e.style.top = (r.top + (r.height || 600) * (hautPrix > 0.5 ? 0.6 : 0.2)) + 'px'; setTimeout(() => e.remove(), 5500);   // v7.4 : la pastille reste plus longtemps (lisible sur le live)
+      // v7.4 (demande d'Adel) : au milieu entre la ligne d'ENTRÉE et le TP (vers le trait blanc), sinon loin du prix
+      let yCible = null; try { const LG = lignesAlign(), E = LG['ENTRÉE'], T = LG.TP2 || LG.TP1; if (E && T) { const ser = chart()._chartWidget.model().mainSeries(), fv = ser.firstValue(), ps = ser.priceScale();
+        yCible = r.top + (ps.priceToCoordinate(E.y, fv) + ps.priceToCoordinate(T.y, fv)) / 2 - e.offsetHeight / 2; } } catch (er) {}
+      e.style.top = (yCible != null && yCible > r.top + 100 && yCible < r.top + (r.height || 600) - 160 ? yCible : r.top + (r.height || 600) * (hautPrix > 0.5 ? 0.6 : 0.2)) + 'px'; setTimeout(() => e.remove(), 8000);   // v7.4 : la pastille reste plus longtemps (lisible sur le live)
       setTimeout(() => { try { const e2 = e.cloneNode(false); e2.className = 'align-punch en'; const m2 = en.split(' '); const em2 = /^\p{Extended_Pictographic}/u.test(m2[0]) ? m2.shift() : emo;
-        e2.innerHTML = '<span class="emo">' + esc(em2) + '</span> ' + esc(m2.join(' ')); document.querySelectorAll('.align-punch').forEach(x => x.remove()); document.body.appendChild(e2); setTimeout(() => e2.remove(), 5500); } catch (er) {} }, 5600);
+        e2.innerHTML = '<span class="emo">' + esc(em2) + '</span> ' + esc(m2.join(' ')); document.querySelectorAll('.align-punch').forEach(x => x.remove()); document.body.appendChild(e2); setTimeout(() => e2.remove(), 8000); } catch (er) {} }, 8100);
     } catch (e) {}
   }
   function choisirPlateforme(v) { PLATEFORME = v; try { localStorage.setItem('alignPlateforme', v); } catch (e) {} remplir(); }
@@ -813,7 +816,7 @@
     if (retour) return; const LG = lignesAlign(), E = LG['ENTRÉE'], S = LG.SL; if (!E || !S) return;
     const B = barres(3); if (!B.length) return; const p = B[B.length - 1][4], sens = S.y > E.y ? -1 : 1;
     if (sens * (p - E.y) <= 0) return;
-    coeurs(1, ['😊']); setTimeout(() => coeurs(1, ['😏']), 11600);
+    coeurs(1, ['😊']); setTimeout(() => coeurs(1, ['😏']), 16600);
   } catch (e) {} }, 240000);
   window.__ALIGN_BANDE__ = {
     version: VERSION, recu, punch: c => coeurs(1, [c]), plateforme: v => choisirPlateforme(v),
