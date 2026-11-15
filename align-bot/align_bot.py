@@ -3822,6 +3822,41 @@ def alerte_retournement(m, r, tr):
             "🙅 Aucune entrée en sens inverse avant cette confirmation")
 
 
+FIBO_UT = (("15 min", "b15", 48), ("1h", "b1h", 48), ("4h", "b4h", 30))
+
+def fibo_zones(m, r, cle):
+    """FIBONACCI EN TEMPS RÉEL (demande d'Adel 15/11) : pour chaque unité (15 min, 1h, 4h), dernier mouvement = plus haut /
+    plus bas des N dernières bougies ; le bot dit à quel % du retracement on est. Annonce quand le prix entre dans la zone
+    clé 61,8 – 78,6 % (zone de retournement probable), une fois par mouvement et par unité."""
+    p = r["m1"][-1]["c"] if r.get("m1") else None
+    if p is None:
+        return None
+    lignes = []
+    for nom, k, n in FIBO_UT:
+        b = (r.get(k) or [])[-n:]
+        if len(b) < 10:
+            continue
+        ih = max(range(len(b)), key=lambda i: b[i]["h"]); il = min(range(len(b)), key=lambda i: b[i]["l"])
+        hi, lo = b[ih]["h"], b[il]["l"]
+        if hi <= lo:
+            continue
+        hausse = il < ih                                  # le plus bas est venu avant le plus haut : mouvement de hausse
+        pct = (hi - p) / (hi - lo) * 100 if hausse else (p - lo) / (hi - lo) * 100
+        if not 61.8 <= pct <= 78.6:
+            continue
+        cle_mvt = f"{nom}|{round(hi, 2)}|{round(lo, 2)}"
+        deja = cle.setdefault("fibo_dit", {})
+        if deja.get(nom) == cle_mvt:
+            continue
+        deja[nom] = cle_mvt
+        lignes.append(f"📐 Fibo {nom} : on est à {pct:.0f} % du dernier mouvement de {'hausse' if hausse else 'baisse'}")
+    if not lignes:
+        return None
+    return (f"📐 ZONE FIBONACCI — {ICONE.get(m, '')} {m}\n" + "\n".join(lignes) +
+            "\n🎯 Zone clé 61,8 – 78,6 % : c'est là que le prix se retourne souvent\n"
+            "⏳ On attend la clôture de bougie pour savoir s'il rebondit ou s'il casse\n"
+            "⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
+
 def radar_climax(m, r, cle):
     """RADAR RETOURNEMENT (validé par Adel le 15/11, « oui radar ») — le LONG raté 62 → 65,5 k BTC :
     1) volume climax : une des 4 dernières bougies 15 min CLÔTURÉES a un volume ≥ 3 × la moyenne des 40 d'avant (épuisement) ;
@@ -9013,6 +9048,9 @@ def agent(m, r, cle, ferme):
     except Exception as ex:
         print("après SL", ex)
     try:
+        fz_ = fibo_zones(m, r, cle)                   # Fibonacci en temps réel 15 min / 1h / 4h (demande d'Adel)
+        if fz_:
+            out.append(fz_)
         rc_ = radar_climax(m, r, cle)                 # radar retournement (volume climax + balayage + EMA9)
         if rc_ and not tr:
             out.append(rc_)
