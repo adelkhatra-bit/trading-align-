@@ -371,3 +371,19 @@ class ScalpVautLeCoup(unittest.TestCase):
         self.assertFalse(ab.scalp_vaut_le_coup(dict(si, atr=10.0)))               # trop court (< 2 ATR)
         self.assertIn("le bot le prend", "\n".join(ab.texte_scalp("BTC", si, -1)))
         self.assertIn("ne le prend pas", "\n".join(ab.texte_scalp("BTC", dict(si, rr=1.5), -1)))
+
+
+class LeconsIA(unittest.TestCase):
+    def test_lecons_relues_et_pause_apres_2_sl(self):
+        etat = {}
+        pr = {"d": 1, "type": "repli"}
+        self.assertFalse(ab.noter_lecon(etat, "BTC", pr, -1.0, "Entrée trop tôt, attendre la clôture"))
+        self.assertTrue(ab.noter_lecon(etat, "BTC", pr, -0.5, "Zone déjà mangée à 100 %"))
+        self.assertTrue(ab.en_pause(etat, "BTC")); self.assertFalse(ab.en_pause(etat, "GOLD"))
+        self.assertTrue(any("trop tôt" in x for x in ab.lecons_pour("BTC")))
+        ab.noter_lecon(etat, "BTC", pr, 2.0, "TP propre")
+        self.assertEqual(etat["serie_sl"]["BTC"], 0)
+        with unittest.mock.patch.object(ab, "_envoi_sur") as env:
+            ab.auto_entree(etat, "BTC", {"d": 1, "e": 1, "sl": 0.5, "tp1": 3})   # en pause : aucun ordre
+        env.assert_not_called()
+        ab.LECONS[:] = []
