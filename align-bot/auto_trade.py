@@ -31,6 +31,16 @@ SYMBOLES = {"BTC": ["BTCUSD", "BTCUSD.", "BTCUSDm"], "GOLD": ["XAUUSD", "XAUUSD.
             "NASDAQ": ["NDX100", "NAS100", "US100", "USTEC", "NDX100."]}
 
 TOKEN = os.environ.get("METAAPI_TOKEN", "")
+def budget_risque(e, sl, tp, tp2=None):
+    """Règle d'Adel (15/11) : 100 $ de risque SEULEMENT si l'objectif rapporte au moins 3 fois le risque (1:3 → 300-400 $),
+    60 $ si au moins 2 fois (1:2), sinon PAS de position. Renvoie le budget total en $ (0 = on n'entre pas)."""
+    r = abs(e - sl)
+    if r <= 0:
+        return 0.0
+    rr = abs((tp2 or tp) - e) / r
+    return 100.0 if rr >= 3 else 60.0 if rr >= 2 else 0.0
+
+
 def lire_comptes(brut):
     """Ids MetaApi (format UUID) lus dans la variable, même collés deux fois ou sans virgule ; sans doublon, ordre gardé."""
     ids = re.findall(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", brut or "", re.I)
@@ -149,9 +159,12 @@ def executer(etat, signal, journal=print):
             sens_mt = "POSITION_TYPE_BUY" if signal["sens"] == "LONG" else "POSITION_TYPE_SELL"
             if any(p.get("symbol") == sym and p.get("type") != sens_mt for p in pos):
                 res.append({"compte": compte, "ok": False, "raison": "position opposée interdite"}); continue
+            budget = budget_risque(signal["e"], signal["sl"], signal["tp"], signal.get("tp2"))
+            if not budget:
+                res.append({"compte": compte, "ok": False, "raison": "gain visé < 2 × le risque : on n'entre pas"}); continue
             spec = _api("GET", f"{compte}/symbols/{sym}/specification")
             lots = volume(signal["e"], signal["sl"], float(spec.get("contractSize", 1)),
-                          float(spec.get("volumeStep", 0.01)), float(spec.get("minVolume", 0.01)))
+                          float(spec.get("volumeStep", 0.01)), float(spec.get("minVolume", 0.01)), risque=budget / 2)
             if not lots:
                 res.append({"compte": compte, "ok": False, "raison": "SL trop large pour le risque"}); continue
             px = _api("GET", f"{compte}/symbols/{sym}/current-price")
@@ -169,7 +182,7 @@ def executer(etat, signal, journal=print):
             res.append({"compte": compte, "ok": r.get("stringCode") in ("TRADE_RETCODE_DONE", "ERR_NO_ERROR"), "reponse": r, "ordre": ordre})
             etat.setdefault("mt5_plan", {})[compte] = {"marche": m, "sens": signal["sens"], "sym": sym, "e": prix, "sl": sl_mt5,
                                                       "tp": tp_mt5, "taille": float(spec.get("contractSize", 1)),
-                                                      "pas": float(spec.get("volumeStep", 0.01)), "be": False, "rachats": 0}
+                                                      "pas": float(spec.get("volumeStep", 0.01)), "be": False, "rachats": 0, "budget": budget}
         except Exception as ex:
             res.append({"compte": compte, "ok": False, "raison": f"erreur {ex}"})
         time.sleep(0.5)
@@ -202,7 +215,7 @@ def decision(plan, positions, prix):
         return None, None
     if plan.get("rachats", 0) >= 1 and d * (plan.get("dernier_rachat", plan["e"]) - prix) < 0.25 * r1:
         return None, None                                    # pas deux rachats au même endroit
-    reste = RISQUE_TOTAL_MAX - risque_positions(positions, plan["taille"])
+    reste = min(RISQUE_TOTAL_MAX, plan.get("budget", RISQUE_TOTAL_MAX)) - risque_positions(positions, plan["taille"])
     budget = min(RISQUE_RACHAT, reste)
     lots = volume(prix, plan["sl"], plan["taille"], plan.get("pas", 0.01), risque=budget, elargi=False) if budget > 0 else 0
     return ("rachat", lots) if lots else (None, None)

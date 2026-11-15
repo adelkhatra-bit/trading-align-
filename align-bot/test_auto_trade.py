@@ -115,5 +115,19 @@ class TestPrixFiable(unittest.TestCase):
         self.assertTrue(at.prix_fiable({"time": "2026-11-15T18:59:30Z"}, 64950, 64900, self.N)[0])
 
 
+
+class TestRR(unittest.TestCase):
+    def test_budget_selon_rr(self):
+        self.assertEqual(at.budget_risque(100, 90, 130), 100.0)   # 1:3
+        self.assertEqual(at.budget_risque(100, 90, 125), 60.0)    # 1:2,5
+        self.assertEqual(at.budget_risque(100, 90, 115), 0.0)     # 1:1,5 → on n'entre pas
+        self.assertEqual(at.budget_risque(100, 90, 112, 135), 100.0)   # le TP2 compte
+
+    def test_rachat_respecte_le_budget_60(self):
+        plan = {"sens": "LONG", "e": 100.0, "sl": 90.0, "tp": 120.0, "taille": 1.0, "pas": 0.01, "be": False, "rachats": 0, "budget": 60.0}
+        quoi, lots = at.decision(plan, [{"openPrice": 100.0, "stopLoss": 90.0, "volume": 3.0}], 95.0)   # 30 $ déjà
+        self.assertEqual(quoi, "rachat"); self.assertLessEqual(lots * 5, 30.0001)
+
+
 if __name__ == "__main__":
     unittest.main()
