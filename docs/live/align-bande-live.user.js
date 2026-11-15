@@ -1073,10 +1073,13 @@
 
   // v7.4 (demande d'Adel) : position en cours dans le bon sens → petits mots qui font sourire, toutes les 4 min (sans prix)
   let posK = null, posN = 0;
+  // v8.9 (demande d'Adel) : pub légère pendant qu'on attend le TP, jamais de prix
   const POS_TXT = ['🔥 LA TEAM, Y\'A DU MONDE DANS LE TRAIN ? 🚂 si t\'es dedans tapote l\'écran et écris OUI 👇 • partage le live pour qu\'il reste tout en haut 🙏',
+    '🚀 TU VEUX FAIRE PARTIE DE L\'AVENTURE ? viens tester GRATUITEMENT en compte démo, zéro risque 😉 • tout est dans le lien en bio 👉',
     '😎 ALIGN EST DÉJÀ DEDANS DEPUIS UN MOMENT… ET LE MARCHÉ SUIT LE PLAN 🍿 • trop tard pour monter : on ne court jamais après un train qui roule 🚄 • t\'es dedans ? tapote 👆 et écris OUI 👇 • tu l\'as loupé ? la prochaine fois, le lien en bio te prévient AVANT 😉'];
   EN.push([POS_TXT[0], '🔥 TEAM, WHO\'S ON THE TRAIN? 🚂 if you\'re in, tap the screen and write YES 👇 • share the live to keep it on top 🙏'],
-    [POS_TXT[1], '😎 ALIGN HAS BEEN IN FOR A WHILE… AND THE MARKET IS FOLLOWING THE PLAN 🍿 • too late to jump on: we never chase a moving train 🚄 • you\'re in? tap 👆 and write YES 👇 • missed it? next time, the link in bio warns you BEFORE 😉']);
+    [POS_TXT[1], '🚀 WANT TO BE PART OF THE ADVENTURE? try it FOR FREE on a demo account, zero risk 😉 • everything is in the link in bio 👉'],
+    [POS_TXT[2], '😎 ALIGN HAS BEEN IN FOR A WHILE… AND THE MARKET IS FOLLOWING THE PLAN 🍿 • too late to jump on: we never chase a moving train 🚄 • you\'re in? tap 👆 and write YES 👇 • missed it? next time, the link in bio warns you BEFORE 😉']);
   const posT = setInterval(() => { try {
     if (retour) return; const LG = lignesAlign(), E = LG['ENTRÉE'], S = LG.SL; if (!E || !S) return;
     const B = barres(3); if (!B.length) return; const p = B[B.length - 1][4], sens = S.y > E.y ? -1 : 1;
@@ -1085,7 +1088,8 @@
     const kPos = Math.round(E.y); posN = posK === kPos ? posN + 1 : 0; posK = kPos;
     if (!occupe && !file.length) {
       if (posN === 0) montrer(POS_TXT[0], false, 1);
-      else if (posN % 3 === 0) montrer(POS_TXT[1], false, 1);
+      else if (posN % 3 === 0) montrer(POS_TXT[2], false, 1);
+      else if (posN % 3 === 2) montrer(POS_TXT[1], false, 1);   // v8.9 : pendant qu'on attend le TP → petite pub (sans prix)
     }
     coeurs(1, ['😊']); setTimeout(() => coeurs(1, ['😏']), 16600);
   } catch (e) {} }, 190000);   // v7.7 : +12 %
