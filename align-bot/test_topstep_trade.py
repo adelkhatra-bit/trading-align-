@@ -42,9 +42,9 @@ class TestPhases(unittest.TestCase):
 
 
 class TestRisque(unittest.TestCase):
-    def test_sl_plafonne_a_100_dollars(self):
-        # MNQ : tick 0,25 = 0,5 $ → 100 $ max = 200 ticks
-        self.assertEqual(ts.ticks(500, 0.25, 0.5), 200)
+    def test_sl_plafonne_a_75_dollars(self):
+        # MNQ : tick 0,25 = 0,5 $ → 75 $ max = 150 ticks
+        self.assertEqual(ts.ticks(500, 0.25, 0.5), 150)
         self.assertEqual(ts.ticks(10, 0.25, 0.5), 50)   # 10 pts ×1,25 = 12,5 pts = 50 ticks
 
     def test_garde_fou_jour_et_plancher(self):
