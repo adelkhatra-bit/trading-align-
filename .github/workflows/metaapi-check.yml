@@ -1,0 +1,17 @@
+name: ALIGN MetaApi vérification
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [align-bot/metaapi_check.py, .github/workflows/metaapi-check.yml]
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Connexion au compte FundedNext via MetaApi (aucun ordre)
+        env:
+          METAAPI_TOKEN: ${{ secrets.METAAPI_TOKEN }}
+          METAAPI_COMPTES: ${{ vars.METAAPI_COMPTES }}
+          METAAPI_REGION: ${{ vars.METAAPI_REGION }}
+        run: python3 align-bot/metaapi_check.py
