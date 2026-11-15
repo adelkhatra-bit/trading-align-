@@ -5394,6 +5394,41 @@ def noter(etat, cid, m, pos, sortie, motif):
         + f"🧾 Motif : {motif}\n"
         + ("🎉 Objectif positif enregistré." if pts > 0 else "🛡 Risque clôturé. Le prochain signal sera traité séparément." if pts < 0 else "Position clôturée à l’équilibre.")))
 
+def texte_team(bj):
+    """Bilan du jour SANS montant : nombre de TP et de SL ; la phrase « les profits ont couvert les SL » seulement si c'est VRAI."""
+    if not bj or not (bj["tp"] + bj["sl"]):
+        return None
+    t = f"🏆 LA TEAM ALIGN AUJOURD'HUI : ✅ {bj['tp']} TP • ❌ {bj['sl']} SL"
+    if bj["sl"] and bj["tp"] and bj["pct"] > 0:
+        t += " • heureusement que les profits ont couvert les SL 😉"
+    elif not bj["sl"]:
+        t += " • zéro SL, propre 😎"
+    return t
+
+def bilan_team(etat, gain, now=None):
+    """Compte du jour (heure de Paris) mis à jour à chaque clôture du bot → bande du live tout de suite, chaînes au plus toutes les 4 h."""
+    now = time.time() if now is None else now
+    jour = datetime.datetime.fromtimestamp(now, ZoneInfo("Europe/Paris")).strftime("%Y-%m-%d")
+    bj = etat.get("bilan_jour") or {}
+    if bj.get("jour") != jour:
+        bj = {"jour": jour, "tp": 0, "sl": 0, "pct": 0.0}
+    bj["tp" if gain > 0 else "sl"] += 1
+    bj["pct"] += gain
+    etat["bilan_jour"] = bj
+    t = texte_team(bj)
+    if not t:
+        return None
+    try:
+        live_bande(etat, t + " • lien en bio", "team", 300, toujours=True)
+    except Exception as ex:
+        print("bande team", ex)
+    if TOKEN and now - float(etat.get("team_publie", 0)) >= 4 * 3600:
+        etat["team_publie"] = now
+        for canal in (etat.get("canaux_marche") or {}).values():
+            if canal:
+                _envoi_sur(canal, text=t + "\n⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
+    return t
+
 def texte_bilan(etat):
     b = etat.get("bilan")
     if not b or not (b["tp"] + b["sl"]):
@@ -10574,6 +10609,10 @@ def un_tour(etat, chats):
                 gain = trf["d"] * (sortie - trf["e"]) / trf["e"] * 100
                 bil["tp" if gain > 0 else "sl"] += 1
                 bil["pct"] += gain
+                try:
+                    bilan_team(etat, gain)                # demande d'Adel : « la team : X TP • Y SL » (jamais de montant) sur le live + chaînes
+                except Exception as ex:
+                    print("bilan team", ex)
                 cle["dernier"] = round(gain, 2)
                 apprendre(etat, trf, gain)
                 journal_trade(etat, nom_marche, trf, sortie, motif, gain)
