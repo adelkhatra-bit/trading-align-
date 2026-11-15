@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '8.2';  // v8.2 : prix cachés dans la ligne du bas du tableau (❓ + lien en bio) ; v8.1  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
+  const VERSION = '8.3';  // v8.3 : grosses étiquettes ENTRÉE/SL/TP masquées (❓, alignées sur le TP2, même taille), ligne du bas du tableau en couleur neutre, plus grosse, « tu peux rentrer ? 👍 » ; v8.2  // v8.2 : prix cachés dans la ligne du bas du tableau (❓ + lien en bio) ; v8.1  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
   // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
@@ -1015,7 +1015,7 @@
   const masque = document.createElement('div'); masque.id = 'align-masque'; document.body.appendChild(masque);
   cssPunch.textContent += `
   #align-masque{position:fixed;z-index:140;pointer-events:none;display:none;align-items:center;justify-content:center;gap:10px;color:#fff;
-    font:800 12px/1 system-ui,Segoe UI,Arial,sans-serif;white-space:nowrap;overflow:hidden;letter-spacing:.3px}
+    background:linear-gradient(90deg,#4a148c,#880e4f)!important;font:900 15px/1 system-ui,Segoe UI,Arial,sans-serif;white-space:nowrap;overflow:hidden;letter-spacing:.3px}
   #align-masque .cle{display:inline-block;animation:emoDanse .6s ease-in-out infinite alternate}
   html.align-cache #align-masque{visibility:hidden!important}`;
   let masqueN = 0;
@@ -1045,13 +1045,56 @@
       const en = langueBande() === 'en', sens = (cel.t.match(/[▼▲]?\s*(SHORT|LONG)[^E\d]*/) || [''])[0].trim();
       masque.innerHTML = (masqueN++ % 4 < 2)
         ? esc(sens) + ' • ' + (en ? 'ENTRY' : 'ENTRÉE') + ' <span class="cle">❓</span> • TP <span class="cle">❓</span> • SL <span class="cle">❓</span>'
-        : '<span class="cle">🔒</span> ' + (en ? 'ENTRY PRICE? 👉 LINK IN BIO • FOLLOW 😉' : 'PRIX D\'ENTRÉE ? 👉 LIEN EN BIO • ABONNE-TOI 😉');
+        : (arme ? '<span class="cle">⏳</span> ' + (en ? 'IT\'S ALMOST TIME… CAN YOU GET IN? 👍 LINK IN BIO, HURRY!' : 'ÇA VA ÊTRE LE MOMENT… TU PEUX RENTRER ? 👍 LIEN EN BIO, VITE !')
+          : '<span class="cle">🤔</span> ' + (en ? 'WANT TO KNOW IF YOU CAN GET IN? 👍 LINK IN BIO' : 'TU VEUX SAVOIR SI TU PEUX RENTRER ? 👍 LIEN EN BIO'));   // v8.3 : « vite » seulement quand le spectacle a vraiment annoncé un mouvement (pas de fake)
     } catch (e) {}
   }
+  // v8.3 (demande d'Adel) : les GROSSES étiquettes ENTRÉE / SL / TP1 / TP2 (à gauche, avec les prix) sont recouvertes
+  // et remplacées par des étiquettes courtes « ❓ », toutes de la même taille, alignées sur la colonne du TP2, juste sous leur ligne
+  const etiqBox = document.createElement('div'); etiqBox.id = 'align-etiq'; document.body.appendChild(etiqBox);
+  cssPunch.textContent += `
+  #align-etiq .cache{position:fixed;z-index:139;pointer-events:none;background:rgb(15,15,15)}
+  #align-etiq .etq{position:fixed;z-index:139;pointer-events:none;min-width:104px;padding:3px 10px;border-radius:6px;text-align:center;
+    font:900 14px/1.15 system-ui,Segoe UI,Arial,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.45)}
+  #align-etiq .etq b{display:inline-block;animation:emoDanse .7s ease-in-out infinite alternate}
+  html.align-cache #align-etiq{visibility:hidden!important}`;
+  function grossesEtiquettes() {
+    const res = [];
+    try { const mod = chart()._chartWidget.model().model();
+      for (const ds of mod.dataSources()) { if (!/ALIGN/.test(String(ds.title && ds.title()))) continue; const vu = new Set();
+        (function walk(o, d, dansData) { if (!o || d > 8 || typeof o !== 'object' || vu.has(o)) return; vu.add(o);
+          if (o instanceof Map) { o.forEach(v => walk(v, d + 1, dansData)); return; }
+          if (dansData && typeof o.t === 'string' && typeof o.y === 'number') { const n = (o.t.match(/^\s*(ENTRÉE|SL|TP1|TP2)\b/) || [])[1]; if (n && o.st === 'lrg') res.push({ n, o }); return; }
+          for (const k of Object.keys(o)) walk(o[k], d + 1, dansData || k === '_primitivesDataById');
+        })(ds.graphics()._primitivesCollection.dwglabels, 0, false); } } catch (e) {}
+    return res;
+  }
+  function poserEtiquettes() {
+    try {
+      const E = grossesEtiquettes(); if (!E.length) { etiqBox.innerHTML = ''; return; }
+      const cv = document.querySelector('.chart-markup-table .chart-gui-wrapper canvas'); if (!cv) return;
+      const R = cv.getBoundingClientRect(), k = cv.width / R.width, ctx = cv.getContext('2d');
+      const ser = chart()._chartWidget.model().mainSeries(), ps = ser.priceScale(), fv = ser.firstValue();
+      const boites = [];
+      for (const { n, o } of E) {
+        const y = ps.priceToCoordinate(o.y, fv); if (!isFinite(y)) continue;
+        const a = ((o.ci >>> 24) & 255) / 255, col = [o.ci & 255, (o.ci >> 8) & 255, (o.ci >> 16) & 255].map(v => Math.round(a * v + (1 - a) * 15));
+        const y0 = Math.max(0, Math.round((y - 18) * k)), hh = Math.round(36 * k), W = Math.round(cv.width * 0.75), d = ctx.getImageData(0, y0, W, hh).data;
+        let mi = 1e9, ma = -1, yt = 1e9, yb = -1;
+        for (let yy = 0; yy < hh; yy++) for (let x = 0; x < W; x++) { const j = (yy * W + x) * 4; if (Math.abs(d[j] - col[0]) < 14 && Math.abs(d[j + 1] - col[1]) < 14 && Math.abs(d[j + 2] - col[2]) < 14) { if (x < mi) mi = x; if (x > ma) ma = x; if (yy < yt) yt = yy; if (yy > yb) yb = yy; } }
+        boites.push({ n, o, y, col: 'rgb(' + col.join(',') + ')', tc: (o.tci & 255) > 128 ? '#fff' : '#111', box: ma > mi + 20 ? { l: mi / k + R.left, t: (y0 + yt) / k + R.top, r: (ma + 1) / k + R.left, b: (y0 + yb + 1) / k + R.top } : null });
+      }
+      const tp2 = boites.find(x => x.n === 'TP2' && x.box) || boites.find(x => x.box); if (!tp2) { etiqBox.innerHTML = ''; return; }
+      const xCol = tp2.box.l, en = langueBande() === 'en';
+      etiqBox.innerHTML = boites.map(x => (x.box ? '<div class="cache" style="left:' + (x.box.l - 2) + 'px;top:' + (x.box.t - 2) + 'px;width:' + (x.box.r - x.box.l + 4) + 'px;height:' + (x.box.b - x.box.t + 4) + 'px"></div>' : '')
+        + '<div class="etq" style="left:' + xCol + 'px;top:' + (R.top + x.y + 3) + 'px;background:' + x.col + ';color:' + x.tc + '">' + (x.n === 'ENTRÉE' && en ? 'ENTRY' : x.n) + (/✅/.test(x.o.t) ? ' ✅' : '') + ' <b>❓</b></div>').join('');
+    } catch (e) {}
+  }
+  const etiqT = setInterval(poserEtiquettes, 1500); poserEtiquettes();
   const masqueT = setInterval(poserMasque, 1500); poserMasque();
   window.__ALIGN_BANDE__ = {
     version: VERSION, recu, punch: c => coeurs(1, [c]), plateforme: v => choisirPlateforme(v),
-    stop() { vivant = false; clearTimeout(survolT); cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); clearInterval(masqueT); masque.remove(); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
+    stop() { vivant = false; clearTimeout(survolT); cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); clearInterval(masqueT); masque.remove(); clearInterval(etiqT); etiqBox.remove(); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
       [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur,.align-billet,.align-argent,.align-punch,.align-ping').forEach(x => x.remove()); try { cssBillet.remove(); } catch (e) {} obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
   };
 })();
