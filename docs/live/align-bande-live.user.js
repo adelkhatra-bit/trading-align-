@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '9.2';  // v9.2 : plus de spectacle quand le marché hésite (l'animateur parle toutes les ~40 s, discussion avis → merci → lien en bio), bulle « 🤫 PSST… LE GRAPH BALANCE » ; v9.1 : plus aucune flèche ni sens (monter / baisser) sur la bande ; v9.0 : « tu préfères BTC, Gold ou NASDAQ ? une autre unité de temps ? lien en bio » ; v8.9 : « ALIGN est dedans depuis le début… trop tard pour rentrer, on ne court jamais après le prix » ; v8.8  // v8.8 : l'animateur parle toutes les ~90 s (humour, nouveaux arrivants, commentaires), feu d'artifice « objectif de likes atteint » ; v8.7  // v8.7 : « je t'avais prévenu » après le chrono de grosse distribution / accumulation ; v8.6  // v8.6 : marché calme → l'animateur (vrai trader) parle aux spectateurs : questions rebond / cassure, pression pour taper et commenter ; v8.5  // v8.5 : phrases IA gratuites toujours nouvelles (FR/EN), chrono « une position arrive » + agenda (discours, annonces, ouvertures) venant du bot, chrono posé AU-DESSUS des colonnes 1 min / 3 min / 5 min ; v8.4   // v8.4 : ligne du bas du tableau revenue à sa couleur d'origine (v8.2), texte 13 px ; v8.3  // v8.3 : (étiquettes posées par-dessus désactivées, à faire dans le Pine), ligne du bas du tableau en couleur neutre, plus grosse, « tu peux rentrer ? 👍 » ; v8.2  // v8.2 : prix cachés dans la ligne du bas du tableau (❓ + lien en bio) ; v8.1  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
+  const VERSION = '9.3';  // v9.3 : titres de bulle drôles liés au marché (fin de « LE GRAPH BALANCE ») ; v9.2 : plus de spectacle quand le marché hésite (l'animateur parle toutes les ~40 s, discussion avis → merci → lien en bio), bulle « 🤫 PSST… LE GRAPH BALANCE » ; v9.1 : plus aucune flèche ni sens (monter / baisser) sur la bande ; v9.0 : « tu préfères BTC, Gold ou NASDAQ ? une autre unité de temps ? lien en bio » ; v8.9 : « ALIGN est dedans depuis le début… trop tard pour rentrer, on ne court jamais après le prix » ; v8.8  // v8.8 : l'animateur parle toutes les ~90 s (humour, nouveaux arrivants, commentaires), feu d'artifice « objectif de likes atteint » ; v8.7  // v8.7 : « je t'avais prévenu » après le chrono de grosse distribution / accumulation ; v8.6  // v8.6 : marché calme → l'animateur (vrai trader) parle aux spectateurs : questions rebond / cassure, pression pour taper et commenter ; v8.5  // v8.5 : phrases IA gratuites toujours nouvelles (FR/EN), chrono « une position arrive » + agenda (discours, annonces, ouvertures) venant du bot, chrono posé AU-DESSUS des colonnes 1 min / 3 min / 5 min ; v8.4   // v8.4 : ligne du bas du tableau revenue à sa couleur d'origine (v8.2), texte 13 px ; v8.3  // v8.3 : (étiquettes posées par-dessus désactivées, à faire dans le Pine), ligne du bas du tableau en couleur neutre, plus grosse, « tu peux rentrer ? 👍 » ; v8.2  // v8.2 : prix cachés dans la ligne du bas du tableau (❓ + lien en bio) ; v8.1  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
   // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
@@ -715,6 +715,18 @@
       for (const sp of piste.children) { const q = sp.getBoundingClientRect(); if (q.left <= cx && q.right >= cx) return sp.classList.contains('en') ? 'en' : 'fr'; } } catch (e) {}
     return 'fr';
   }
+  // v9.3 (demande d'Adel) : « LE GRAPH BALANCE » pas clair → titres drôles et liés au marché, qui changent à chaque bulle (jamais de sens ni de prix)
+  const TITRES_PUNCH = [
+    ['🕵️ LE GRAPHIQUE A REPÉRÉ UN TRUC', '🕵️ THE CHART SPOTTED SOMETHING'],
+    ['🐋 LES BALEINES SE RÉVEILLENT', '🐋 THE WHALES ARE WAKING UP'],
+    ['🍿 SORS LE POP-CORN, LE MARCHÉ JOUE', '🍿 GRAB THE POPCORN, THE MARKET IS ON'],
+    ['🕯️ LES BOUGIES ONT UN TRUC À TE DIRE', '🕯️ THE CANDLES HAVE SOMETHING TO SAY'],
+    ['☕ PAUSE CAFÉ ? PAS POUR LE MARCHÉ', '☕ COFFEE BREAK? NOT FOR THE MARKET'],
+    ['🎢 ACCROCHE TA CEINTURE', '🎢 FASTEN YOUR SEATBELT'],
+    ['📢 FLASH DU MARCHÉ', '📢 MARKET FLASH'],
+    ['🧲 LE PRIX CHERCHE LA LIQUIDITÉ', '🧲 PRICE IS HUNTING LIQUIDITY'],
+  ];
+  let titreN = 0;
   function coeurs(n, liste, sensForce) {
     try {
       const cle = (liste || []).join(''), g = PUNCH.find(x => x[0].test(cle)) || PUNCH[PUNCH.length - 1];
@@ -724,9 +736,9 @@
       // v7.8 (demande d'Adel) : la pastille parle la MÊME langue que la bande du haut (FR avec FR, EN avec EN) pour éviter les confusions
       const parts = (txt, defEmo) => { const m = txt.split(' '); const em = /^\p{Extended_Pictographic}/u.test(m[0]) ? m.shift() : defEmo; return [em, m.join(' ')]; };
       const [emoFr, txtFr] = parts(fr, '💬'), [emoEn, txtEn] = parts(en, emoFr);
-      let lgCour = null;
+      let lgCour = null; titreN++;
       const affiche = lg => { lgCour = lg; e.classList.toggle('en', lg === 'en'); const [em, tx] = lg === 'en' ? [emoEn, txtEn] : [emoFr, txtFr];
-        e.innerHTML = '<span class="qui">' + (lg === 'en' ? '🤫 PSST… THE CHART IS SPILLING' : '🤫 PSST… LE GRAPH BALANCE') + '</span><span class="emo">' + esc(em) + '</span> <span class="txt">' + esc(tx) + '</span>';
+        e.innerHTML = '<span class="qui">' + TITRES_PUNCH[titreN % TITRES_PUNCH.length][lg === 'en' ? 1 : 0] + '</span><span class="emo">' + esc(em) + '</span> <span class="txt">' + esc(tx) + '</span>';
         e.style.animation = 'none'; void e.offsetWidth; e.style.animation = ''; };
       document.querySelectorAll('.align-punch').forEach(x => x.remove());
       affiche(langueBande()); document.body.appendChild(e);
