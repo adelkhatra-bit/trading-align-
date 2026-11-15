@@ -6610,6 +6610,8 @@ def live_prepare_toi(etat, derniers, now=None):
         sens = "ça peut couler 📉" if p["d"] == -1 else "ça peut décoller 📈"
         live_bande(etat, f"BULLE:⚠️ {ic} {p['m']} : prépare-toi, {sens} • ⏱ verdict dans {min_avant_cloture15(now)} min • "
                          "les niveaux en privé : lien en bio 🎁 gratuit", f"prep{p['m']}{p['d']}", 1800, toujours=True)
+        # v8.5 (demande d'Adel) : chrono « une position arrive, dépêche-toi » jusqu'à la clôture 15 min (jamais de prix)
+        live_bande(etat, f"CMD:chrono:{900 - int(now) % 900}:{p['m']}", f"chrono{p['m']}{p['d']}", 1800, toujours=True)
         # Jeu du live (idée d'Adel) : les spectateurs tapotent l'écran pour parier sur la suite ; le coach l'a déjà annoncé en privé
         live_bande(etat, f"BULLE:👆 JEU : tapote l'écran si tu penses que {ic} {p['m']} va {'couler 📉' if p['d'] == -1 else 'monter 📈'} ! "
                          f"• réponse dans {min_avant_cloture15(now)} min • le coach l'a déjà annoncé : lien en bio 🎁",
@@ -9305,6 +9307,90 @@ def live_bande(etat, texte, cle=None, pause=60, toujours=False):
         _LIVE_DERNIER[cle] = time.time()
     return live_publier(texte)
 
+# ───── v8.5 « SPECTACLE » (demande d'Adel 15/11) : IA gratuite + agenda (discours, annonces, ouvertures) sur la bande ─────
+LIVE_IA_INTERVALLE = int(os.environ.get("LIVE_IA_INTERVALLE", "1800"))      # 1 lot de phrases IA / 30 min (quota gratuit)
+_INTERDIT_BANDE = re.compile(r"\d|telegram|entr[ée]e|\bSL\b|\bTP\d?\b|\bstop\b|€|\$|%", re.I)
+SESSIONS_LIVE = (("🇯🇵 TOKYO", 1, 0), ("🇬🇧 LONDRES", 9, 0), ("🇺🇸 NEW YORK", 15, 30))
+MOTS_DISCOURS = ("Speaks", "Speech", "Powell", "Testifies", "Press Conference", "FOMC")
+
+
+def phrases_bande_propres(brut):
+    """Lignes « FR | EN » de l'IA → paires propres : jamais de chiffre, prix, ENTRÉE / SL / TP, ni le mot Telegram."""
+    paires = []
+    for ligne in str(brut or "").splitlines():
+        if "|" not in ligne:
+            continue
+        fr, en = [x.strip(" -•*\"'\t") for x in ligne.split("|", 1)]
+        if not (8 <= len(fr) <= 140 and 8 <= len(en) <= 140):
+            continue
+        if _INTERDIT_BANDE.search(fr) or _INTERDIT_BANDE.search(en):
+            continue
+        paires.append([fr, en])
+    return paires[:8]
+
+
+def live_phrases_ia(etat, maintenant):
+    """Toutes les 30 min, l'IA GRATUITE (Gemini gratuit / Groq / IA sans clé) invente un lot de phrases FR + EN pour la bande."""
+    if not live_actif(etat) or maintenant - etat.get("live_ia_t", 0) < LIVE_IA_INTERVALLE:
+        return False
+    etat["live_ia_t"] = maintenant
+    h = datetime.datetime.fromtimestamp(maintenant, PARIS).hour
+    moment = "nuit" if h < 7 else "matin" if h < 12 else "après-midi" if h < 18 else "soirée"
+    consigne = ("Écris 6 phrases pour la bande qui défile d'un live TikTok / YouTube de trading (BTC, Gold, NASDAQ). "
+                "Format EXACT, une par ligne : phrase en français | la même phrase en anglais. "
+                "Tu parles comme un VRAI trader pro qui anime son live et connaît le marché par cœur (inspire-toi des meilleurs streamers trading) : "
+                "tu t'adresses directement aux spectateurs (tu, la team), tu poses des questions (ça va rebondir ? cassure ou rejet ?), "
+                "tu mets une pression gentille (si personne ne tape je garde l'info, cinquante taps et je lâche un indice ; JAMAIS de chiffre). "
+                "Ton jeune, drôle, poli, sûr de lui, émojis bienvenus, 80 caractères max par phrase. "
+                "Varie à chaque fois : faire commenter (ça monte ou ça descend ? dis-le en commentaire), faire tapoter l'écran, "
+                "s'abonner, partager, « tu veux mon avis ? lien en bio », suspense sur le prochain mouvement. "
+                "INTERDIT : aucun chiffre, aucun prix, pas les mots entrée, SL, TP, stop, Telegram ; aucune promesse de gain. "
+                "Réponds uniquement avec les 6 lignes.")
+    donnees = {"moment": moment, "deja_dites": [p[0] for p in etat.get("live_ia_paires", [])][:6]}
+    paires = phrases_bande_propres(ia(etat, consigne, donnees))
+    print(f"LIVE_IA {len(paires)} phrases via {etat.get('ia_dernier_fournisseur')} {etat.get('ia_dernier_statut')}")
+    if not paires:
+        return False
+    etat["live_ia_paires"] = paires
+    return live_publier("IA:" + json.dumps(paires, ensure_ascii=False))
+
+
+def live_agenda(etat, maintenant):
+    """Discours, annonces US et ouvertures de marché : la bande prévient 15 min avant et en direct (aucun chiffre de prix)."""
+    if not live_actif(etat):
+        return 0
+    n = 0
+    now = datetime.datetime.fromtimestamp(maintenant, PARIS)
+    if now.weekday() < 5:
+        for nom, hh, mm in SESSIONS_LIVE:
+            t = int(now.replace(hour=hh, minute=mm, second=0, microsecond=0).timestamp())
+            reste = t - maintenant
+            if 14 * 60 < reste <= 16 * 60:
+                texte = f"🔔 OUVERTURE {nom} DANS 15 MIN • ça peut secouer BTC • GOLD • NASDAQ • prépare-toi 👉 lien en bio"
+            elif 0 <= -reste <= 3 * 60:
+                texte = f"🔔 {nom} EST OUVERT ! le volume arrive sur BTC • GOLD • NASDAQ • ça monte ou ça descend ? dis-le en commentaire 👇"
+            else:
+                continue
+            n += bool(live_bande(etat, texte, f"ses{nom}{t}{reste > 0}", 3600))
+    try:
+        evts = calendrier(etat, maintenant) or []
+    except Exception as ex:
+        print("live agenda", ex)
+        evts = []
+    for e in evts:
+        reste = e["t"] - maintenant
+        titre = re.sub(r"\s+", " ", re.sub(r"\d", "", e.get("titre", ""))).strip()
+        quoi = "🎤 DISCOURS" if any(k in e.get("titre", "") for k in MOTS_DISCOURS) else "📰 ANNONCE"
+        if 14 * 60 < reste <= 16 * 60:
+            texte = f"{quoi} USA DANS 15 MIN : {titre} • BTC • GOLD • NASDAQ peuvent s'emballer ⚡ • le détail en temps réel 👉 lien en bio"
+        elif 0 <= -reste <= 3 * 60:
+            texte = f"🔴 EN DIRECT : {quoi} {titre} • ça peut bouger très fort, reste concentré 👀 • l'analyse en direct 👉 lien en bio"
+        else:
+            continue
+        n += bool(live_bande(etat, texte, f"cal{e['t']}{e.get('titre')}{reste > 0}", 3600))
+    return n
+
+
 # ───── Écran du live → Telegram (demande d'Adel, 14/11) ─────
 # La bande du live (onglet TradingView) voit un événement sur les bougies (pression, manipulation, cassure, accélération,
 # baleines) et l'anime à l'écran ; elle l'envoie aussi ici (canal ntfy « …-ecran »). Le bot le publie EN DÉTAIL
@@ -10029,6 +10115,11 @@ def un_tour(etat, chats):
                           "🧭 Le bot n'entre toujours qu'avec 15 min / 1 h / 4 h alignées")
     except Exception as ex:
         print("alerte dxy", ex)
+    try:
+        live_agenda(etat, int(time.time()))          # v8.5 : discours / annonces / ouvertures sur la bande
+        live_phrases_ia(etat, int(time.time()))      # v8.5 : phrases IA gratuites toujours nouvelles
+    except Exception as ex:
+        print("live spectacle", ex)
     try:
         envois += annonces_et_sessions(etat, int(time.time()), derniers)
         try:

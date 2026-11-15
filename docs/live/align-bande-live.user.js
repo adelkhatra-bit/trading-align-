@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '8.4';  // v8.4 : ligne du bas du tableau revenue à sa couleur d'origine (v8.2), texte 13 px ; v8.3  // v8.3 : (étiquettes posées par-dessus désactivées, à faire dans le Pine), ligne du bas du tableau en couleur neutre, plus grosse, « tu peux rentrer ? 👍 » ; v8.2  // v8.2 : prix cachés dans la ligne du bas du tableau (❓ + lien en bio) ; v8.1  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
+  const VERSION = '8.6';  // v8.6 : marché calme → l'animateur (vrai trader) parle aux spectateurs : questions rebond / cassure, pression pour taper et commenter ; v8.5  // v8.5 : phrases IA gratuites toujours nouvelles (FR/EN), chrono « une position arrive » + agenda (discours, annonces, ouvertures) venant du bot, chrono posé AU-DESSUS des colonnes 1 min / 3 min / 5 min ; v8.4   // v8.4 : ligne du bas du tableau revenue à sa couleur d'origine (v8.2), texte 13 px ; v8.3  // v8.3 : (étiquettes posées par-dessus désactivées, à faire dans le Pine), ligne du bas du tableau en couleur neutre, plus grosse, « tu peux rentrer ? 👍 » ; v8.2  // v8.2 : prix cachés dans la ligne du bas du tableau (❓ + lien en bio) ; v8.1  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
   // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
@@ -284,6 +284,37 @@
     "🔵 Astuce : ligne bleue = TP • ligne rouge = SL • le coach te dit quand ça s'approche • lien en bio 🎁",
     "📊 Astuce : regarde le tableau en bas • plus il y a d'unités alignées, plus le mouvement est solide • lien en bio 🎁"
   ];
+  // v8.5 (demande d'Adel) : phrases inventées par l'IA gratuite du bot (FR | EN), toujours nouvelles, jamais de prix
+  const HAUT_TABLEAU = 3.4;   // hauteur du tableau des unités ≈ 3,4 × la ligne du bas
+  // v8.5 (constat d'Adel) : la bande ne dit « ça encaisse / vous êtes rentrés ? » QUE si le bot a vraiment donné la position (Telegram)
+  const botPos = {};
+  function cleMarche(t) { const x = String(t || '').match(/BTC|GOLD|XAU|NASDAQ|NAS/i); return x ? x[0].toUpperCase().replace('XAU', 'GOLD').replace(/^NAS$/, 'NASDAQ') : ''; }
+  function botSuivi(t) {
+    const k = cleMarche(t); if (!k) return;
+    if (/ENTRE EN POSITION/i.test(t)) botPos[k] = Date.now();
+    else if (/TP2 TOUCH|OBJECTIF FINAL|SL TOUCH|STOP TOUCH|POSITION (FERMÉE|CLÔTURÉE)/i.test(t)) delete botPos[k];
+  }
+  EN.push([' a touché l\'objectif du graphique • pas de position du coach cette fois ⏳ • attends le prochain cycle : lien en bio', ' touched the chart target • no coach trade this time ⏳ • wait for the next cycle: link in bio']);
+  function botDedans(m) { const t = botPos[cleMarche(m)]; return !!t && Date.now() - t < 12 * 3600 * 1000; }
+  // v8.6 : l'animateur du live (trader pro qui connaît le marché par cœur) — jamais de prix
+  const COACH = { anim: ["🎙 {m} respire… et moi je sais déjà où il va 😏 • 50 taps et je lâche un indice 👆", "🤔 {m} fait le calme avant la tempête… TOI tu dis quoi : ça monte ou ça descend ? écris-le 👇", "😤 {m} attend que VOUS tapiez… personne tape = je garde l'info pour moi 🤫", "👀 {m} : les gros joueurs se placent en silence… toi t'es prêt ou tu dors ? 👆 tapote si t'es là", "🧠 {m} : un vrai trader n'attend pas le mouvement, il l'ANTICIPE • tu veux savoir comment ? lien en bio 😏", "🔥 {m} : je compte jusqu'à cent taps et je vous dis ce que je vois 👀 • allez la team !", "💬 {m} : écris « LONG » ou « SHORT » en commentaire… on verra qui avait raison 😎", "⏳ {m} : le marché s'endort, mais moi non 😏 • partage le live, quand ça part tu me remercieras", "🎯 {m} : je connais ce marché par cœur… et là il prépare un coup 👀 • t'es dedans ou tu regardes ? 👇", "🙋 {m} : tu viens d'arriver ? bienvenue 👋 regarde d'abord le spectacle, ne rentre pas tout de suite • partage le live 🙏 • lien en bio"],
+    rebond: ["📉 {m} est en bas de sa zone… tu penses qu'il va REBONDIR ou CASSER ? dis-le en commentaire 👇", "🤔 {m} touche le plancher… rebond ou chute ? 👆 tapote si tu crois au rebond"],
+    cassure: ["📈 {m} est en haut de sa zone… CASSURE ou REJET ? écris ton pronostic 👇", "😏 {m} tape le plafond… ça passe ou ça repart en bas ? 👆 tapote si tu dis que ça passe"] };
+  EN.push([" respire… et moi je sais déjà où il va 😏 • 50 taps et je lâche un indice 👆", " breathes… and I already know where it's going 😏 • 50 taps and I drop a hint 👆"], [" fait le calme avant la tempête… TOI tu dis quoi : ça monte ou ça descend ? écris-le 👇", " is the calm before the storm… YOU tell me: up or down? write it 👇"], [" attend que VOUS tapiez… personne tape = je garde l'info pour moi 🤫", " is waiting for YOU to tap… nobody taps = I keep the info to myself 🤫"], [" : les gros joueurs se placent en silence… toi t'es prêt ou tu dors ? 👆 tapote si t'es là", " : big players are positioning quietly… are you ready or sleeping? 👆 tap if you are here"], [" : un vrai trader n'attend pas le mouvement, il l'ANTICIPE • tu veux savoir comment ? lien en bio 😏", " : a real trader doesn't wait for the move, he ANTICIPATES it • want to know how? link in bio 😏"], [" : je compte jusqu'à cent taps et je vous dis ce que je vois 👀 • allez la team !", " I count to a hundred taps and I tell you what I see 👀 • come on team!"], [" : écris « LONG » ou « SHORT » en commentaire… on verra qui avait raison 😎", " write « LONG » or « SHORT » in the comments… we'll see who was right 😎"], [" : le marché s'endort, mais moi non 😏 • partage le live, quand ça part tu me remercieras", " the market falls asleep, but I don't 😏 • share the live, when it moves you'll thank me"], [" : je connais ce marché par cœur… et là il prépare un coup 👀 • t'es dedans ou tu regardes ? 👇", " I know this market by heart… and it's preparing a move 👀 • are you in or just watching? 👇"], [" : tu viens d'arriver ? bienvenue 👋 regarde d'abord le spectacle, ne rentre pas tout de suite • partage le live 🙏 • lien en bio", " just arrived? welcome 👋 watch the show first, don't jump in right away • share the live 🙏 • link in bio"], [" est en bas de sa zone… tu penses qu'il va REBONDIR ou CASSER ? dis-le en commentaire 👇", " is at the bottom of its range… do you think it will BOUNCE or BREAK? tell us in the comments 👇"], [" touche le plancher… rebond ou chute ? 👆 tapote si tu crois au rebond", " touches the floor… bounce or drop? 👆 tap if you believe in the bounce"], [" est en haut de sa zone… CASSURE ou REJET ? écris ton pronostic 👇", " is at the top of its range… BREAKOUT or REJECTION? write your call 👇"], [" tape le plafond… ça passe ou ça repart en bas ? 👆 tapote si tu dis que ça passe", " hits the ceiling… does it break or drop back? 👆 tap if you say it breaks"]);
+  let iaPool = [], iaN = 0;
+  EN.push(['⚡ UNE POSITION SE PRÉPARE • dépêche-toi, les retardataires ont toujours tort 😉 • lien en bio', '⚡ A TRADE IS GETTING READY • hurry up, latecomers are always wrong 😉 • link in bio']);
+  function recuIA(json) {
+    try {
+      const paires = JSON.parse(json).filter(p => Array.isArray(p) && p.length === 2 && !/\d|telegram/i.test(p[0] + p[1]));
+      if (!paires.length) return;
+      iaPool = paires.map(([fr, en]) => { const f = sansPrix(fr); if (!EN.some(e => e[0] === f)) EN.push([f, en]); return f; });
+      iaN = 0;
+    } catch (e) {}
+  }
+  const iaT = setInterval(() => {
+    if (occupe || file.length || !iaPool.length) return;   // jamais par-dessus une vraie info
+    montrer(iaPool[iaN++ % iaPool.length], false, 1);
+  }, 4 * 60 * 1000);
   let astuceN = 0;
   const astuceT = setInterval(() => {
     if (occupe || file.length) return;            // jamais par-dessus une vraie info (TP, SL, news…)
@@ -438,6 +469,14 @@
 
   function recu(txt) {
     txt = String(txt || '').trim(); if (!txt) return;
+    botSuivi(txt);                                                               // v8.5 : le bot est-il VRAIMENT en position ?
+    if (txt.startsWith('IA:')) { recuIA(txt.slice(3)); return; }                 // v8.5 : lot de phrases IA
+    if (txt.startsWith('CMD:chrono:')) {                                          // v8.5 : « une position arrive » + chrono
+      const sec = Math.min(900, Math.max(30, parseInt(txt.split(':')[2], 10) || 0));
+      window.__ALIGN_POS__ = { fin: Date.now() + sec * 1000 };
+      montrer('⚡ UNE POSITION SE PRÉPARE • dépêche-toi, les retardataires ont toujours tort 😉 • lien en bio', false, 1, 'proche', true);
+      return;
+    }
     if (txt.startsWith('CMD:plateforme:')) {          // le bot peut basculer la bande : tiktok / youtube / les2
       const v = txt.split(':')[2]; if (['tiktok', 'youtube', 'les2'].includes(v)) choisirPlateforme(v); return;
     }
@@ -865,7 +904,8 @@
           montrer(tete + ' • le marché prépare quelque chose 👀 pourquoi ? 📲 lien en bio 🎁', false, 2, couleurLigne(n));
           versBot('ligne', cur[4] > l.y ? 1 : -1, '', n);
           setTimeout(() => coeurs(1, ['🤔']), 3600);   // v7.0 : « rentrer ou couper ? » + lien en bio
-          if (n.startsWith('TP')) { explosionArgent(cur[4] > l.y ? -1 : 1); feuArtifice(traverse ? '🎯 OBJECTIF ATTEINT D\'UN COUP !' : '🍾 ÇA ENCAISSE !'); pluieBillets(35); setTimeout(() => coeurs(1, ['💥']), 2500); }   // v7.4 : ligne bleue touchée = champagne + billets + explosion   // v7.4 : TP traversé d'un coup = explosion   // objectif atteint : l'argent suit le sens du marché
+          if (n.startsWith('TP') && !botDedans(m)) { montrer('👀 ' + m + ' a touché l\'objectif du graphique • pas de position du coach cette fois ⏳ • attends le prochain cycle : lien en bio', false, 1); }
+        else if (n.startsWith('TP')) { explosionArgent(cur[4] > l.y ? -1 : 1); feuArtifice(traverse ? '🎯 OBJECTIF ATTEINT D\'UN COUP !' : '🍾 ÇA ENCAISSE !'); pluieBillets(35); setTimeout(() => coeurs(1, ['💥']), 2500); }   // v7.4 : ligne bleue touchée = champagne + billets + explosion   // v7.4 : TP traversé d'un coup = explosion   // objectif atteint : l'argent suit le sens du marché
           return;
         }
       }
@@ -937,7 +977,8 @@
         const r10 = B.slice(-10).reduce((a, x) => a + (x[2] - x[3]), 0) / 10, r40 = B.reduce((a, x) => a + (x[2] - x[3]), 0) / B.length;
         const h = new Date().getHours(), calme = r10 < 0.6 * r40 && tour !== 2;
         const CAL = h < 6 || h >= 23 ? PHRASES.calme_nuit : h < 11 ? PHRASES.calme_matin : h < 14 ? PHRASES.calme_midi : h < 19 ? PHRASES.calme_aprem : PHRASES.calme_soir;
-        const L = calme ? (tendN % 2 ? PHRASES.ennui : CAL) : tour === 3 ? PHRASES.commente : tour === 2 ? PHRASES.branche
+        // v8.6 (demande d'Adel) : marché calme → un VRAI trader anime le live : questions, pression gentille, « tapote », « commente »
+    const L = calme ? (pos < 0.25 ? COACH.rebond : pos > 0.75 ? COACH.cassure : [COACH.anim, COACH.anim, PHRASES.ennui, CAL][tendN % 4]) : tour === 3 ? PHRASES.commente : tour === 2 ? PHRASES.branche
           : tour === 1 ? (pos < 0.2 ? PHRASES.bas_zone : pos > 0.8 ? PHRASES.haut_zone : PHRASES.milieu)
           : larg < 3.2 ? PHRASES.range : pente > 1.2 ? PHRASES.hausse : pente < -1.2 ? PHRASES.baisse : PHRASES.range;
         if (bandeShow(L[Math.floor(tendN / 3) % L.length].replace('{m}', m))) {
@@ -957,7 +998,9 @@
     const s = Math.floor(Date.now() / 1000), reste = 900 - (s % 900), r = zoneGraphique();
     const enAttente = arme && arme.quart === Math.floor(s / 900);
     // v5.8 (demande d'Adel) : le chrono n'est pas là tout le temps : il surgit dans la DERNIÈRE MINUTE puis disparaît à la clôture
-    if ((reste <= 45 || (enAttente && reste <= 60)) && !retour) {
+    // v8.5 (demande d'Adel) : le bot annonce qu'une position arrive → chrono « dépêche-toi, lien en bio » jusqu'au verdict
+    const pa = window.__ALIGN_POS__ && window.__ALIGN_POS__.fin > Date.now() ? window.__ALIGN_POS__ : null;
+    if (((reste <= 45 || (enAttente && reste <= 60)) || pa) && !retour) {
       chrono.style.display = 'flex'; chrono.classList.toggle('urgent', reste <= (enAttente ? 30 : 10));
       // v6.6 : le texte clignote jusqu'à l'explosion et alterne français / anglais toutes les 3 s
       const fr = Math.floor(reste / 3) % 2 === 0;
@@ -965,15 +1008,18 @@
         ? (arme.d === -1 ? (fr ? '🔴 GROSSE DISTRIBUTION<br>' : '🔴 BIG SELL-OFF<br>') : (fr ? '🟢 GROSSE ACCUMULATION<br>' : '🟢 BIG ACCUMULATION<br>'))
           + (reste <= 20 ? (fr ? 'C\'EST MAINTENANT !' : 'IT\'S NOW!') : (fr ? 'abonne-toi • partage 🎁' : 'follow • share 🎁'))
         : (fr ? '⏱ CLÔTURE 15 MIN<br>ça va se décider 👀' : '⏱ 15 MIN CLOSE<br>it\'s about to decide 👀');
-      chrono.innerHTML = Math.floor(reste / 60) + ':' + String(reste % 60).padStart(2, '0') + '<small>' + lbl + '</small>';
+      const rr = pa ? Math.max(0, Math.ceil((pa.fin - Date.now()) / 1000)) : reste;
+      const lbl2 = pa ? plateforme(fr ? '⚡ UNE POSITION ARRIVE<br>dépêche-toi 👉 lien en bio' : '⚡ A TRADE IS COMING<br>hurry up 👉 link in bio') : lbl;
+      chrono.innerHTML = Math.floor(rr / 60) + ':' + String(rr % 60).padStart(2, '0') + '<small>' + lbl2 + '</small>';
       // v5.7 (demande d'Adel) : en bas à droite, côté prix, juste au-dessus du tableau de bord (TikTok coupe le haut gauche)
       // v8.3 (demande d'Adel) : le chrono se met en bas à GAUCHE du tableau, à côté de l'unité 1 min (plus jamais sur un message)
       const mq = masque.style.display === 'flex' ? masque.getBoundingClientRect() : null;
-      if (!mq) chrono.style.left = (r.left + r.width - 70 - chrono.offsetWidth - 14) + 'px';
+      if (!mq) { chrono.style.width = ''; chrono.style.left = (r.left + r.width - 70 - chrono.offsetWidth - 14) + 'px'; }
       // v5.7 : marché qui baisse → en haut à droite juste sous la bande (les bougies descendent, on ne les cache pas) ;
       //        marché qui monte → en bas à droite, un peu au-dessus du tableau de bord (sans le mordre)
       if (!mq) chrono.style.top = (enAttente && arme.d === -1 ? r.top + 82 : r.top + (r.height || 700) - 205 - chrono.offsetHeight) + 'px';
-      else { chrono.style.left = Math.max(r.left + 10, mq.left - chrono.offsetWidth - 12) + 'px'; chrono.style.top = (mq.bottom - chrono.offsetHeight) + 'px'; }
+      // v8.5 (règle d'Adel) : chrono AU-DESSUS des colonnes 1 min / 3 min / 5 min du tableau (3 colonnes sur 11)
+      else { const col3 = mq.width * 3 / 11; chrono.style.boxSizing = 'border-box'; chrono.style.width = col3 + 'px'; chrono.style.left = mq.left + 'px'; chrono.style.top = Math.max(r.top + 90, mq.top - mq.height * HAUT_TABLEAU - chrono.offsetHeight - 8) + 'px'; }
       if (reste === 45 && uneFois('cl' + s)) bandeShow('⏱ Clôture 15 min dans 45 s sur ' + nomMarche() + ' • c\'est elle qui décide 👀 • la suite en temps réel : lien en bio 🎁');
     } else if (chrono.style.display !== 'none') {
       chrono.style.display = 'none';
@@ -1007,10 +1053,21 @@
   const coeurT = setInterval(() => { if (!retour) coeurs(10); }, 80000);   // v7.7 : +12 %
 
   // v7.4 (demande d'Adel) : position en cours dans le bon sens → petits mots qui font sourire, toutes les 4 min (sans prix)
+  let posK = null, posN = 0;
+  const POS_TXT = ['🔥 LA TEAM, VOUS ÊTES RENTRÉS ? si oui tapote l\'écran et écris OUI en commentaire 👇 • partage le live pour qu\'il reste en haut 🙏',
+    '😎 ÇA CONTINUE DANS LE SENS • vous êtes contents ? • ceux qui sont dedans : protection bien placée, on se protège 🛡 • pas rentré ? lien en bio, attends le prochain cycle ⏳'];
+  EN.push([POS_TXT[0], '🔥 TEAM, ARE YOU IN? if yes tap the screen and write YES in the comments 👇 • share the live to keep it on top 🙏'],
+    [POS_TXT[1], '😎 IT KEEPS GOING OUR WAY • happy? • if you are in: keep your protection in place 🛡 • not in? link in bio, wait for the next cycle ⏳']);
   const posT = setInterval(() => { try {
     if (retour) return; const LG = lignesAlign(), E = LG['ENTRÉE'], S = LG.SL; if (!E || !S) return;
     const B = barres(3); if (!B.length) return; const p = B[B.length - 1][4], sens = S.y > E.y ? -1 : 1;
-    if (sens * (p - E.y) <= 0) return;
+    if (sens * (p - E.y) <= 0 || !botDedans(nomMarche())) return;   // v8.5 : seulement si le bot a vraiment donné la position
+    // v8.5 (demande d'Adel) : le marché suit le plan → « vous êtes rentrés ? » puis « ça continue, vous êtes contents ? » (jamais de prix)
+    const kPos = Math.round(E.y); posN = posK === kPos ? posN + 1 : 0; posK = kPos;
+    if (!occupe && !file.length) {
+      if (posN === 0) montrer(POS_TXT[0], false, 1);
+      else if (posN % 3 === 0) montrer(POS_TXT[1], false, 1);
+    }
     coeurs(1, ['😊']); setTimeout(() => coeurs(1, ['😏']), 16600);
   } catch (e) {} }, 190000);   // v7.7 : +12 %
   // v8.2 (demande d'Adel) : en live, la ligne du bas du tableau (▼ SHORT E … TP … SL …) ne montre plus les prix :
@@ -1043,7 +1100,9 @@
       for (let y = cv.height - y0 - 1; y >= 0; y--) { let n = 0, mi = 1e9, ma = -1;   // v8.3 : on part du BAS (la ligne SHORT/LONG est la dernière du tableau)
         for (let x = 0; x < W; x += 2) { const j = (y * W + x) * 4; if (Math.abs(d[j] - R0) < 8 && Math.abs(d[j + 1] - G0) < 8 && Math.abs(d[j + 2] - B0) < 8) { n++; if (x < mi) mi = x; if (x > ma) ma = x; } }
         if (ma - mi > W * 0.3 && n * 2 > 0.6 * (ma - mi)) { if (bas < 0) { bas = y; g = mi; dr = ma; } top = y; } else if (bas >= 0 && top - y > 1) break; }   // s'arrête au trait entre deux lignes du tableau   // le texte blanc au milieu ne coupe pas la ligne
-      if (bas < 0) return;   // v8.4 : si la ligne n'est pas retrouvée un instant, le cache RESTE en place (jamais de prix qui réapparaît)
+      // v8.6 (constat d'Adel) : quand la ligne des % est de la même couleur, le cache montait dessus et cachait les % → hauteur limitée à UNE ligne
+    if (bas >= 0 && bas - top + 1 > 27 * k) top = bas - Math.round(22 * k);
+    if (bas < 0) return;   // v8.4 : si la ligne n'est pas retrouvée un instant, le cache RESTE en place (jamais de prix qui réapparaît)
       Object.assign(masque.style, { display: 'flex', left: (g / k + R.left) + 'px', top: ((top + y0) / k + R.top) + 'px', width: ((dr - g + 2) / k) + 'px',
         height: ((bas - top + 1) / k) + 'px', background: 'rgb(' + R0 + ',' + G0 + ',' + B0 + ')' });
       const en = langueBande() === 'en', sens = (cel.t.match(/[▼▲]?\s*(SHORT|LONG)[^E\d]*/) || [''])[0].trim();
