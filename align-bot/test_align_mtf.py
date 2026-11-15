@@ -1884,7 +1884,7 @@ class AlignSoundAndAiBudgetTest(unittest.TestCase):
                     if isinstance(n, ast.keyword) and n.arg == "disable_notification":
                         silencieux.add(f.name)
         # règles/menu épinglés, chrono et jauge modifiés en place, changement de langue : jamais prépare-toi / entrée / TP / SL
-        self.assertEqual(silencieux, {"epingler", "epingler_menus_chaines", "menu_canal_vip", "_editer_chrono_ou_recreer", "_lancer_chrono_verrouille", "changer_langue", "maj_jauge",
+        self.assertEqual(silencieux, {"epingler", "epingler_menus_chaines", "epingler_compte_finance", "menu_canal_vip", "_editer_chrono_ou_recreer", "_lancer_chrono_verrouille", "changer_langue", "maj_jauge",
                                       "notifier_canal_marche", "renvoyer_claviers", "menu_canal_resultats"})   # écran du live → chaîne : AVEC son ; commentaires de chaîne et nouveau clavier : sans son
 
     def test_sound_asset_and_menu_button(self):

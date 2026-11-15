@@ -5416,8 +5416,12 @@ def boutons_menu_rapide(etat):
     """Boutons sous les messages (chaînes + bot) : positions gagnantes / perdantes, live, coach. Liens vers le bot (marchent depuis une chaîne)."""
     return json.dumps({"inline_keyboard": [
         [{"text": "🏆 Gagnantes", "url": BOT_LIEN + "?start=gagnantes"}, {"text": "❌ Perdantes", "url": BOT_LIEN + "?start=perdantes"}],
-        [{"text": "🧑‍🏫 Mon coach (gratuit)", "url": BOT_LIEN}],
-        [{"text": "💎 VIP", "url": BOT_LIEN + "?start=vip"}, {"text": "🔴 Live" if live_actif(etat) else "📺 Le live", "url": LIVE_LIEN}]]})
+        [{"text": "🧑‍🏫 Mon coach (gratuit)", "url": BOT_LIEN}]]
+        # v8.9 (demande d'Adel) : boutons rapides → l'écran du live le dit tout de suite (anti-spam : 1 fois / 10 min / personne)
+        + ([[{"text": "✅ Je suis rentré", "url": BOT_LIEN + "?start=rentre"}, {"text": "🙅 Pas rentré", "url": BOT_LIEN + "?start=pasrentre"}],
+            [{"text": "👋 Je regarde le live", "url": BOT_LIEN + "?start=present"}]] if live_actif(etat) else [])
+        + [[{"text": "🏦 Compte financé -15 %", "url": BOT_LIEN + "?start=topstep"}]]   # v8.9 : parrainage Topstep
+        + [[{"text": "💎 VIP", "url": BOT_LIEN + "?start=vip"}, {"text": "🔴 Live" if live_actif(etat) else "📺 Le live", "url": LIVE_LIEN}]]})   # VIP / Live toujours en bas
 
 
 def publier_resultat(etat, m, tr, sortie, motif, gain):
@@ -6083,6 +6087,10 @@ def traiter(etat, chats, updates):
             if any(k in txt for k in ("btc", "bitcoin", "gold", "xau", "nasdaq", "nas100")):
                 premier_choix_marche(etat, cid, md_)
             demandes.append((cid, md_))
+        elif "topstep" in txt or "compte finance" in txt:   # v8.9 (demande d'Adel) : parrainage compte financé
+            _envoi_sur(cid, text=texte_compte_finance())
+        elif "start present" in txt or txt.strip() == "present":   # v8.9 : « je regarde le live » → l'écran le dit
+            live_present(etat, cid)
         elif "pasrentre" in txt or "pas rentre" in txt:   # v8.7 (demande d'Adel) : « pas rentré cette fois » → on le garde connecté
             pas_rentre(etat, cid)
         elif "rentre" in txt or txt.strip() == "oui":
@@ -9302,7 +9310,8 @@ def live_publier(texte):
         return False
     try:
         req = urllib.request.Request("https://ntfy.sh/" + urllib.parse.quote(LIVE_SUJET),
-                                     data=str(texte)[:200].encode("utf-8"), headers={"User-Agent": "align-bot"})
+                                     data=str(texte)[:3800 if str(texte).startswith("IA:") else 200].encode("utf-8"),   # v8.9 : le lot IA (JSON) était coupé à 200 caractères → illisible
+                                     headers={"User-Agent": "align-bot"})
         with urllib.request.urlopen(req, timeout=8):
             return True
     except Exception as ex:
@@ -9553,15 +9562,32 @@ def ecran_vers_telegram(etat):
         kb.setdefault("inline_keyboard", []).insert(0, [{"text": "🧠 En savoir plus", "url": BOT_LIEN + "?start=ecran_" + m.lower()}])
         _envoi_sur(canal, text=court, reply_markup=json.dumps(kb))     # AVEC son : l'écran intrigue, le téléphone donne la réponse
 
+def sondage_tp(etat, m):
+    """v8.9 (demande d'Adel) : TP touché → sondage « tu as encaissé ? » dans la chaîne du marché + la bande renvoie vers le mobile."""
+    if time.time() - _LIVE_DERNIER.get(f"sondage{m}", 0) < 1800:
+        return False
+    _LIVE_DERNIER[f"sondage{m}"] = time.time()
+    canal = (etat.get("canaux_marche") or {}).get(m)
+    if canal and TOKEN:
+        try:
+            telegram("sendPoll", chat_id=canal, question=f"🏆 TP touché sur {ICONE.get(m, '')} {m} ! Tu as encaissé avec la team ?",
+                     options=json.dumps(["✅ OUI, encaissé 💰", "🙅 Pas cette fois", "👀 Je regardais le spectacle"]))
+        except Exception as ex:
+            print("sondage tp", m, ex)
+    live_publier("BULLE:🏆 ALORS LA TEAM, QUI A ENCAISSÉ ? 💰 réponds au petit sondage sur ton mobile 📲 • lien en bio")
+    return True
+
+
 def live_annonces(etat, m, textes):
     """Ce que le bot envoie sur Telegram → la bande (sans aucun niveau)."""
     ic = ICONE.get(m, "")
     for t in textes or []:
         t = t if isinstance(t, str) else str(t)
-        if "J'ENTRE MAINTENANT" in t:
+        if "J'ENTRE MAINTENANT" in t or est_entree(t):   # v8.9 : le nouveau modèle « 🟢 GOLD - LONG » n'était pas vu → l'écran ne savait pas qu'ALIGN était dedans
             live_bande(etat, f"🚀 ALIGN ENTRE EN POSITION sur {ic} {m} ! 👉 Le coach en direct : lien en bio 🎁", f"entre{m}", 600, toujours=True)
         elif "OBJECTIF FINAL ATTEINT" in t or re.search(r"TP[2-9] TOUCHÉ", t):
             live_bande(etat, f"🏆 TP TOUCHÉ sur {ic} {m} ! Bravo à ceux qui ont suivi 🔥" + FIN_BANDE, f"tp2{m}", 600, toujours=True)
+            sondage_tp(etat, m)
         elif "FRÔLÉ" in t:
             live_bande(etat, f"BULLE:😅 {ic} {m} : TP frôlé à un cheveu • petit recul, on garde le cap 😎" + FIN_BANDE, f"frole{m}", 600, toujours=True)
         elif "STOP TOUCHÉ" in t:
@@ -9627,13 +9653,92 @@ def live_news(etat, maintenant):
             live_bande(etat, texte, toujours=True)
 
 
+TOPSTEP_CODE = os.environ.get("TOPSTEP_CODE", "TS-K3VLYHY9EORJ2")   # code de parrainage Topstep d'Adel (valable 90 j, à régénérer)
+
+
+FUNDEDNEXT_CODE = os.environ.get("FUNDEDNEXT_CODE", "REFZLZJA3")   # code de parrainage FundedNext d'Adel (7 % de commission)
+TOPSTEP_FIN = "13/02/2027"          # le code expire : à régénérer sur le tableau de bord Topstep (Referrals)
+COMPTE_PROMO_VERSION = "topstep-1"  # changer la valeur = republier + réépingler le message dans les chaînes
+
+
+def texte_compte_finance():
+    """v8.9 (demande d'Adel) : message commercial « compte financé » (épinglé dans les chaînes + bouton du menu).
+    Conseil aux nouveaux + avertissement + transparence sur le parrainage (obligatoire)."""
+    return ("🏦 TRADE AVEC LE CAPITAL D'UNE PROP FIRM 🚀\n━━━━━━━━━━━━\n"
+            "💡 Pourquoi risquer tes économies ? Réussis le challenge, trade avec le capital de la prop firm "
+            "et garde l'essentiel des gains 💰\n"
+            f"🎟 -15 % sur ton 1er Trading Combine Topstep avec le code :\n👉 {TOPSTEP_CODE}\n"
+            f"⏳ Réservé aux 5 premiers nouveaux traders • valable jusqu'au {TOPSTEP_FIN}\n🔗 topstep.com\n━━━━━━━━━━━━\n"
+            f"🎟 -5 % chez FundedNext avec le code : 👉 {FUNDEDNEXT_CODE}\n🔗 fundednext.com\n"
+            "🆓 Pas prêt ? Commence par l'ESSAI GRATUIT / le compte démo : zéro risque pour apprendre 😉\n"
+            "🧠 Lequel choisir ?\n"
+            "🟢 Débutant → CFD (FundedNext / FTMO) : tu choisis ta taille en micro-lots, c'est plus doux pour apprendre\n"
+            "🔴 Confirmé → Futures (Topstep) : 1 seul contrat bouge déjà vite, il faut une vraie maîtrise\n━━━━━━━━━━━━\n"
+            "🧭 LA MÉTHODE ALIGN POUR BIEN DÉMARRER\n"
+            "1️⃣ Regarde d'abord une position ALIGN aller jusqu'au TP1 👀\n"
+            "2️⃣ Ensuite prends la suivante, toujours avec ton SL 🛡\n"
+            "3️⃣ Une position peut durer quelques heures à 2-3 jours : on ne court jamais après le prix 😎\n"
+            "4️⃣ UN SEUL LOT (petite taille) et UNE SEULE position à la fois, surtout sur FTMO / Topstep 🎯\n"
+            "5️⃣ Retardataire ? Fais comme sur le graphique : le prix peut être un peu différent selon ta plateforme 👀\n"
+            "6️⃣ Ne renforce JAMAIS une position (même si ALIGN le fait) : mieux vaut attendre la suivante 🚫\n"
+            "7️⃣ Pas besoin de rester collé à ton téléphone 📵 : active les notifications, ALIGN te prévient AVANT chaque position 🔔\n━━━━━━━━━━━━\n"
+            "⚠️ Ceci n'est pas un conseil en investissement. Le trading comporte un risque de perte en capital. "
+            "Fais tes propres recherches (DYOR).\n🤝 Liens de parrainage : ALIGN reçoit un avantage si tu utilises ces codes.")
+
+
+def epingler_compte_finance(etat):
+    """v8.9 : le message « compte financé » est publié puis épinglé une seule fois par version dans chaque chaîne (sans retirer le menu)."""
+    if not TOKEN:
+        return
+    for m, canal in (etat.get("canaux_marche") or {}).items():
+        info = etat.setdefault("canal_live", {}).setdefault(m, {})
+        if info.get("promo_v") == COMPTE_PROMO_VERSION or time.time() - float(info.get("promo_essai", 0)) < 3600:
+            continue
+        info["promo_essai"] = time.time()
+        res = _envoi_sur(canal, text=texte_compte_finance(), disable_notification="true")
+        try:
+            mid = res["result"]["message_id"]
+        except Exception as ex:
+            print("promo chaîne", m, ex)
+            continue
+        info["promo_v"] = COMPTE_PROMO_VERSION
+        try:
+            telegram("pinChatMessage", chat_id=canal, message_id=mid, disable_notification="true")
+        except Exception as ex:
+            print("épinglage promo", m, ex)
+
+
+LIVE_ECRAN_PAUSE = 20          # v8.9 : au plus 1 message de membre toutes les 20 s sur l'écran (pas d'encombrement)
+
+
+def ecran_membre_libre(cle, pause=600):
+    """Anti-spam des boutons rapides : 1 fois / 10 min par personne et 1 message de membre / 20 s sur l'écran."""
+    now = time.time()
+    if now - _LIVE_DERNIER.get(cle, 0) < pause or now - _LIVE_DERNIER.get("ecran_membres", 0) < LIVE_ECRAN_PAUSE:
+        return False
+    _LIVE_DERNIER[cle] = now
+    _LIVE_DERNIER["ecran_membres"] = now
+    return True
+
+
+def live_present(etat, cid):
+    """v8.9 (demande d'Adel) : « 👋 Je regarde le live » → son prénom passe à l'écran (anti-spam)."""
+    p = (etat.get("prenoms", {}).get(str(cid)) or "Un membre").split(" ")[0][:16]
+    if ecran_membre_libre(f"present{cid}"):
+        live_publier(f"BULLE:👋 {p.upper()} EST SUR LE LIVE ! qui d'autre regarde ? tapote l'écran 👆 et partage 🙏")
+        _envoi_sur(cid, text="👋 Ton prénom passe sur le live !\n👆 Tapote l'écran, commente et partage 🙏")
+    else:
+        _envoi_sur(cid, text="⏳ Déjà envoyé ! Tu pourras renvoyer ton prénom dans quelques minutes 😉")
+
+
 def pas_rentre(etat, cid):
     """v8.7 (demande d'Adel) : un membre n'est pas rentré → on le rassure en privé et l'écran du live le dit (prénom seulement)."""
     p = (etat.get("prenoms", {}).get(str(cid)) or "Un membre").split(" ")[0][:16]
     _envoi_sur(cid, text=("😉 Pas grave, " + p + " !\n🔔 Reste connecté : active la cloche du live et de Telegram\n"
                           "🍿 Regarde le spectacle, la prochaine position arrive\n🙏 Partage le live avec un ami 😄"))
-    live_bande(etat, f"BULLE:😉 {p.upper()} N'EST PAS RENTRÉ CETTE FOIS • pas grave : reste connecté, active la cloche 🔔 • "
-                     "regarde le spectacle et partage le live 🙏😄", f"pasrentre{cid}", 900, toujours=True)
+    if ecran_membre_libre(f"pasrentre{cid}"):
+        live_publier(f"BULLE:😉 {p.upper()} N'EST PAS RENTRÉ CETTE FOIS • pas grave : reste connecté, active la cloche 🔔 • "
+                     "regarde le spectacle et partage le live 🙏😄")
 
 
 def live_suivi(etat, cid, m):
@@ -10222,6 +10327,7 @@ def un_tour(etat, chats):
         try:
             preparer_chaines(etat)
             epingler_menus_chaines(etat)
+            epingler_compte_finance(etat)          # v8.9 : message « compte financé » épinglé
             renvoyer_claviers(etat, chats)
         except Exception as ex:
             print("préparer chaînes", ex)
