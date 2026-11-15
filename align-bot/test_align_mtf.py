@@ -3217,6 +3217,17 @@ class TestEveryMainButtonAnswers(unittest.TestCase):
             out, _ = self._run(t)
             self.assertTrue(out and "DÉJÀ VIP" in out[0]["text"])
 
+    def test_indicateur_pas_vendu_pour_le_moment(self):
+        # Décision d'Adel (15/11) : plus de bouton « 🧩 Indicateur TradingView » ni de prix de l'indicateur
+        self.assertFalse(align_bot.INDICATEUR_EN_VENTE)
+        self.assertNotIn("Indicateur TradingView", align_bot.CLAVIER)
+        self.assertNotIn("/indicateur", align_bot.COMMANDES)
+        sent = []
+        with unittest.mock.patch.object(align_bot, "_envoi_sur", side_effect=lambda c, **k: sent.append(k)):
+            align_bot.menu_indicateur({"proprio": ["1"]}, "999", "x")
+        self.assertTrue(sent and "pas disponible" in sent[0]["text"])
+        self.assertNotIn("49,90", sent[0]["text"])
+
     def test_member_buttons_all_answer(self):
         for t in ("🤖 Mon bot", "📈 Mes résultats", "📸 Partager mon gain", "🧩 Indicateur TradingView", "📊 Faire une analyse"):
             out, d = self._run(t)
