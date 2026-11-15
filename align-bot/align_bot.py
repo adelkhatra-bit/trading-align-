@@ -5420,6 +5420,7 @@ def boutons_menu_rapide(etat):
         # v8.9 (demande d'Adel) : boutons rapides → l'écran du live le dit tout de suite (anti-spam : 1 fois / 10 min / personne)
         + ([[{"text": "✅ Je suis rentré", "url": BOT_LIEN + "?start=rentre"}, {"text": "🙅 Pas rentré", "url": BOT_LIEN + "?start=pasrentre"}],
             [{"text": "👋 Je regarde le live", "url": BOT_LIEN + "?start=present"}]] if live_actif(etat) else [])
+        + [[{"text": "🏦 Compte financé -15 %", "url": BOT_LIEN + "?start=topstep"}]]   # v8.9 : parrainage Topstep
         + [[{"text": "💎 VIP", "url": BOT_LIEN + "?start=vip"}, {"text": "🔴 Live" if live_actif(etat) else "📺 Le live", "url": LIVE_LIEN}]]})   # VIP / Live toujours en bas
 
 
@@ -6086,6 +6087,8 @@ def traiter(etat, chats, updates):
             if any(k in txt for k in ("btc", "bitcoin", "gold", "xau", "nasdaq", "nas100")):
                 premier_choix_marche(etat, cid, md_)
             demandes.append((cid, md_))
+        elif "topstep" in txt or "compte finance" in txt:   # v8.9 (demande d'Adel) : parrainage compte financé
+            _envoi_sur(cid, text=texte_compte_finance())
         elif "start present" in txt or txt.strip() == "present":   # v8.9 : « je regarde le live » → l'écran le dit
             live_present(etat, cid)
         elif "pasrentre" in txt or "pas rentre" in txt:   # v8.7 (demande d'Adel) : « pas rentré cette fois » → on le garde connecté
@@ -9630,6 +9633,20 @@ def live_news(etat, maintenant):
         if etape and cle not in vus:
             vus.append(cle)
             live_bande(etat, texte, toujours=True)
+
+
+TOPSTEP_CODE = os.environ.get("TOPSTEP_CODE", "TS-K3VLYHY9EORJ2")   # code de parrainage Topstep d'Adel (valable 90 j, à régénérer)
+
+
+def texte_compte_finance():
+    """v8.9 (demande d'Adel) : compte financé (prop firm) + conseil aux nouveaux + avertissement + transparence sur le parrainage."""
+    return ("🏦 COMPTE FINANCÉ (prop firm)\n━━━━━━━━━━━━\n"
+            f"🎟 Code Topstep : {TOPSTEP_CODE}\n💸 -15 % sur ton 1er Trading Combine\n🔗 topstep.com\n━━━━━━━━━━━━\n"
+            "👀 Nouveau ? Ne rentre pas tout de suite : regarde d'abord une position ALIGN aller jusqu'au TP1, pour comprendre.\n"
+            "✅ Ensuite tu prends la suivante, toujours avec ton SL.\n"
+            "⏳ Une position peut durer de quelques heures à 2-3 jours, et revenir vers l'entrée avant de partir.\n━━━━━━━━━━━━\n"
+            "⚠️ Ceci n'est pas un conseil en investissement. Le trading comporte un risque de perte en capital. "
+            "Fais tes propres recherches (DYOR).\n🤝 Code de parrainage : ALIGN reçoit un avantage si tu l'utilises.")
 
 
 LIVE_ECRAN_PAUSE = 20          # v8.9 : au plus 1 message de membre toutes les 20 s sur l'écran (pas d'encombrement)
