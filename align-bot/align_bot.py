@@ -7091,7 +7091,7 @@ def envoyer_prospects(etat, texte, signal, clavier=None):
             vus[cid] = ref
         if bot_on(etat, cid) and (TOUT_GRATUIT or (cid not in deja and cid not in etat.get("essai_fini", []))):
             deja[cid] = m      # la position du jour est PROPOSÉE : il choisit de la prendre ou non
-            txt = (("🎁 POSITION GRATUITE\n" if TOUT_GRATUIT else "🎁 TA POSITION GRATUITE DU JOUR\n")
+            txt = (("🎁 POSITION GRATUITE\n" if TOUT_GRATUIT else "🎁 TA POSITION GRATUITE DU JOUR\n") +
                    "🙋 Tu la prends ? Bouton 📍 ci-dessous (tu n'es pas obligé)\n━━━━━━━━━━━━\n" + texte
                    + ("\n━━━━━━━━━━━━\n🎁 Tout est gratuit pour le moment" if TOUT_GRATUIT else "\n━━━━━━━━━━━━\n💎 Toutes les autres + le coach : VIP 49,90 € / mois"))
             k = {"reply_markup": json.dumps({"inline_keyboard": [
