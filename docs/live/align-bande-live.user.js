@@ -1089,8 +1089,14 @@
         const fond = ctx.getImageData(Math.round(3 * k), Math.round(y * k), 1, 1).data;   // v8.3 : la vraie couleur de fond de l'écran (plus de tache noire)
         const a = ((o.ci >>> 24) & 255) / 255, col = [o.ci & 255, (o.ci >> 8) & 255, (o.ci >> 16) & 255].map((v, i) => Math.round(a * v + (1 - a) * fond[i]));
         const y0 = Math.max(0, Math.round((y - 18) * k)), hh = Math.round(36 * k), W = Math.round(cv.width * 0.75), d = ctx.getImageData(0, y0, W, hh).data;
-        let mi = 1e9, ma = -1, yt = 1e9, yb = -1;
-        for (let yy = 0; yy < hh; yy++) for (let x = 0; x < W; x++) { const j = (yy * W + x) * 4; if (Math.abs(d[j] - col[0]) < 14 && Math.abs(d[j + 1] - col[1]) < 14 && Math.abs(d[j + 2] - col[2]) < 14) { if (x < mi) mi = x; if (x > ma) ma = x; if (yy < yt) yt = yy; if (yy > yb) yb = yy; } }
+        // v8.3 : on mesure le CORPS de l'étiquette (colonnes colorées sur au moins 9 px de haut) : la ligne fine de même couleur ne compte pas
+        const ok = j => Math.abs(d[j] - col[0]) < 14 && Math.abs(d[j + 1] - col[1]) < 14 && Math.abs(d[j + 2] - col[2]) < 14;
+        const cnt = new Uint16Array(W); for (let yy = 0; yy < hh; yy++) for (let x = 0; x < W; x++) if (ok((yy * W + x) * 4)) cnt[x]++;
+        const minH = Math.round(9 * k); let mi = -1, ma = -1;
+        for (let x = 0; x < W; x++) { if (cnt[x] >= minH) { if (mi < 0) mi = x; ma = x; } else if (mi >= 0 && x - ma > Math.round(8 * k)) break; }
+        let yt = 1e9, yb = -1;
+        if (mi >= 0) for (let yy = 0; yy < hh; yy++) { let n = 0; for (let x = mi; x <= ma; x++) if (ok((yy * W + x) * 4)) n++; if (n > (ma - mi + 1) * 0.5) { if (yy < yt) yt = yy; if (yy > yb) yb = yy; } }
+        if (mi < 0 || yb < 0) { mi = 1e9; ma = -1; }
         boites.push({ n, o, y, fond: 'rgb(' + fond[0] + ',' + fond[1] + ',' + fond[2] + ')', col: 'rgb(' + col.join(',') + ')', tc: (o.tci & 255) > 128 ? '#fff' : '#111', box: ma > mi + 20 ? { l: mi / k + R.left, t: (y0 + yt) / k + R.top, r: (ma + 1) / k + R.left, b: (y0 + yb + 1) / k + R.top } : null });
       }
       // v8.3 (demande d'Adel : « j'ai l'impression que tu en as mis deux » + « petites bandes noires ») : UNE seule étiquette par ligne,
@@ -1106,7 +1112,10 @@
         + (x.n === 'ENTRÉE' && en ? 'ENTRY' : x.n) + ' <b>❓</b> <span>' + defi(x) + '</span></div>').join('');
     } catch (e) {}
   }
-  const etiqT = setInterval(poserEtiquettes, 300);   // v8.3 : suit le graphique quand tu bouges la souris poserEtiquettes();
+  const etiqT = setInterval(poserEtiquettes, 300);
+  // v8.3 (demande d'Adel) : quand tu bouges / zoomes le graphique, les étiquettes et le cache suivent tout de suite
+  let suitT = 0; ['wheel', 'pointermove'].forEach(ev => document.addEventListener(ev, e => { if (!vivant || (ev === 'pointermove' && !e.buttons) || suitT) return;
+    suitT = requestAnimationFrame(() => { suitT = 0; poserEtiquettes(); poserMasque(); }); }, { passive: true, capture: true }));   // v8.3 : suit le graphique quand tu bouges la souris poserEtiquettes();
   const masqueT = setInterval(poserMasque, 300); poserMasque();
   window.__ALIGN_BANDE__ = {
     version: VERSION, recu, punch: c => coeurs(1, [c]), plateforme: v => choisirPlateforme(v),
