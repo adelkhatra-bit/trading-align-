@@ -10156,8 +10156,10 @@ def live_annonces(etat, m, textes):
         elif "STOP TOUCHÉ" in t:
             live_bande(etat, f"😤 {ic} {m} : stop touché • on coupe petit, on va se refaire 💪" + FIN_BANDE, f"sl{m}", 600, toujours=True)
         elif "🚀 DIRECTION TP" in t:          # demande d'Adel : le marché prend de la vitesse vers le TP → « waouh » + chrono (jamais de prix ni de sens)
-            live_bande(etat, f"BULLE:🤩 WAOUH, ÇA ACCÉLÈRE sur {ic} {m} ! le marché prend de la vitesse 🏎️ • ⏱ prochaine clôture dans {max(1, 5 - int(time.time() // 60) % 5)} min" + FIN_BANDE,
-                       f"waouh{m}", 900, toujours=True)
+            d_ = ((etat.get(m) or {}).get("trade") or {}).get("d", 1)   # demande d'Adel : on prévoit aussi quand ça coule
+            live_bande(etat, (f"BULLE:🌊 WAOUH, ÇA PLONGE sur {ic} {m} ! le marché dévale la pente 🎢" if d_ == -1 else
+                              f"BULLE:🤩 WAOUH, ÇA ACCÉLÈRE sur {ic} {m} ! le marché prend de la vitesse 🏎️")
+                       + f" • ⏱ prochaine clôture dans {max(1, 5 - int(time.time() // 60) % 5)} min" + FIN_BANDE, f"waouh{m}", 900, toujours=True)
             live_bande(etat, f"CMD:chrono:{300 - int(time.time()) % 300}:{m}", f"chronowaouh{m}", 900, toujours=True)
         elif "COUPE ET REPRENDS" in t:      # demande d'Adel : spectacle quand on encaisse avant le retour
             live_bande(etat, f"BULLE:✂️ {ic} {m} : on encaisse TOUT, le gain est dans la poche 💰 • le marché veut revenir… on l'attend au tournant 😏" + FIN_BANDE, f"coupe{m}", 900, toujours=True)
