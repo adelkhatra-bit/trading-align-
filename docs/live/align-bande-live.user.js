@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '8.2';  // v8.2 : prix cachés dans la ligne du bas du tableau (❓ + lien en bio) ; v8.1  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
+  const VERSION = '8.4';  // v8.4 : ligne du bas du tableau revenue à sa couleur d'origine (v8.2), texte 13 px ; v8.3  // v8.3 : (étiquettes posées par-dessus désactivées, à faire dans le Pine), ligne du bas du tableau en couleur neutre, plus grosse, « tu peux rentrer ? 👍 » ; v8.2  // v8.2 : prix cachés dans la ligne du bas du tableau (❓ + lien en bio) ; v8.1  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
   // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
@@ -967,10 +967,13 @@
         : (fr ? '⏱ CLÔTURE 15 MIN<br>ça va se décider 👀' : '⏱ 15 MIN CLOSE<br>it\'s about to decide 👀');
       chrono.innerHTML = Math.floor(reste / 60) + ':' + String(reste % 60).padStart(2, '0') + '<small>' + lbl + '</small>';
       // v5.7 (demande d'Adel) : en bas à droite, côté prix, juste au-dessus du tableau de bord (TikTok coupe le haut gauche)
-      chrono.style.left = (r.left + r.width - 70 - chrono.offsetWidth - 14) + 'px';
+      // v8.3 (demande d'Adel) : le chrono se met en bas à GAUCHE du tableau, à côté de l'unité 1 min (plus jamais sur un message)
+      const mq = masque.style.display === 'flex' ? masque.getBoundingClientRect() : null;
+      if (!mq) chrono.style.left = (r.left + r.width - 70 - chrono.offsetWidth - 14) + 'px';
       // v5.7 : marché qui baisse → en haut à droite juste sous la bande (les bougies descendent, on ne les cache pas) ;
       //        marché qui monte → en bas à droite, un peu au-dessus du tableau de bord (sans le mordre)
-      chrono.style.top = (enAttente && arme.d === -1 ? r.top + 82 : r.top + (r.height || 700) - 205 - chrono.offsetHeight) + 'px';
+      if (!mq) chrono.style.top = (enAttente && arme.d === -1 ? r.top + 82 : r.top + (r.height || 700) - 205 - chrono.offsetHeight) + 'px';
+      else { chrono.style.left = Math.max(r.left + 10, mq.left - chrono.offsetWidth - 12) + 'px'; chrono.style.top = (mq.bottom - chrono.offsetHeight) + 'px'; }
       if (reste === 45 && uneFois('cl' + s)) bandeShow('⏱ Clôture 15 min dans 45 s sur ' + nomMarche() + ' • c\'est elle qui décide 👀 • la suite en temps réel : lien en bio 🎁');
     } else if (chrono.style.display !== 'none') {
       chrono.style.display = 'none';
@@ -1015,7 +1018,7 @@
   const masque = document.createElement('div'); masque.id = 'align-masque'; document.body.appendChild(masque);
   cssPunch.textContent += `
   #align-masque{position:fixed;z-index:140;pointer-events:none;display:none;align-items:center;justify-content:center;gap:10px;color:#fff;
-    font:800 12px/1 system-ui,Segoe UI,Arial,sans-serif;white-space:nowrap;overflow:hidden;letter-spacing:.3px}
+    font:900 13px/1 system-ui,Segoe UI,Arial,sans-serif;   /* v8.4 (Adel) : on garde la couleur d'origine de la ligne, comme en v8.2 (« c'était nickel »), texte un peu plus gros */white-space:nowrap;overflow:hidden;letter-spacing:.3px}
   #align-masque .cle{display:inline-block;animation:emoDanse .6s ease-in-out infinite alternate}
   html.align-cache #align-masque{visibility:hidden!important}`;
   let masqueN = 0;
@@ -1032,26 +1035,94 @@
   function poserMasque() {
     try {
       const cel = celluleSens(); if (!cel) { masque.style.display = 'none'; return; }
-      const R0 = cel.bgc & 255, G0 = (cel.bgc >> 8) & 255, B0 = (cel.bgc >> 16) & 255;
+      const A0 = ((cel.bgc >>> 24) & 255) / 255; let R0 = cel.bgc & 255, G0 = (cel.bgc >> 8) & 255, B0 = (cel.bgc >> 16) & 255;   // v8.4 : couleur parfois transparente
       const cv = document.querySelector('.chart-markup-table .chart-gui-wrapper canvas'); if (!cv) return;
       const R = cv.getBoundingClientRect(), k = cv.width / R.width, W = cv.width, y0 = Math.floor(cv.height * 0.55);
+      { const f = cv.getContext('2d').getImageData(3, cv.height - 3, 1, 1).data; R0 = Math.round(A0 * R0 + (1 - A0) * f[0]); G0 = Math.round(A0 * G0 + (1 - A0) * f[1]); B0 = Math.round(A0 * B0 + (1 - A0) * f[2]); }   // mélangée avec le fond
       const d = cv.getContext('2d').getImageData(0, y0, W, cv.height - y0).data; let top = -1, bas = -1, g = 0, dr = 0;
-      for (let y = 0; y < cv.height - y0; y++) { let n = 0, mi = 1e9, ma = -1;
+      for (let y = cv.height - y0 - 1; y >= 0; y--) { let n = 0, mi = 1e9, ma = -1;   // v8.3 : on part du BAS (la ligne SHORT/LONG est la dernière du tableau)
         for (let x = 0; x < W; x += 2) { const j = (y * W + x) * 4; if (Math.abs(d[j] - R0) < 8 && Math.abs(d[j + 1] - G0) < 8 && Math.abs(d[j + 2] - B0) < 8) { n++; if (x < mi) mi = x; if (x > ma) ma = x; } }
-        if (ma - mi > W * 0.3 && n * 2 > 0.35 * (ma - mi)) { if (top < 0) { top = y; g = mi; dr = ma; } bas = y; } else if (top >= 0 && y - bas > 3) break; }   // le texte blanc au milieu ne coupe pas la ligne
-      if (top < 0) { masque.style.display = 'none'; return; }
+        if (ma - mi > W * 0.3 && n * 2 > 0.6 * (ma - mi)) { if (bas < 0) { bas = y; g = mi; dr = ma; } top = y; } else if (bas >= 0 && top - y > 1) break; }   // s'arrête au trait entre deux lignes du tableau   // le texte blanc au milieu ne coupe pas la ligne
+      if (bas < 0) return;   // v8.4 : si la ligne n'est pas retrouvée un instant, le cache RESTE en place (jamais de prix qui réapparaît)
       Object.assign(masque.style, { display: 'flex', left: (g / k + R.left) + 'px', top: ((top + y0) / k + R.top) + 'px', width: ((dr - g + 2) / k) + 'px',
         height: ((bas - top + 1) / k) + 'px', background: 'rgb(' + R0 + ',' + G0 + ',' + B0 + ')' });
       const en = langueBande() === 'en', sens = (cel.t.match(/[▼▲]?\s*(SHORT|LONG)[^E\d]*/) || [''])[0].trim();
       masque.innerHTML = (masqueN++ % 4 < 2)
         ? esc(sens) + ' • ' + (en ? 'ENTRY' : 'ENTRÉE') + ' <span class="cle">❓</span> • TP <span class="cle">❓</span> • SL <span class="cle">❓</span>'
-        : '<span class="cle">🔒</span> ' + (en ? 'ENTRY PRICE? 👉 LINK IN BIO • FOLLOW 😉' : 'PRIX D\'ENTRÉE ? 👉 LIEN EN BIO • ABONNE-TOI 😉');
+        : (arme ? '<span class="cle">⏳</span> ' + (en ? 'IT\'S ALMOST TIME… CAN YOU GET IN? 👍 LINK IN BIO, HURRY!' : 'ÇA VA ÊTRE LE MOMENT… TU PEUX RENTRER ? 👍 LIEN EN BIO, VITE !')
+          : '<span class="cle">🤔</span> ' + (en ? 'WANT TO KNOW IF YOU CAN GET IN? 👍 LINK IN BIO' : 'TU VEUX SAVOIR SI TU PEUX RENTRER ? 👍 LIEN EN BIO'));   // v8.3 : « vite » seulement quand le spectacle a vraiment annoncé un mouvement (pas de fake)
     } catch (e) {}
   }
-  const masqueT = setInterval(poserMasque, 1500); poserMasque();
+  // v8.3 (demande d'Adel) : les GROSSES étiquettes ENTRÉE / SL / TP1 / TP2 (à gauche, avec les prix) sont recouvertes
+  // et remplacées par des étiquettes courtes « ❓ », toutes de la même taille, alignées sur la colonne du TP2, juste sous leur ligne
+  const etiqBox = document.createElement('div'); etiqBox.id = 'align-etiq'; document.body.appendChild(etiqBox);
+  cssPunch.textContent += `
+  #align-etiq .cache{position:fixed;z-index:139;pointer-events:none;background:rgb(15,15,15);display:flex;align-items:center;justify-content:center;overflow:hidden;
+    white-space:nowrap;border-radius:6px;font:900 13px/1 system-ui,Segoe UI,Arial,sans-serif}
+  #align-etiq .etq span{display:inline-block;animation:emoDanse .9s ease-in-out infinite alternate}
+  #align-etiq .etq.chaud{animation:chaud .6s ease-in-out infinite alternate}
+  @keyframes chaud{from{filter:brightness(1)}to{filter:brightness(1.7) saturate(1.4)}}
+  #align-etiq .etq{position:fixed;z-index:139;pointer-events:none;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;overflow:hidden;padding:0 8px;border-radius:6px;
+    font:900 14px/1.15 system-ui,Segoe UI,Arial,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.45)}
+  #align-etiq .etq b{display:inline-block;animation:emoDanse .7s ease-in-out infinite alternate}
+  html.align-cache #align-etiq{visibility:hidden!important}`;
+  function grossesEtiquettes() {
+    const res = [];
+    try { const mod = chart()._chartWidget.model().model();
+      for (const ds of mod.dataSources()) { if (!/ALIGN/.test(String(ds.title && ds.title()))) continue; const vu = new Set();
+        (function walk(o, d, dansData) { if (!o || d > 8 || typeof o !== 'object' || vu.has(o)) return; vu.add(o);
+          if (o instanceof Map) { o.forEach(v => walk(v, d + 1, dansData)); return; }
+          if (dansData && typeof o.t === 'string' && typeof o.y === 'number') { const n = (o.t.match(/^\s*(ENTRÉE|SL|TP1|TP2)\b/) || [])[1]; if (n && o.st === 'lrg') res.push({ n, o }); return; }
+          for (const k of Object.keys(o)) walk(o[k], d + 1, dansData || k === '_primitivesDataById');
+        })(ds.graphics()._primitivesCollection.dwglabels, 0, false); } } catch (e) {}
+    return res;
+  }
+  let etiqN = 0;
+  const ETIQ_ACTIVES = false;   // v8.3 (décision d'Adel) : PAS d'étiquette posée par-dessus celles du graphique → les étiquettes ENTRÉE/SL/TP se changent dans le script Pine
+  function poserEtiquettes() {
+    if (!ETIQ_ACTIVES) { etiqBox.innerHTML = ''; return; }
+    try {
+      const E = grossesEtiquettes(); if (!E.length) { etiqBox.innerHTML = ''; return; }
+      const cv = document.querySelector('.chart-markup-table .chart-gui-wrapper canvas'); if (!cv) return;
+      const R = cv.getBoundingClientRect(), k = cv.width / R.width, ctx = cv.getContext('2d');
+      const ser = chart()._chartWidget.model().mainSeries(), ps = ser.priceScale(), fv = ser.firstValue();
+      const boites = [];
+      for (const { n, o } of E) {
+        const y = ps.priceToCoordinate(o.y, fv); if (!isFinite(y)) continue;
+        const fond = ctx.getImageData(Math.round(3 * k), Math.round(y * k), 1, 1).data;   // v8.3 : la vraie couleur de fond de l'écran (plus de tache noire)
+        const a = ((o.ci >>> 24) & 255) / 255, col = [o.ci & 255, (o.ci >> 8) & 255, (o.ci >> 16) & 255].map((v, i) => Math.round(a * v + (1 - a) * fond[i]));
+        const y0 = Math.max(0, Math.round((y - 18) * k)), hh = Math.round(36 * k), W = Math.round(cv.width * 0.75), d = ctx.getImageData(0, y0, W, hh).data;
+        // v8.3 : on mesure le CORPS de l'étiquette (colonnes colorées sur au moins 9 px de haut) : la ligne fine de même couleur ne compte pas
+        const ok = j => Math.abs(d[j] - col[0]) < 14 && Math.abs(d[j + 1] - col[1]) < 14 && Math.abs(d[j + 2] - col[2]) < 14;
+        const cnt = new Uint16Array(W); for (let yy = 0; yy < hh; yy++) for (let x = 0; x < W; x++) if (ok((yy * W + x) * 4)) cnt[x]++;
+        const minH = Math.round(9 * k); let mi = -1, ma = -1;
+        for (let x = 0; x < W; x++) { if (cnt[x] >= minH) { if (mi < 0) mi = x; ma = x; } else if (mi >= 0 && x - ma > Math.round(8 * k)) break; }
+        let yt = 1e9, yb = -1;
+        if (mi >= 0) for (let yy = 0; yy < hh; yy++) { let n = 0; for (let x = mi; x <= ma; x++) if (ok((yy * W + x) * 4)) n++; if (n > (ma - mi + 1) * 0.5) { if (yy < yt) yt = yy; if (yy > yb) yb = yy; } }
+        if (mi < 0 || yb < 0) { mi = 1e9; ma = -1; }
+        boites.push({ n, o, y, fond: 'rgb(' + fond[0] + ',' + fond[1] + ',' + fond[2] + ')', col: 'rgb(' + col.join(',') + ')', tc: (o.tci & 255) > 128 ? '#fff' : '#111', box: ma > mi + 20 ? { l: mi / k + R.left, t: (y0 + yt) / k + R.top, r: (ma + 1) / k + R.left, b: (y0 + yb + 1) / k + R.top } : null });
+      }
+      // v8.3 (demande d'Adel : « j'ai l'impression que tu en as mis deux » + « petites bandes noires ») : UNE seule étiquette par ligne,
+      // posée exactement sur l'étiquette d'origine (plus de doublon, plus de cache noir), toutes alignées et de la même largeur,
+      // le prix remplacé par « ❓ » + un petit défi qui change, qui clignote quand le prix s'approche
+      const vis = boites.filter(x => x.box); if (!vis.length) { etiqBox.innerHTML = ''; return; }
+      const xCol = Math.min(...vis.map(x => x.box.l)), larg = Math.max(...vis.map(x => x.box.r)) - xCol, en = langueBande() === 'en';
+      const pNow = ((barres(1)[0]) || [])[4] || 0; etiqN++;
+      const proche = x => pNow && Math.abs(pNow - x.o.y) / pNow < 0.002;
+      const defi = x => { const L = proche(x) ? (en ? ['⚡ GETTING CLOSE!', '👉 LINK IN BIO, HURRY!'] : ['⚡ ÇA APPROCHE !', '👉 LIEN EN BIO, VITE !'])
+        : (en ? ['👀 LINK IN BIO', '🤔 WANNA KNOW?', '😏 DARE YOU?'] : ['👀 LIEN EN BIO', '🤔 T\'AS ENVIE DE SAVOIR ?', '😏 CAP OU PAS CAP ?']); return L[Math.floor(etiqN / 12) % L.length]; };
+      etiqBox.innerHTML = vis.map(x => '<div class="etq' + (proche(x) ? ' chaud' : '') + '" style="left:' + (xCol - 2) + 'px;top:' + (x.box.t - 2) + 'px;width:' + (larg + 4) + 'px;height:' + (x.box.b - x.box.t + 4) + 'px;background:' + x.col + ';color:' + x.tc + '">'
+        + (x.n === 'ENTRÉE' && en ? 'ENTRY' : x.n) + ' <b>❓</b> <span>' + defi(x) + '</span></div>').join('');
+    } catch (e) {}
+  }
+  const etiqT = setInterval(poserEtiquettes, 300);
+  // v8.3 (demande d'Adel) : quand tu bouges / zoomes le graphique, les étiquettes et le cache suivent tout de suite
+  let suitT = 0; ['wheel', 'pointermove'].forEach(ev => document.addEventListener(ev, e => { if (!vivant || (ev === 'pointermove' && !e.buttons) || suitT) return;
+    suitT = requestAnimationFrame(() => { suitT = 0; poserEtiquettes(); poserMasque(); }); }, { passive: true, capture: true }));   // v8.3 : suit le graphique quand tu bouges la souris poserEtiquettes();
+  const masqueT = setInterval(poserMasque, 300); poserMasque();
   window.__ALIGN_BANDE__ = {
     version: VERSION, recu, punch: c => coeurs(1, [c]), plateforme: v => choisirPlateforme(v),
-    stop() { vivant = false; clearTimeout(survolT); cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); clearInterval(masqueT); masque.remove(); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
+    stop() { vivant = false; clearTimeout(survolT); cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); clearInterval(masqueT); masque.remove(); try { cssPunch.remove(); } catch (e) {}   /* v8.4 : plus de vieux styles qui restent après une réinjection */ clearInterval(etiqT); etiqBox.remove(); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
       [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur,.align-billet,.align-argent,.align-punch,.align-ping').forEach(x => x.remove()); try { cssBillet.remove(); } catch (e) {} obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
   };
 })();
