@@ -1038,7 +1038,7 @@
       const d = cv.getContext('2d').getImageData(0, y0, W, cv.height - y0).data; let top = -1, bas = -1, g = 0, dr = 0;
       for (let y = 0; y < cv.height - y0; y++) { let n = 0, mi = 1e9, ma = -1;
         for (let x = 0; x < W; x += 2) { const j = (y * W + x) * 4; if (Math.abs(d[j] - R0) < 8 && Math.abs(d[j + 1] - G0) < 8 && Math.abs(d[j + 2] - B0) < 8) { n++; if (x < mi) mi = x; if (x > ma) ma = x; } }
-        if (ma - mi > W * 0.3 && n * 2 > 0.8 * (ma - mi)) { if (top < 0) { top = y; g = mi; dr = ma; } bas = y; } else if (top >= 0) break; }
+        if (ma - mi > W * 0.3 && n * 2 > 0.35 * (ma - mi)) { if (top < 0) { top = y; g = mi; dr = ma; } bas = y; } else if (top >= 0 && y - bas > 3) break; }   // le texte blanc au milieu ne coupe pas la ligne
       if (top < 0) { masque.style.display = 'none'; return; }
       Object.assign(masque.style, { display: 'flex', left: (g / k + R.left) + 'px', top: ((top + y0) / k + R.top) + 'px', width: ((dr - g + 2) / k) + 'px',
         height: ((bas - top + 1) / k) + 'px', background: 'rgb(' + R0 + ',' + G0 + ',' + B0 + ')' });
