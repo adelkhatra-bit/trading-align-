@@ -257,6 +257,16 @@ jobs:
           ALIGN_TV_API_URL: ${{ secrets.ALIGN_TV_API_URL }}
           ALIGN_TV_READ_TOKEN: ${{ secrets.ALIGN_TV_READ_TOKEN }}
           ALIGN_LIVE_SUJET: ${{ secrets.ALIGN_LIVE_SUJET }}
+          # Trading automatique (mode TEST tant que AUTO_TRADE / TOPSTEP_REEL ne valent pas 1)
+          METAAPI_TOKEN: ${{ secrets.METAAPI_TOKEN }}
+          METAAPI_COMPTES: ${{ vars.METAAPI_COMPTES }}
+          METAAPI_REGION: ${{ vars.METAAPI_REGION }}
+          AUTO_TRADE: ${{ vars.AUTO_TRADE }}
+          TOPSTEP_USERNAME: ${{ secrets.TOPSTEP_USERNAME }}
+          TOPSTEP_API_KEY: ${{ secrets.TOPSTEP_API_KEY }}
+          TOPSTEP_COMPTE: ${{ vars.TOPSTEP_COMPTE }}
+          TOPSTEP_PLANCHER: ${{ vars.TOPSTEP_PLANCHER }}
+          TOPSTEP_REEL: ${{ vars.TOPSTEP_REEL }}
           DUREE_SEC: "21000"
           PAUSE_SEC: "5"
         run: exec python3 align_bot.py
