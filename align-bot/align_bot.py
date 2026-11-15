@@ -2489,6 +2489,16 @@ def carte_coach(m, r, cle, genre, tr=None, raison=None, declencheur=None, signal
         if tr.get("tp2") is not None and tp2_affichable(d, tr["tp1"], tr["tp2"]):
             niv.append((f"🏁 TP2 : {px(tr['tp2'])}", tr["tp2"]))
         l += [x for x, _ in sorted(niv, key=lambda z: -z[1])] + [f"⚖️ R:R : 1:{rr:.1f}".replace(".", ",")]
+        # v8.7 (demande d'Adel) : durée estimée de la position + « le prix peut revenir vers l'entrée », pour ne pas paniquer
+        try:
+            bg = [x for x in (r.get("m1") or [])[-120:] if isinstance(x, dict) and x.get("h") is not None and x.get("l") is not None]
+            a1 = sum(x["h"] - x["l"] for x in bg) / max(len(bg), 1)
+            mins = 0.5 * (abs(tr["tp1"] - tr["e"]) / a1) ** 2 if a1 > 0 else 0
+            if mins > 0:
+                duree = "moins d'1 h" if mins < 60 else "quelques heures" if mins < 360 else "environ 1 journée" if mins < 1800 else "2 à 3 jours"
+                l.append(f"⏳ Durée estimée : {duree} • le prix peut revenir vers l'entrée avant de partir, garde ton SL")
+        except Exception:
+            pass
         if validite:
             l.append(f"⏱ Valide : {validite}")
         try:
@@ -2996,6 +3006,7 @@ def boutons_canal(etat, texte):
     # → 1 seul bouton sous chaque message : il ouvre le bot, où le VIP retrouve le MÊME menu que le gratuit.
     if position and est_entree(texte):
         lignes.append([{"text": "📍 Je prends cette position", "url": lien("rentre")}])
+        lignes.append([{"text": "🙅 Pas rentré cette fois", "url": lien("pasrentre")}])
     lignes.append([{"text": "🤖 Ouvrir mon menu ALIGN", "url": lien("boutons")}])
     return json.dumps({"inline_keyboard": lignes})
 
@@ -6072,6 +6083,8 @@ def traiter(etat, chats, updates):
             if any(k in txt for k in ("btc", "bitcoin", "gold", "xau", "nasdaq", "nas100")):
                 premier_choix_marche(etat, cid, md_)
             demandes.append((cid, md_))
+        elif "pasrentre" in txt or "pas rentre" in txt:   # v8.7 (demande d'Adel) : « pas rentré cette fois » → on le garde connecté
+            pas_rentre(etat, cid)
         elif "rentre" in txt or txt.strip() == "oui":
             repondre(etat, cid, True)
         elif "sorti" in txt or "non" in txt:
@@ -9609,6 +9622,15 @@ def live_news(etat, maintenant):
         if etape and cle not in vus:
             vus.append(cle)
             live_bande(etat, texte, toujours=True)
+
+
+def pas_rentre(etat, cid):
+    """v8.7 (demande d'Adel) : un membre n'est pas rentré → on le rassure en privé et l'écran du live le dit (prénom seulement)."""
+    p = (etat.get("prenoms", {}).get(str(cid)) or "Un membre").split(" ")[0][:16]
+    _envoi_sur(cid, text=("😉 Pas grave, " + p + " !\n🔔 Reste connecté : active la cloche du live et de Telegram\n"
+                          "🍿 Regarde le spectacle, la prochaine position arrive\n🙏 Partage le live avec un ami 😄"))
+    live_bande(etat, f"BULLE:😉 {p.upper()} N'EST PAS RENTRÉ CETTE FOIS • pas grave : reste connecté, active la cloche 🔔 • "
+                     "regarde le spectacle et partage le live 🙏😄", f"pasrentre{cid}", 900, toujours=True)
 
 
 def live_suivi(etat, cid, m):
