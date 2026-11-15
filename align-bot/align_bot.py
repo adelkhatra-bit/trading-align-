@@ -6497,6 +6497,10 @@ def topstep_horaires(etat):
             etat["topstep_plat"] = jour
             topstep_trade.tout_fermer()
             etat.pop("topstep_pos", None)
+        if auto_trade:                                     # économies MetaApi : en service seulement quand une entrée approche
+            on_ = {k for k, v in (etat.get("auto_marches") or {}).items() if v}
+            besoin_ = any((etat.get(k) or {}).get("prep") or (etat.get(k) or {}).get("trade") for k in on_)
+            auto_trade.gerer_deploiement(etat, besoin_)
         for msg_ in (auto_trade.gerer(etat) if auto_trade else []):   # FundedNext : rachats sur repli (100 $ max au total) + BE
             for p_ in proprio(etat):
                 _envoi_sur(p_, text="🤖 " + msg_)
