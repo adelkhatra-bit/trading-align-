@@ -6415,6 +6415,9 @@ def topstep_horaires(etat):
             etat["topstep_plat"] = jour
             topstep_trade.tout_fermer()
             etat.pop("topstep_pos", None)
+        for msg_ in (auto_trade.gerer(etat) if auto_trade else []):   # FundedNext : rachats sur repli (100 $ max au total) + BE
+            for p_ in proprio(etat):
+                _envoi_sur(p_, text="🤖 " + msg_)
         for msg_ in topstep_trade.gerer(etat):             # TP1 → 50 % + BE, TP2 → tout encaissé (demande d'Adel)
             for p_ in proprio(etat):
                 _envoi_sur(p_, text="🤖 " + msg_)
