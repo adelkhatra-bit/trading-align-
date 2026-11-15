@@ -258,6 +258,15 @@ class TestSpectacleV85(unittest.TestCase):
             self.assertNotIn("Telegram", x)
 
 
+class TestIABandeNumerotee(unittest.TestCase):
+    def test_lignes_numerotees_acceptees(self):
+        brut = "1. ça monte ou ça descend ? dis-le en commentaire 👇 | up or down? tell us in the comments 👇\n- **tapote l'écran si t'es là 👆** | **tap the screen if you are here 👆**"
+        p = ab.phrases_bande_propres(brut)
+        self.assertEqual(len(p), 2)
+        self.assertTrue(p[0][0].startswith("ça monte"))
+        self.assertNotIn("**", p[1][0])
+
+
 class TestBandeRassure(unittest.TestCase):
     def test_contre_le_bot_rassure_sans_niveau(self):
         t = ab.texte_bande_flash("🎙 ÇA BOUGE !\n🟠 BTC : 65000\n⚠️ Contre le bot", -1, "BTC")
