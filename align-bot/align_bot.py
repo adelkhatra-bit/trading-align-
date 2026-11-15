@@ -8413,7 +8413,28 @@ def resistance_fvg(out, m, r, cle):
         zones.append((lo, hi, ut.replace("m", " min"), "fvg"))
     for lo, hi, ut, sorte in zones:
         if not (x["h"] >= lo - 0.05 * a and x["l"] <= hi + 0.05 * a):
-            continue                                   # pas touché sur la dernière minute
+            # v7.3 (demande d'Adel, 15/11) : le prix S'APPROCHE (moins de 0,4 ATR) et vient vers la zone → le coach prévient AVANT
+            if pc < lo and p < lo and lo - p <= 0.4 * a and p > pc:
+                plafond = True
+            elif pc > hi and p > hi and p - hi <= 0.4 * a and p < pc:
+                plafond = False
+            else:
+                continue                               # loin, ou le prix s'en éloigne
+            cle_ = f"app{sorte}{ut}{round(lo, 2)}{jour}"
+            if cle_ in vu:
+                continue
+            vu[cle_] = 1
+            cle["rsfvg_t"] = time.time()
+            niveau = px(lo) if lo == hi else f"{px(lo)} – {px(hi)}"
+            quoi = f"la FVG {ut}" if sorte == "fvg" else f"la {'résistance' if plafond else 'zone de support'} {ut}"
+            out.append(f"🔮 ÇA VA TESTER — {ICONE.get(m, '')} {m}\n🎯 Le prix se rapproche de {quoi} ≈ {niveau}\n💰 Prix : {px(p)}\n"
+                       f"{'⬇️ Ça peut rebondir dessous' if plafond else '⬆️ Ça peut rebondir dessus'}\n"
+                       f"🧘 Ne prends pas ça pour argent comptant\n⏳ Patiente jusqu'au « ✅ VALIDÉ »\n🛡 Notre équipe contrôle tous les indicateurs")
+            try:
+                live_publier(f"🔮 {ICONE.get(m, '')} {m} va bientôt tester une zone clé… rebond ou pas ? on te prévient en temps réel : lien en bio 🎁")
+            except Exception as ex:
+                print("bande approche", ex)
+            return
         if pc < lo:
             plafond = True                             # on arrive par le bas : ça bute dessous
         elif pc > hi:
