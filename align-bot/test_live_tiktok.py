@@ -84,6 +84,12 @@ class LiveTikTok(unittest.TestCase):
         for mot in ("GOLD", "SHORT", "LONG", "ZONE", "position"):
             self.assertNotIn(mot, self.publie[0])
 
+    def test_reinjection_arrete_tous_les_animateurs_periodiques(self):
+        bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
+        stop = bande[bande.index("stop() { vivant = false;"):]
+        for timer in ("coachT", "iaT", "astuceT", "regardT", "chronoT", "coeurT", "posT", "masqueT", "etiqT"):
+            self.assertIn(f"clearInterval({timer})", stop, f"timer non arrêté lors de la réinjection : {timer}")
+
     def test_jamais_le_mot_telegram_a_l_ecran(self):
         src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "align_bot.py"), encoding="utf-8").read()
         for ligne in src.splitlines():
