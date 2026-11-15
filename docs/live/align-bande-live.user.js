@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      6.9
+// @version      7.0
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '6.9';
+  const VERSION = '7.0';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -508,7 +508,15 @@
   }
   // v6.9 (demande d'Adel) : plus de petits émojis qui s'envolent (on ne comprend pas ce que c'est) → UNE punchline pro
   // dans une pastille qui monte doucement, en français avec l'anglais dessous. Le contexte choisit la phrase.
+  // v7.0 (demande d'Adel) : quand le marché se réveille, on remercie les tapotements avec un petit mot qui fait sourire (jamais 2 fois le même d'affilée) ;
+  // quand le prix arrive sur une zone clé : « rentrer ou couper ? » + abonne-toi, lien en bio (jamais de prix ni TP/SL sur la bande).
   const PUNCH = [
+    [/⏰/, ['⏰ Vos tapotements ont réveillé le marché 😄', 'Your taps woke up the market'], ['👆 Continuez de tapoter, ça le réveille 😜', 'Keep tapping, it wakes it up'],
+      ['😳 Le marché s\'est réveillé !', 'The market just woke up!'], ['⚡ La team ALIGN a remis le courant 😎', 'Team ALIGN turned the power back on'],
+      ['🥁 Ça bouge enfin ! Merci les tapoteurs 😁', 'Finally moving! Thanks, tappers'], ['☕ Le marché a bu son café 😅', 'The market had its coffee'],
+      ['🔔 Debout là-dedans ! 🤣', 'Wakey wakey! 🤣'], ['💥 Vous l\'avez secoué 😏', 'You shook it up 😏']],
+    [/🤔/, ['🤔 Rentrer ou couper ? 😏', 'In or out? • abonne-toi / follow : lien en bio 🎁'], ['👀 Tu dois couper ta position ? 😬', 'Cut or hold? • abonne-toi / follow : lien en bio 🎁'],
+      ['🎯 Rentrer maintenant ou attendre ? 🤫', 'Enter now or wait? • abonne-toi / follow : lien en bio 🎁'], ['😅 Garder ou couper ? Le coach sait 😉', 'Hold or cut? The coach knows • lien en bio 🎁']],
     [/🪤|🎣|🪶/, ['🪤 Piège en cours', 'Trap in progress'], ['🎣 Qui va mordre ?', 'Who takes the bait?']],
     [/🐋|💰/, ['🐋 Les baleines arrivent', 'Whales incoming'], ['👀 Gros volume', 'Big volume']],
     [/📉|🔴|🌊/, ['📉 La pression vend', 'Sellers in control'], ['🔴 Ça pousse en bas', 'Pushing lower']],
@@ -645,19 +653,20 @@
           const tete = '👀 ' + m + ' arrive sur une zone clé';
           montrer(tete + ' • le marché prépare quelque chose 👀 pourquoi ? 🔌 lien en bio 🎁', false, 2, couleurLigne(n));
           versBot('ligne', cur[4] > l.y ? 1 : -1, '', n);
+          setTimeout(() => coeurs(1, ['🤔']), 3600);   // v7.0 : « rentrer ou couper ? » + lien en bio
           if (n.startsWith('TP')) explosionArgent(cur[4] > l.y ? -1 : 1);   // objectif atteint : l'argent suit le sens du marché
           return;
         }
       }
       // 1) bougie qui accélère (corps > 1,6× la taille moyenne) : explosion visuelle + lueur rouge/verte
       if (Math.abs(corps) > 1.6 * moyR && uneFois('acc' + id)) {
-        pop(sens === -1 ? '📉' : '📈', 'ÇA ACCÉLÈRE ' + (sens === -1 ? '🔴 ' : '🟢 ') + m, sens, 'jusqu\'où ? la suite en temps réel : lien en bio 🎁'); lueur(sens); versBot('acc', sens);
+        pop(sens === -1 ? '📉' : '📈', 'ÇA ACCÉLÈRE ' + (sens === -1 ? '🔴 ' : '🟢 ') + m, sens, 'jusqu\'où ? la suite en temps réel : lien en bio 🎁'); lueur(sens); versBot('acc', sens); setTimeout(() => coeurs(1, ['⏰']), 3600);
         return;
       }
       // 2) cassure du dernier plus haut / plus bas (20 bougies) : on le montre sans donner le prix
       const hh = Math.max(...prev.map(x => x[2])), ll = Math.min(...prev.map(x => x[3]));
-      if (cur[4] < ll && uneFois('cb' + id)) { pop('🚨', 'ÇA CASSE 🔴 ' + m, -1, 'dernier plus bas cassé 📉 ça peut couler encore… infos en temps réel : lien en bio 🎁'); lueur(-1); versBot('casse', -1); return; }
-      if (cur[4] > hh && uneFois('ch' + id)) { pop('🚀', 'ÇA CASSE 🟢 ' + m, 1, 'dernier plus haut cassé 📈 ça peut décoller… infos en temps réel : lien en bio 🎁'); lueur(1); versBot('casse', 1); return; }
+      if (cur[4] < ll && uneFois('cb' + id)) { pop('🚨', 'ÇA CASSE 🔴 ' + m, -1, 'dernier plus bas cassé 📉 ça peut couler encore… infos en temps réel : lien en bio 🎁'); lueur(-1); versBot('casse', -1); setTimeout(() => coeurs(1, ['⏰']), 3600); return; }
+      if (cur[4] > hh && uneFois('ch' + id)) { pop('🚀', 'ÇA CASSE 🟢 ' + m, 1, 'dernier plus haut cassé 📈 ça peut décoller… infos en temps réel : lien en bio 🎁'); lueur(1); versBot('casse', 1); setTimeout(() => coeurs(1, ['⏰']), 3600); return; }
       // 3) gros volume
       if (moyV > 0 && (cur[5] || 0) > 2.5 * moyV && uneFois('vol' + id)) { pop('🐋', 'LES BALEINES BOUGENT sur ' + m, 0, 'gros volume 👀 quelque chose se prépare • lien en bio 🎁'); coeurs(8, ['🐋', '💰', '👀']); versBot('volume', sens); return; }
       // 5) v5.6 ANTICIPATION (demande d'Adel) : dire AVANT que ça accélère, avec le chrono jusqu'à la clôture 15 min
@@ -773,7 +782,7 @@
   const coeurT = setInterval(() => { if (!retour) coeurs(10); }, 100000);
 
   window.__ALIGN_BANDE__ = {
-    version: VERSION, recu, plateforme: v => choisirPlateforme(v),
+    version: VERSION, recu, punch: c => coeurs(1, [c]), plateforme: v => choisirPlateforme(v),
     stop() { cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
       [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur,.align-billet,.align-argent,.align-punch').forEach(x => x.remove()); try { cssBillet.remove(); } catch (e) {} obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
   };
