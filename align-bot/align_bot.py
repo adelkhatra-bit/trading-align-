@@ -2000,7 +2000,7 @@ TRAD = {
 " — dans ": " — in ", " jours": " days", " — en cours": " — now", "✅ Rien d'ici": "✅ Nothing within", "✅ Plus aucune annonce ni discours cette semaine": "✅ No more news or speeches this week",
 "lun. ": "Mon ", "mar. ": "Tue ", "mer. ": "Wed ", "jeu. ": "Thu ", "ven. ": "Fri ", "sam. ": "Sat ", "dim. ": "Sun ", ": ÇA RETRACE": ": IT'S PULLING BACK", "😎 Le repli qu'on attend commence": "😎 The pullback we're waiting for is starting",
 "🎯 Zone visée ≈": "🎯 Target zone ≈", "🎯 Il devrait revenir vers ≈": "🎯 It should come back to ≈", "🕯 La moitié du dernier grand mouvement (vue 15 min)": "🕯 Half of the last big move (15-min chart)", "👀 Sois patient": "👀 Be patient", "👀 Vue 15 min, sois patient": "👀 15-min chart, be patient", "🔔 Je te préviens dès qu'on y est": "🔔 I'll tell you as soon as we're there",
-": LE REPLI EST LÀ": ": THE PULLBACK IS HERE", "se prépare": "is building", "👀 Vue 15 min, tiens-toi prêt": "👀 15-min chart, get ready", "🔔 Prochaine alerte : ÇA ARRIVE": "🔔 Next alert: IT'S COMING", "⚡⚡ PRÉPARE-TOI —": "⚡⚡ GET READY —", "🎯 On est à quelques pips de l'entrée": "🎯 We're a few pips from the entry",
+": LE REPLI EST LÀ": ": THE PULLBACK IS HERE", "se prépare": "is building", "👀 Vue 15 min, tiens-toi prêt": "👀 15-min chart, get ready", "🔔 Prochaine alerte : ÇA ARRIVE": "🔔 Next alert: IT'S COMING", "⚡⚡ PRÉPARE-TOI —": "⚡⚡ GET READY —", "😝 Prépare-toi ≠ vas-y : attends mon feu vert, reste concentré": "😝 Get ready ≠ go: wait for my green light, stay focused", "🎯 On est à quelques pips de l'entrée": "🎯 We're a few pips from the entry",
 "🛑 Dès que tu es dedans : SL un peu": "🛑 As soon as you're in: SL a little", "💰 TP1 juste": "💰 TP1 just", "🙅 Jamais de position sans SL": "🙅 Never a position without SL",
 "🚦 Feu vert 🟢 dans un instant": "🚦 Green light 🟢 in a moment", "🛑 Mets ton SL TOUT DE SUITE": "🛑 Set your SL RIGHT NOW", "✅ Ton bot t'a déjà mis dedans 🤖": "✅ Your bot already put you in 🤖", "🤖 Mon bot": "🤖 My bot", "🤖 MON BOT": "🤖 MY BOT",
 "✅ Il entre tout seul dans chaque position": "✅ It enters every position by itself", "👀 Vue 15 min • SL un peu sous / au-dessus de la mèche": "👀 15-min chart • SL a little below / above the wick",
@@ -3333,7 +3333,7 @@ def ia(etat, consigne, donnees, cle_cache=None, duree=600, premium=False, recher
             cache.pop(k)
     return txt
 
-IA_TON_JEUNE = ("Réponds TOUJOURS en français. Ton : coach trading jeune et cool, tutoiement, phrases très simples, motivant, jamais vulgaire, "
+IA_TON_JEUNE = ("Réponds TOUJOURS en français. Tu es un trader senior expert (bougies, liquidité, news, anticipation) qui parle comme un coach jeune et cool : tutoiement, phrases très simples, motivant, jamais vulgaire, "
                 "jamais de promesse de gain. FORMAT : 4 lignes courtes maximum, une info par ligne, "
                 "chaque ligne commence par un emoji, 12 mots maximum par ligne, aucun paragraphe.")
 
@@ -9348,7 +9348,7 @@ def agent(m, r, cle, ferme):
             if r["t"] - cle.get("recalc_t", 0) >= 1800:
                 out.append((f"⚡⚡ PRÉPARE-TOI — {ICONE.get(m, '')} {m}\n{SENS[d]}\n{qualite(o)}🎯 On est à quelques pips de l'entrée\n👀 Vue {o.get('sl_ut', '5 min')}\n"
                         f"🛑 Dès que tu es dedans : SL un peu {meche_sl(o)}\n"
-                        f"💰 TP1 juste {'sous la' if d == 1 else 'au-dessus du'} {o['n1']}\n🙅 Jamais de position sans SL{statut_txt(0, o)}",
+                        f"💰 TP1 juste {'sous la' if d == 1 else 'au-dessus du'} {o['n1']}\n🙅 Jamais de position sans SL\n😝 Prépare-toi ≠ vas-y : attends mon feu vert, reste concentré{statut_txt(0, o)}",
                         bouton_auto(m)))
         # Surcharge sur PLUSIEURS UT : 5m obligatoire + au moins 1 parmi 10m/15m/30m + confirmation 1h
         R = dict(zip(UT, r["rsis"]))
@@ -9779,11 +9779,13 @@ def live_phrases_ia(etat, maintenant):
     moment = "nuit" if h < 7 else "matin" if h < 12 else "après-midi" if h < 18 else "soirée"
     consigne = ("Écris 6 phrases pour la bande qui défile d'un live TikTok / YouTube de trading (BTC, Gold, NASDAQ). "
                 "Format EXACT, une par ligne : phrase en français | la même phrase en anglais. "
-                "Tu parles comme un VRAI trader pro qui anime son live et connaît le marché par cœur (inspire-toi des meilleurs streamers trading) : "
+                "Tu es un trader SENIOR et commentateur live expert des marchés financiers (bougies, liquidité, sessions, news, discours des banques centrales) : "
+                "tu lis le marché, tu réagis à ce qui se passe et tu ANTICIPES, comme les meilleurs streamers trading. "
                 "tu t'adresses directement aux spectateurs (tu, la team), tu poses des questions (ça va rebondir ? cassure ou rejet ?), "
                 "tu mets une pression gentille (si personne ne tape je garde l'info, cinquante taps et je lâche un indice ; JAMAIS de chiffre). "
                 "Ton jeune, drôle, poli, sûr de lui, émojis bienvenus, 80 caractères max par phrase. "
-                "Varie à chaque fois : faire commenter (ça monte ou ça descend ? dis-le en commentaire), faire tapoter l'écran, "
+                "Varie à chaque fois : faire commenter (ça monte ou ça descend ? dis-le en commentaire), faire tapoter l'écran, petites blagues de trader "
+                "(« c'est pas parce que je dis prépare-toi que je t'ai dit d'y aller 😝 », attendre le feu vert, rester discipliné), vocabulaire des bougies avec un clin d'œil jeune, "
                 "s'abonner, partager, « tu veux mon avis ? lien en bio », suspense sur le prochain mouvement. "
                 "INTERDIT : aucun chiffre, aucun prix, pas les mots entrée, SL, TP, stop, Telegram ; aucune promesse de gain. "
                 "Réponds uniquement avec les 6 lignes.")
