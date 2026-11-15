@@ -5416,11 +5416,11 @@ def boutons_menu_rapide(etat):
     """Boutons sous les messages (chaînes + bot) : positions gagnantes / perdantes, live, coach. Liens vers le bot (marchent depuis une chaîne)."""
     return json.dumps({"inline_keyboard": [
         [{"text": "🏆 Gagnantes", "url": BOT_LIEN + "?start=gagnantes"}, {"text": "❌ Perdantes", "url": BOT_LIEN + "?start=perdantes"}],
-        [{"text": "🧑‍🏫 Mon coach (gratuit)", "url": BOT_LIEN}],
-        [{"text": "💎 VIP", "url": BOT_LIEN + "?start=vip"}, {"text": "🔴 Live" if live_actif(etat) else "📺 Le live", "url": LIVE_LIEN}]]
+        [{"text": "🧑‍🏫 Mon coach (gratuit)", "url": BOT_LIEN}]]
         # v8.9 (demande d'Adel) : boutons rapides → l'écran du live le dit tout de suite (anti-spam : 1 fois / 10 min / personne)
         + ([[{"text": "✅ Je suis rentré", "url": BOT_LIEN + "?start=rentre"}, {"text": "🙅 Pas rentré", "url": BOT_LIEN + "?start=pasrentre"}],
-            [{"text": "👋 Je regarde le live", "url": BOT_LIEN + "?start=present"}]] if live_actif(etat) else [])})
+            [{"text": "👋 Je regarde le live", "url": BOT_LIEN + "?start=present"}]] if live_actif(etat) else [])
+        + [[{"text": "💎 VIP", "url": BOT_LIEN + "?start=vip"}, {"text": "🔴 Live" if live_actif(etat) else "📺 Le live", "url": LIVE_LIEN}]]})   # VIP / Live toujours en bas
 
 
 def publier_resultat(etat, m, tr, sortie, motif, gain):
