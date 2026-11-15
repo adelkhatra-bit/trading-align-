@@ -2851,10 +2851,12 @@ def telegram(methode, **params):
     return resultat
 
 # ───────── Boutons et jauge ─────────
+# Décision d'Adel (15/11) : bouton « 🧩 Indicateur TradingView » retiré tant que l'indicateur n'est pas vendu (INDICATEUR_EN_VENTE=1 pour le remettre)
+INDICATEUR_EN_VENTE = os.environ.get("INDICATEUR_EN_VENTE", "0") == "1"
 CLAVIER = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}, {"text": "💠 Analyse Nasdaq"}],
                                    [{"text": "📊 Faire une analyse"}, {"text": "📡 Mes marchés"}, {"text": "🎙 Mes chaînes"}],
                                    [{"text": "🤖 Mon bot"}, {"text": "📈 Mes résultats"}, {"text": "📸 Partager mon gain"}],
-                                   [{"text": "🧩 Indicateur TradingView"}, {"text": "🌐 English"}],
+                                   ([{"text": "🧩 Indicateur TradingView"}] if INDICATEUR_EN_VENTE else []) + [{"text": "🌐 English"}],
                                    [{"text": "🔴 Live"}]],
                       "resize_keyboard": True, "is_persistent": True, "input_field_placeholder": "Choisis une action ALIGN"})
 # Bot gratuit = accueil / inscriptions : peu de boutons ; « 🎙 Mes chaînes » donne le lien de la chaîne du marché + le coach.
@@ -2886,7 +2888,7 @@ REGLES = ("📌 RÈGLES — ALIGN Signaux\n"
           "📰 News et IA en direct : dans ALIGN VIP 💎\n"
           "🤖 Les abonnés au suivi sont enregistrés automatiquement à l'ouverture du signal.\n"
           "📈 Les résultats sont calculés à la clôture réellement constatée.\n"
-          "🧩 Indicateur TradingView : bouton 🧩 en bas (ne signifie pas que ses signaux sont reçus automatiquement)\n"
+          + ("🧩 Indicateur TradingView : bouton 🧩 en bas (ne signifie pas que ses signaux sont reçus automatiquement)\n" if INDICATEUR_EN_VENTE else "") +
           "━━━━━━━━━━━━\n"
           "🤝 Partage à tes amis :\n"
           "👉 https://t.me/align_mtf_adel_bot")
@@ -2940,7 +2942,7 @@ def message_partage(etat):
     txt = ("🤝 Tu aimes ALIGN Signaux ?\n"
            "📤 Partage-le à tes amis, fais-les en profiter\n"
            f"👉 {lien}\n"
-           "🎁 Positions gratuites\n🧩 Indicateur TradingView 49,90 € / mois")
+           "🎁 Positions gratuites" + ("\n🧩 Indicateur TradingView 49,90 € / mois" if INDICATEUR_EN_VENTE else ""))
     url = "https://t.me/share/url?" + urllib.parse.urlencode({"url": lien, "text": "📈 Signaux BTC + Gold en direct, simples et clairs 👇"})
     return txt, json.dumps({"inline_keyboard": [[{"text": "📤 Partager à un ami", "url": url}]]})
 
@@ -3065,7 +3067,7 @@ def menu_canal_vip(etat):
         [{"text": "🥇 Analyse Gold", "url": lien("analyse_gold")}, {"text": "🟠 Analyse BTC", "url": lien("analyse_btc")}],
         [{"text": "📊 Faire une analyse", "url": lien("faire_analyse")}, {"text": "📡 Mes marchés", "url": lien("marches")}],
         [{"text": "🤖 Mon bot", "url": lien("mon_bot")}, {"text": "📈 Mes résultats", "url": lien("resultats")}],
-        [{"text": "📸 Partager mon gain", "url": lien("gain")}, {"text": "🧩 Indicateur TradingView", "url": lien("indicateur")}],
+        [{"text": "📸 Partager mon gain", "url": lien("gain")}] + ([{"text": "🧩 Indicateur TradingView", "url": lien("indicateur")}] if INDICATEUR_EN_VENTE else []),
         [{"text": "🏆 Gagnantes", "url": lien("gagnantes")}, {"text": "❌ Perdantes", "url": lien("perdantes")}],
         [{"text": "🔴 Le live ALIGN", "url": LIVE_LIEN}]]})
     try:
@@ -5288,7 +5290,7 @@ def changer_langue(etat, cid, anglais, membre_ok):
 COMMANDES = {"/faire_analyse": "📊 Faire une analyse", "/analyse_btc": "🟠 Analyse BTC", "/analyse_gold": "🥇 Analyse Gold", "/mon_bot": "🤖 Mon bot",
              "/resultats": "📈 Mes résultats", "/gain": "📸 Partager mon gain", "/vip": "💎 Devenir VIP",
              "/english": "🌐 English", "/francais": "🌐 Français", "/rentre": "✅ Je suis rentré", "/sorti": "🚪 Je suis sorti",
-             "/indicateur": "🧩 Indicateur TradingView", "/focus": "🎯 Où me concentrer ?",
+             **({"/indicateur": "🧩 Indicateur TradingView"} if INDICATEUR_EN_VENTE else {}), "/focus": "🎯 Où me concentrer ?",
              "/live": "🔴 Live", "/gagnantes": "🏆 Positions gagnantes", "/perdantes": "❌ Positions perdantes"}
 
 def installer_menu(etat):
@@ -6132,6 +6134,13 @@ def bouton_indicateur(etat):
 def menu_indicateur(etat, cid, user):
     """Bouton 🧩 Indicateur : présentation, ou demande du pseudo TradingView si l'abonné y a droit."""
     info = etat.setdefault("indic", {}).get(cid, {})
+    # Décision d'Adel (15/11) : l'indicateur n'est PAS vendu pour le moment, les gens passent par ALIGN (chaînes / live)
+    if not INDICATEUR_EN_VENTE and cid not in proprio(etat) and cid not in etat.get("indic_offert", []):
+        _envoi_sur(cid, reply_markup=CLAVIER, text=(
+            "🧩 L'indicateur n'est pas disponible pour le moment\n"
+            "🎁 Toutes les positions ALIGN restent gratuites\n"
+            "👉 Suis-les en direct dans ta chaîne : bouton 🎙 Mes chaînes"))
+        return
     if a_indicateur(etat, cid):
         if info.get("ok"):
             _envoi_sur(cid, reply_markup=CLAVIER, text=(
