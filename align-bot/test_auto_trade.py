@@ -3,12 +3,12 @@ import auto_trade as at
 
 
 class TestAutoTrade(unittest.TestCase):
-    def test_risque_75_dollars_btc(self):
-        # BTC : contrat 1, SL à 400 $ → SL élargi 500 $ → 75 / 500 = 0,15 lot
-        self.assertEqual(at.volume(64000, 63600, 1), 0.15)
+    def test_risque_1re_entree_50_dollars_btc(self):
+        # BTC : contrat 1, SL à 400 $ → SL élargi 500 $ → 50 / 500 = 0,10 lot (la moitié du budget de 100 $)
+        self.assertEqual(at.volume(64000, 63600, 1), 0.1)
 
     def test_gold_contrat_100(self):
-        self.assertEqual(at.volume(4000, 3995, 100), 0.12)
+        self.assertEqual(at.volume(4000, 3995, 100), 0.08)
 
     def test_sl_trop_large_pas_de_position(self):
         self.assertEqual(at.volume(64000, 54000, 1), 0.0)
@@ -62,6 +62,32 @@ class TestSymboles(unittest.TestCase):
     def test_nasdaq_trouve_le_nom_du_serveur(self):
         with unittest.mock.patch.object(at, "_api", return_value=["US100", "XAUUSD"]):
             self.assertEqual(at.symbole({}, "c", "NASDAQ"), "US100")
+
+
+
+class TestRachats(unittest.TestCase):
+    """Stratégie d'Adel (15/11) : rachats sur repli, TOUTES les positions ensemble ≤ 100 $ de perte."""
+    plan = {"sens": "LONG", "e": 100.0, "sl": 90.0, "tp": 120.0, "taille": 1.0, "pas": 0.01, "be": False, "rachats": 0}
+
+    def pos(self, *x):
+        return [{"openPrice": o, "stopLoss": 90.0, "volume": v} for o, v in x]
+
+    def test_rachat_sur_repli(self):
+        quoi, lots = at.decision(dict(self.plan), self.pos((100.0, 5.0)), 95.0)   # 5 lots × 10 $ = 50 $ de risque
+        self.assertEqual(quoi, "rachat"); self.assertEqual(lots, 5.0)             # 25 $ / 5 $ = 5 lots
+
+    def test_jamais_plus_de_100_dollars(self):
+        pos = self.pos((100.0, 5.0), (95.0, 5.0), (96.0, 3.5))                   # 50 + 25 + 21 = 96 $
+        quoi, lots = at.decision(dict(self.plan, rachats=2, dernier_rachat=99.0), pos, 94.0)
+        self.assertEqual(quoi, "rachat"); self.assertLessEqual(at.risque_positions(pos, 1) + lots * 4, 100.0001)
+
+    def test_pas_de_rachat_sans_repli_ni_sous_le_sl(self):
+        self.assertEqual(at.decision(dict(self.plan), self.pos((100.0, 5.0)), 99.0), (None, None))
+        self.assertEqual(at.decision(dict(self.plan), self.pos((100.0, 5.0)), 89.0), (None, None))
+
+    def test_be_a_plus_1r(self):
+        quoi, moy = at.decision(dict(self.plan), self.pos((100.0, 5.0), (95.0, 5.0)), 108.0)   # moyenne 97,5 → +10,5
+        self.assertEqual(quoi, "be"); self.assertAlmostEqual(moy, 97.5)
 
 
 if __name__ == "__main__":
