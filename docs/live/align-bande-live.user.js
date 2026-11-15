@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      7.0
+// @version      7.1
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '7.0';
+  const VERSION = '7.1';
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -415,6 +415,7 @@
     const bulle = txt.startsWith('BULLE:');
     if (bulle) txt = txt.slice(6).trim();
     if (/TP\d? TOUCH|OBJECTIF FINAL|TP2 TOUCH/i.test(txt)) { feuArtifice(/TP2|FINAL/i.test(txt) ? '🏆 ÇA ENCAISSE !' : '💰 ÇA ENCAISSE !'); pluieBillets(45); }
+    if (/\bSL\b[^\n]{0,12}TOUCH|STOP TOUCH/i.test(txt)) setTimeout(() => coeurs(1, ['😢']), 3600);   // v7.1 : smiley triste, on se refait
     montrer(txt, bulle, 2);
   }
 
@@ -511,6 +512,10 @@
   // v7.0 (demande d'Adel) : quand le marché se réveille, on remercie les tapotements avec un petit mot qui fait sourire (jamais 2 fois le même d'affilée) ;
   // quand le prix arrive sur une zone clé : « rentrer ou couper ? » + abonne-toi, lien en bio (jamais de prix ni TP/SL sur la bande).
   const PUNCH = [
+    // v7.1 : objectif de protection touché → un smiley triste qui relativise (jamais le mot SL ni de prix sur la bande)
+    [/😢/, ['😢 Pas cette fois…', 'Not this time…'], ['😔 Ça arrive, on se refait 💪', 'It happens, we bounce back 💪'],
+      ['🥲 Le marché a gagné cette manche', 'The market won this round'], ['🧠 Le bot apprend de chaque trade', 'The bot learns from every trade'],
+      ['🙃 C\'est pas grave, on le récupère', 'No big deal, we\'ll get it back']],
     [/⏰/, ['⏰ Vos tapotements ont réveillé le marché 😄', 'Your taps woke up the market'], ['👆 Continuez de tapoter, ça le réveille 😜', 'Keep tapping, it wakes it up'],
       ['😳 Le marché s\'est réveillé !', 'The market just woke up!'], ['⚡ La team ALIGN a remis le courant 😎', 'Team ALIGN turned the power back on'],
       ['🥁 Ça bouge enfin ! Merci les tapoteurs 😁', 'Finally moving! Thanks, tappers'], ['☕ Le marché a bu son café 😅', 'The market had its coffee'],
@@ -529,6 +534,8 @@
   cssPunch.textContent = `.align-punch{position:fixed;z-index:9997;pointer-events:none;padding:8px 18px;border-radius:999px;text-align:center;
     background:linear-gradient(90deg,#ff2d95,#8a2be2,#1e90ff);color:#fff;font:900 24px/1.15 system-ui,Segoe UI,Arial,sans-serif;
     box-shadow:0 6px 18px rgba(0,0,0,.45);text-shadow:0 2px 3px rgba(0,0,0,.4);animation:punchMonte 3.4s ease-out forwards}
+  .align-punch .emo{display:inline-block;animation:emoDanse .45s ease-in-out infinite alternate}
+  @keyframes emoDanse{0%{transform:rotate(-14deg) scale(1)}100%{transform:rotate(14deg) scale(1.3)}}
   .align-punch small{display:block;font:700 14px/1.2 system-ui,Segoe UI,Arial,sans-serif;opacity:.9}
   @keyframes punchMonte{0%{opacity:0;transform:translateY(20px) scale(.7)}15%{opacity:1;transform:translateY(0) scale(1.05)}
     25%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-120px)}}`;
@@ -539,10 +546,14 @@
       const cle = (liste || []).join(''), g = PUNCH.find(x => x[0].test(cle)) || PUNCH[PUNCH.length - 1];
       const [fr, en] = g[1 + (punchN++ % (g.length - 1))];
       const r = zoneGraphique(), e = document.createElement('div'); e.className = 'align-punch';
-      e.innerHTML = esc(fr) + '<small>' + esc(en) + '</small>';
+      const mots = fr.split(' '), emo = mots.shift();   // v7.1 : le smiley bouge dans la pastille
+      e.innerHTML = '<span class="emo">' + esc(emo) + '</span> ' + esc(mots.join(' ')) + '<small>' + esc(en) + '</small>';
       document.querySelectorAll('.align-punch').forEach(x => x.remove());
-      e.style.left = (r.left + r.width - 360) + 'px'; e.style.top = (r.top + (r.height || 600) * 0.45) + 'px';
-      document.body.appendChild(e); setTimeout(() => e.remove(), 3500);
+      document.body.appendChild(e);
+      // v7.1 : jamais sur l'échelle de prix (≈ 80 px à droite) ni sur le prix en cours : en bas si le prix est en haut, en haut sinon
+      let hautPrix = 0.5; try { const B = barres(40); const hi = Math.max(...B.map(x => x[2])), lo = Math.min(...B.map(x => x[3])); hautPrix = (B[B.length - 1][4] - lo) / ((hi - lo) || 1); } catch (er) {}
+      e.style.left = Math.max(r.left + 10, r.left + r.width - 90 - e.offsetWidth) + 'px';
+      e.style.top = (r.top + (r.height || 600) * (hautPrix > 0.5 ? 0.6 : 0.2)) + 'px'; setTimeout(() => e.remove(), 3500);
     } catch (e) {}
   }
   function choisirPlateforme(v) { PLATEFORME = v; try { localStorage.setItem('alignPlateforme', v); } catch (e) {} remplir(); }
