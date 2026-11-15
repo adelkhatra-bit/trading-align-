@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      7.3
+// @version      7.4
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @run-at       document-idle
@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '7.3';  // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
+  const VERSION = '7.4';  // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
@@ -117,7 +117,7 @@
   #align-bande .piste span{margin-right:70px}
   #align-bande .flash{position:absolute;inset:0;display:none;align-items:center;justify-content:flex-start;
     padding:0;white-space:nowrap;overflow:hidden;font:900 40px/86px system-ui,Segoe UI,Arial,sans-serif;
-    background:linear-gradient(90deg,#ff4fa3,#ffd400);color:#000;text-shadow:none}
+    background:linear-gradient(90deg,#ff4fa3,#ffd400);color:#000;text-shadow:none;text-transform:uppercase}   /* v7.4 : même rendu que la bande d'accueil (majuscules, 86 px, 40 px) */
   /* v5.4 : même taille d'écriture que la bande normale, une couleur par type d'info (plus de bande blanche) */
   #align-bande .flash.bulle{background:linear-gradient(90deg,#ff7ab8,#ffb3d6);color:#000}
   #align-bande .flash.tp{background:linear-gradient(90deg,#00c853,#ffd400);color:#000}
@@ -225,7 +225,7 @@
     // v6.5 (règle d'Adel) : chaque info rappelle le risque, en français puis en anglais
     if (!/risque|risk/i.test(texte)) texte += ' • ⚠️ Ceci n\'est pas un conseil en investissement, fais tes propres recherches (DYOR) • risque de perte';
     // v7.3 (règle d'Adel, 15/11) : chaque info passe 2 fois en français PUIS 2 fois en anglais
-    const nPass = Math.max(4, 2 * (fois || 1)), items = []; for (let i = 0; i < nPass; i++) items.push({ texte: plateforme(i >= nPass / 2 ? enAnglais(texte) : texte), bulle, g });
+    const nPass = Math.max(4, 2 * (fois || 1)), items = []; for (let i = 0; i < nPass; i++) items.push({ texte: (i >= nPass / 2 ? '🇬🇧 ' : '🇫🇷 ') + plateforme(i >= nPass / 2 ? enAnglais(texte) : texte), bulle, g, en: i >= nPass / 2 });   // v7.4 : jamais FR et EN mélangés, drapeau + teinte
     if (urgent) { let k = 0; while (k < file.length && file[k].g && file[k].g !== 'proche') k++; file.splice(k, 0, ...items); }
     else file.push(...items);
     suivant();
@@ -235,7 +235,7 @@
     occupe = true;
     const m = file.shift();
     flash.innerHTML = '<span>' + esc(m.texte) + '</span>';   // le message défile vite (lisible sur téléphone, même si TikTok coupe les bords)
-    flash.className = 'flash' + (m.g ? ' ' + m.g : m.bulle ? ' bulle' : '');
+    flash.className = 'flash' + (m.g ? ' ' + m.g : m.bulle ? ' bulle' : '') + (m.en ? ' en' : '');
     bande.classList.add('on');
     const sp = flash.firstChild, W = bande.clientWidth, w = sp.offsetWidth;
     const dur = Math.max(4000, (W + w) / 0.38);      // v5.4 : plus rapide (info en temps réel), toujours lisible
@@ -516,6 +516,9 @@
   // v7.0 (demande d'Adel) : quand le marché se réveille, on remercie les tapotements avec un petit mot qui fait sourire (jamais 2 fois le même d'affilée) ;
   // quand le prix arrive sur une zone clé : « rentrer ou couper ? » + abonne-toi, lien en bio (jamais de prix ni TP/SL sur la bande).
   const PUNCH = [
+    // v7.4 : position en cours dans le bon sens → on fait sourire (sans prix)
+    [/😊/, ['😊 Vous êtes contents ? Je vous demande rien…', '😊 Happy? I ask for nothing…'], ['🙏 Juste tapoter l\'écran et partager', '🙏 Just tap the screen and share'], ['😄 Ça roule pour la team ALIGN', '😄 Smooth ride for team ALIGN']],
+    [/😏/, ['😏 Je plains ceux en contre-tendance…', '😏 Feeling sorry for the counter-trend crowd…'], ['💪 On continue dans le sens du marché', '💪 We keep riding the trend'], ['🤭 Pendant ce temps, à contre-sens…', '🤭 Meanwhile, the wrong-way crowd…']],
     // v7.3 : le graphique « parle » quand le coach annonce une zone (🔮 approche, 🧱 / 🛏 contact)
     [/🔮/, ['🔮 Ça va tester !', 'Testing soon!'], ['👀 Zone en approche', 'Zone incoming'], ['🎯 Le marché vise une zone', 'Market eyeing a zone']],
     [/🧱|🛏/, ['🧱 Ça bute !', 'Hitting a wall!'], ['🎯 Zone touchée', 'Zone touched'], ['😮 Contact !', 'Contact!']],
@@ -540,7 +543,9 @@
   const cssPunch = document.createElement('style');
   cssPunch.textContent = `.align-punch{position:fixed;z-index:9997;pointer-events:none;padding:8px 18px;border-radius:999px;text-align:center;
     background:linear-gradient(90deg,#ff2d95,#8a2be2,#1e90ff);color:#fff;font:900 24px/1.15 system-ui,Segoe UI,Arial,sans-serif;
-    box-shadow:0 6px 18px rgba(0,0,0,.45);text-shadow:0 2px 3px rgba(0,0,0,.4);animation:punchMonte 3.4s ease-out forwards}
+    box-shadow:0 6px 18px rgba(0,0,0,.45);text-shadow:0 2px 3px rgba(0,0,0,.4);animation:punchMonte 5.4s ease-out forwards}
+  .align-punch.en{background:linear-gradient(90deg,#0d47a1,#1e88e5,#00bcd4)}
+  #align-bande .flash.en{filter:hue-rotate(35deg) saturate(1.15)}
   .align-punch .emo{display:inline-block;animation:emoDanse .45s ease-in-out infinite alternate}
   @keyframes emoDanse{0%{transform:rotate(-14deg) scale(1)}100%{transform:rotate(14deg) scale(1.3)}}
   .align-punch small{display:block;font:700 14px/1.2 system-ui,Segoe UI,Arial,sans-serif;opacity:.9}
@@ -554,13 +559,15 @@
       const [fr, en] = g[1 + (punchN++ % (g.length - 1))];
       const r = zoneGraphique(), e = document.createElement('div'); e.className = 'align-punch';
       const mots = fr.split(' '), emo = mots.shift();   // v7.1 : le smiley bouge dans la pastille
-      e.innerHTML = '<span class="emo">' + esc(emo) + '</span> ' + esc(mots.join(' ')) + '<small>' + esc(en) + '</small>';
+      e.innerHTML = '<span class="emo">' + esc(emo) + '</span> ' + esc(mots.join(' '));   // v7.4 : la pastille passe en FR, PUIS en EN (jamais mélangées)
       document.querySelectorAll('.align-punch').forEach(x => x.remove());
       document.body.appendChild(e);
       // v7.1 : jamais sur l'échelle de prix (≈ 80 px à droite) ni sur le prix en cours : en bas si le prix est en haut, en haut sinon
       let hautPrix = 0.5; try { const B = barres(40); const hi = Math.max(...B.map(x => x[2])), lo = Math.min(...B.map(x => x[3])); hautPrix = (B[B.length - 1][4] - lo) / ((hi - lo) || 1); } catch (er) {}
       e.style.left = Math.max(r.left + 10, r.left + r.width - 90 - e.offsetWidth) + 'px';
-      e.style.top = (r.top + (r.height || 600) * (hautPrix > 0.5 ? 0.6 : 0.2)) + 'px'; setTimeout(() => e.remove(), 3500);
+      e.style.top = (r.top + (r.height || 600) * (hautPrix > 0.5 ? 0.6 : 0.2)) + 'px'; setTimeout(() => e.remove(), 5500);   // v7.4 : la pastille reste plus longtemps (lisible sur le live)
+      setTimeout(() => { try { const e2 = e.cloneNode(false); e2.className = 'align-punch en'; const m2 = en.split(' '); const em2 = /^\p{Extended_Pictographic}/u.test(m2[0]) ? m2.shift() : emo;
+        e2.innerHTML = '<span class="emo">' + esc(em2) + '</span> ' + esc(m2.join(' ')); document.querySelectorAll('.align-punch').forEach(x => x.remove()); document.body.appendChild(e2); setTimeout(() => e2.remove(), 5500); } catch (er) {} }, 5600);
     } catch (e) {}
   }
   function choisirPlateforme(v) { PLATEFORME = v; try { localStorage.setItem('alignPlateforme', v); } catch (e) {} remplir(); }
@@ -799,9 +806,16 @@
   // de temps en temps des cœurs qui montent : « tapote l'écran »
   const coeurT = setInterval(() => { if (!retour) coeurs(10); }, 100000);
 
+  // v7.4 (demande d'Adel) : position en cours dans le bon sens → petits mots qui font sourire, toutes les 4 min (sans prix)
+  const posT = setInterval(() => { try {
+    if (retour) return; const LG = lignesAlign(), E = LG['ENTRÉE'], S = LG.SL; if (!E || !S) return;
+    const B = barres(3); if (!B.length) return; const p = B[B.length - 1][4], sens = S.y > E.y ? -1 : 1;
+    if (sens * (p - E.y) <= 0) return;
+    coeurs(1, ['😊']); setTimeout(() => coeurs(1, ['😏']), 11600);
+  } catch (e) {} }, 240000);
   window.__ALIGN_BANDE__ = {
     version: VERSION, recu, punch: c => coeurs(1, [c]), plateforme: v => choisirPlateforme(v),
-    stop() { cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
+    stop() { cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
       [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur,.align-billet,.align-argent,.align-punch').forEach(x => x.remove()); try { cssBillet.remove(); } catch (e) {} obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
   };
 })();
