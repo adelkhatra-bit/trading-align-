@@ -1035,9 +1035,10 @@
   function poserMasque() {
     try {
       const cel = celluleSens(); if (!cel) { masque.style.display = 'none'; return; }
-      const R0 = cel.bgc & 255, G0 = (cel.bgc >> 8) & 255, B0 = (cel.bgc >> 16) & 255;
+      const A0 = ((cel.bgc >>> 24) & 255) / 255; let R0 = cel.bgc & 255, G0 = (cel.bgc >> 8) & 255, B0 = (cel.bgc >> 16) & 255;   // v8.4 : couleur parfois transparente
       const cv = document.querySelector('.chart-markup-table .chart-gui-wrapper canvas'); if (!cv) return;
       const R = cv.getBoundingClientRect(), k = cv.width / R.width, W = cv.width, y0 = Math.floor(cv.height * 0.55);
+      { const f = cv.getContext('2d').getImageData(3, cv.height - 3, 1, 1).data; R0 = Math.round(A0 * R0 + (1 - A0) * f[0]); G0 = Math.round(A0 * G0 + (1 - A0) * f[1]); B0 = Math.round(A0 * B0 + (1 - A0) * f[2]); }   // mélangée avec le fond
       const d = cv.getContext('2d').getImageData(0, y0, W, cv.height - y0).data; let top = -1, bas = -1, g = 0, dr = 0;
       for (let y = cv.height - y0 - 1; y >= 0; y--) { let n = 0, mi = 1e9, ma = -1;   // v8.3 : on part du BAS (la ligne SHORT/LONG est la dernière du tableau)
         for (let x = 0; x < W; x += 2) { const j = (y * W + x) * 4; if (Math.abs(d[j] - R0) < 8 && Math.abs(d[j + 1] - G0) < 8 && Math.abs(d[j + 2] - B0) < 8) { n++; if (x < mi) mi = x; if (x > ma) ma = x; } }
