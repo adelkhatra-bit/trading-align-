@@ -6,7 +6,7 @@ Différences voulues par Adel (15/11) avec FundedNext :
     (17 h heure de Chicago, dimanche soir pour le week-end).
   • FundedNext (MT5, auto_trade.py) peut garder les positions plus longtemps.
 
-Sécurité (codée en dur) : 1 micro-contrat, perte max 100 $ par position, arrêt à -150 $ dans la journée,
+Sécurité (codée en dur) : 1 micro-contrat, perte max 75 $ par position, arrêt à -150 $ dans la journée,
 arrêt définitif si le solde passe sous le plancher du compte + 100 $. Mode TEST par défaut (TOPSTEP_REEL=1 pour le réel).
 """
 import json, os, datetime, urllib.request
@@ -18,7 +18,7 @@ LIMITE_TOPSTEP = datetime.time(15, 10)     # positions à plat obligatoires (heu
 FERMETURE_ALIGN = datetime.time(14, 10)    # demande d'Adel : 1 h avant
 REOUVERTURE = datetime.time(17, 0)
 CONTRATS = 1
-PERTE_POSITION_MAX = 100.0
+PERTE_POSITION_MAX = 75.0      # demande d'Adel : 70-80 $ par position
 PERTE_JOUR_MAX = 150.0
 MARGE_PLANCHER = 100.0
 SL_ELARGI = 1.25
