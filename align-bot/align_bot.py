@@ -9645,6 +9645,9 @@ def clavier_live(etat, cid, anglais=False):
         lignes.append([{"text": LIVE_CHOIX[k][2], "callback_data": f"livemain:{k}"} for k in ("1", "5", "15", "60")])
         lignes.append([{"text": f"🎙 {k}", "callback_data": f"coachlive:{k}"} for k in ("BTC", "GOLD", "NASDAQ")])
     if str(cid) in {str(x) for x in proprio(etat)}:
+        # v8.8 (demande d'Adel) : objectif de likes affiché à l'écran, puis « objectif atteint » avec feu d'artifice
+        lignes.append([{"text": f"🎯 {k} likes", "callback_data": f"likeobj:{k}"} for k in ("1K", "5K", "10K", "20K")])
+        lignes.append([{"text": "🎆 Objectif de likes atteint !", "callback_data": "likeok:x"}])
         lignes.append([{"text": "⏹ Live terminé" if live_actif(etat) else "🔴 Je lance le live",
                         "callback_data": "liveoff:x" if live_actif(etat) else "liveon:x"}])
     return json.dumps({"inline_keyboard": lignes}) if lignes else None
@@ -9675,9 +9678,25 @@ def live_annoncer_debut(etat, chats):
 
 def live_callback(etat, chats, cb, choix, mk, qui):
     """Boutons du live. Renvoie True si le bouton appartenait au live."""
-    if choix not in ("liveon", "liveoff", "liveboost", "livemain", "menulive"):
+    if choix not in ("liveon", "liveoff", "liveboost", "livemain", "menulive", "likeobj", "likeok"):
         return False
     anglais = qui in LANG_EN
+    if choix in ("likeobj", "likeok"):          # v8.8 : réservé au propriétaire
+        if qui not in {str(x) for x in proprio(etat)}:
+            return True
+        if choix == "likeobj":
+            etat["like_obj"] = mk
+            live_publier(f"BULLE:🎯 OBJECTIF {mk} LIKES ! tapote l'écran à fond 👆❤️ • quand on y est, je vous lâche la prochaine info 😏 • lien en bio")
+            _envoi_sur(qui, text=f"🎯 Objectif {mk} likes affiché sur le live.\n🎆 Appuie sur « Objectif de likes atteint ! » quand c'est fait.")
+        else:
+            obj = etat.pop("like_obj", "")
+            live_publier(f"🎆 FÉLICITATIONS LA TEAM ! OBJECTIF {obj + ' ' if obj else ''}LIKES ATTEINT 🎉 • comme promis, la prochaine info arrive : viens dans la bio 👉")
+            _envoi_sur(qui, text="🎆 Feu d'artifice envoyé sur le live !")
+        try:
+            telegram("answerCallbackQuery", callback_query_id=cb["id"])
+        except Exception:
+            pass
+        return True
     if choix == "menulive":          # bouton « 🔴 Le live » de l'accueil
         menu_live(etat, qui)
         return True
