@@ -26,7 +26,17 @@ class AdminAuto(unittest.TestCase):
             ab.menu_bot({}, 7)
             ab.menu_bot({}, 8)
         cb = lambda k: [b.get("callback_data") for r in json.loads(k["reply_markup"])["inline_keyboard"] for b in r]
-        self.assertIn("autoadm:menu", cb(vus[0])); self.assertNotIn("autoadm:menu", cb(vus[1]))
+        self.assertIn("autoadm:BTC", cb(vus[0]))                          # panneau ADMIN envoyé au propriétaire
+        self.assertIn("autoadm:menu", cb(vus[1])); self.assertNotIn("autoadm:menu", cb(vus[2]))
+        self.assertEqual(len(vus), 3)
+
+    def test_admin_aussi_en_vue_gratuite(self):
+        vus = []
+        with unittest.mock.patch.object(ab, "_envoi_sur", lambda c, **k: vus.append(k)), \
+             unittest.mock.patch.object(ab, "proprio", return_value=[7]), unittest.mock.patch.object(ab, "vue_gratuite", return_value=True), \
+             unittest.mock.patch.object(ab, "menu_bot_gratuit", lambda e, c: None):
+            ab.menu_bot({}, 7)
+        self.assertTrue(any("autoadm:BTC" in (k.get("reply_markup") or "") for k in vus))
 
 
 if __name__ == "__main__":

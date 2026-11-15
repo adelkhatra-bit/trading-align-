@@ -4575,6 +4575,9 @@ def menu_bot_gratuit(etat, cid):
         + ([[{"text": "💎 Revenir en vue VIP (propriétaire)", "callback_data": "vuegratuit:off"}]] if str(cid) in {str(x) for x in proprio(etat)} else [])}))
 
 def menu_bot(etat, cid):
+    if str(cid) in {str(x) for x in proprio(etat)}:
+        # 16/11 : Adel ne trouvait pas les boutons (son compte est en « vue gratuite ») → le panneau ADMIN arrive TOUJOURS sous « 🤖 Mon bot »
+        commande_auto(etat, cid, "/auto")
     if vue_gratuite(etat, cid):
         return menu_bot_gratuit(etat, cid)
     on = bot_on(etat, cid)
