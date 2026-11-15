@@ -31,6 +31,9 @@ SYMBOLES = {"BTC": ["BTCUSD", "BTCUSD.", "BTCUSDm"], "GOLD": ["XAUUSD", "XAUUSD.
             "NASDAQ": ["NDX100", "NAS100", "US100", "USTEC", "NDX100."]}
 
 TOKEN = os.environ.get("METAAPI_TOKEN", "")
+RISQUE_CONTRE = 60.0   # demande d'Adel (16/11) : contre-tendance pris par le bot, mais jamais plus de 60 $ de risque
+
+
 def budget_risque(e, sl, tp, tp2=None):
     """Règle d'Adel (15/11) : 100 $ de risque SEULEMENT si l'objectif rapporte au moins 3 fois le risque (1:3 → 300-400 $),
     60 $ si au moins 2 fois (1:2), sinon PAS de position. Renvoie le budget total en $ (0 = on n'entre pas)."""
@@ -163,6 +166,8 @@ def executer(etat, signal, journal=print):
             if any(p.get("symbol") == sym and p.get("type") != sens_mt for p in pos):
                 res.append({"compte": compte, "ok": False, "raison": "position opposée interdite"}); continue
             budget = budget_risque(signal["e"], signal["sl"], signal["tp"], signal.get("tp2"))
+            if signal.get("contre"):                     # ↩ contre-tendance vers l'entrée du plan principal : prudence challenge, 60 $ max
+                budget = min(budget, RISQUE_CONTRE)
             if not budget:
                 res.append({"compte": compte, "ok": False, "raison": "gain visé < 2 × le risque : on n'entre pas"}); continue
             spec = _api("GET", f"{compte}/symbols/{sym}/specification")

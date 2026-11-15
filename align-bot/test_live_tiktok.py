@@ -361,3 +361,13 @@ class ZoneMangee(unittest.TestCase):
             t = ab.avant_entree("BTC", r, {}, o, -1)
         self.assertIn("🍽 Zone mangée à 40 %", t)
         self.assertIn("Zone eaten 40 %", ab.traduire(t))
+
+
+class ScalpVautLeCoup(unittest.TestCase):
+    def test_regle(self):
+        si = {"d": 1, "e": 100.0, "sl": 95.0, "tp": 115.0, "rr": 3.0, "voy": 3, "atr": 4.0}
+        self.assertTrue(ab.scalp_vaut_le_coup(si))
+        self.assertFalse(ab.scalp_vaut_le_coup(dict(si, rr=1.5)))                 # gain < 2 × risque
+        self.assertFalse(ab.scalp_vaut_le_coup(dict(si, atr=10.0)))               # trop court (< 2 ATR)
+        self.assertIn("le bot le prend", "\n".join(ab.texte_scalp("BTC", si, -1)))
+        self.assertIn("ne le prend pas", "\n".join(ab.texte_scalp("BTC", dict(si, rr=1.5), -1)))

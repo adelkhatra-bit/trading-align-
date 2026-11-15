@@ -149,5 +149,19 @@ class TestDeploiement(unittest.TestCase):
         self.assertIn(("POST", "A/deploy"), appels); self.assertIn(("POST", "A/undeploy"), appels)
 
 
+class TestContreTendance(unittest.TestCase):
+    def test_contre_plafonne_a_60(self):
+        rep = {"account-information": {"equity": 10000}, "positions": [], "specification": {"contractSize": 1, "volumeStep": 0.01, "minVolume": 0.01},
+               "current-price": {"bid": 64000, "ask": 64002, "time": None}, "/symbols": ["BTCUSD"]}
+        with unittest.mock.patch.object(at, "TOKEN", "x"), unittest.mock.patch.object(at, "COMPTES", ["c1"]), \
+             unittest.mock.patch.object(at, "REEL", False), unittest.mock.patch.object(at, "_api", side_effect=lambda m, c, b=None: next(v for k, v in rep.items() if c.endswith(k))), \
+             unittest.mock.patch.object(at, "prix_fiable", return_value=(True, "")), \
+             unittest.mock.patch.object(at.time, "sleep"), unittest.mock.patch.object(at, "assurer_deploye", return_value=True):
+            sig = {"marche": "BTC", "sens": "LONG", "e": 64000, "sl": 63600, "tp": 65600}      # 1:4 → 100 $ normalement
+            n = at.executer({"auto_marches": {"BTC": True}}, dict(sig), journal=lambda *_: None)[0]["ordre"]["volume"]
+            c = at.executer({"auto_marches": {"BTC": True}}, dict(sig, contre=True), journal=lambda *_: None)[0]["ordre"]["volume"]
+        self.assertLess(c, n)
+
+
 if __name__ == "__main__":
     unittest.main()
