@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '8.1';  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
+  const VERSION = '8.2';  // v8.2 : prix cachés dans la ligne du bas du tableau (❓ + lien en bio) ; v8.1  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
   // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
@@ -1010,9 +1010,48 @@
     if (sens * (p - E.y) <= 0) return;
     coeurs(1, ['😊']); setTimeout(() => coeurs(1, ['😏']), 16600);
   } catch (e) {} }, 190000);   // v7.7 : +12 %
+  // v8.2 (demande d'Adel) : en live, la ligne du bas du tableau (▼ SHORT E … TP … SL …) ne montre plus les prix :
+  // un cache de la même couleur se pose exactement dessus (repéré dans l'image du graphique), sens gardé, prix → « ? » + lien en bio
+  const masque = document.createElement('div'); masque.id = 'align-masque'; document.body.appendChild(masque);
+  cssPunch.textContent += `
+  #align-masque{position:fixed;z-index:140;pointer-events:none;display:none;align-items:center;justify-content:center;gap:10px;color:#fff;
+    font:800 12px/1 system-ui,Segoe UI,Arial,sans-serif;white-space:nowrap;overflow:hidden;letter-spacing:.3px}
+  #align-masque .cle{display:inline-block;animation:emoDanse .6s ease-in-out infinite alternate}
+  html.align-cache #align-masque{visibility:hidden!important}`;
+  let masqueN = 0;
+  function celluleSens() {
+    try { const mod = chart()._chartWidget.model().model(); let res = null;
+      for (const ds of mod.dataSources()) { if (!/ALIGN/.test(String(ds.title && ds.title()))) continue; const vu = new Set();
+        (function walk(o, d, dansData) { if (!o || d > 8 || typeof o !== 'object' || vu.has(o) || res) return; vu.add(o);
+          if (o instanceof Map) { o.forEach(v => walk(v, d + 1, dansData)); return; }
+          if (dansData && typeof o.t === 'string' && typeof o.bgc === 'number') { if (/\b(SHORT|LONG)\b/.test(o.t) && /\d{3,}/.test(o.t)) res = o; return; }
+          for (const k of Object.keys(o)) walk(o[k], d + 1, dansData || k === '_primitivesDataById');
+        })(ds.graphics()._primitivesCollection.dwgtablecells, 0, false); }
+      return res; } catch (e) { return null; }
+  }
+  function poserMasque() {
+    try {
+      const cel = celluleSens(); if (!cel) { masque.style.display = 'none'; return; }
+      const R0 = cel.bgc & 255, G0 = (cel.bgc >> 8) & 255, B0 = (cel.bgc >> 16) & 255;
+      const cv = document.querySelector('.chart-markup-table .chart-gui-wrapper canvas'); if (!cv) return;
+      const R = cv.getBoundingClientRect(), k = cv.width / R.width, W = cv.width, y0 = Math.floor(cv.height * 0.55);
+      const d = cv.getContext('2d').getImageData(0, y0, W, cv.height - y0).data; let top = -1, bas = -1, g = 0, dr = 0;
+      for (let y = 0; y < cv.height - y0; y++) { let n = 0, mi = 1e9, ma = -1;
+        for (let x = 0; x < W; x += 2) { const j = (y * W + x) * 4; if (Math.abs(d[j] - R0) < 8 && Math.abs(d[j + 1] - G0) < 8 && Math.abs(d[j + 2] - B0) < 8) { n++; if (x < mi) mi = x; if (x > ma) ma = x; } }
+        if (ma - mi > W * 0.3 && n * 2 > 0.35 * (ma - mi)) { if (top < 0) { top = y; g = mi; dr = ma; } bas = y; } else if (top >= 0 && y - bas > 3) break; }   // le texte blanc au milieu ne coupe pas la ligne
+      if (top < 0) { masque.style.display = 'none'; return; }
+      Object.assign(masque.style, { display: 'flex', left: (g / k + R.left) + 'px', top: ((top + y0) / k + R.top) + 'px', width: ((dr - g + 2) / k) + 'px',
+        height: ((bas - top + 1) / k) + 'px', background: 'rgb(' + R0 + ',' + G0 + ',' + B0 + ')' });
+      const en = langueBande() === 'en', sens = (cel.t.match(/[▼▲]?\s*(SHORT|LONG)[^E\d]*/) || [''])[0].trim();
+      masque.innerHTML = (masqueN++ % 4 < 2)
+        ? esc(sens) + ' • ' + (en ? 'ENTRY' : 'ENTRÉE') + ' <span class="cle">❓</span> • TP <span class="cle">❓</span> • SL <span class="cle">❓</span>'
+        : '<span class="cle">🔒</span> ' + (en ? 'ENTRY PRICE? 👉 LINK IN BIO • FOLLOW 😉' : 'PRIX D\'ENTRÉE ? 👉 LIEN EN BIO • ABONNE-TOI 😉');
+    } catch (e) {}
+  }
+  const masqueT = setInterval(poserMasque, 1500); poserMasque();
   window.__ALIGN_BANDE__ = {
     version: VERSION, recu, punch: c => coeurs(1, [c]), plateforme: v => choisirPlateforme(v),
-    stop() { vivant = false; clearTimeout(survolT); cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
+    stop() { vivant = false; clearTimeout(survolT); cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); clearInterval(masqueT); masque.remove(); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
       [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur,.align-billet,.align-argent,.align-punch,.align-ping').forEach(x => x.remove()); try { cssBillet.remove(); } catch (e) {} obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
   };
 })();
