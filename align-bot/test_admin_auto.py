@@ -15,8 +15,18 @@ class AdminAuto(unittest.TestCase):
             ab.commande_auto(etat, 1, "/auto_btc")
             self.assertTrue(etat["auto_marches"]["BTC"])
         cb = [b["callback_data"] for r in json.loads(vus[-1]["reply_markup"])["inline_keyboard"] for b in r]
-        self.assertIn("auto:stop", cb); self.assertIn("auto:go", cb); self.assertIn("auto:BTC", cb)
+        self.assertIn("autoadm:stop", cb); self.assertIn("autoadm:go", cb); self.assertIn("autoadm:BTC", cb)
+        self.assertNotIn("auto:BTC", cb)     # jamais le même bouton que le « Coach : préviens-moi » des abonnés
         self.assertIn("TEST", vus[-1]["text"])
+
+    def test_bouton_admin_dans_mon_bot_pour_le_proprio_seulement(self):
+        vus = []
+        with unittest.mock.patch.object(ab, "_envoi_sur", lambda c, **k: vus.append(k)), \
+             unittest.mock.patch.object(ab, "proprio", return_value=[7]), unittest.mock.patch.object(ab, "vue_gratuite", return_value=False):
+            ab.menu_bot({}, 7)
+            ab.menu_bot({}, 8)
+        cb = lambda k: [b.get("callback_data") for r in json.loads(k["reply_markup"])["inline_keyboard"] for b in r]
+        self.assertIn("autoadm:menu", cb(vus[0])); self.assertNotIn("autoadm:menu", cb(vus[1]))
 
 
 if __name__ == "__main__":

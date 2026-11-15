@@ -1497,6 +1497,37 @@ def bloque_dw(r, d, prix=None):
 
 # ───────── Mémoire du bot : il apprend de ses TP et de ses SL ─────────
 MEMOIRE = []          # copie de etat["memoire"] (sauvegardé entre les lancements)
+LECONS = []           # copie de etat["lecons_ia"] : leçons tirées par l'IA après chaque TP / SL, relues avant chaque décision (16/11)
+SERIE_SL_PAUSE = 2    # 2 SL de suite sur un marché → le trading automatique fait une pause de réflexion
+PAUSE_APRES_SL = 2 * 3600
+
+
+def lecons_pour(m, n=3):
+    """Les dernières leçons de l'IA sur ce marché (les SL d'abord) : l'IA les relit avant chaque avis → elle ne refait pas la même erreur."""
+    l = [x for x in LECONS if x.get("m") == m]
+    l.sort(key=lambda x: (x.get("g", 0) > 0, -x.get("t", 0)))
+    return [f"{'SL' if x.get('g', 0) <= 0 else 'TP'} {x.get('sens', '')} {x.get('type', '')} : {x.get('txt', '')}"[:220] for x in l[:n]]
+
+
+def noter_lecon(etat, m, pr, gain, txt):
+    """Garde la leçon de l'IA (30 dernières) et compte les SL de suite par marché (remis à 0 au premier TP)."""
+    if txt:
+        lst = etat.setdefault("lecons_ia", [])
+        lst.append({"m": m, "sens": "LONG" if pr.get("d") == 1 else "SHORT", "type": pr.get("type", ""), "g": round(gain, 3),
+                    "txt": " ".join(str(txt).split())[:200], "t": int(time.time())})
+        del lst[:-30]
+        LECONS[:] = lst
+    s_ = etat.setdefault("serie_sl", {})
+    s_[m] = 0 if gain > 0 else s_.get(m, 0) + 1
+    if s_[m] >= SERIE_SL_PAUSE:
+        etat.setdefault("pause_auto", {})[m] = time.time() + PAUSE_APRES_SL
+        return True
+    return False
+
+
+def en_pause(etat, m, now=None):
+    """Vrai si le marché est en pause de réflexion après plusieurs SL de suite."""
+    return (now or time.time()) < float((etat.get("pause_auto") or {}).get(m, 0))
 
 def session_de(ts):
     h = datetime.datetime.fromtimestamp(ts, PARIS).hour
@@ -2391,7 +2422,8 @@ TRAD.update({   # cartes reliées au graphique (mêmes mots que l'indicateur)
     "🛑 Stop = étiquette « STOP » du graphique": "🛑 Stop = « STOP » label on the chart",
     "⏱ La bougie": "⏱ The", " qui décide clôture dans": " candle that decides closes in",
     "(étiquette ENTRÉE)": "(« ENTRÉE » label)", "🍽 Zone intacte (0 % mangée) : toute la réaction est encore à venir": "🍽 Untouched zone (0 % eaten): the whole reaction is still ahead",
-    "🍽 Zone mangée à": "🍽 Zone eaten", "↩ contre-tendance (60 $ max)": "↩ counter-trend ($60 max)", ": il reste de la place pour rebondir": ": still room to bounce", ": elle s'use, prudence": ": it's wearing out, be careful",
+    "🍽 Zone mangée à": "🍽 Zone eaten", "SL de suite": "SLs in a row", "🤖 Trading auto en pause 2 h : je retravaille mes positions": "🤖 Auto-trading paused 2 h: I'm reworking my positions",
+    "🧠 L'IA relit ses leçons avant de reprendre": "🧠 The AI re-reads its lessons before resuming", "↩ contre-tendance (60 $ max)": "↩ counter-trend ($60 max)", ": il reste de la place pour rebondir": ": still room to bounce", ": elle s'use, prudence": ": it's wearing out, be careful",
     "🍽 Zone mangée à 100 % : traversée en entier, on attend la clôture": "🍽 Zone 100 % eaten: fully crossed, we wait for the close", "· mangée à": "· eaten", "· intacte": "· untouched", "🧲 La zone est une ": "🧲 The zone is a ", "order block + ": "order block + ",
     "FVG : le prix rebondit souvent dessus, on attend le rejet": "FVG: price often bounces there, we wait for the rejection", "l'étiquette ENTRÉE": "the « ENTRÉE » label",
 })
@@ -3522,6 +3554,9 @@ def donnees_ia(m, r, cle):
         "secondes_restantes": max(0, int(close_ts - time.time())),
         "signification": "réévaluation à la clôture, pas une prévision d'entrée"
     }
+    lp = lecons_pour(m)
+    if lp:
+        data["leçons_passées (erreurs à ne pas refaire)"] = lp
     return data
 
 IA_LIGNES_MAX = 6
@@ -4554,7 +4589,8 @@ def menu_bot(etat, cid):
                                                            [{"text": "📡 Choisir mes marchés", "callback_data": "marketsmenu:x"}],
                                                            [{"text": "🔔 Son pièce", "callback_data": "son:piece"}],
                                                            [bouton_plateforme(etat, cid)]]
-                                       + ([[{"text": "👁 Tester la version gratuite", "callback_data": "vuegratuit:on"}]] if str(cid) in {str(x) for x in proprio(etat)} else [])}))
+                                       + ([[{"text": "🛠 ADMIN : trading auto (démarrer / arrêter)", "callback_data": "autoadm:menu"}],
+                                           [{"text": "👁 Tester la version gratuite", "callback_data": "vuegratuit:on"}]] if str(cid) in {str(x) for x in proprio(etat)} else [])}))
 
 def regler_bot(etat, cid, on):
     off = etat.setdefault("bot_off", [])
@@ -5933,12 +5969,12 @@ def traiter(etat, chats, updates):
                     pass
                 _envoi_sur(qui, text=texte_compte_finance())
                 continue
-            if choix == "auto" and str(qui) in {str(x) for x in proprio(etat)}:   # boutons admin du trading automatique
+            if choix == "autoadm" and str(qui) in {str(x) for x in proprio(etat)}:   # boutons ADMIN du trading automatique (propriétaire seulement)
                 try:
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="✅ C'est noté")
                 except Exception:
                     pass
-                commande_auto(etat, qui, {"stop": "/auto_stop", "go": "/auto_go"}.get(mk, f"/auto_{mk.lower()}"))
+                commande_auto(etat, qui, {"stop": "/auto_stop", "go": "/auto_go", "menu": "/auto"}.get(mk, f"/auto_{mk.lower()}"))
                 continue
             if choix == "plateforme":
                 try:
@@ -6473,14 +6509,22 @@ def commande_auto(etat, cid, txt):
     reel = (auto_trade and auto_trade.REEL) or (topstep_trade and topstep_trade.REEL)
     l.append("💰 Mode : RÉEL (vrais ordres)" if reel else "🧪 Mode : TEST (aucun vrai ordre)")
     l.append("🛡 Arrêt automatique : -350 $/jour, -750 $ au total, 100 $ max par plan")
-    boutons = [[{"text": f"{'⏸ Éteindre' if am.get(m) else '▶️ Allumer'} {m}", "callback_data": f"auto:{m}"}] for m in AUTO_MARCHES]
-    boutons += [[{"text": "🛑 TOUT ARRÊTER", "callback_data": "auto:stop"}, {"text": "▶️ TOUT RELANCER", "callback_data": "auto:go"}]]
+    # « autoadm: » (pas « auto: ») : le bouton coach des abonnés « auto:BTC » ne doit JAMAIS allumer / éteindre le vrai trading (bug 16/11)
+    boutons = [[{"text": f"{'⏸ Éteindre' if am.get(m) else '▶️ Allumer'} {m}", "callback_data": f"autoadm:{m}"}] for m in AUTO_MARCHES]
+    boutons += [[{"text": "🛑 TOUT ARRÊTER", "callback_data": "autoadm:stop"}, {"text": "▶️ TOUT RELANCER", "callback_data": "autoadm:go"}]]
+    boutons += [[{"text": "🔄 Actualiser", "callback_data": "autoadm:menu"}]]
+    if any(en_pause(etat, m) for m in AUTO_MARCHES):
+        l.append("🧘 En pause de réflexion (2 SL de suite) : " + ", ".join(m for m in AUTO_MARCHES if en_pause(etat, m)))
     _envoi_sur(cid, text="\n".join(l), reply_markup=json.dumps({"inline_keyboard": boutons}))
 
 
 def auto_entree(etat, m, trx, contre=False):
     """Le bot vient d'entrer : il prend la même position sur les comptes (FundedNext puis Topstep) et prévient le propriétaire.
-    contre=True : ↩ scalp contre-tendance vers l'entrée du plan principal (risque plafonné à 60 $)."""
+    contre=True : ↩ scalp contre-tendance vers l'entrée du plan principal (risque plafonné à 60 $).
+    Pause de réflexion après 2 SL de suite sur ce marché : aucune nouvelle position automatique pendant 2 h."""
+    if en_pause(etat, m):
+        print("AUTO_TRADE", m, "pause de réflexion après SL")
+        return
     sig = {"marche": m, "sens": "LONG" if trx["d"] == 1 else "SHORT", "e": trx["e"], "sl": trx["sl"], "tp": trx["tp1"], "tp2": trx.get("tp2"),
            "contre": contre}
     lignes = []
@@ -10707,7 +10751,7 @@ def surveiller_releve():
 def un_tour(etat, chats):
     """Un tour complet : messages reçus, analyse BTC + Gold, envois, jauges, sauvegarde."""
     LANG_EN.clear(); LANG_EN.update(etat.get("en", []))
-    MEMOIRE[:] = etat.get("memoire", [])
+    MEMOIRE[:] = etat.get("memoire", []); LECONS[:] = etat.get("lecons_ia", [])
     if TOKEN:
         installer_menu(etat)
     demandes = []
@@ -10907,10 +10951,15 @@ def un_tour(etat, chats):
                               f"📚 {pr.get('type', 'position')} {'LONG' if pr.get('d') == 1 else 'SHORT'} en session {pr.get('session', '?')}\n"
                               f"🧠 Bilan de ce type : {w_}/{n_} gagnés\n"
                               + ("💡 Leçon : je serai plus prudent sur ce type de position" if gain <= 0 else "💪 Je garde ce type de position"))
-                t_ = None if not IA_AUTO else ia(etat, "La position est terminée. Tire UNE leçon simple et utile pour la prochaine fois (pourquoi TP ou pourquoi SL). FORMAT : 4 lignes courtes maximum, une info par ligne, chaque ligne commence par un emoji, 12 mots maximum par ligne, aucun paragraphe ni conclusion.",
-                        {"marché": nom_marche, "résultat %": round(gain, 2), "motif": motif, "profil": pr, "bilan de ce type": f"{w_}/{n_}"})
+                t_ = None if not IA_AUTO else ia(etat, "La position est terminée. Tire UNE leçon simple et utile pour la prochaine fois (pourquoi TP ou pourquoi SL : entrée trop tôt, contre la tendance, SL trop serré, news, zone déjà mangée…). Si c'est un SL, dis précisément ce que tu changeras. Ne répète pas une leçon déjà dans leçons_passées : cherche ce qui revient. FORMAT : 4 lignes courtes maximum, une info par ligne, chaque ligne commence par un emoji, 12 mots maximum par ligne, aucun paragraphe ni conclusion.",
+                        {"marché": nom_marche, "résultat %": round(gain, 2), "motif": motif, "profil": pr, "bilan de ce type": f"{w_}/{n_}",
+                         "leçons_passées": lecons_pour(nom_marche, 5)})
                 if t_:
                     envois.append(taguer(f"🧠 La leçon de l'IA ALIGN\n{compacter_ia(t_)}", nom_marche))
+                if noter_lecon(etat, nom_marche, pr, gain, t_) and (etat.get("auto_marches") or {}).get(nom_marche):
+                    for p_ in proprio(etat):
+                        _envoi_sur(p_, text=f"🧘 {ICONE.get(nom_marche, '')} {nom_marche} : {SERIE_SL_PAUSE} SL de suite\n"
+                                            "🤖 Trading auto en pause 2 h : je retravaille mes positions\n🧠 L'IA relit ses leçons avant de reprendre")
         derniers[nom_marche] = r; DERNIERS[nom_marche] = r
         synchroniser_veille_auto(etat, nom_marche, r)
         notifier_clotures(etat, nom_marche, r, cle); notifier_coach_live(etat, nom_marche, r, cle); notifier_canal_marche(etat, nom_marche, r, cle)
@@ -11123,7 +11172,7 @@ def sauver_etat(etat, chats=None):
 def main():
     etat = charger_etat()
     LANG_EN.clear(); LANG_EN.update(etat.get("en", []))
-    MEMOIRE[:] = etat.get("memoire", [])
+    MEMOIRE[:] = etat.get("memoire", []); LECONS[:] = etat.get("lecons_ia", [])
     maintenant_paris = datetime.datetime.now(PARIS)
     print(f"ALIGN_TZ=Europe/Paris LOCAL_NOW={maintenant_paris.isoformat()} UTC_NOW={datetime.datetime.now(datetime.timezone.utc).isoformat()}", flush=True)
     chats = set(etat.get("chats", []))
