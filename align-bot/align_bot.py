@@ -9310,7 +9310,8 @@ def live_publier(texte):
         return False
     try:
         req = urllib.request.Request("https://ntfy.sh/" + urllib.parse.quote(LIVE_SUJET),
-                                     data=str(texte)[:200].encode("utf-8"), headers={"User-Agent": "align-bot"})
+                                     data=str(texte)[:3800 if str(texte).startswith("IA:") else 200].encode("utf-8"),   # v8.9 : le lot IA (JSON) était coupé à 200 caractères → illisible
+                                     headers={"User-Agent": "align-bot"})
         with urllib.request.urlopen(req, timeout=8):
             return True
     except Exception as ex:
