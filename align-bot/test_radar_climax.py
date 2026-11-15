@@ -38,5 +38,13 @@ class Radar(unittest.TestCase):
         self.assertIsNone(ab.texte_ecran("BTC", "feinte", 1, 5, r, cle))
 
 
+class RadarBranche(unittest.TestCase):
+    def test_le_vrai_bot_donne_assez_de_bougies_au_radar(self):
+        src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "align_bot.py"), encoding="utf-8").read()
+        self.assertIn("b15_long=m15[-90:]", src)                       # ≥ 66 bougies 15 min, sinon le radar est muet
+        b = serie()["b15"]
+        self.assertIsNotNone(ab.radar_climax("BTC", {"b15": b[-30:], "b15_long": b, "t": 70 * 900}, {}))
+
+
 if __name__ == "__main__":
     unittest.main()
