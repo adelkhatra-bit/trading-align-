@@ -1,3 +1,4 @@
+import unittest.mock
 """LIVE TikTok : bande qui défile, bulles, boost, télécommande payante (Stars) — jamais de niveaux sur l'écran."""
 import json
 import os
@@ -160,7 +161,7 @@ class CartesRelieesAuGraphique(unittest.TestCase):
         self.assertIn("CLOSE BELOW", en)
         self.assertIn("red line", en)
         src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "align_bot.py"), encoding="utf-8").read()
-        self.assertIn("🟨 Ligne jaune ENTRÉE : attends la CLÔTURE 15 min", src)
+        self.assertIn("CLÔTURE SOUS l'étiquette « ENTRÉE »", src)
         self.assertIn("REJOINT LA TEAM ALIGN", src)
 
 
@@ -190,7 +191,7 @@ class LectureTP1(unittest.TestCase):
 class CartesCouleursGraphique(unittest.TestCase):
     def test_cartes_parlent_des_lignes(self):
         src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "align_bot.py"), encoding="utf-8").read()
-        for mot in ("(ligne jaune)", "(ligne rouge)", "(ligne bleue)", "🔒 SL protégé", "🟨 Entrée {px(tr['e'])} • 🛑 SL"):
+        for mot in ("(étiquette ENTRÉE)", "(ligne rouge)", "(ligne bleue)", "🔒 SL protégé", "🟨 Entrée {px(tr['e'])} • 🛑 SL"):
             self.assertIn(mot, src)
         self.assertIn("(red line)", ab.traduire("🛑 SL : 1 (ligne rouge)"))
 
@@ -329,3 +330,14 @@ class MarcheFermeJamaisEnPosition(unittest.TestCase):
             p = ab.proximite_marche(m, r, {"trade": {"d": 1}}, samedi)
             self.assertEqual(p["classe"], "ferme")
         self.assertEqual(ab.proximite_marche("BTC", r, {"trade": {"d": 1}}, samedi)["classe"], "position")
+
+
+class CarteEntreeClaire(unittest.TestCase):
+    def test_pas_de_jaune_et_meme_bougie_que_le_chrono(self):
+        o = {"e": 100.0, "za": 99.0, "zb": 101.0, "tp1": 95.0, "src": "FVG"}
+        with unittest.mock.patch.object(ab, "timeframe_attendu", return_value="5m"):
+            t = ab.avant_entree("BTC", {}, {}, o, -1)
+        self.assertNotIn("jaune", t.lower()); self.assertNotIn("15 min", t)
+        self.assertIn("bougie 5 min CLÔTURE SOUS l'étiquette « ENTRÉE »", t)
+        self.assertIn("on n'entre PAS encore", t); self.assertIn("VALIDÉ 🔴 SHORT", t)
+        self.assertIn("CLOSE BELOW", ab.traduire(t))
