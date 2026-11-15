@@ -2935,6 +2935,7 @@ def message_partage(etat):
     return txt, json.dumps({"inline_keyboard": [[{"text": "📤 Partager à un ami", "url": url}]]})
 
 OFFERT_JOURS = int(os.environ.get("OFFERT_JOURS", "7"))   # 1 signal complet offert aux visiteurs tous les X jours
+TOUT_GRATUIT = os.environ.get("TOUT_GRATUIT", "1") == "1"   # v7.4 (décision d'Adel, 15/11) : pour le moment TOUT est gratuit ; 0 = modèle essai jusqu'au 1er TP + différé
 DIFFERE_MIN = int(os.environ.get("DIFFERE_MIN", "30"))   # v7.4 : après son 1er TP, le gratuit reçoit les positions en DIFFÉRÉ (le temps réel = VIP)
 POSITIONS_GRATUITES = os.environ.get("POSITIONS_GRATUITES", "0") == "1"   # 0 = positions VIP (49,90 €/mois), 1 position de bienvenue offerte
 LIEN_INDICATEUR = os.environ.get("LIEN_INDICATEUR", "")   # lien du script TradingView « invite-only » (à remplir après publication)
@@ -5435,7 +5436,9 @@ def publier_resultat(etat, m, tr, sortie, motif, gain):
             pay = bouton_payer(etat) or kb
             # v7.4 (modèle d'Adel, 15/11) : le gratuit suit le bot JUSQU'À SON PREMIER TP.
             # SL → on lui offre une autre position ; TP → essai validé : la suite arrive en DIFFÉRÉ, le temps réel = VIP.
-            if g_ > 0:
+            if TOUT_GRATUIT:
+                etat.setdefault("bienvenue", {}).pop(c, None)   # tout gratuit pour le moment : le bot reste allumé, la suivante arrivera aussi
+            elif g_ > 0:
                 fini = etat.setdefault("essai_fini", [])
                 if c not in fini:
                     fini.append(c)
@@ -7079,6 +7082,21 @@ def envoyer_prospects(etat, texte, signal, clavier=None):
         return
     vus = etat.setdefault("masque_vu", {})
     ref = f"{m}:{(tr or {}).get('cree') or int(time.time() // 1800)}"
+    if TOUT_GRATUIT:                       # v7.4 : tout gratuit pour le moment → chaque position part en temps réel
+        for cid in destinataires_gratuits(etat):
+            if not marche_autorise(etat, cid, m) or not bot_on(etat, cid) or vus.get(cid) == ref:
+                continue
+            vus[cid] = ref
+            deja[cid] = m
+            k = {"reply_markup": json.dumps({"inline_keyboard": [
+                [{"text": "📍 Je la prends", "callback_data": f"in:{m}"}],
+                [{"text": "⏸ Plus de positions", "callback_data": "botoff:x"}]]})}
+            try:
+                telegram("sendMessage", chat_id=cid, text=("🎁 POSITION GRATUITE\n🙋 Tu la prends ? Bouton 📍 ci-dessous (tu n'es pas obligé)\n━━━━━━━━━━━━\n"
+                                                            + texte + "\n━━━━━━━━━━━━\n🎁 Tout est gratuit pour le moment"), **k)
+            except Exception as ex:
+                print("prospect", cid, ex)
+        return
     for cid in destinataires_gratuits(etat):
         if not marche_autorise(etat, cid, m):
             continue
