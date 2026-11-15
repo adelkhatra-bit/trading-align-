@@ -9386,7 +9386,11 @@ def agent(m, r, cle, ferme):
         touche = (lo <= o["e"]) if d == 1 else (hi >= o["e"])
         if not cle.get("prep") and abs(p - o["e"]) <= max(0.6 * r["atr"], abs(o["e"] - o["sl"]) * 0.5):
             cle["prep"] = True
-            if r["t"] - cle.get("recalc_t", 0) >= 1800:
+            k_pea = f"{d}|{round(o['e'] / max(r['atr'], 1e-9) / 2)}"
+            vu_pea = cle.setdefault("pea_vu", {})
+            deja_pea = r["t"] - vu_pea.get(k_pea, -10 ** 9) < 4 * 3600 or r["t"] - cle.get("pea_t", -10 ** 9) < 3600
+            if r["t"] - cle.get("recalc_t", 0) >= 1800 and not deja_pea:   # demande d'Adel : UNE seule fois, puis « tu peux entrer » avec le SL
+                vu_pea[k_pea] = r["t"]; cle["pea_t"] = r["t"]
                 out.append((f"{'🟩🟩' if d == 1 else '🟥🟥'} POINT D'ENTRÉE À VENIR — {ICONE.get(m, '')} {m}\n{SENS[d]}\n{qualite(o)}👀 ÇA ARRIVE\n🟩 Le prix entre dans la ZONE du graphique\n🟨 Ligne jaune ENTRÉE : attends la CLÔTURE 15 min {'AU-DESSUS' if d == 1 else 'EN DESSOUS'}\n🙅 Une mèche seule ne suffit pas\n🛑 SL = ligne rouge du graphique\n⚡ Tiens-toi prêt\n🔔 Cloche activée ? Ne rate pas le feu vert\n📍 Zone ≈ {px(o.get('za', o['e']))} – {px(o.get('zb', o['e']))}{statut_txt(0, o)}{avant_entree(m, r, cle, o, d)}", bouton_auto(m)))
         # À quelques pips de l'entrée : « PRÉPARE-TOI » + rappel SL / TP (1 fois par point d'entrée)
         seuil = max(5 * PIP.get(m, 0.1), 0.05 * r["atr"])
