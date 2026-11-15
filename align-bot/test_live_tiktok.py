@@ -223,12 +223,39 @@ class TestPrepareToiLive(unittest.TestCase):
             ab._LIVE_DERNIER.clear()
             ab.live_prepare_toi({}, {}, 1000.0)
             ab.live_prepare_toi({}, {}, 1060.0)
-        self.assertEqual(len(pub), 2)                # prépare-toi + jeu « tapote l'écran », une seule fois
+        self.assertEqual(len(pub), 3)                # prépare-toi + chrono « une position arrive » (v8.5) + jeu « tapote l'écran », une seule fois
         self.assertIn("couler", pub[0]); self.assertIn("verdict dans", pub[0]); self.assertIn("lien en bio", pub[0])
-        self.assertIn("tapote", pub[1])
+        self.assertEqual(pub[1], "CMD:chrono:800:BTC")   # chrono jusqu'à la clôture 15 min, jamais de prix
+        self.assertIn("tapote", pub[2])
         for t in pub:
             self.assertNotIn("65", t); self.assertNotIn("Telegram", t)
 
+
+
+class TestSpectacleV85(unittest.TestCase):
+    def test_phrases_ia_filtrees(self):
+        brut = ("ça monte ou ça descend ? dis-le en commentaire 👇 | up or down? tell us in the comments 👇\n"
+                "BTC à 65000 ce soir | BTC at 65000 tonight\n"
+                "rejoins le Telegram | join the Telegram\n"
+                "prépare ton entrée | get your entry ready\n"
+                "phrase sans anglais")
+        p = ab.phrases_bande_propres(brut)
+        self.assertEqual(p, [["ça monte ou ça descend ? dis-le en commentaire 👇", "up or down? tell us in the comments 👇"]])
+
+    def test_agenda_discours_et_ouverture(self):
+        pub = []
+        t0 = int(ab.datetime.datetime(2026, 11, 16, 15, 15, tzinfo=ab.PARIS).timestamp())   # lundi 15 h 15
+        evts = [{"titre": "Fed Chair Powell Speaks", "t": t0 + 15 * 60}]
+        with mock.patch.object(ab, "calendrier", return_value=evts), \
+             mock.patch.object(ab, "live_publier", side_effect=lambda t: pub.append(t) or True):
+            ab._LIVE_DERNIER.clear()
+            ab.live_agenda({}, t0)
+            ab.live_agenda({}, t0 + 30)                # pas de doublon
+        self.assertEqual(len(pub), 2)
+        self.assertTrue(any("DISCOURS" in x and "Powell" in x for x in pub))
+        self.assertTrue(any("NEW YORK" in x for x in pub))
+        for x in pub:
+            self.assertNotIn("Telegram", x)
 
 
 class TestBandeRassure(unittest.TestCase):
