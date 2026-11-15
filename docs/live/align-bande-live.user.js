@@ -1073,10 +1073,10 @@
 
   // v7.4 (demande d'Adel) : position en cours dans le bon sens → petits mots qui font sourire, toutes les 4 min (sans prix)
   let posK = null, posN = 0;
-  const POS_TXT = ['🔥 LA TEAM, VOUS ÊTES RENTRÉS ? si oui tapote l\'écran et écris OUI en commentaire 👇 • partage le live pour qu\'il reste en haut 🙏',
-    '😎 ALIGN EST DEDANS DEPUIS LE DÉBUT ET ÇA CONTINUE • vous êtes contents ? • trop tard pour rentrer maintenant, on ne court jamais après le prix 🙅 • t\'es rentré ? tapote 👆 et écris OUI 👇 • pas rentré ? lien en bio, le prochain cycle arrive ⏳'];
-  EN.push([POS_TXT[0], '🔥 TEAM, ARE YOU IN? if yes tap the screen and write YES in the comments 👇 • share the live to keep it on top 🙏'],
-    [POS_TXT[1], '😎 ALIGN HAS BEEN IN SINCE THE START AND IT KEEPS GOING • happy? • too late to get in now, we never chase the price 🙅 • you\'re in? tap 👆 and write YES 👇 • not in? link in bio, the next cycle is coming ⏳']);
+  const POS_TXT = ['🔥 LA TEAM, Y\'A DU MONDE DANS LE TRAIN ? 🚂 si t\'es dedans tapote l\'écran et écris OUI 👇 • partage le live pour qu\'il reste tout en haut 🙏',
+    '😎 ALIGN EST DÉJÀ DEDANS DEPUIS UN MOMENT… ET LE MARCHÉ SUIT LE PLAN 🍿 • trop tard pour monter : on ne court jamais après un train qui roule 🚄 • t\'es dedans ? tapote 👆 et écris OUI 👇 • tu l\'as loupé ? la prochaine fois, le lien en bio te prévient AVANT 😉'];
+  EN.push([POS_TXT[0], '🔥 TEAM, WHO\'S ON THE TRAIN? 🚂 if you\'re in, tap the screen and write YES 👇 • share the live to keep it on top 🙏'],
+    [POS_TXT[1], '😎 ALIGN HAS BEEN IN FOR A WHILE… AND THE MARKET IS FOLLOWING THE PLAN 🍿 • too late to jump on: we never chase a moving train 🚄 • you\'re in? tap 👆 and write YES 👇 • missed it? next time, the link in bio warns you BEFORE 😉']);
   const posT = setInterval(() => { try {
     if (retour) return; const LG = lignesAlign(), E = LG['ENTRÉE'], S = LG.SL; if (!E || !S) return;
     const B = barres(3); if (!B.length) return; const p = B[B.length - 1][4], sens = S.y > E.y ? -1 : 1;
