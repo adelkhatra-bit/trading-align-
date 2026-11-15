@@ -2379,6 +2379,19 @@ TRAD.update({   # cartes reliées au graphique (mêmes mots que l'indicateur)
     "🟨 Ligne jaune ENTRÉE : attends la CLÔTURE 15 min EN DESSOUS": "🟨 Yellow ENTRY line: wait for the 15-min CLOSE BELOW",
     "🙅 Une mèche seule ne suffit pas": "🙅 A wick alone is not enough",
     "🛑 SL = ligne rouge du graphique": "🛑 SL = red line on the chart",
+    "👀 ÇA ARRIVE · on n'entre PAS encore": "👀 IT'S COMING · we do NOT enter yet",
+    "😌 Pas de panique : rien à faire pour l'instant": "😌 No panic: nothing to do for now",
+    "📋 Ce qui va se passer :": "📋 What happens next:",
+    "1️⃣ Le prix arrive dans la ZONE du graphique": "1️⃣ Price reaches the chart ZONE",
+    "2️⃣ J'attends qu'une bougie": "2️⃣ I wait for a",
+    " CLÔTURE SOUS l'étiquette « ENTRÉE »": " candle to CLOSE BELOW the « ENTRÉE » label",
+    " CLÔTURE AU-DESSUS de l'étiquette « ENTRÉE »": " candle to CLOSE ABOVE the « ENTRÉE » label",
+    "3️⃣ Je t'envoie « ✅ VALIDÉ": "3️⃣ I send you « ✅ VALIDATED",
+    " » : c'est LÀ qu'on entre": " »: THAT's when we enter",
+    "🛑 Stop = étiquette « STOP » du graphique": "🛑 Stop = « STOP » label on the chart",
+    "⏱ La bougie": "⏱ The", " qui décide clôture dans": " candle that decides closes in",
+    "(étiquette ENTRÉE)": "(« ENTRÉE » label)", "🧲 La zone est une ": "🧲 The zone is a ", "order block + ": "order block + ",
+    "FVG : le prix rebondit souvent dessus, on attend le rejet": "FVG: price often bounces there, we wait for the rejection", "l'étiquette ENTRÉE": "the « ENTRÉE » label",
 })
 _CLES = sorted(TRAD, key=len, reverse=True)
 
@@ -4146,7 +4159,7 @@ def texte_apercu(m, r, cle, vip=True):
         "",
     ] + voyants_unites(r) + [""]
     # Position ouverte : les niveaux du trade font foi (pas de cible différente du TP).
-    obj = ([f"🟨 Entrée : {px(tr['e'])} (ligne jaune)",
+    obj = ([f"🟨 Entrée : {px(tr['e'])} (étiquette ENTRÉE)",
             (f"🔒 SL protégé : {px(tr['sl'])} (plus de perte possible)" if tr.get("d") and tr["d"] * (tr["e"] - tr["sl"]) <= 0
              else f"🛑 SL : {px(tr['sl'])} (ligne rouge)"),
             f"🎯 TP1 : {px(tr['tp1'])} (ligne bleue)"]
@@ -9076,20 +9089,37 @@ def retour_entree(m, r, tr, d, e, t1, p):
                       risque_retour(r, d), "😎 T'inquiète, je surveille chaque clôture"])
 
 
+TF_NOM = {"1m": "1 min", "5m": "5 min", "15m": "15 min", "1h": "1 h", "4h": "4 h"}
+
+
 def avant_entree(m, r, cle, o, d):
-    """Le coach parle AVANT l'entrée : combien de temps avant la clôture qui décide, et pourquoi le prix peut rebondir (FVG / order block)."""
-    l = []
+    """Carte « POINT D'ENTRÉE À VENIR » (16/11, Adel) : on comprend en une lecture, sans panique.
+    Pas de couleur de ligne (le graphique a beaucoup de jaune / vert) : on cite les ÉTIQUETTES écrites sur le graphique
+    (ZONE, ENTRÉE, STOP) et la MÊME bougie que le chrono (avant : « 15 min » d'un côté, « 5m » de l'autre)."""
     try:
         tf = timeframe_attendu(r, cle)
+    except Exception:
+        tf = "15m"
+    tfn = TF_NOM.get(tf, tf)
+    l = ["👀 ÇA ARRIVE · on n'entre PAS encore", "😌 Pas de panique : rien à faire pour l'instant", "",
+         "📋 Ce qui va se passer :", "1️⃣ Le prix arrive dans la ZONE du graphique",
+         f"2️⃣ J'attends qu'une bougie {tfn}" + (" CLÔTURE SOUS l'étiquette « ENTRÉE »" if d == -1 else " CLÔTURE AU-DESSUS de l'étiquette « ENTRÉE »"),
+         "3️⃣ Je t'envoie « ✅ VALIDÉ " + ("🟢 LONG" if d == 1 else "🔴 SHORT") + " » : c'est LÀ qu'on entre",
+         "🙅 Une mèche seule ne suffit pas", "🛑 Stop = étiquette « STOP » du graphique"]
+    if o.get("za") or o.get("e"):
+        l += ["", f"📍 Zone ≈ {px(o.get('za', o.get('e')))} – {px(o.get('zb', o.get('e')))}"]
+    if o.get("tp1"):
+        l.append(f"💰 TP visé ≈ {px(o['tp1'])} ({o.get('n1', 'TP1')})")
+    try:
         reste = max(0, prochaine_cloture_bougie(r, tf, time.time()) - time.time())
-        l.append(f"⏱ La bougie {tf} qui décide clôture dans {mmss(reste)}")
+        l.append(f"⏱ La bougie {tfn} qui décide clôture dans {mmss(reste)}")
     except Exception:
         pass
     src = str(o.get("src") or "")
     if "FVG" in src or "Order block" in src:
         l.append(f"🧲 La zone est une {'order block + ' if 'Order block' in src else ''}FVG : le prix rebondit souvent dessus, on attend le rejet")
-    l.append("🧑‍🏫 Je te dis « ✅ VALIDÉ " + ("🟢 LONG" if d == 1 else "🔴 SHORT") + " » dès que la clôture confirme")
-    return "\n" + "\n".join(l)
+    l.append("🔔 Cloche activée ? Ne rate pas le feu vert")
+    return "\n".join(l)
 
 def statut_txt(entre, o=None):
     """Toujours clair : est-ce que j'entre ou pas, et quel TP on vise."""
@@ -9395,7 +9425,7 @@ def agent(m, r, cle, ferme):
             deja_pea = r["t"] - vu_pea.get(k_pea, -10 ** 9) < 4 * 3600 or r["t"] - cle.get("pea_t", -10 ** 9) < 3600
             if r["t"] - cle.get("recalc_t", 0) >= 1800 and not deja_pea:   # demande d'Adel : UNE seule fois, puis « tu peux entrer » avec le SL
                 vu_pea[k_pea] = r["t"]; cle["pea_t"] = r["t"]
-                out.append((f"{'🟩🟩' if d == 1 else '🟥🟥'} POINT D'ENTRÉE À VENIR — {ICONE.get(m, '')} {m}\n{SENS[d]}\n{qualite(o)}👀 ÇA ARRIVE\n🟩 Le prix entre dans la ZONE du graphique\n🟨 Ligne jaune ENTRÉE : attends la CLÔTURE 15 min {'AU-DESSUS' if d == 1 else 'EN DESSOUS'}\n🙅 Une mèche seule ne suffit pas\n🛑 SL = ligne rouge du graphique\n⚡ Tiens-toi prêt\n🔔 Cloche activée ? Ne rate pas le feu vert\n📍 Zone ≈ {px(o.get('za', o['e']))} – {px(o.get('zb', o['e']))}{statut_txt(0, o)}{avant_entree(m, r, cle, o, d)}", bouton_auto(m)))
+                out.append((f"{'🟩🟩' if d == 1 else '🟥🟥'} POINT D'ENTRÉE À VENIR — {ICONE.get(m, '')} {m}\n{SENS[d]}\n{qualite(o)}{avant_entree(m, r, cle, o, d)}", bouton_auto(m)))
         # À quelques pips de l'entrée : « PRÉPARE-TOI » + rappel SL / TP (1 fois par point d'entrée)
         seuil = max(5 * PIP.get(m, 0.1), 0.05 * r["atr"])
         if cle.get("prep") and (abs(p - o["e"]) <= seuil or touche) and time.time() - cle.get("pret_t", 0) > 1800:
@@ -9978,7 +10008,7 @@ ECRAN_TITRES = {
     "respire": ("😮‍💨 Pas de distribution finalement : le marché respire", "😮‍💨 Pas d'envolée finalement : le marché respire"),
     "feinte": ("🪤 FEINTE : le prix REMONTE contre la tendance baissière", "🪤 FEINTE : le prix RECULE contre la tendance haussière"),
 }
-ECRAN_LIGNES = {"TP1": "le TP1 (ligne bleue)", "TP2": "le TP2 (ligne bleue)", "SL": "le SL (ligne rouge)", "ENTRÉE": "la ligne ENTRÉE (jaune)"}
+ECRAN_LIGNES = {"TP1": "le TP1 (ligne bleue)", "TP2": "le TP2 (ligne bleue)", "SL": "le SL (ligne rouge)", "ENTRÉE": "l'étiquette ENTRÉE"}
 ECRAN_CONSEIL = {
     "TP1": "🧘 Pas de panique : un rebond sur le TP est NORMAL, les gros encaissent là\n🛡 En position ? Gains en partie pris + SL à l'entrée (BE) = zéro risque",
     "TP2": "🧘 Objectif final : le marché souffle souvent ici\n💰 En position ? C'est le moment d'encaisser",
