@@ -45,8 +45,23 @@ class TestEnvoi(unittest.TestCase):
         with unittest.mock.patch.object(ab, "_envoi_sur", lambda *a, **k: None):
             ab.regler_plateforme(etat, 111, "topstep")
         self.assertEqual(ab.plateforme(etat, "111"), "topstep")
-        self.assertEqual(ab.bouton_plateforme(etat, 111)["callback_data"], "plateforme:tv")
+        self.assertEqual(ab.bouton_plateforme(etat, 111)["callback_data"], "plateforme:menu")
         self.assertEqual(ab.plateforme({}, 5), "tv")
+
+    def test_les_deux_recoivent_aussi_topstep(self):
+        etat = {"plateforme": {"111": "deux", "222": "tv", "333": "topstep"}}
+        envoyes = []
+        with unittest.mock.patch.object(ab, "_envoi_sur", lambda cid, **k: envoyes.append(cid)), \
+             unittest.mock.patch.object(ab, "marche_autorise", lambda e, c, m: True), \
+             unittest.mock.patch.object(ts, "prix_futures", lambda m: 20120.0):
+            ab.prix_topstep_inscrits(etat, "NASDAQ", TR, 20000.0)
+        self.assertEqual(sorted(envoyes), ["111", "333"])
+
+    def test_menu_trois_choix(self):
+        vus = []
+        with unittest.mock.patch.object(ab, "_envoi_sur", lambda cid, **k: vus.append(k)):
+            ab.regler_plateforme({}, 1, "menu")
+        self.assertEqual(len(__import__("json").loads(vus[0]["reply_markup"])["inline_keyboard"]), 3)
 
 
 if __name__ == "__main__":
