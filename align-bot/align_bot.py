@@ -5417,7 +5417,10 @@ def boutons_menu_rapide(etat):
     return json.dumps({"inline_keyboard": [
         [{"text": "🏆 Gagnantes", "url": BOT_LIEN + "?start=gagnantes"}, {"text": "❌ Perdantes", "url": BOT_LIEN + "?start=perdantes"}],
         [{"text": "🧑‍🏫 Mon coach (gratuit)", "url": BOT_LIEN}],
-        [{"text": "💎 VIP", "url": BOT_LIEN + "?start=vip"}, {"text": "🔴 Live" if live_actif(etat) else "📺 Le live", "url": LIVE_LIEN}]]})
+        [{"text": "💎 VIP", "url": BOT_LIEN + "?start=vip"}, {"text": "🔴 Live" if live_actif(etat) else "📺 Le live", "url": LIVE_LIEN}]]
+        # v8.9 (demande d'Adel) : boutons rapides → l'écran du live le dit tout de suite (anti-spam : 1 fois / 10 min / personne)
+        + ([[{"text": "✅ Je suis rentré", "url": BOT_LIEN + "?start=rentre"}, {"text": "🙅 Pas rentré", "url": BOT_LIEN + "?start=pasrentre"}],
+            [{"text": "👋 Je regarde le live", "url": BOT_LIEN + "?start=present"}]] if live_actif(etat) else [])})
 
 
 def publier_resultat(etat, m, tr, sortie, motif, gain):
@@ -6083,6 +6086,8 @@ def traiter(etat, chats, updates):
             if any(k in txt for k in ("btc", "bitcoin", "gold", "xau", "nasdaq", "nas100")):
                 premier_choix_marche(etat, cid, md_)
             demandes.append((cid, md_))
+        elif "start present" in txt or txt.strip() == "present":   # v8.9 : « je regarde le live » → l'écran le dit
+            live_present(etat, cid)
         elif "pasrentre" in txt or "pas rentre" in txt:   # v8.7 (demande d'Adel) : « pas rentré cette fois » → on le garde connecté
             pas_rentre(etat, cid)
         elif "rentre" in txt or txt.strip() == "oui":
@@ -9627,13 +9632,37 @@ def live_news(etat, maintenant):
             live_bande(etat, texte, toujours=True)
 
 
+LIVE_ECRAN_PAUSE = 20          # v8.9 : au plus 1 message de membre toutes les 20 s sur l'écran (pas d'encombrement)
+
+
+def ecran_membre_libre(cle, pause=600):
+    """Anti-spam des boutons rapides : 1 fois / 10 min par personne et 1 message de membre / 20 s sur l'écran."""
+    now = time.time()
+    if now - _LIVE_DERNIER.get(cle, 0) < pause or now - _LIVE_DERNIER.get("ecran_membres", 0) < LIVE_ECRAN_PAUSE:
+        return False
+    _LIVE_DERNIER[cle] = now
+    _LIVE_DERNIER["ecran_membres"] = now
+    return True
+
+
+def live_present(etat, cid):
+    """v8.9 (demande d'Adel) : « 👋 Je regarde le live » → son prénom passe à l'écran (anti-spam)."""
+    p = (etat.get("prenoms", {}).get(str(cid)) or "Un membre").split(" ")[0][:16]
+    if ecran_membre_libre(f"present{cid}"):
+        live_publier(f"BULLE:👋 {p.upper()} EST SUR LE LIVE ! qui d'autre regarde ? tapote l'écran 👆 et partage 🙏")
+        _envoi_sur(cid, text="👋 Ton prénom passe sur le live !\n👆 Tapote l'écran, commente et partage 🙏")
+    else:
+        _envoi_sur(cid, text="⏳ Déjà envoyé ! Tu pourras renvoyer ton prénom dans quelques minutes 😉")
+
+
 def pas_rentre(etat, cid):
     """v8.7 (demande d'Adel) : un membre n'est pas rentré → on le rassure en privé et l'écran du live le dit (prénom seulement)."""
     p = (etat.get("prenoms", {}).get(str(cid)) or "Un membre").split(" ")[0][:16]
     _envoi_sur(cid, text=("😉 Pas grave, " + p + " !\n🔔 Reste connecté : active la cloche du live et de Telegram\n"
                           "🍿 Regarde le spectacle, la prochaine position arrive\n🙏 Partage le live avec un ami 😄"))
-    live_bande(etat, f"BULLE:😉 {p.upper()} N'EST PAS RENTRÉ CETTE FOIS • pas grave : reste connecté, active la cloche 🔔 • "
-                     "regarde le spectacle et partage le live 🙏😄", f"pasrentre{cid}", 900, toujours=True)
+    if ecran_membre_libre(f"pasrentre{cid}"):
+        live_publier(f"BULLE:😉 {p.upper()} N'EST PAS RENTRÉ CETTE FOIS • pas grave : reste connecté, active la cloche 🔔 • "
+                     "regarde le spectacle et partage le live 🙏😄")
 
 
 def live_suivi(etat, cid, m):
