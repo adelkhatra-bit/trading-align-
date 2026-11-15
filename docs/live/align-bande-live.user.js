@@ -286,6 +286,16 @@
   ];
   // v8.5 (demande d'Adel) : phrases inventées par l'IA gratuite du bot (FR | EN), toujours nouvelles, jamais de prix
   const HAUT_TABLEAU = 3.4;   // hauteur du tableau des unités ≈ 3,4 × la ligne du bas
+  // v8.5 (constat d'Adel) : la bande ne dit « ça encaisse / vous êtes rentrés ? » QUE si le bot a vraiment donné la position (Telegram)
+  const botPos = {};
+  function cleMarche(t) { const x = String(t || '').match(/BTC|GOLD|XAU|NASDAQ|NAS/i); return x ? x[0].toUpperCase().replace('XAU', 'GOLD').replace(/^NAS$/, 'NASDAQ') : ''; }
+  function botSuivi(t) {
+    const k = cleMarche(t); if (!k) return;
+    if (/ENTRE EN POSITION/i.test(t)) botPos[k] = Date.now();
+    else if (/TP2 TOUCH|OBJECTIF FINAL|SL TOUCH|STOP TOUCH|POSITION (FERMÉE|CLÔTURÉE)/i.test(t)) delete botPos[k];
+  }
+  EN.push([' a touché l\'objectif du graphique • pas de position du coach cette fois ⏳ • attends le prochain cycle : lien en bio', ' touched the chart target • no coach trade this time ⏳ • wait for the next cycle: link in bio']);
+  function botDedans(m) { const t = botPos[cleMarche(m)]; return !!t && Date.now() - t < 12 * 3600 * 1000; }
   let iaPool = [], iaN = 0;
   EN.push(['⚡ UNE POSITION SE PRÉPARE • dépêche-toi, les retardataires ont toujours tort 😉 • lien en bio', '⚡ A TRADE IS GETTING READY • hurry up, latecomers are always wrong 😉 • link in bio']);
   function recuIA(json) {
@@ -454,6 +464,7 @@
 
   function recu(txt) {
     txt = String(txt || '').trim(); if (!txt) return;
+    botSuivi(txt);                                                               // v8.5 : le bot est-il VRAIMENT en position ?
     if (txt.startsWith('IA:')) { recuIA(txt.slice(3)); return; }                 // v8.5 : lot de phrases IA
     if (txt.startsWith('CMD:chrono:')) {                                          // v8.5 : « une position arrive » + chrono
       const sec = Math.min(900, Math.max(30, parseInt(txt.split(':')[2], 10) || 0));
@@ -888,7 +899,8 @@
           montrer(tete + ' • le marché prépare quelque chose 👀 pourquoi ? 📲 lien en bio 🎁', false, 2, couleurLigne(n));
           versBot('ligne', cur[4] > l.y ? 1 : -1, '', n);
           setTimeout(() => coeurs(1, ['🤔']), 3600);   // v7.0 : « rentrer ou couper ? » + lien en bio
-          if (n.startsWith('TP')) { explosionArgent(cur[4] > l.y ? -1 : 1); feuArtifice(traverse ? '🎯 OBJECTIF ATTEINT D\'UN COUP !' : '🍾 ÇA ENCAISSE !'); pluieBillets(35); setTimeout(() => coeurs(1, ['💥']), 2500); }   // v7.4 : ligne bleue touchée = champagne + billets + explosion   // v7.4 : TP traversé d'un coup = explosion   // objectif atteint : l'argent suit le sens du marché
+          if (n.startsWith('TP') && !botDedans(m)) { montrer('👀 ' + m + ' a touché l\'objectif du graphique • pas de position du coach cette fois ⏳ • attends le prochain cycle : lien en bio', false, 1); }
+        else if (n.startsWith('TP')) { explosionArgent(cur[4] > l.y ? -1 : 1); feuArtifice(traverse ? '🎯 OBJECTIF ATTEINT D\'UN COUP !' : '🍾 ÇA ENCAISSE !'); pluieBillets(35); setTimeout(() => coeurs(1, ['💥']), 2500); }   // v7.4 : ligne bleue touchée = champagne + billets + explosion   // v7.4 : TP traversé d'un coup = explosion   // objectif atteint : l'argent suit le sens du marché
           return;
         }
       }
@@ -996,12 +1008,12 @@
       // v5.7 (demande d'Adel) : en bas à droite, côté prix, juste au-dessus du tableau de bord (TikTok coupe le haut gauche)
       // v8.3 (demande d'Adel) : le chrono se met en bas à GAUCHE du tableau, à côté de l'unité 1 min (plus jamais sur un message)
       const mq = masque.style.display === 'flex' ? masque.getBoundingClientRect() : null;
-      if (!mq) chrono.style.left = (r.left + r.width - 70 - chrono.offsetWidth - 14) + 'px';
+      if (!mq) { chrono.style.width = ''; chrono.style.left = (r.left + r.width - 70 - chrono.offsetWidth - 14) + 'px'; }
       // v5.7 : marché qui baisse → en haut à droite juste sous la bande (les bougies descendent, on ne les cache pas) ;
       //        marché qui monte → en bas à droite, un peu au-dessus du tableau de bord (sans le mordre)
       if (!mq) chrono.style.top = (enAttente && arme.d === -1 ? r.top + 82 : r.top + (r.height || 700) - 205 - chrono.offsetHeight) + 'px';
       // v8.5 (règle d'Adel) : chrono AU-DESSUS des colonnes 1 min / 3 min / 5 min du tableau (3 colonnes sur 11)
-      else { const col3 = mq.width * 3 / 11; chrono.style.left = Math.max(r.left + 10, mq.left + col3 / 2 - chrono.offsetWidth / 2) + 'px'; chrono.style.top = Math.max(r.top + 90, mq.top - mq.height * HAUT_TABLEAU - chrono.offsetHeight - 8) + 'px'; }
+      else { const col3 = mq.width * 3 / 11; chrono.style.boxSizing = 'border-box'; chrono.style.width = col3 + 'px'; chrono.style.left = mq.left + 'px'; chrono.style.top = Math.max(r.top + 90, mq.top - mq.height * HAUT_TABLEAU - chrono.offsetHeight - 8) + 'px'; }
       if (reste === 45 && uneFois('cl' + s)) bandeShow('⏱ Clôture 15 min dans 45 s sur ' + nomMarche() + ' • c\'est elle qui décide 👀 • la suite en temps réel : lien en bio 🎁');
     } else if (chrono.style.display !== 'none') {
       chrono.style.display = 'none';
@@ -1043,7 +1055,7 @@
   const posT = setInterval(() => { try {
     if (retour) return; const LG = lignesAlign(), E = LG['ENTRÉE'], S = LG.SL; if (!E || !S) return;
     const B = barres(3); if (!B.length) return; const p = B[B.length - 1][4], sens = S.y > E.y ? -1 : 1;
-    if (sens * (p - E.y) <= 0) return;
+    if (sens * (p - E.y) <= 0 || !botDedans(nomMarche())) return;   // v8.5 : seulement si le bot a vraiment donné la position
     // v8.5 (demande d'Adel) : le marché suit le plan → « vous êtes rentrés ? » puis « ça continue, vous êtes contents ? » (jamais de prix)
     const kPos = Math.round(E.y); posN = posK === kPos ? posN + 1 : 0; posK = kPos;
     if (!occupe && !file.length) {
