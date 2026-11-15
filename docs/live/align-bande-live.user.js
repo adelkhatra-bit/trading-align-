@@ -10,13 +10,14 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '7.4';  // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
+  const VERSION = '7.5';  // v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
+  // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
     '👉 ABONNE-TOI • PARTAGE • TAPOTE L\'ÉCRAN',
     '🔗 LIEN EN BIO : COACH EN DIRECT',
-    '🔌 BRANCHE-TOI AU MARCHÉ • chaque bougie expliquée en direct • lien en bio 🎁',
+    '📲 CONNECTÉ AU MARCHÉ EN TEMPS RÉEL DEPUIS TON PORTABLE • chaque bougie expliquée en direct • lien en bio 🎁',
     '🧭 CHEZ ALIGN ON NE VA JAMAIS CONTRE LA TENDANCE • on suit le marché, on ne le combat pas 💪',
     '⚠️ CECI N\'EST PAS UN CONSEIL EN INVESTISSEMENT • fais tes propres recherches (DYOR)',
     '⚠️ NOT FINANCIAL ADVICE • do your own research (DYOR)',
@@ -29,7 +30,7 @@
     '🔗 LINK IN BIO: LIVE COACH',
     '📩 GO TO THE LINK IN BIO • get real-time market alerts with the details and the news 🎁',
     '🔔 TURN ON YOUR NOTIFICATIONS • link in bio: we\'ll tell you as soon as the market gets ready 🎁',
-    '🔌 PLUG INTO THE MARKET • every candle explained live • link in bio 🎁',
+    '📲 CONNECTED TO THE MARKET IN REAL TIME FROM YOUR PHONE • every candle explained live • link in bio 🎁',
     '🧭 AT ALIGN WE NEVER TRADE AGAINST THE TREND • we follow the market, we don\'t fight it 💪',
     '⚠️ Trading involves a high risk of capital loss • Informational and educational content only, it is neither investment advice nor a personalised recommendation • Past performance is not indicative of future results'
   ];
@@ -38,7 +39,10 @@
     ['pas de panique • le marché respire, il est comme vous 😅 • patience, la suite en temps réel', 'don\'t panic • the market is breathing, just like you 😅 • patience, what\'s next live'],
     ['le marché prépare quelque chose', 'the market is preparing something'], ['la suite en temps réel', 'what\'s next, live'],
     ['infos en temps réel', 'live info'], ['plus d\'infos en temps réel', 'more live info'], ['plus d\'infos', 'more info'],
-    ['branche-toi au marché', 'plug into the market'], ['lien en bio', 'link in bio'], ['abonne-toi, partage', 'follow, share'],
+    ['connecte-toi au marché depuis ton portable', 'connect to the market from your phone'], ['branche-toi au marché', 'plug into the market'],
+    ['Ton portable connecté au marché en temps réel : chaque bougie expliquée en direct', 'Your phone connected to the market in real time: every candle explained live'],
+    ['Connecté au marché depuis ton portable : le coach lit chaque bougie avec toi', 'Connected to the market from your phone: the coach reads every candle with you'],
+    ['CHANGEMENT DE PROGRAMME', 'CHANGE OF PLAN'], ['le marché a changé d\'avis', 'the market changed its mind'], ['on suit le marché, on ne le combat pas', 'we follow the market, we don\'t fight it'], ['lien en bio', 'link in bio'], ['abonne-toi, partage', 'follow, share'],
     ['abonne-toi', 'follow'], ['partage', 'share'], ['la team', 'team'], ['pas de panique', 'don\'t panic'], ['pourquoi ?', 'why?'],
     ['COMPTE À REBOURS sur', 'COUNTDOWN on'], ['GROSSE DISTRIBUTION', 'BIG SELL-OFF'], ['ÇA VA PÉTER EN L\'AIR', 'IT\'S ABOUT TO BLAST OFF'],
     ['min max', 'min max'], ['dans', 'in'], ['ÇA ACCÉLÈRE', 'IT\'S SPEEDING UP'], ['jusqu\'où ?', 'how far?'], ['ÇA CASSE', 'BREAKOUT'],
@@ -217,7 +221,7 @@
   function sansPrix(t) { return String(t)
     .replace(/ENTRE EN POSITION/gi, 'PASSE À L\'ACTION').replace(/SL (à|a) l['’]entrée/gi, 'risque zéro').replace(/l['’]entrée/gi, 'la zone').replace(/\bTP\s?\d?\b/g, 'objectif').replace(/\bSL\b|\bstop\b/gi, 'protection')
     .replace(/\bENTRÉE\b|\bentrée\b/g, 'zone').replace(/\(ligne (bleue|rouge|jaune)\)/gi, '').replace(/\d{1,3}(?:[\s\u202f\u00a0]\d{3})+(?:[.,]\d+)?|\d{3,}(?:[.,]\d+)?/g, '').replace(/\(\s*\)|:\s*(?=•)/g, '').replace(/\s{2,}/g, ' ').trim(); }
-  function montrer(texte, bulle, fois, couleur) {
+  function montrer(texte, bulle, fois, couleur, devant) {
     const g = couleur || genre(texte);
     texte = sansPrix(texte);
     const urgent = g && g !== 'proche' ? 1 : 0;
@@ -226,10 +230,13 @@
     if (!/risque|risk/i.test(texte)) texte += ' • ⚠️ Ceci n\'est pas un conseil en investissement, fais tes propres recherches (DYOR) • risque de perte';
     // v7.3 (règle d'Adel, 15/11) : chaque info passe 2 fois en français PUIS 2 fois en anglais
     const nPass = Math.max(4, 2 * (fois || 1)), items = []; for (let i = 0; i < nPass; i++) items.push({ texte: (i >= nPass / 2 ? '🇬🇧 ' : '🇫🇷 ') + plateforme(i >= nPass / 2 ? enAnglais(texte) : texte), bulle, g, en: i >= nPass / 2 });   // v7.4 : jamais FR et EN mélangés, drapeau + teinte
-    if (urgent) { let k = 0; while (k < file.length && file[k].g && file[k].g !== 'proche') k++; file.splice(k, 0, ...items); }
+    if (devant) { file.splice(0, file.length, ...items, ...file.filter(m => m.g && m.g !== 'proche')); couper(); }   // v7.5 : clic sur une zone = la bande en parle TOUT DE SUITE
+    else if (urgent) { let k = 0; while (k < file.length && file[k].g && file[k].g !== 'proche') k++; file.splice(k, 0, ...items); }
     else file.push(...items);
     suivant();
   }
+  let animCur = null, timerCur = null;
+  function couper() { if (!occupe) return; try { animCur && animCur.cancel(); } catch (e) {} clearTimeout(timerCur); bande.classList.remove('on'); occupe = false; }
   function suivant() {
     if (occupe || !file.length) return;
     occupe = true;
@@ -239,8 +246,8 @@
     bande.classList.add('on');
     const sp = flash.firstChild, W = bande.clientWidth, w = sp.offsetWidth;
     const dur = Math.max(4000, (W + w) / 0.38);      // v5.4 : plus rapide (info en temps réel), toujours lisible
-    sp.animate([{ transform: 'translateX(' + W + 'px)' }, { transform: 'translateX(' + (-w) + 'px)' }], { duration: dur, easing: 'linear' });
-    setTimeout(() => { bande.classList.remove('on'); occupe = false; if (!file.length) x = 0; suivant(); }, dur);   // v7.4 : après les infos, la bande d'accueil repart du DÉBUT (en français)
+    animCur = sp.animate([{ transform: 'translateX(' + W + 'px)' }, { transform: 'translateX(' + (-w) + 'px)' }], { duration: dur, easing: 'linear' });
+    timerCur = setTimeout(() => { bande.classList.remove('on'); occupe = false; if (!file.length) x = 0; suivant(); }, dur);   // v7.4 : après les infos, la bande d'accueil repart du DÉBUT (en français)
   }
 
   // v5.3 : de temps en temps une astuce (2 passages) pour apprendre à lire le graphique, sans aucun prix ni sens
@@ -451,7 +458,7 @@
       if (!/[━]|ENTRÉE|SL|TP|ZONE|RETOURNEMENT|CONFIRMATION/.test(txt)) return;
       t.style.visibility = 'hidden';                 // la fenêtre ne s'affiche plus : tout passe dans la bande
       const ligne = texteLigne(txt), now = Date.now();
-      if (ligne && now - (vuTT[ligne] || 0) > 45000) { vuTT[ligne] = now; montrer(teaserLigne(ligne), false, 2, couleurLigne(ligne)); }
+      if (ligne && now - (vuTT[ligne] || 0) > 45000 && now - (window.__alignExpl || 0) > 5000) { vuTT[ligne] = now; montrer(teaserLigne(ligne), false, 2, couleurLigne(ligne)); }
     });
   });
   obs.observe(document.body, { childList: true, subtree: true });
@@ -537,41 +544,50 @@
     [/🐋|💰/, ['🐋 Les baleines arrivent', 'Whales incoming'], ['👀 Gros volume', 'Big volume']],
     [/📉|🔴|🌊/, ['📉 La pression vend', 'Sellers in control'], ['🔴 Ça pousse en bas', 'Pushing lower']],
     [/📈|🟢|🚀/, ['📈 Les acheteurs poussent', 'Buyers in control'], ['🟢 Ça pousse en haut', 'Pushing higher']],
-    [/🔌|📡|🧠/, ['🔌 Branché au marché', 'Plugged into the market'], ['📡 En direct', 'Live']],
+    [/📲|🔌|📡|🧠/, ['📲 Connecté en temps réel', '📲 Connected in real time'], ['📡 En direct sur ton portable', '📡 Live on your phone']],
+    [/🔄/, ['🔄 Changement de programme !', '🔄 Change of plan!'], ['🧭 On suit le marché', '🧭 We follow the market']],
+    [/🏦/, ['🏦 Les gros sont là', '🏦 Big players here'], ['👀 Zone des gros', '👀 Smart-money zone']],
+    [/🧲/, ['🧲 Le marché comble le trou', '🧲 Filling the gap'], ['👀 Zone aimant', '👀 Magnet zone']],
     [/↩️/, ['↩️ Rebond sur zone clé', 'Bounce on key zone'], ['👀 Réaction du marché', 'Market reaction']],
     [/./, ['❤️ Tapote l\'écran', 'Tap the screen'], ['🔔 Abonne-toi', 'Follow'], ['💪 La team ALIGN', 'Team ALIGN'], ['🎯 Reste concentré', 'Stay focused']]
   ];
   const cssPunch = document.createElement('style');
-  cssPunch.textContent = `.align-punch{position:fixed;z-index:9997;pointer-events:none;padding:8px 18px;border-radius:999px;text-align:center;
-    background:linear-gradient(90deg,#ff2d95,#8a2be2,#1e90ff);color:#fff;font:900 24px/1.15 system-ui,Segoe UI,Arial,sans-serif;
+  cssPunch.textContent = `.align-punch{position:fixed;z-index:9997;pointer-events:none;padding:10px 22px;border-radius:999px;text-align:center;white-space:nowrap;
+    background:linear-gradient(90deg,#ff2d95,#8a2be2,#1e90ff);color:#fff;font:900 30px/1.15 system-ui,Segoe UI,Arial,sans-serif;
     box-shadow:0 6px 18px rgba(0,0,0,.45);text-shadow:0 2px 3px rgba(0,0,0,.4);animation:punchMonte 7.9s ease-out forwards}
   .align-punch.en{background:linear-gradient(90deg,#0d47a1,#1e88e5,#00bcd4)}
   #align-bande .flash.en{filter:hue-rotate(35deg) saturate(1.15)}
   .align-punch .emo{display:inline-block;animation:emoDanse .45s ease-in-out infinite alternate}
   @keyframes emoDanse{0%{transform:rotate(-14deg) scale(1)}100%{transform:rotate(14deg) scale(1.3)}}
-  .align-punch small{display:block;font:700 14px/1.2 system-ui,Segoe UI,Arial,sans-serif;opacity:.9}
+  .align-punch small{display:block;font:700 17px/1.2 system-ui,Segoe UI,Arial,sans-serif;opacity:.9}
   @keyframes punchMonte{0%{opacity:0;transform:translateY(20px) scale(.7)}15%{opacity:1;transform:translateY(0) scale(1.05)}
     25%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-120px)}}`;
   document.head.appendChild(cssPunch);
-  let punchN = 0;
-  function coeurs(n, liste) {
+  let punchN = 0, punchTok = 0;   // v7.5 : l'anglais d'une ancienne pastille n'efface plus la nouvelle
+  // v7.5 (demande d'Adel) : sens de la pastille = celui de l'info (📉 baisse → en HAUT, 📈 hausse → en BAS), sinon la pente récente
+  function sensPastille(cle) {
+    if (/📉|🔴|🌊|😢|🚨/.test(cle)) return -1; if (/📈|🟢|🚀|💥|😊/.test(cle)) return 1;
+    try { const B = barres(10); return B[B.length - 1][4] >= B[0][4] ? 1 : -1; } catch (e) { return 1; }
+  }
+  function placerPastille(e, sens) {
+    const r = zoneGraphique(), H = r.height || 600, w = e.offsetWidth, h = e.offsetHeight;
+    e.style.left = Math.max(r.left + 10, r.left + r.width - 70 - w - 14) + 'px';   // v7.5 : alignée côté prix (comme le chrono), jamais sur l'échelle de prix
+    let top = sens < 0 ? r.top + 100 : r.top + H - 205 - h;                       // ça baisse → en haut sous la bande ; ça monte → en bas au-dessus du tableau
+    try { if (chrono.style.display === 'flex') { const c = chrono.getBoundingClientRect(); if (top < c.bottom + 8 && top + h > c.top - 8) top = sens < 0 ? c.bottom + 10 : c.top - h - 10; } } catch (er) {}   // jamais sur le chrono
+    e.style.top = Math.max(r.top + 92, Math.min(top, r.top + H - 120 - h)) + 'px';
+  }
+  function coeurs(n, liste, sensForce) {
     try {
       const cle = (liste || []).join(''), g = PUNCH.find(x => x[0].test(cle)) || PUNCH[PUNCH.length - 1];
-      const [fr, en] = g[1 + (punchN++ % (g.length - 1))];
+      const [fr, en] = g[1 + (punchN++ % (g.length - 1))], tok = ++punchTok;
       const r = zoneGraphique(), e = document.createElement('div'); e.className = 'align-punch';
       const mots = fr.split(' '), emo = mots.shift();   // v7.1 : le smiley bouge dans la pastille
       e.innerHTML = '<span class="emo">' + esc(emo) + '</span> ' + esc(mots.join(' '));   // v7.4 : la pastille passe en FR, PUIS en EN (jamais mélangées)
       document.querySelectorAll('.align-punch').forEach(x => x.remove());
       document.body.appendChild(e);
-      // v7.1 : jamais sur l'échelle de prix (≈ 80 px à droite) ni sur le prix en cours : en bas si le prix est en haut, en haut sinon
-      let hautPrix = 0.5; try { const B = barres(40); const hi = Math.max(...B.map(x => x[2])), lo = Math.min(...B.map(x => x[3])); hautPrix = (B[B.length - 1][4] - lo) / ((hi - lo) || 1); } catch (er) {}
-      e.style.left = Math.max(r.left + 10, r.left + (r.width - 80 - e.offsetWidth) / 2) + 'px';   // v7.4 : au CENTRE du graphique (visible sur téléphone, entre les étiquettes et le prix)
-      // v7.4 (demande d'Adel) : au milieu entre la ligne d'ENTRÉE et le TP (vers le trait blanc), sinon loin du prix
-      let yCible = null; try { const LG = lignesAlign(), E = LG['ENTRÉE'], T = LG.TP2 || LG.TP1; if (E && T) { const ser = chart()._chartWidget.model().mainSeries(), fv = ser.firstValue(), ps = ser.priceScale();
-        yCible = r.top + (ps.priceToCoordinate(E.y, fv) + ps.priceToCoordinate(T.y, fv)) / 2 - e.offsetHeight / 2; } } catch (er) {}
-      e.style.top = (yCible != null && yCible > r.top + 100 && yCible < r.top + (r.height || 600) - 160 ? yCible : r.top + (r.height || 600) * (hautPrix > 0.5 ? 0.6 : 0.2)) + 'px'; setTimeout(() => e.remove(), 8000);   // v7.4 : la pastille reste plus longtemps (lisible sur le live)
-      setTimeout(() => { try { const e2 = e.cloneNode(false); e2.className = 'align-punch en'; const m2 = en.split(' '); const em2 = /^\p{Extended_Pictographic}/u.test(m2[0]) ? m2.shift() : emo;
-        e2.innerHTML = '<span class="emo">' + esc(em2) + '</span> ' + esc(m2.join(' ')); document.querySelectorAll('.align-punch').forEach(x => x.remove()); document.body.appendChild(e2); setTimeout(() => e2.remove(), 8000); } catch (er) {} }, 8100);
+      const sensP = sensForce || sensPastille(cle); placerPastille(e, sensP); setTimeout(() => e.remove(), 8000);   // v7.4 : la pastille reste plus longtemps (lisible sur le live)
+      setTimeout(() => { try { if (tok !== punchTok) return; const e2 = e.cloneNode(false); e2.className = 'align-punch en'; const m2 = en.split(' '); const em2 = /^\p{Extended_Pictographic}/u.test(m2[0]) ? m2.shift() : emo;
+        e2.innerHTML = '<span class="emo">' + esc(em2) + '</span> ' + esc(m2.join(' ')); document.querySelectorAll('.align-punch').forEach(x => x.remove()); document.body.appendChild(e2); placerPastille(e2, sensP); setTimeout(() => e2.remove(), 8000); } catch (er) {} }, 8100);
     } catch (e) {}
   }
   function choisirPlateforme(v) { PLATEFORME = v; try { localStorage.setItem('alignPlateforme', v); } catch (e) {} remplir(); }
@@ -626,6 +642,56 @@
     } catch (e) {}
     return res;
   }
+
+  // v7.5 (demande d'Adel) : les ZONES de l'indicateur (FVG, ORDER BLOCK) lues dans le graphique
+  function zonesAlign() {
+    const res = [];
+    try {
+      const mod = chart()._chartWidget.model().model();
+      for (const ds of mod.dataSources()) {
+        if (!/ALIGN/.test(String(ds.title && ds.title()))) continue;
+        const vu = new Set();
+        (function walk(o, d, dansData) {
+          if (!o || d > 8 || typeof o !== 'object' || vu.has(o)) return; vu.add(o);
+          if (o instanceof Map) { o.forEach(v => walk(v, d + 1, dansData)); return; }
+          if (dansData && typeof o.y1 === 'number' && typeof o.y2 === 'number') { if (o.t) res.push({ id: o.id, t: String(o.t), hi: Math.max(o.y1, o.y2), lo: Math.min(o.y1, o.y2) }); return; }
+          for (const k of Object.keys(o)) walk(o[k], d + 1, dansData || k === '_primitivesDataById');
+        })(ds.graphics()._primitivesCollection.dwgboxes, 0, false);
+      }
+    } catch (e) {}
+    return res;
+  }
+  function texteZone(t, m) {
+    return /FVG/i.test(t) ? '🧲 ' + m + ' • ZONE FVG : un trou laissé par le marché… il adore revenir le combler 👀 rebond ou cassure ? 📲 en temps réel sur ton portable : lien en bio 🎁'
+      : /ORDER|OB\b/i.test(t) ? '🏦 ' + m + ' • ORDER BLOCK : la zone où les gros ont passé leurs ordres… ils la défendent souvent 👀 📲 en temps réel sur ton portable : lien en bio 🎁'
+      : '👀 ' + m + ' • ' + String(t).toUpperCase() + ' : zone clé du marché • ce qu\'elle annonce : 📲 lien en bio 🎁';
+  }
+  // prix sous le doigt / la souris (coordonnées de la page → prix du graphique)
+  function prixA(yPage) {
+    try { const r = zoneGraphique(), ser = chart()._chartWidget.model().mainSeries(), ps = ser.priceScale(), fv = ser.firstValue();
+      const p = ps.coordinateToPrice(yPage - r.top, fv), p2 = ps.coordinateToPrice(yPage - r.top + 12, fv); return { p, tol: Math.abs(p - p2) }; } catch (e) { return null; }
+  }
+  // v7.5 : clic / tap (ou souris posée) sur une ligne ALIGN ou une zone → l'explication défile TOUT DE SUITE dans la bande + pastille
+  const vuClic = {};
+  function expliquerSous(xPage, yPage, clic) {
+    const r = zoneGraphique(); if (xPage < r.left || xPage > r.left + r.width - 70 || yPage < r.top + 86 || yPage > r.top + (r.height || 600)) return false;
+    const q = prixA(yPage); if (!q || !isFinite(q.p)) return false;
+    const m = nomMarche(), LG = lignesAlign(); let cle = null, txt = null, coul = 'alerte', emo = '👀';
+    for (const n of ['ENTRÉE', 'SL', 'TP1', 'TP2']) { const l = LG[n]; if (l && Math.abs(l.y - q.p) <= q.tol) { cle = 'l' + n + Math.round(l.y); txt = teaserLigne(n); coul = couleurLigne(n); emo = n.startsWith('TP') ? '🎯' : n === 'SL' ? '🧱' : '🔮'; break; } }
+    if (!cle) for (const z of zonesAlign()) { if (q.p <= z.hi + q.tol / 2 && q.p >= z.lo - q.tol / 2) { cle = 'z' + z.id; txt = texteZone(z.t, m); emo = /FVG/i.test(z.t) ? '🧲' : /ORDER/i.test(z.t) ? '🏦' : '👀'; break; } }
+    if (!cle) return false;
+    const now = Date.now(); window.__alignExpl = now; if (now - (vuClic[cle] || 0) < (clic ? 4000 : 45000)) return true; vuClic[cle] = now;
+    montrer(txt, false, 1, coul, true); coeurs(1, [emo]); lueur(0);   // pastille : en haut si le marché baisse, en bas s'il monte
+    return true;
+  }
+  let posDown = null, survolT = null;
+  document.addEventListener('pointerdown', e => { posDown = { x: e.clientX, y: e.clientY, t: Date.now() }; }, { passive: true, capture: true });
+  document.addEventListener('pointerup', e => { try {
+    if (!posDown || Math.hypot(e.clientX - posDown.x, e.clientY - posDown.y) > 8 || Date.now() - posDown.t > 700) return;   // un glisser n'est pas un clic
+    if (e.target && e.target.closest && e.target.closest('.chart-markup-table')) expliquerSous(e.clientX, e.clientY, true);
+  } catch (er) {} }, { passive: true, capture: true });
+  document.addEventListener('pointermove', e => { if (e.pointerType !== 'mouse') return; clearTimeout(survolT); const x0 = e.clientX, y0 = e.clientY;
+    survolT = setTimeout(() => { try { expliquerSous(x0, y0, false); } catch (er) {} }, 600); }, { passive: true, capture: true });   // souris posée 0,6 s sur ENTRÉE / SL / TP ou une zone
   const deja = {};
   function uneFois(cle) { if (deja[cle]) return false; deja[cle] = 1; return true; }
   const PHRASES = {
@@ -639,14 +705,14 @@
              '🔴 Les vendeurs tiennent {m} 😬 ça peut encore descendre • plus d\'infos : lien en bio 🎁',
              '🌊 {m} glisse… le coach surveille chaque bougie : lien en bio 🎁'],
     // v6.1 : où est le prix (sans le donner) + le lien en bio = être BRANCHÉ au marché
-    bas_zone: ['📍 {m} est posé sur une zone clé en bas 👀 rebond ou cassure ? 🔌 branche-toi au marché : lien en bio 🎁',
+    bas_zone: ['📍 {m} est posé sur une zone clé en bas 👀 rebond ou cassure ? 📲 connecte-toi au marché depuis ton portable : lien en bio 🎁',
                '🧲 {m} teste le bas de sa zone… les acheteurs vont-ils tenir ? 📡 en direct : lien en bio 🎁'],
-    haut_zone: ['📍 {m} touche le haut de sa zone 👀 cassure ou rejet ? 🔌 branche-toi au marché : lien en bio 🎁',
+    haut_zone: ['📍 {m} touche le haut de sa zone 👀 cassure ou rejet ? 📲 connecte-toi au marché depuis ton portable : lien en bio 🎁',
                 '🧱 {m} bute sous un plafond… les vendeurs vont-ils frapper ? 📡 en direct : lien en bio 🎁'],
     milieu: ['🧭 {m} au milieu de sa zone : il cherche sa direction… le coach te dit quand ça part 📡 lien en bio 🎁',
              '⚖️ {m} en équilibre : acheteurs et vendeurs se regardent… qui va craquer ? 👀 lien en bio 🎁'],
-    branche: ['🔌 Le lien en bio = ton câble branché sur le marché : chaque bougie expliquée en direct 📡',
-              '📡 Comme si tu étais connecté au marché : le coach lit chaque bougie avec toi • lien en bio 🎁',
+    branche: ['📲 Ton portable connecté au marché en temps réel : chaque bougie expliquée en direct • lien en bio 🎁',
+              '📡 Connecté au marché depuis ton portable : le coach lit chaque bougie avec toi • lien en bio 🎁',
               '🧠 Tu vois les bougies, le coach te dit ce qu\'elles préparent • lien en bio 🎁',
               '⚡ Ressens le marché en direct : pression, pièges, accélérations… tout est dans le lien en bio 🎁'],
     // v6.5 : marché tout calme → on parle comme un pote, selon l'heure
@@ -674,6 +740,14 @@
       const moyR = prev.reduce((a, x) => a + (x[2] - x[3]), 0) / prev.length || 1;
       const moyV = prev.reduce((a, x) => a + (x[5] || 0), 0) / prev.length || 0;
       const corps = cur[4] - cur[1], sens = corps < 0 ? -1 : 1, id = m + cur[0];
+      // v7.5 (constat d'Adel : « il dit que ça va chuter et le marché explose ») : une annonce contredite par le marché est ANNULÉE tout de suite
+      if (arme && (cur[4] - arme.p) * arme.d < -0.6 * (arme.r || moyR)) {
+        const d = -arme.d, am = arme.m; arme = null;
+        montrer('🔄 CHANGEMENT DE PROGRAMME sur ' + am + ' : le marché a changé d\'avis ' + (d === 1 ? '📈' : '📉') + ' • on suit le marché, on ne le combat pas 💪 • la suite en temps réel : lien en bio 🎁', false, 1, d === 1 ? 'haut' : 'bas', true);
+        lueur(d); setTimeout(() => coeurs(1, ['🔄'], d), 1500);
+        return;
+      }
+      const pente40 = (cur[4] - B[0][4]) / moyR;   // v7.5 : la tendance de fond (40 bougies) doit être d'accord avant d'annoncer un sens
       // 0) v6.2 : le prix arrive sur une ligne ALIGN → son explication défile dans la bande (2 fois), une fois par quart d'heure
       const LG = lignesAlign(), q15 = Math.floor(Date.now() / 900000);
       for (const n of ['TP2', 'TP1', 'SL', 'ENTRÉE']) {
@@ -687,6 +761,11 @@
           if (n.startsWith('TP')) { explosionArgent(cur[4] > l.y ? -1 : 1); feuArtifice(traverse ? '💥 ÇA A TOUT ÉCLATÉ !' : '🍾 ÇA ENCAISSE !'); pluieBillets(35); setTimeout(() => coeurs(1, ['💥']), 2500); }   // v7.4 : ligne bleue touchée = champagne + billets + explosion   // v7.4 : TP traversé d'un coup = explosion   // objectif atteint : l'argent suit le sens du marché
           return;
         }
+      }
+      // 0b) v7.5 : le prix entre dans une zone FVG / ORDER BLOCK → explication dans la bande + pastille (une fois par quart d'heure)
+      for (const z of zonesAlign()) {
+        const dedans = cur[4] <= z.hi && cur[4] >= z.lo, avant = B[B.length - 2][4] > z.hi || B[B.length - 2][4] < z.lo;
+        if (dedans && avant && uneFois('zone' + z.id + q15)) { montrer(texteZone(z.t, m), false, 1, 'alerte'); coeurs(1, [/FVG/i.test(z.t) ? '🧲' : '🏦'], cur[4] > B[B.length - 2][4] ? 1 : -1); lueur(0); versBot('ligne', cur[4] > B[B.length - 2][4] ? 1 : -1, '', /FVG/i.test(z.t) ? 'FVG' : 'OB'); return; }
       }
       // 1) bougie qui accélère (corps > 1,6× la taille moyenne) : explosion visuelle + lueur rouge/verte
       if (Math.abs(corps) > 1.6 * moyR && uneFois('acc' + id)) {
@@ -706,7 +785,8 @@
       const comp = B.slice(-4).reduce((a, x) => a + (x[2] - x[3]), 0) / 4 < 0.75 * moyR;
       const colle = dirT === -1 ? (cur[4] - ll) < 0.6 * moyR : dirT === 1 ? (hh - cur[4]) < 0.6 * moyR : false;
       const quart = Math.floor(Date.now() / 900000), minRest = Math.max(1, Math.ceil((900 - Math.floor(Date.now() / 1000) % 900) / 60));
-      if (dirT && (comp || colle) && uneFois('pr' + m + quart)) {
+      const daccord = dirT && Math.sign(pente40) === dirT && Math.abs(pente40) > 1.5 && corps * dirT > -0.5 * moyR;   // v7.5 : jamais contre la tendance de fond ni contre la bougie en cours
+      if (daccord && (comp || colle) && uneFois('pr' + m + quart)) {
         arme = { d: dirT, quart, m, p: cur[4], r: moyR };
         lueur(dirT); coeurs(8, dirT === -1 ? ['📉', '🌊', '⚡'] : ['📈', '🚀', '⚡']);
         pop('⏳', 'COMPTE À REBOURS sur ' + m + ' : ' + (dirT === -1 ? '🔴 GROSSE DISTRIBUTION' : '🟢 ÇA VA PÉTER EN L\'AIR'), dirT,
@@ -728,7 +808,7 @@
       }
       // 6) manipulation : grosse mèche CONTRE la tendance (les gros piègent) → la vraie direction peut arriver
       const meche = dirT === -1 ? cur[2] - Math.max(cur[1], cur[4]) : dirT === 1 ? Math.min(cur[1], cur[4]) - cur[3] : 0;
-      if (dirT && meche > 1.1 * moyR && uneFois('mn' + id)) {
+      if (daccord && meche > 1.1 * moyR && uneFois('mn' + id)) {
         arme = { d: dirT, quart, m, p: cur[4], r: moyR };
         lueur(dirT);
         pop('🌀', 'MANIPULATION sur ' + m, dirT, (dirT === -1 ? 'les gros piègent les acheteurs… la belle distribution 📉' : 'les gros piègent les vendeurs… le rechargement 📈')
@@ -752,7 +832,7 @@
           if (L === PHRASES.ennui) teteEnnui();
           if (L === PHRASES.bas_zone || L === PHRASES.haut_zone) versBot('zone', L === PHRASES.bas_zone ? -1 : 1);   // la vraie réponse part dans la chaîne du marché
           derniereTend = Date.now(); tendN++;
-          coeurs(8, L === PHRASES.branche ? ['🔌', '📡', '⚡', '🧠'] : L === PHRASES.baisse ? ['🔴', '📉', '🌊'] : L === PHRASES.hausse ? ['🟢', '📈', '🚀'] : ['👀', '❤️', '🔥']);
+          coeurs(8, L === PHRASES.branche ? ['📲', '📡', '⚡', '🧠'] : L === PHRASES.baisse ? ['🔴', '📉', '🌊'] : L === PHRASES.hausse ? ['🟢', '📈', '🚀'] : ['👀', '❤️', '🔥']);
         }
       }
     } catch (e) {}
