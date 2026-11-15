@@ -9947,6 +9947,26 @@ def ecran_vers_telegram(etat):
         kb.setdefault("inline_keyboard", []).insert(0, [{"text": "🧠 En savoir plus", "url": BOT_LIEN + "?start=ecran_" + m.lower()}])
         _envoi_sur(canal, text=court, reply_markup=json.dumps(kb))     # AVEC son : l'écran intrigue, le téléphone donne la réponse
 
+def promo_apres_tp(etat, m, now=None):
+    """Demande d'Adel (15/11) : quand on tape un TP, on remet en avant le parrainage (compte démo gratuit + codes prop firms)
+    dans la chaîne du marché, avec les boutons ; au plus une fois toutes les 3 h par marché (pas de spam)."""
+    now = time.time() if now is None else now
+    cle_ = f"promo_tp{m}"
+    if now - float((etat.get("promo_tp") or {}).get(cle_, -1e12)) < 3 * 3600:
+        return False
+    canal = (etat.get("canaux_marche") or {}).get(m)
+    if not (canal and TOKEN):
+        return False
+    etat.setdefault("promo_tp", {})[cle_] = now
+    _envoi_sur(canal, text=("🔥 ENCORE UN TP POUR LA TEAM ALIGN !\n"
+                            "🤩 Toi aussi tu veux trader avec le capital d'une prop firm ?\n"
+                            "🆓 Commence par le COMPTE DÉMO gratuit, sans risque\n"
+                            f"🎟 Codes promo : Topstep {TOPSTEP_CODE} • FundedNext {FUNDEDNEXT_CODE}\n"
+                            "⚠️ Ceci n'est pas un conseil en investissement (DYOR)\n"
+                            "🤝 Liens de parrainage : ALIGN reçoit un avantage si tu les utilises"),
+               reply_markup=markup_compte_finance(), disable_notification="true")
+    return True
+
 def sondage_tp(etat, m):
     """v8.9 (demande d'Adel) : TP touché → sondage « tu as encaissé ? » dans la chaîne du marché + la bande renvoie vers le mobile."""
     if time.time() - _LIVE_DERNIER.get(f"sondage{m}", 0) < 1800:
@@ -9973,6 +9993,7 @@ def live_annonces(etat, m, textes):
         elif "OBJECTIF FINAL ATTEINT" in t or re.search(r"TP[2-9] TOUCHÉ", t):
             live_bande(etat, f"🏆 TP TOUCHÉ sur {ic} {m} ! Bravo à ceux qui ont suivi 🔥" + FIN_BANDE, f"tp2{m}", 600, toujours=True)
             sondage_tp(etat, m)
+            promo_apres_tp(etat, m)               # demande d'Adel : le parrainage revient après chaque TP (3 h max)
         elif "FRÔLÉ" in t:
             live_bande(etat, f"BULLE:😅 {ic} {m} : TP frôlé à un cheveu • petit recul, on garde le cap 😎" + FIN_BANDE, f"frole{m}", 600, toujours=True)
         elif "STOP TOUCHÉ" in t:
@@ -9987,6 +10008,7 @@ def live_annonces(etat, m, textes):
             live_bande(etat, f"BULLE:🔁 {ic} {m} : il est revenu, comme prévu 😎 • deuxième service, on reprend la même 🍽️ • lien en bio" + FIN_BANDE, f"reprise{m}", 900, toujours=True)
         elif "TP1 TOUCHÉ" in t:
             live_bande(etat, f"🎯 TP1 TOUCHÉ sur {ic} {m} ! ✅ On protège : SL à l'entrée 🛡" + FIN_BANDE, f"tp1{m}", 600, toujours=True)
+            promo_apres_tp(etat, m)
         elif "POINT D'ENTRÉE À VENIR" in t:
             # Règle live : aucune info (ni sens, ni niveau, ni marché) ; jamais le mot « Telegram » à l'écran (TikTok réduit la portée des lives qui renvoient ailleurs) → « lien en bio »
             live_bande(etat, f"BULLE:🎯 Le prix arrive dans une zone clé 👀 • ⏱ verdict dans {min_avant_cloture15()} min (clôture 15 min) • "
