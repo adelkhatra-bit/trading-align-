@@ -1087,7 +1087,10 @@
       const tp2 = boites.find(x => x.n === 'TP2' && x.box) || boites.find(x => x.box); if (!tp2) { etiqBox.innerHTML = ''; return; }
       const xCol = tp2.box.l, en = langueBande() === 'en';
       etiqBox.innerHTML = boites.map(x => (x.box ? '<div class="cache" style="left:' + (x.box.l - 2) + 'px;top:' + (x.box.t - 2) + 'px;width:' + (x.box.r - x.box.l + 4) + 'px;height:' + (x.box.b - x.box.t + 4) + 'px"></div>' : '')
-        + '<div class="etq" style="left:' + xCol + 'px;top:' + (R.top + x.y + 3) + 'px;background:' + x.col + ';color:' + x.tc + '">' + (x.n === 'ENTRÉE' && en ? 'ENTRY' : x.n) + (/✅/.test(x.o.t) ? ' ✅' : '') + ' <b>❓</b></div>').join('');
+        + '<div class="etq" data-y="' + (R.top + x.y) + '" style="left:' + xCol + 'px;top:' + (R.top + x.y + 3) + 'px;background:' + x.col + ';color:' + x.tc + '">' + (x.n === 'ENTRÉE' && en ? 'ENTRY' : x.n) + (/✅/.test(x.o.t) ? ' ✅' : '') + ' <b>❓</b></div>').join('');
+      // deux lignes trop proches (SL collé à l'ENTRÉE) : l'étiquette du haut passe AU-DESSUS de sa ligne, jamais l'une sur l'autre
+      const els = [...etiqBox.querySelectorAll('.etq')].sort((p, q) => p.getBoundingClientRect().top - q.getBoundingClientRect().top);
+      for (let i = 1; i < els.length; i++) { const p = els[i - 1].getBoundingClientRect(), q = els[i].getBoundingClientRect(); if (q.top < p.bottom + 2) els[i - 1].style.top = (+els[i - 1].dataset.y - p.height - 3) + 'px'; }
     } catch (e) {}
   }
   const etiqT = setInterval(poserEtiquettes, 1500); poserEtiquettes();
