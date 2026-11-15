@@ -2285,6 +2285,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
         self.assertIn("protégé", txt)
         self.assertEqual(align_bot.humaniser({}, "9", "X"), "X")
 
+    @unittest.mock.patch.object(align_bot, "TOUT_GRATUIT", False)   # ancien modèle (1 position offerte puis masquée), gardé pour plus tard
     def test_free_flow_one_proposed_position_then_masked(self):
         from unittest.mock import patch
         state = {"prospects": ["7"], "proprio": ["1"], "proprio_gratuit": True, "lien": "https://t.me/+x", "GOLD": {"trade": {"cree": 5, "qui": {}}}}
@@ -2305,6 +2306,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
             align_bot.envoyer_prospects(state, entree, True)
             self.assertEqual(tg.call_count, 0)          # pas deux fois le même avis
 
+    @unittest.mock.patch.object(align_bot, "TOUT_GRATUIT", False)   # ancien modèle (1 position offerte puis masquée), gardé pour plus tard
     def test_free_bot_off_gets_only_masked_and_respects_market(self):
         from unittest.mock import patch
         state = {"prospects": ["7", "8"], "bot_off": ["7"], "marches_par_chat": {"8": "BTC"}, "GOLD": {"trade": {"cree": 5}}}
