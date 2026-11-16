@@ -15,6 +15,7 @@ on:
       - main
     paths:
       - "align-bot/**"
+      - "docs/live/**"
       - ".github/workflows/**"
 
 permissions:
