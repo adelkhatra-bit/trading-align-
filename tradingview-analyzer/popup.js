@@ -1346,6 +1346,65 @@ function renderSignal(live) {
     state.lastRec = rec;
     renderStats();
   }
+  if (canEnter && _sigExecutable && !_sigConflict && !_sigDirConflict) {
+    showConfirmedSignal(live, coach, it, rec);
+  }
+}
+
+function closeConfirmedSignal() {
+  var overlay = $('signalShowOverlay');
+  if (!overlay) return;
+  overlay.classList.remove('is-open');
+  overlay.setAttribute('aria-hidden', 'true');
+  window.setTimeout(function () { if (!overlay.classList.contains('is-open')) overlay.hidden = true; }, 240);
+  if (window.__alignSignalShowTimer) { clearTimeout(window.__alignSignalShowTimer); window.__alignSignalShowTimer = null; }
+}
+
+function showConfirmedSignal(live, coach, instantTrade, rec) {
+  var execution = (live && live.execution) || (coach && coach.execution) || {};
+  var entry = execution.entry ?? execution.e ?? instantTrade.entry ?? instantTrade.price;
+  var sl = execution.sl ?? instantTrade.sl;
+  var tp1 = execution.tp1 ?? instantTrade.tp1;
+  var tp2 = execution.tp2 ?? instantTrade.tp2;
+  var tp = execution.tp ?? instantTrade.tp;
+  var direction = (rec === 'LONG' || rec === 'BUY') ? 'LONG' : 'SHORT';
+  var key = [state.symbol, state.timeframe, direction, entry, sl, tp1, tp2, tp].join('|');
+  if (!entry || !sl || (!tp1 && !tp) || state._lastSignalShowKey === key) return;
+  state._lastSignalShowKey = key;
+  var overlay = $('signalShowOverlay');
+  var title = $('signalShowTitle');
+  var market = $('signalShowMarket');
+  var levels = $('signalShowLevels');
+  if (!overlay || !title || !market || !levels) return;
+  title.textContent = direction === 'LONG' ? '▲ LONG CONFIRMÉ' : '▼ SHORT CONFIRMÉ';
+  title.style.color = direction === 'LONG' ? COL_LONG : COL_SHORT;
+  market.textContent = String(state.symbol || (live && live.symbol) || 'MARCHÉ') + ' · ' + fmtTime();
+  var rows = [
+    ['ENTRÉE', entry, ''],
+    ['STOP LOSS', sl, 'sl']
+  ];
+  if (tp1 != null) rows.push(['TP1', tp1, 'tp']);
+  if (tp2 != null) rows.push(['TP2', tp2, 'tp']);
+  if (tp1 == null && tp != null) rows.push(['OBJECTIF', tp, 'tp']);
+  levels.innerHTML = rows.map(function (row) {
+    return '<div class="signal-show-level ' + row[2] + '"><span>' + row[0] + '</span><strong>' + fmtPrice(row[1]) + '</strong></div>';
+  }).join('');
+  overlay.hidden = false;
+  overlay.setAttribute('aria-hidden', 'false');
+  requestAnimationFrame(function () { overlay.classList.add('is-open'); });
+  var close = $('signalShowClose');
+  if (close && !close.dataset.bound) {
+    close.addEventListener('click', closeConfirmedSignal);
+    close.dataset.bound = '1';
+  }
+  if (!overlay.dataset.bound) {
+    overlay.addEventListener('click', function (event) {
+      if (event.target === overlay) closeConfirmedSignal();
+    });
+    overlay.dataset.bound = '1';
+  }
+  if (window.__alignSignalShowTimer) clearTimeout(window.__alignSignalShowTimer);
+  window.__alignSignalShowTimer = window.setTimeout(closeConfirmedSignal, 5200);
 }
 
 function renderBadges(health) {
