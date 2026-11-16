@@ -432,6 +432,25 @@ class LiveOutbox(unittest.TestCase):
         finally:
             ab.DERNIER_ETAT = previous
 
+    def test_demande_analyse_autorise_une_reponse_apres_le_traitement_du_bouton(self):
+        observations = []
+
+        def faux_http(url, data):
+            observations.append(ab._telegram_sortant_autorise(
+                "sendMessage", {"chat_id": "42", "text": "Analyse demandée"}))
+            return {"ok": True, "result": {"message_id": 123}}
+
+        with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True), \
+             mock.patch.object(ab, "http_json", side_effect=faux_http):
+            resultat = ab._envoi_sur_demande("42", text="Analyse demandée")
+            self.assertFalse(ab._telegram_sortant_autorise(
+                "sendMessage", {"chat_id": "42", "text": "Message spontané"}))
+            self.assertFalse(ab._telegram_sortant_autorise(
+                "sendMessage", {"chat_id": "43", "text": "Analyse demandée"}))
+
+        self.assertTrue(resultat["ok"])
+        self.assertEqual(observations, [True])
+
 
 
 if __name__ == "__main__":
