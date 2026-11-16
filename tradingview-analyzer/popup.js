@@ -1287,8 +1287,8 @@ function renderSignal(live) {
     sigEl.textContent = stateLabel;
     // Couleur CSS directionnelle SEULEMENT si setup exécutable (canEnter + sl + tp)
     // Sinon neutre — évite rouge/vert trompeur quand canEnter=false
-    var _sigExecSl = Number((live && live.execution && live.execution.sl) || (coach.execution && coach.execution.sl) || 0);
-    var _sigExecTp = Number((live && live.execution && live.execution.tp) || (coach.execution && coach.execution.tp) || 0);
+    var _sigExecSl = Number((live && live.execution && (live.execution.sl || live.execution.stopLoss)) || (coach.execution && (coach.execution.sl || coach.execution.stopLoss)) || 0);
+    var _sigExecTp = Number((live && live.execution && (live.execution.tp || live.execution.tp1 || live.execution.tp2 || live.execution.takeProfit)) || (coach.execution && (coach.execution.tp || coach.execution.tp1 || coach.execution.tp2 || coach.execution.takeProfit)) || 0);
     var _sigExecutable = canEnter && _sigExecSl > 0 && _sigExecTp > 0;
     var _cfSnap2 = ((live && live.coach && live.coach.analysisSnapshot && live.coach.analysisSnapshot.sourceSummary) || (live && live.analysisSnapshot && live.analysisSnapshot.sourceSummary) || {});
     var _sigConflict    = !!_cfSnap2.conflictDetected;      // tout blocage (qualité, RSI, conf...)
@@ -1346,6 +1346,65 @@ function renderSignal(live) {
     state.lastRec = rec;
     renderStats();
   }
+  if (canEnter && _sigExecutable && !_sigConflict && !_sigDirConflict) {
+    showConfirmedSignal(live, coach, it, rec);
+  }
+}
+
+function closeConfirmedSignal() {
+  var overlay = $('signalShowOverlay');
+  if (!overlay) return;
+  overlay.classList.remove('is-open');
+  overlay.setAttribute('aria-hidden', 'true');
+  window.setTimeout(function () { if (!overlay.classList.contains('is-open')) overlay.hidden = true; }, 240);
+  if (window.__alignSignalShowTimer) { clearTimeout(window.__alignSignalShowTimer); window.__alignSignalShowTimer = null; }
+}
+
+function showConfirmedSignal(live, coach, instantTrade, rec) {
+  var execution = Object.assign({}, (coach && coach.execution) || {}, (live && live.execution) || {});
+  var entry = execution.entry ?? execution.e ?? execution.entryPrice ?? instantTrade.entry ?? instantTrade.entryPrice;
+  var sl = execution.sl ?? execution.stopLoss ?? execution.stop_loss ?? instantTrade.sl ?? instantTrade.stopLoss;
+  var tp1 = execution.tp1 ?? execution.takeProfit1 ?? instantTrade.tp1;
+  var tp2 = execution.tp2 ?? execution.takeProfit2 ?? instantTrade.tp2;
+  var tp = execution.tp ?? execution.takeProfit ?? instantTrade.tp;
+  var nEntry = Number(entry), nSl = Number(sl);
+  var nTp1 = tp1 != null ? Number(tp1) : (tp != null ? Number(tp) : NaN);
+  var nTp2 = tp2 != null ? Number(tp2) : NaN;
+  if (![nEntry, nSl, nTp1].every(function (n) { return Number.isFinite(n) && n > 0; })) return;
+  var direction = (rec === 'LONG' || rec === 'BUY' || rec === 'ACHAT') ? 'LONG' : 'SHORT';
+  var key = [state.symbol, state.timeframe, direction, nEntry, nSl, nTp1, nTp2].join('|');
+  if (state._lastSignalShowKey === key) return;
+  state._lastSignalShowKey = key;
+  var overlay = $('signalShowOverlay');
+  var title = $('signalShowTitle');
+  var market = $('signalShowMarket');
+  var levels = $('signalShowLevels');
+  if (!overlay || !title || !market || !levels) return;
+  title.textContent = direction === 'LONG' ? '▲ LONG CONFIRMÉ' : '▼ SHORT CONFIRMÉ';
+  title.style.color = direction === 'LONG' ? COL_LONG : COL_SHORT;
+  market.textContent = String(state.symbol || (live && live.symbol) || 'MARCHÉ') + ' · ' + fmtTime();
+  var rows = [['ENTRÉE', nEntry, ''], ['STOP LOSS', nSl, 'sl']];
+  rows.push([tp1 != null ? 'TP1' : 'OBJECTIF', nTp1, 'tp']);
+  if (Number.isFinite(nTp2) && nTp2 > 0) rows.push(['TP2', nTp2, 'tp']);
+  levels.innerHTML = rows.map(function (row) {
+    return '<div class="signal-show-level ' + row[2] + '"><span>' + row[0] + '</span><strong>' + fmtPrice(row[1]) + '</strong></div>';
+  }).join('');
+  overlay.hidden = false;
+  overlay.setAttribute('aria-hidden', 'false');
+  requestAnimationFrame(function () { overlay.classList.add('is-open'); });
+  var close = $('signalShowClose');
+  if (close && !close.dataset.bound) {
+    close.addEventListener('click', closeConfirmedSignal);
+    close.dataset.bound = '1';
+  }
+  if (!overlay.dataset.bound) {
+    overlay.addEventListener('click', function (event) {
+      if (event.target === overlay) closeConfirmedSignal();
+    });
+    overlay.dataset.bound = '1';
+  }
+  if (window.__alignSignalShowTimer) clearTimeout(window.__alignSignalShowTimer);
+  window.__alignSignalShowTimer = window.setTimeout(closeConfirmedSignal, 5200);
 }
 
 function renderBadges(health) {
