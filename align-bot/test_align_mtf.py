@@ -2696,6 +2696,17 @@ class TestTelegramPositionStateClarity(unittest.TestCase):
         self.assertEqual(result["provenance"], "PAXG proxy")
         self.assertIn("indisponible", result["interpretation"])
 
+    def test_paxg_volume_is_explicitly_not_gold_market_volume(self):
+        bars = [{"v": 100.0, "volume_source": "Kraken PAXGUSD"} for _ in range(21)]
+        result = align_bot.resume_volume(bars, "Gold")
+        self.assertTrue(result["disponible"])
+        self.assertIn("PAS le volume global du marché Gold", result["interpretation"])
+
+    def test_comex_volume_is_labelled_as_a_futures_proxy(self):
+        bars = [{"v": 100.0, "volume_source": "COMEX GC=F Yahoo proxy"} for _ in range(21)]
+        result = align_bot.resume_volume(bars, "Gold")
+        self.assertIn("proxy du volume futures COMEX", result["interpretation"])
+
     def test_regrouping_sums_source_volume_without_changing_price_aggregation(self):
         bars = [
             dict(candle(0), v=12.5, trades=4),
