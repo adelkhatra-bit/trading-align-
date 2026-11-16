@@ -351,7 +351,7 @@ class LiveOutbox(unittest.TestCase):
              mock.patch.object(ab.time, "time", return_value=500):
             ab.activer_coach_live(state, cid, market, True)
         self.assertNotIn(cid, state["bot_off"])
-        self.assertEqual(state["coach_live"][market][cid], {"dernier_t": 100})
+        self.assertEqual(state["coach_live"][market][cid], {"dernier_t": 100, "started_t": 500})
 
     def test_coach_live_ignores_legacy_expiry_and_keeps_monitoring(self):
         market = "BTC"
@@ -378,11 +378,11 @@ class LiveOutbox(unittest.TestCase):
         with mock.patch.object(ab, "DERNIERS", {
             "BTC": {"b15": [{"t": 100}, {"t": 200}]},
             "GOLD": {"b15": [{"t": 300}, {"t": 400}]}
-        }):
+        }), mock.patch.object(ab.time, "time", return_value=500):
             selected = ab.demarrer_recherche_positions(state, "user-42")
         self.assertEqual(selected, ("BTC", "GOLD"))
-        self.assertEqual(state["coach_live"]["BTC"]["user-42"], {"dernier_t": 100})
-        self.assertEqual(state["coach_live"]["GOLD"]["user-42"], {"dernier_t": 300})
+        self.assertEqual(state["coach_live"]["BTC"]["user-42"], {"dernier_t": 100, "started_t": 500})
+        self.assertEqual(state["coach_live"]["GOLD"]["user-42"], {"dernier_t": 300, "started_t": 500})
         self.assertNotIn("user-42", state["bot_off"])
 
 
@@ -390,8 +390,8 @@ class LiveOutbox(unittest.TestCase):
     def test_coach_live_sends_new_position_without_waiting_for_m15_close(self):
         market = "BTC"
         cid = "user-42"
-        trade = {"d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0}
-        state = {"coach_live": {market: {cid: {"dernier_t": 0}}}}
+        trade = {"d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0, "ouvert_t": 100}
+        state = {"coach_live": {market: {cid: {"dernier_t": 0, "started_t": 50}}}}
         sent = []
         with mock.patch.object(ab, "bot_on", return_value=True), \
              mock.patch.object(ab, "dans_chaine", return_value=False), \
@@ -404,6 +404,23 @@ class LiveOutbox(unittest.TestCase):
 
 
 
+
+    def test_coach_live_does_not_send_a_trade_opened_before_the_search(self):
+        market, cid = "BTC", "user-42"
+        trade = {"d": -1, "e": 100.0, "sl": 102.0, "tp1": 96.0, "tp2": 92.0, "ouvert_t": 100}
+        state = {
+            "coach_live": {market: {cid: {"dernier_t": 0, "started_t": 200}}},
+            "recherche_positions_active": [cid]
+        }
+        sent = []
+        with mock.patch.object(ab, "bot_on", return_value=True), \\
+             mock.patch.object(ab, "dans_chaine", return_value=False), \\
+             mock.patch.object(ab, "_envoi_sur", side_effect=lambda *a, **kw: sent.append((a, kw)) or {"ok": True}), \\
+             mock.patch.object(ab, "markup_analyse", return_value=None):
+            ab.notifier_coach_live(state, market, {"m1": [{"c": 99.0}]}, {"trade": trade})
+        self.assertFalse(any("POSITION ALIGN DÉTECTÉE" in str(item) for item in sent))
+        self.assertEqual(state["coach_live"][market][cid]["position_key"], "-1|100.0|102.0|96.0|92.0")
+        self.assertEqual(state["recherche_positions_active"], [cid])
 
     def test_telegram_pull_mode_blocks_background_notifications(self):
         with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True):
