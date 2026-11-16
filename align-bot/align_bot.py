@@ -6063,6 +6063,10 @@ def traiter(etat, chats, updates):
             if choix == "trade":
                 if mk == "no":
                     etat.setdefault("trade_jour", {})[qui] = datetime.datetime.now(PARIS).strftime("%Y-%m-%d")
+                    off = etat.setdefault("bot_off", [])
+                    if qui not in off:
+                        off.append(qui)       # stoppe les nouveaux signaux ; le suivi d'une position déjà ouverte reste actif
+                    etat["coach_pending"] = [x for x in etat.get("coach_pending", []) if str(x) != qui]
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="Bien noté")
                     continue
                 if mk == "yes":
