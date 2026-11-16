@@ -4103,7 +4103,7 @@ def radar_climax(m, r, cle):
     1) volume climax : une des 4 dernières bougies 15 min CLÔTURÉES a un volume ≥ 3 × la moyenne des 40 d'avant (épuisement) ;
     2) balayage : une de ces bougies est passée sous le plus bas (sur le plus haut) des 20 bougies d'avant, puis la clôture est revenue au-dessus ;
     3) confirmation : la dernière clôture 15 min repasse au-dessus (au-dessous) de l'EMA9.
-    → position CONTRE-TENDANCE « prenable, risquée », SL sous la mèche du balayage ; le bot ne la prend pas lui-même.
+    → BTC garde son signal historique ; GOLD/NASDAQ restent en veille tant que H1 et H4 ne confirment pas ensemble.
     Une alerte par sens toutes les 2 h ; mémorise l'heure (radar_t) pour ne pas envoyer « FEINTE » juste après."""
     # 16/11 : le radar lisait « b15 » coupé à 30 bougies alors qu'il en faut 66 → il ne se déclenchait JAMAIS en réel (LONG raté).
     dirs = r.get("dirs") or []
@@ -4140,9 +4140,9 @@ def radar_climax(m, r, cle):
             if m in ("GOLD", "NASDAQ") and (len(dirs) < 10 or dirs[7] != sens or dirs[9] != sens):
                 h1_txt = "haussier" if len(dirs) > 7 and dirs[7] == 1 else "baissier" if len(dirs) > 7 and dirs[7] == -1 else "neutre"
                 h4_txt = "haussier" if len(dirs) > 9 and dirs[9] == 1 else "baissier" if len(dirs) > 9 and dirs[9] == -1 else "neutre"
-                return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, ' ')} {m}\\n"
-                        f"Balayage et volume détectés, mais H1 est {h1_txt} et H4 {h4_txt}.\\n"
-                        "⛔ Pas de position contre le biais H1/H4 : aucune entrée ni aucun SL/TP à prendre.\\n"
+                return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, ' ')} {m}\n"
+                        f"Balayage et volume détectés, mais H1 est {h1_txt} et H4 {h4_txt}.\n"
+                        "⛔ Pas de position contre le biais H1/H4 : aucune entrée ni aucun SL/TP à prendre.\n"
                         "⏳ J'attends que H1 et H4 confirment le même sens.")
             e = cl[-1]
             mot = "plus bas" if sens == 1 else "plus haut"
@@ -4186,10 +4186,10 @@ def retournement_marche(m, r, cle):
         sens_txt = "à la hausse" if sens == 1 else "à la baisse"
         h1_txt = "haussier" if d60 == 1 else "baissier" if d60 == -1 else "neutre"
         h4_txt = "haussier" if d240 == 1 else "baissier" if d240 == -1 else "neutre"
-        return (f"👀 RETOURNEMENT EN OBSERVATION — {ICONE.get(m, ' ')} {m}\\n"
-                f"Les M5 et M15 se retournent {sens_txt}, mais H1 reste {h1_txt} et H4 {h4_txt}.\\n"
-                "⛔ PAS DE POSITION dans ce nouveau sens : aucune entrée, aucun SL/TP à prendre.\\n"
-                "⏳ J'attends la confirmation des clôtures H1 ET H4 dans le même sens, puis le déclencheur M5.\\n"
+        return (f"👀 RETOURNEMENT EN OBSERVATION — {ICONE.get(m, ' ')} {m}\n"
+                f"Les M5 et M15 se retournent {sens_txt}, mais H1 reste {h1_txt} et H4 {h4_txt}.\n"
+                "⛔ PAS DE POSITION dans ce nouveau sens : aucune entrée, aucun SL/TP à prendre.\n"
+                "⏳ J'attends la confirmation des clôtures H1 ET H4 dans le même sens, puis le déclencheur M5.\n"
                 "ℹ️ Alerte de surveillance uniquement.")
 
     # BTC : logique et seuils historiques conservés.
@@ -4207,14 +4207,14 @@ def retournement_marche(m, r, cle):
     st = (62, 38)
     vu = f"le 5 min, le 15 min et même le 1h ont tourné {'à la hausse' if sens == 1 else 'à la baisse'}, alors que le 4h va encore dans l'autre sens"
     pq = "Sur le BTC je n'entre jamais sur le 5 min seul : c'est souvent un piège. Là, le 1h a suivi, donc c'est sérieux"
-    return (f"↩️ RETOURNEMENT {'LONG ⬆️' if sens == 1 else 'SHORT ⬇️'} — {ICONE.get(m, ' ')} {m}\\n"
-            f"👀 Regarde ton graphique : {vu}.\\n"
-            f"💡 {pq}. Le prix peut aller chercher le {haut} de la 1h, voire de la 4h.\\n"
-            f"📊 Sur mes 60 derniers jours, ce signal a atteint le {haut} 1h {st[0]} % du temps, le {haut} 4h {st[1]} %.\\n"
-            f"🎯 Cible 1 : {px(h1 if sens == 1 else l1)} ({haut} 1h)\\n"
-            f"🚀 Cible 2 : {px(h4 if sens == 1 else l4)} ({haut} 4h)\\n"
-            f"🛑 SL : {px(sl)}, juste {'sous le dernier creux' if sens == 1 else 'au-dessus du dernier sommet'} 5 min. S'il casse, je me suis trompé et on sort.\\n"
-            f"🛡 Dès que le prix touche {px(be)}, mets-toi à BE : il ne doit plus revenir à ton entrée. Là, on encaisse sans risque 💰\\n"
+    return (f"↩️ RETOURNEMENT {'LONG ⬆️' if sens == 1 else 'SHORT ⬇️'} — {ICONE.get(m, ' ')} {m}\n"
+            f"👀 Regarde ton graphique : {vu}.\n"
+            f"💡 {pq}. Le prix peut aller chercher le {haut} de la 1h, voire de la 4h.\n"
+            f"📊 Sur mes 60 derniers jours, ce signal a atteint le {haut} 1h {st[0]} % du temps, le {haut} 4h {st[1]} %.\n"
+            f"🎯 Cible 1 : {px(h1 if sens == 1 else l1)} ({haut} 1h)\n"
+            f"🚀 Cible 2 : {px(h4 if sens == 1 else l4)} ({haut} 4h)\n"
+            f"🛑 SL : {px(sl)}, juste {'sous le dernier creux' if sens == 1 else 'au-dessus du dernier sommet'} 5 min. S'il casse, je me suis trompé et on sort.\n"
+            f"🛡 Dès que le prix touche {px(be)}, mets-toi à BE : il ne doit plus revenir à ton entrée. Là, on encaisse sans risque 💰\n"
             "📺 Tu retrouves la même explication sur le graphique (infobulle ↩️)")
 
 
