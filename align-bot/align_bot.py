@@ -944,6 +944,8 @@ def _sniper(r):
     dirs, a3, a15, a5, zp = r.get("dirs") or [], r.get("atr3"), r.get("atr"), r.get("atr5") or r.get("atr"), r.get("zone_pine")
     m1, b3 = r.get("m1") or [], r.get("b3") or []
     b5, b15 = (r.get("b5") or [])[:-1], (r.get("b15") or [])[:-1]          # la dernière bougie M5 / M15 est en formation
+    if r.get("market") in ("GOLD", "NASDAQ") and len(dirs) >= 10 and (dirs[7] != d or dirs[9] != d):
+        return None, f"CONFLUENCE_H1_H4 refusée : {r.get('market')} exige H1 et H4 dans le même sens que le plan (H1={dirs[7]}, H4={dirs[9]}, plan={d})"
     if d not in (1, -1) or len(dirs) < 11 or not a3 or not a15 or not zp or len(m1) < 40 or len(b3) < 12 or len(b5) < 8 or len(b15) < 5:
         return None, f"DONNEES/PLAN absents (dirPlan={d}, zone={'oui' if zp else 'non'}, b3={len(b3)}, b5={len(b5)}, b15={len(b15)})"
     if (r["bull"] if d == 1 else r["bear"]) < MIN_ALIGN or r.get("sens") != d or dirs[9] == -d or dirs[7] == -d:
@@ -10999,6 +11001,7 @@ def un_tour(etat, chats):
             recevoir_updates_telegram(etat, chats, demandes)
             if SHUTDOWN_REQUESTED.is_set():
                 return
+            r["market"] = nom_marche  # le moteur SNIPER applique les règles H1/H4 propres à GOLD/NASDAQ
             r["tv_indicator_mtf"] = fetch_tv_mtf(pair)
             fusionne_lectures_tradingview(r)
         except Exception as ex:
