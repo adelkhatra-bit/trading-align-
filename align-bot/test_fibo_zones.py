@@ -132,8 +132,12 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn("if (!voixActive", self.js)
         self.assertIn("speechSynthesis.speak(utterance)", self.js)
         self.assertNotIn("voirFiboProgression", self.js)
-        self.assertIn("// @version      10.9", self.js)
-        self.assertIn("const VERSION = '10.9'", self.js)
+        self.assertIn("// @version      11.0", self.js)
+        self.assertIn("const VERSION = '11.0'", self.js)
+        self.assertIn("live-data/live.json", self.js)
+        self.assertIn("synchroniserEtatBot()", self.js)
+        self.assertIn("item.etat === 'entree'", self.js)
+        self.assertIn("clearInterval(botEtatSyncT)", self.js)
 
 
 if __name__ == "__main__":
