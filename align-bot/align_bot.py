@@ -8093,6 +8093,8 @@ def destinataires_message(etat, chats, texte):
     # En privé : consentement Coach obligatoire ; un message global n'est routé qu'aux coachs actifs.
     ens = marches_message(texte)
     def abonne_au_message(cid):
+        if vue_gratuite(etat, cid):
+            return False  # les prospects opt-in reçoivent le flux réduit dédié, jamais le flux VIP complet
         marches = ens if ens else set(MARCHES)
         return any(coach_abonne(etat, cid, m) and (not ens or m in marches_choisis(etat, cid))
                    for m in marches)
