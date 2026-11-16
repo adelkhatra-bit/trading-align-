@@ -387,6 +387,22 @@ class LiveOutbox(unittest.TestCase):
 
 
 
+    def test_coach_live_sends_new_position_without_waiting_for_m15_close(self):
+        market = "BTC"
+        cid = "user-42"
+        trade = {"d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0}
+        state = {"coach_live": {market: {cid: {"dernier_t": 0}}}}
+        sent = []
+        with mock.patch.object(ab, "bot_on", return_value=True), \
+             mock.patch.object(ab, "dans_chaine", return_value=False), \
+             mock.patch.object(ab, "_envoi_sur", side_effect=lambda *a, **kw: sent.append((a, kw)) or {"ok": True}), \
+             mock.patch.object(ab, "markup_analyse", return_value=None):
+            ab.notifier_coach_live(state, market, {"m1": [{"c": 101.0}]}, {"trade": trade})
+        self.assertEqual(state["coach_live"][market][cid]["position_key"], "1|100.0|98.0|104.0|108.0")
+        self.assertTrue(any("POSITION ALIGN DÉTECTÉE" in str(item) and "TP1" in str(item) for item in sent))
+
+
+
 if __name__ == "__main__":
     unittest.main()
 
