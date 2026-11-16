@@ -281,7 +281,7 @@ jobs:
           ANTHROPIC_MAX_JOUR: ${{ vars.ANTHROPIC_MAX_JOUR }}
           ALIGN_TV_API_URL: ${{ secrets.ALIGN_TV_API_URL }}
           ALIGN_TV_READ_TOKEN: ${{ secrets.ALIGN_TV_READ_TOKEN }}
-          ALIGN_LIVE_SUJET: ${{ secrets.ALIGN_LIVE_SUJET }}
+          ALIGN_LIVE_SUJET: align-live-2a4bccafd9548d93
           # Trading automatique (mode TEST tant que AUTO_TRADE / TOPSTEP_REEL ne valent pas 1)
           METAAPI_TOKEN: ${{ secrets.METAAPI_TOKEN }}
           METAAPI_COMPTES: ${{ vars.METAAPI_COMPTES }}
