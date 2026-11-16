@@ -11298,8 +11298,9 @@ def un_tour(etat, chats):
                 return
             r["market"] = nom_marche
             r["tv_indicator_mtf"] = fetch_tv_mtf(pair)
+            r["require_tv_bridge"] = nom_marche in ("GOLD", "NASDAQ")
             fusionne_lectures_tradingview(r)
-            # Revalider après lecture du bridge : le SNIPER et le coach doivent voir le même accord local + TradingView.
+            # Revalider après lecture du bridge : Gold/Nasdaq ne peuvent pas ouvrir de position sans ROBOT V12 M5/M15/H1 frais.
             r["confirme"] = direction_confirmee_marche(
                 nom_marche, r.get("dirs_cloturees") or r.get("dirs"), r.get("confirme"), r
             )
