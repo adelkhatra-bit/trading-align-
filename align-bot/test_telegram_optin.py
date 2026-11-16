@@ -148,6 +148,12 @@ class TelegramOptIn(unittest.TestCase):
             ab.notifier_coach_live(etat, "GOLD", r, {})
         send.assert_not_called()
 
+    def test_activation_coach_live_reactive_le_bot_apres_off(self):
+        etat = {"bot_off": ["10"], "coach_live": {"GOLD": {}}}
+        ab.activer_coach_live(etat, "10", "GOLD", True)
+        self.assertNotIn("10", etat["bot_off"])
+        self.assertIn("10", etat["coach_live"]["GOLD"])
+
     def test_bot_off_purge_les_messages_telegram_en_attente(self):
         etat = {
             "telegram_outbox": [
