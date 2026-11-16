@@ -2924,6 +2924,11 @@ def traiter_file_telegram(etat, maintenant=None, limite=20):
     return envoyes
 
 
+def _telegram_position_attendue(texte):
+    """Les alertes de recherche autorisées se limitent à une entrée réellement ouverte par ALIGN."""
+    return est_entree(str(texte or "")) or "POSITION ALIGN DÉTECTÉE" in str(texte or "")
+
+
 def _telegram_sortant_autorise(methode, params):
     """Aucun push spontané : réponse privée à une action explicite, ou entrée attendue après demande."""
     if not TELEGRAM_PULL_MODE:
@@ -2940,7 +2945,7 @@ def _telegram_sortant_autorise(methode, params):
     etat = DERNIER_ETAT or {}
     actifs = {str(x) for x in etat.get("recherche_positions_active", [])}
     texte = str(params.get("text") or params.get("caption") or "")
-    if cid and cid in actifs and methode in ("sendMessage", "sendPhoto") and est_entree(texte):
+    if cid and cid in actifs and methode in ("sendMessage", "sendPhoto") and _telegram_position_attendue(texte):
         return True
     print(f"TELEGRAM_PULL_BLOCK method={methode} chat={cid or '-'}", flush=True)
     return False
@@ -3015,7 +3020,7 @@ def telegram(methode, **params):
         etat_courant = DERNIER_ETAT or {}
         actifs = etat_courant.setdefault("recherche_positions_active", [])
         texte_envoye = str(params.get("text") or params.get("caption") or "")
-        if cid_envoye in {str(x) for x in actifs} and est_entree(texte_envoye):
+        if cid_envoye in {str(x) for x in actifs} and _telegram_position_attendue(texte_envoye):
             etat_courant["recherche_positions_active"] = [x for x in actifs if str(x) != cid_envoye]
             for abonnes in (etat_courant.get("coach_live") or {}).values():
                 if isinstance(abonnes, dict):
