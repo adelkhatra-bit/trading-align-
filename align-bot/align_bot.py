@@ -4757,6 +4757,8 @@ def entrer_inscrits(etat, m, tr, chats=()):
     auto = [str(c) for c in chats if coach_abonne(etat, c, m) and marche_autorise(etat, c, m)
             and not vue_gratuite(etat, c) and str(c) != str(etat.get("canal") or "")]
     ponctuels = [str(c) for c in etat.get("auto", {}).pop(m, [])]
+    for cid in ponctuels:
+        activer_coach_optin(etat, cid, m, True)  # le clic ponctuel devient un coach persistant pour ce marché
     for cid in list(dict.fromkeys(ponctuels + auto)):
         if not bot_on(etat, cid) or not marche_autorise(etat, cid, m):
             continue
