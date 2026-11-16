@@ -40,7 +40,7 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn('src="Fibonacci 50 → 78,6 % (indicateur ALIGN)"', self.bot)
 
     def test_fibonacci_is_internal_live_context_not_a_telegram_alert(self):
-        self.assertIn("def progression_fibonacci_live(r):", self.bot)
+        self.assertIn("def progression_fibonacci_live(r, market=None):", self.bot)
         self.assertIn("def contexte_technique_live(derniers):", self.bot)
         self.assertIn("def live_phrases_ia(etat, maintenant, derniers=None):", self.bot)
         self.assertNotIn("def fibo_zones(", self.bot)
@@ -56,7 +56,7 @@ class FibonacciCommentateurLive(unittest.TestCase):
         bars = mouvement_hausse(48)
         bars.append(dict(t=49, o=132, h=133, l=131, c=132, v=10))
         r = {"m1": [dict(c=132)], "b15_long": bars}
-        result = ab.progression_fibonacci_live(r)
+        result = ab.progression_fibonacci_live(r, "GOLD")
         self.assertAlmostEqual(result["M15"]["retracement_pct"], 68.0, places=1)
         self.assertTrue(result["M15"]["zone_cle_61_8_78_6"])
         self.assertEqual(result["M15"]["fenetre_bougies_cloturees"], 48)
@@ -67,17 +67,49 @@ class FibonacciCommentateurLive(unittest.TestCase):
             "b15_long": mouvement_hausse(48) + [dict(t=49, o=132, h=133, l=131, c=132, v=10)],
             "dirs": [1] * 11, "dirPlan": 1, "strat": "SWING", "rC": 54,
         }
-        brut = ("BTC | Le retracement Fibonacci teste une zone profonde, la tendance reste à confirmer | "
+        brut = ("GOLD | Le retracement Fibonacci teste une zone profonde, la tendance reste à confirmer | "
                 "The Fibonacci pullback tests a deep zone, trend confirmation is still needed")
         with mock.patch.object(ab, "live_actif", return_value=True), \
              mock.patch.object(ab, "ia", return_value=brut) as ia_mock, \
              mock.patch.object(ab, "live_publier", return_value=True) as publish_mock:
             state = {}
-            self.assertTrue(ab.live_phrases_ia(state, 10000, {"BTC": r}))
+            self.assertTrue(ab.live_phrases_ia(state, 10000, {"GOLD": r}))
         donnees = ia_mock.call_args.args[2]
-        self.assertIn("fibonacci", donnees["marches"]["BTC"])
-        self.assertIn("BTC", publish_mock.call_args.args[0])
+        self.assertIn("fibonacci", donnees["marches"]["GOLD"])
+        self.assertIn("GOLD", publish_mock.call_args.args[0])
         self.assertNotIn("ZONE FIBONACCI", publish_mock.call_args.args[0])
+
+    def test_gold_nasdaq_use_latest_equal_extreme_but_btc_keeps_legacy_direction(self):
+        bars = [dict(t=i, o=150, h=180, l=120, c=150, v=10) for i in range(49)]
+        bars[5]["l"] = 100
+        bars[10]["h"] = 200
+        bars[45]["h"] = 200
+        bars[46]["l"] = 100
+        r = {"m1": [dict(c=168)], "b15_long": bars}
+        gold = ab.progression_fibonacci_live(r, "GOLD")["M15"]
+        btc = ab.progression_fibonacci_live(r, "BTC")["M15"]
+        self.assertEqual(gold["mouvement"], "baisse")
+        self.assertAlmostEqual(gold["retracement_pct"], 68.0, places=1)
+        self.assertEqual(btc["mouvement"], "hausse")
+        self.assertAlmostEqual(btc["retracement_pct"], 32.0, places=1)
+
+    def test_gold_nasdaq_wait_for_full_lookback_and_skip_ambiguous_single_bar_swing(self):
+        partial = mouvement_hausse(20) + [dict(t=20, o=132, h=133, l=131, c=132, v=10)]
+        r = {"m1": [dict(c=132)], "b15_long": partial}
+        self.assertNotIn("M15", ab.progression_fibonacci_live(r, "GOLD"))
+        self.assertIn("M15", ab.progression_fibonacci_live(r, "BTC"))
+
+        ambiguous = [dict(t=i, o=150, h=180, l=120, c=150, v=10) for i in range(49)]
+        ambiguous[20]["h"] = 220
+        ambiguous[20]["l"] = 80
+        r["b15_long"] = ambiguous
+        self.assertNotIn("M15", ab.progression_fibonacci_live(r, "NASDAQ"))
+
+    def test_btc_does_not_receive_new_fibonacci_context(self):
+        r = {"m1": [dict(c=132)], "b15_long": mouvement_hausse(48) + [dict(t=49, o=132, h=133, l=131, c=132, v=10)],
+             "dirs": [1] * 11, "dirPlan": 1, "strat": "SWING", "rC": 54}
+        context = ab.contexte_technique_live({"BTC": r})
+        self.assertNotIn("fibonacci", context["marches"]["BTC"])
 
     def test_market_specific_live_phrases_are_filtered_and_clean(self):
         brut = (

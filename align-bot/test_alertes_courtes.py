@@ -140,7 +140,7 @@ class EvenementsPine(unittest.TestCase):
         self.assertIn("RETOURNEMENT CONFIRMÉ SHORT", ab.texte_pine(etat, ev[0])[0] if False else " ".join(ab.texte_pine({"al_rot": {"p:ret_conf:GOLD": -1}}, ev[0])))
 
     def test_confirmation_when_validation_unit_closes_beyond_decision_line(self):
-        etat, r = {}, self.r(dirPlan=1, strat="DAY", dirs=[1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0])
+        etat, r = {}, self.r(dirPlan=1, strat="DAY", dirs=[1, 1, 1, 1, 1, 0, 0, 1, 0, 1, 0])
         r["b5"][-3] = dict(r["b5"][-3], c=98.5); r["b5"][-2] = dict(r["b5"][-2], c=99.6)      # clôture 5 min passe AU-DESSUS de 99,0
         evs = self.lance(etat, "GOLD", r)
         self.assertEqual(self.kinds(evs), ["confirmation"])
@@ -152,7 +152,7 @@ class EvenementsPine(unittest.TestCase):
 
     def test_confirmation_not_repeated_when_zone_moves(self):
         """Cas réel 12/11 : « CONFIRMATION SHORT » 16:16, 16:30, 16:47 (zone recalculée). Une seule par période, même sens."""
-        etat, r = {}, self.r(dirPlan=1, strat="DAY", dirs=[1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0])
+        etat, r = {}, self.r(dirPlan=1, strat="DAY", dirs=[1, 1, 1, 1, 1, 0, 0, 1, 0, 1, 0])
         r["b5"][-3] = dict(r["b5"][-3], c=98.5); r["b5"][-2] = dict(r["b5"][-2], c=99.6)
         self.assertEqual(self.kinds(self.lance(etat, "GOLD", r)), ["confirmation"])
         r2 = self.r(dirPlan=1, strat="DAY", dirs=r["dirs"])
