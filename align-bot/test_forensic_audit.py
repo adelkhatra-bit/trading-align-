@@ -318,9 +318,10 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
         sent = []
         with unittest.mock.patch.object(align_bot, "_envoi_sur", side_effect=lambda cid, **kw: sent.append(kw)):
             align_bot.menu_marches(etat, "new-user")
-        markup = sent[-1]["reply_markup"]
-        self.assertIn("Valider mes marchés", markup)
-        self.assertNotIn("Valider et suivre", markup)
+        markup = json.loads(sent[-1]["reply_markup"])
+        labels = [button["text"] for row in markup["inline_keyboard"] for button in row]
+        self.assertTrue(any("Valider mes marchés" in label for label in labels))
+        self.assertFalse(any("Valider et suivre" in label for label in labels))
 
 
 
