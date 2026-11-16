@@ -4176,13 +4176,17 @@ def radar_climax(m, r, cle):
                 return None
             cle["radar_t"][str(sens)] = t
             cle["radar_dernier"] = t
-            if m in ("GOLD", "NASDAQ") and (len(dirs) < 10 or dirs[7] != sens or dirs[9] != sens):
-                h1_txt = "haussier" if len(dirs) > 7 and dirs[7] == 1 else "baissier" if len(dirs) > 7 and dirs[7] == -1 else "neutre"
-                h4_txt = "haussier" if len(dirs) > 9 and dirs[9] == 1 else "baissier" if len(dirs) > 9 and dirs[9] == -1 else "neutre"
-                return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\n"
-                        f"Balayage et volume détectés, mais H1 est {h1_txt} et H4 {h4_txt}.\n"
-                        "⛔ Pas de position contre le biais H1/H4 : aucune entrée ni aucun SL/TP à prendre.\n"
-                        "⏳ J'attends que H1 et H4 confirment le même sens.")
+            if m in ("GOLD", "NASDAQ"):
+                if not confluence_entree_mtf(m, r, sens):
+                    def etat_ut(i):
+                        return "haussier" if len(dirs) > i and dirs[i] == 1 else "baissier" if len(dirs) > i and dirs[i] == -1 else "neutre"
+                    return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\n"
+                            f"Balayage et volume détectés ; M5 {etat_ut(2)}, M15 {etat_ut(4)}, H1 {etat_ut(7)}, H4 {etat_ut(9)}.\n"
+                            "⛔ Pas de position : M5, M15, H1 et H4 doivent confirmer le même sens.\n"
+                            "⏳ J'attends le déclencheur complet et le plan d'entrée ALIGN.")
+                # Quand les quatre unités sont alignées, le moteur principal émettra le plan complet
+                # avec entrée, SL, TP1 et TP2. Le radar ne doit jamais publier un deuxième plan incomplet.
+                return None
             e = cl[-1]
             mot = "plus bas" if sens == 1 else "plus haut"
             return (f"🔄 RETOURNEMENT : {'LONG' if sens == 1 else 'SHORT'} prenable — {ICONE.get(m, '')} {m}\n"
