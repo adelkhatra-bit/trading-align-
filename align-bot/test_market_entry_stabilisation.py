@@ -67,5 +67,38 @@ class MarketEntryStabilisationTests(unittest.TestCase):
         self.assertFalse(align_bot._stabilisation_m5_apres(r, event))
 
 
+    def test_agent_cancels_pending_entry_during_news_blackout(self):
+        event = datetime.datetime(2026, 11, 16, 10, 0, tzinfo=ZoneInfo("America/New_York")).timestamp()
+        now = event + 10 * 60
+        state = {"cal": {"ev": [{"t": event, "titre": "CPI"}]}}
+        r = {"m1": [{"t": now, "o": 100.0, "h": 101.0, "l": 99.0, "c": 100.0}],
+             "r5": [50.0, 50.0], "confirme": 1, "t": now}
+        cle = {"prep": True, "ordre": {"e": 100.0, "sl": 99.0}}
+        patches = [
+            unittest.mock.patch.dict(align_bot._ETAT_COURANT, {"etat": state}, clear=False),
+            unittest.mock.patch.object(align_bot, "manipulation"),
+            unittest.mock.patch.object(align_bot, "meche_suspecte"),
+            unittest.mock.patch.object(align_bot, "niveaux_cles"),
+            unittest.mock.patch.object(align_bot, "resistance_fvg"),
+            unittest.mock.patch.object(align_bot, "suivre_apres_sl"),
+            unittest.mock.patch.object(align_bot, "reprise_entree", return_value=None),
+            unittest.mock.patch.object(align_bot, "entree_retest", return_value=None),
+            unittest.mock.patch.object(align_bot, "radar_climax", return_value=None),
+            unittest.mock.patch.object(align_bot, "retournement_marche", return_value=None),
+        ]
+        for p in patches:
+            p.start()
+        try:
+            out = align_bot.agent("BTC", r, cle, "")
+        finally:
+            for p in reversed(patches):
+                p.stop()
+        self.assertNotIn("trade", cle)
+        self.assertFalse(cle.get("prep"))
+        self.assertNotIn("ordre", cle)
+        self.assertTrue(any("ENTRÉES EN PAUSE" in str(x) for x in out))
+
+
+
 if __name__ == "__main__":
     unittest.main()
