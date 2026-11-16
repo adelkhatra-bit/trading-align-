@@ -545,7 +545,7 @@ def structure_fvg(bars):
 SL_FVG_MARGE = 0.3   # SL un peu plus large derrière la mèche (0,15 → 0,3 ATR) : moins de SL touchés de justesse — identique au Pine
 SL_FVG_MIN = 1.0     # distance mini entrée → SL (0,8 → 1 ATR)
 
-def plan_fvg(d, st, ent, sl, tp1, tp2, ut_nom="", tick=0.01):
+def plan_fvg(d, st, ent, sl, tp1, tp2, ut_nom="", tick=0.01, market=None):
     """Entrée / SL / TP1 / TP2 de l'indicateur v24.3 sur l'unité affichée (règle identique au Pine). None = le Pine garde son plan d'origine.
     SHORT : entrée = bas de la FVG rouge la plus proche ; SL = au-dessus de la mèche du dernier plus haut / du haut de la FVG (≥ 0,8 ATR) ;
     TP1 = FVG verte ou dernier plus bas (≥ 1,5 x le risque), TP2 = le niveau suivant. LONG : l'inverse."""
@@ -571,11 +571,15 @@ def plan_fvg(d, st, ent, sl, tp1, tp2, ut_nom="", tick=0.01):
         else:
             t1, n1 = (c1, f"FVG verte {ut_nom}") if c1 >= c2 else (c2, f"dernier plus bas {ut_nom}")
         if c1 is None or c2 is None:
-            candidat = min(t1, tp1) if tp1 is not None else None
-            if candidat is not None and candidat < t1 - tick:
-                t2, n2 = candidat, "objectif du plan"
+            if market in ("GOLD", "NASDAQ"):
+                candidat = min(t1, tp1) if tp1 is not None else None
+                if candidat is not None and candidat < t1 - tick:
+                    t2, n2 = candidat, "objectif du plan"
+                else:
+                    t2, n2 = t1 - max(2 * (s - e), 2 * aS), "projection 2R au-delà du TP1"
             else:
-                t2, n2 = t1 - max(2 * (s - e), 2 * aS), "projection 2R au-delà du TP1"
+                t2 = min(t1, tp1) if tp1 is not None else t1
+                n2 = "objectif du plan" if t2 != t1 else n1
         else:
             t2 = min(c1, c2); n2 = f"FVG verte {ut_nom}" if t2 == c1 else f"dernier plus bas {ut_nom}"
         src = f"{'FVG rouge' if obRL is None else 'Order block + FVG rouge'} {ut_nom}"
@@ -594,11 +598,15 @@ def plan_fvg(d, st, ent, sl, tp1, tp2, ut_nom="", tick=0.01):
         else:
             t1, n1 = (c1, f"FVG rouge {ut_nom}") if c1 <= c2 else (c2, f"dernier plus haut {ut_nom}")
         if c1 is None or c2 is None:
-            candidat = max(t1, tp1) if tp1 is not None else None
-            if candidat is not None and candidat > t1 + tick:
-                t2, n2 = candidat, "objectif du plan"
+            if market in ("GOLD", "NASDAQ"):
+                candidat = max(t1, tp1) if tp1 is not None else None
+                if candidat is not None and candidat > t1 + tick:
+                    t2, n2 = candidat, "objectif du plan"
+                else:
+                    t2, n2 = t1 + max(2 * (e - s), 2 * aS), "projection 2R au-delà du TP1"
             else:
-                t2, n2 = t1 + max(2 * (e - s), 2 * aS), "projection 2R au-delà du TP1"
+                t2 = max(t1, tp1) if tp1 is not None else t1
+                n2 = "objectif du plan" if t2 != t1 else n1
         else:
             t2 = max(c1, c2); n2 = f"FVG rouge {ut_nom}" if t2 == c1 else f"dernier plus haut {ut_nom}"
         src = f"{'FVG verte' if obGH is None else 'Order block + FVG verte'} {ut_nom}"
@@ -8644,7 +8652,7 @@ def pine_entree(r, d):
     # v24.3 : mêmes niveaux que l'indicateur sur l'unité de référence (FVG + mèche). Sinon : plan d'origine, comme le Pine.
     ut = UT_FVG.get(r.get("strat") or "", "5")
     vue = PLAN_VUE.get(r.get("strat") or "", "5 min")
-    fv = plan_fvg(d, (r.get("struct_ut") or {}).get(ut), pl["e"], pl["sl"], pl["tp1"], pl["tp2"], vue)
+    fv = plan_fvg(d, (r.get("struct_ut") or {}).get(ut), pl["e"], pl["sl"], pl["tp1"], pl["tp2"], vue, market=r.get("market"))
     if fv:
         bars_ut = [x for x in (r.get(UT_FVG_BARS[ut]) or [])][-3:]
         out.update(fv, src=fv["src"] + " (indicateur ALIGN)", rr=abs(fv["tp1"] - fv["e"]) / max(abs(fv["e"] - fv["sl"]), 1e-9),
