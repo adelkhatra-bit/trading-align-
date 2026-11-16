@@ -3367,8 +3367,18 @@ def analyse_marche(etat, pair):
             r["tv_indicator_mtf"] = {"available": False, "reason": "bridge_unavailable"}
         r["require_tv_bridge"] = os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1" and m in ("GOLD", "NASDAQ")
         fusionne_lectures_tradingview(r)
+        directions = r.get("dirs_cloturees") or r.get("dirs")
+        d_plan = r.get("dirPlan") or 0
+        if d_plan and direction_confirmee_marche(m, directions, d_plan, r) != d_plan:
+            # Le bridge ROBOT V12 peut invalider le biais natif : masquer aussi le plan,
+            # sa zone et ses marqueurs pour que le bot ne contredise jamais l'indicateur.
+            r["dirPlan"] = 0
+            r["strat"] = ""
+            r["zone_pine"] = None
+            r["sigHaut"] = r["sigBas"] = False
+            r["nom"] = ""
         r["confirme"] = direction_confirmee_marche(
-            m, r.get("dirs_cloturees") or r.get("dirs"), r.get("confirme"), r
+            m, directions, r.get("confirme"), r
         )
         r["sniper"] = entree_sniper(r)
         tendance_armee(r, (etat or {}).setdefault(m, {}))
