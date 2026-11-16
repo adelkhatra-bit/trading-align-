@@ -1043,7 +1043,7 @@ class AlignMtfRulesTest(unittest.TestCase):
                 "from": {"id": 123}
             }
         }
-        with patch.object(align_bot, "telegram") as api, \
+        with patch.object(align_bot, "telegram", return_value={"ok": True}) as api, \
              patch.object(align_bot, "repondre") as reply:
             align_bot.traiter({}, set(), [update])
         reply.assert_not_called()
@@ -1747,7 +1747,7 @@ class AlignMtfRulesTest(unittest.TestCase):
             "message": {"chat": {"id": -100123, "type": "supergroup"}},
             "from": {"id": 123}
         }}
-        with patch.object(align_bot, "telegram") as api, patch.object(align_bot, "repondre") as reply:
+        with patch.object(align_bot, "telegram", return_value={"ok": True}) as api, patch.object(align_bot, "repondre") as reply:
             align_bot.traiter({}, set(), [update])
         reply.assert_not_called()
         api.assert_called_once()
@@ -2326,7 +2326,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
         from unittest.mock import patch
         state = {"prospects": ["7"], "proprio": ["1"], "proprio_gratuit": True, "lien": "https://t.me/+x", "GOLD": {"trade": {"cree": 5, "qui": {}}}}
         entree = "🥇 GOLD — J'ENTRE MAINTENANT\nEntrée 3990.50"
-        with patch.object(align_bot, "telegram") as tg:
+        with patch.object(align_bot, "telegram", return_value={"ok": True}) as tg:
             align_bot.envoyer_prospects(state, "📰 NEWS USA DANS 1 H", False)
             self.assertEqual(tg.call_count, 0)          # plus de news côté gratuit
             align_bot.envoyer_prospects(state, entree, True)
@@ -2336,7 +2336,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
     def test_free_bot_off_gets_only_masked_and_respects_market(self):
         from unittest.mock import patch
         state = {"prospects": ["7", "8"], "bot_off": ["7"], "marches_par_chat": {"8": "BTC"}, "GOLD": {"trade": {"cree": 5}}}
-        with patch.object(align_bot, "telegram") as tg, patch.object(align_bot, "PROPRIO_VUE_GRATUITE", False):
+        with patch.object(align_bot, "telegram", return_value={"ok": True}) as tg, patch.object(align_bot, "PROPRIO_VUE_GRATUITE", False):
             align_bot.envoyer_prospects(state, "🥇 GOLD — J'ENTRE MAINTENANT\nEntrée 3990.50", True)
         self.assertEqual(tg.call_count, 0)          # aucun teaser automatique, même bot OFF
 
@@ -2454,7 +2454,7 @@ class TestTradingViewReportRegression(unittest.TestCase):
     def test_analysis_command_maps_to_market_selection_prompt(self):
         self.assertEqual(align_bot.COMMANDES["/faire_analyse"], "📊 Faire une analyse")
         from unittest.mock import patch
-        with patch.object(align_bot, "telegram") as api:
+        with patch.object(align_bot, "telegram", return_value={"ok": True}) as api:
             align_bot.installer_menu({})
         import json
         commands = json.loads(api.call_args_list[0].kwargs["commands"])
@@ -2783,7 +2783,7 @@ class TelegramResponsivePollingRegressionTest(unittest.TestCase):
             align_bot.TELEGRAM_UPDATES.get_nowait()
         align_bot.TELEGRAM_UPDATES.put(update)
         with patch.object(align_bot, "TOKEN", "test-token"), \
-             patch.object(align_bot, "telegram") as api, \
+             patch.object(align_bot, "telegram", return_value={"ok": True}) as api, \
              patch.object(align_bot, "traiter", return_value=[("123", "GOLD")]) as handle:
             count = align_bot.recevoir_updates_telegram(state, chats, demandes)
         self.assertEqual(count, 1)
@@ -2794,7 +2794,7 @@ class TelegramResponsivePollingRegressionTest(unittest.TestCase):
 
     def test_telegram_polling_helper_is_safe_when_token_is_not_configured(self):
         from unittest.mock import patch
-        with patch.object(align_bot, "TOKEN", ""), patch.object(align_bot, "telegram") as api:
+        with patch.object(align_bot, "TOKEN", ""), patch.object(align_bot, "telegram", return_value={"ok": True}) as api:
             self.assertEqual(align_bot.recevoir_updates_telegram({}, set(), []), 0)
         api.assert_not_called()
 
@@ -2989,7 +2989,7 @@ class TestTelegramMarketButtonsJourney(unittest.TestCase):
     def test_markets_confirm_message_is_clear_and_menu_closed(self):
         from unittest.mock import patch
         state = {"marches_par_chat": {"501": ["GOLD"]}}
-        with patch.object(align_bot, "telegram") as tg, patch.object(align_bot, "_envoi_sur") as send:
+        with patch.object(align_bot, "telegram", return_value={"ok": True}) as tg, patch.object(align_bot, "_envoi_sur") as send:
             ok = align_bot.valider_et_suivre_marches(state, "501", 501, 77)
         self.assertTrue(ok)
         self.assertEqual(tg.call_args.args[0], "deleteMessage")
@@ -3031,7 +3031,7 @@ class TestTelegramFloodProtection(unittest.TestCase):
         with patch.object(align_bot, "jauge", side_effect=["p1", "p2", "p3"]), \
              patch.object(align_bot, "marche_autorise", return_value=True), \
              patch.object(align_bot.time, "time", side_effect=[1010.0, 1059.0, 1061.0, 1061.0]), \
-             patch.object(align_bot, "telegram") as tg:
+             patch.object(align_bot, "telegram", return_value={"ok": True}) as tg:
             for _ in range(3):
                 align_bot.maj_jauge(state, "GOLD", {}, cle, {"1"})
         edits = [c for c in tg.call_args_list if c.args[0] == "editMessageText"]
@@ -3415,7 +3415,7 @@ class TelegramExplicitCoachOptInTest(unittest.TestCase):
 
     def test_free_position_push_and_delayed_queue_are_disabled(self):
         state = {"differe": [{"t": 0, "c": "11", "txt": "old signal"}]}
-        with unittest.mock.patch.object(align_bot, "telegram") as tg:
+        with unittest.mock.patch.object(align_bot, "telegram", return_value={"ok": True}) as tg:
             align_bot.envoyer_prospects(state, "🟠 BTC — LONG", True)
             result = align_bot.envoyer_differes(state, now=9999999999)
         self.assertEqual(result, 0)
