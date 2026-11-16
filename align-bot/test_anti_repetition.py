@@ -275,7 +275,8 @@ class MessageEntreeLisible(unittest.TestCase):
     def test_lignes_non_coupees_et_parentheses_equilibrees(self):
         t = self.rendu()
         self.assertIn("Ratio gain/risque TP1 : 1:2.1", t)                                     # plus « 1 (2.1) »
-        self.assertIn("Vue d'entrée : 5 minutes (15M = préparation, M5 = timing après clôture confirmée)", t)
+        self.assertIn("📌 PLAN D'EXÉCUTION", t)
+        self.assertIn("🛑 Stop Loss", t)
         self.assertIn("Distance entrée → SL : 0.12 % du prix (pas le % du capital risqué)", t)
         for l in t.splitlines():
             self.assertEqual(l.count("("), l.count(")"), l)
