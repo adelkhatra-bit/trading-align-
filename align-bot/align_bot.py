@@ -8098,7 +8098,7 @@ def coach_actif(etat, cid, marche):
 def destinataires_message(etat, chats, texte):
     """Une seule destination privée : le bot ALIGN ; seuls les messages explicitement liés à un marché sont poussés."""
     tag = set(getattr(texte, "marches", ()) or ())
-    ens = (marches_message(texte) if not tag or "*" in tag else tag) & set(MARCHES)
+    ens = (marches_du_message(texte) if not tag or "*" in tag else tag) & set(MARCHES)
     canal = str(etat.get("canal") or "")
     # Pas de diffusion privée pour news, agenda, DXY ou messages globaux :
     # l'utilisateur les consulte dans l'analyse demandée ou le live public.
