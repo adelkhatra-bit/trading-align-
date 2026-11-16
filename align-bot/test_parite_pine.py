@@ -199,7 +199,7 @@ class PineRef:
         zHaut0 = surS and (rC < 42 or rsiOS >= 3) and momS > -1.0 and close > opn
         zoneBas = zBas0 and not (zHaut0 and rC < 50)
         zoneHaut = zHaut0 and not zoneBas
-        dirBrut = 1 if longT >= 2 else -1 if longT <= -2 else 1 if zoneHaut else -1 if zoneBas else 1 if retHaut else -1 if retBas else sens   # ordre v24.1 (grosses UT avant zone), comme le bot
+        dirBrut = 1 if zoneHaut else -1 if zoneBas else 1 if longT >= 2 else -1 if longT <= -2 else 1 if retHaut else -1 if retBas else sens   # ordre Pine v24 : zone avant pondération
         dW = f_etat(S["w1"])[0] if len(S["w1"]) >= 50 else 0
         v.update(dirs=dirs, sqzs=sqzs, rsis=rsis, bull=bull, bear=bear, comp=comp, sens=sens, dirBrut=dirBrut, niveaux=niveaux,
                  atrC=atrC, atr15=atr15, close=close, hau1=hau1, bas1=bas1, dW=dW, rsiAchat=rsiAchat, rsiVente=rsiVente,
@@ -523,6 +523,98 @@ class ParitePine(unittest.TestCase):
             print(f"PARITE_REELLE {pair} barres={st['barres']} LONG={st['longs']} SHORT={st['shorts']} stratégies={sorted(st['strats'])} changements_de_sens={st['flips']}")
             fait += st["barres"]
         self.assertGreaterEqual(fait, 40)
+
+
+    def test_bridge_tradingview_ne_melange_pas_les_directions_et_le_plan_align(self):
+        """Un snapshot TV frais reste consultable mais ne remplace pas partiellement les données ALIGN."""
+        r = {
+            "dirs": [1, 1, 1, 1, -1, -1, -1, -1, -1, -1, 0],
+            "rsis": [61.0, 58.0, 55.0, 52.0, 48.0, 46.0, 44.0, 42.0, 40.0, 38.0, 50.0],
+            "confirme": -1,
+            "dirPlan": -1,
+            "plan": {"e": 100.0, "sl": 105.0, "tp1": 90.0},
+            "tv_indicator_mtf": {
+                "activeTimeframe": "M15",
+                "snapshots": {
+                    "M15": {
+                        "fresh": True,
+                        "robotV12": {
+                            "lecture_1m": "LONG", "lecture_5m": "LONG",
+                            "lecture_15m": "LONG", "lecture_60m": "LONG",
+                            "rsi_1m": 65, "rsi_5m": 66, "rsi_15m": 67, "rsi_60m": 68
+                        }
+                    }
+                }
+            }
+        }
+        dirs, rsis = list(r["dirs"]), list(r["rsis"])
+        confirme, dir_plan, plan = r["confirme"], r["dirPlan"], dict(r["plan"])
+        ab.fusionne_lectures_tradingview(r)
+        self.assertEqual(r["dirs"], dirs)
+        self.assertEqual(r["rsis"], rsis)
+        self.assertEqual(r["confirme"], confirme)
+        self.assertEqual(r["dirPlan"], dir_plan)
+        self.assertEqual(r["plan"], plan)
+        self.assertEqual(r["tv_robot_v12_timeframe"], "M15")
+        self.assertTrue(r["tv_robot_v12_fresh"])
+
+    def test_priorite_direction_pine_identique_au_moteur_align(self):
+        """Le Pine doit appliquer la même priorité de direction que le moteur Python."""
+        chemin = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pine", "ALIGN_MTF_PRO_v24.pine")
+        with open(chemin, encoding="utf-8") as f:
+            pine = f.read()
+        expression = "dirBrut = zoneHaut ? 1 : zoneBas ? -1 : longT >= 2 ? 1 : longT <= -2 ? -1 : retHaut ? 1 : retBas ? -1 : sens"
+        self.assertIn(expression, pine)
+
+    def test_mouvement_court_terme_m1_est_distinct_du_biais_de_fond(self):
+        hausse = {"m1": [{"c": float(x)} for x in (100, 101, 102, 103, 104, 105)]}
+        baisse = {"m1": [{"c": float(x)} for x in (105, 104, 103, 102, 101, 100)]}
+        stable = {"m1": [{"c": 100.0} for _ in range(6)]}
+        self.assertIn("HAUSSE", ab.mouvement_recent_m1(hausse))
+        self.assertIn("BAISSE", ab.mouvement_recent_m1(baisse))
+        self.assertIn("STABLE", ab.mouvement_recent_m1(stable))
+        self.assertIn("insuffisantes", ab.mouvement_recent_m1({"m1": [{"c": 100.0}]}))
+
+class AffichageTPGraphique(unittest.TestCase):
+    def test_tp1_et_tp2_sont_traces_des_qu_un_plan_est_affiche(self):
+        chemin = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pine", "ALIGN_MTF_PRO_v24.pine")
+        with open(chemin, encoding="utf-8") as f:
+            pine = f.read()
+        bloc = pine[pine.index("// ═════════ LIGNES DU PLAN (TP1, TP2, STOP)"):pine.index("// ═════════ BARRE (en bas")]
+        self.assertIn("if voirPlan and dirPlan != 0", bloc)
+        self.assertIn("lTP1 := line.new(x1, tp1", bloc)
+        self.assertIn("lTP2 := line.new(x1, tp2", bloc)
+        self.assertIn('eTP1 := label.new(x1, tp1, "TP1 "', bloc)
+        self.assertIn('eTP2 := label.new(x1, tp2, "TP2 "', bloc)
+
+    def test_option_apres_tp1_ne_recree_pas_de_lignes_superposees(self):
+        chemin = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pine", "ALIGN_MTF_PRO_v24.pine")
+        with open(chemin, encoding="utf-8") as f:
+            pine = f.read()
+        bloc = pine[pine.index("// Les deux objectifs restent visibles"):pine.index("// ═════════ LIGNES BLANCHES")]
+        self.assertIn("line.set_width(lTP2, 3)", bloc)
+        self.assertNotIn("line.new(", bloc)
+
+
+class AffichageTPGraphique(unittest.TestCase):
+    def test_v25_trace_tp1_et_tp2_des_qu_un_plan_est_actif(self):
+        chemin = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pine", "ALIGN_MTF_PRO_v25.pine")
+        with open(chemin, encoding="utf-8") as f:
+            pine = f.read()
+        bloc = pine[pine.index("// ═════════ LIGNES DU PLAN (TP1, TP2, STOP)"):pine.index("// ═════════ BARRE (en bas")]
+        self.assertIn("if voirPlan and dirPlan != 0", bloc)
+        self.assertIn("lTP1 := line.new(x1, tp1", bloc)
+        self.assertIn("lTP2 := line.new(x1, tp2", bloc)
+        self.assertIn('eTP1 := label.new(x1, tp1, "TP1 "', bloc)
+        self.assertIn('eTP2 := label.new(x1, tp2, "TP2 "', bloc)
+
+    def test_v25_option_apres_tp1_n_empile_pas_de_lignes(self):
+        chemin = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pine", "ALIGN_MTF_PRO_v25.pine")
+        with open(chemin, encoding="utf-8") as f:
+            pine = f.read()
+        bloc = pine[pine.index("// Les deux objectifs restent visibles"):pine.index("// ═════════ LIGNES BLANCHES")]
+        self.assertIn("line.set_width(lTP2, 3)", bloc)
+        self.assertNotIn("line.new(", bloc)
 
 
 if __name__ == "__main__":

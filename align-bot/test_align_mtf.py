@@ -135,17 +135,21 @@ class AlignMtfRulesTest(unittest.TestCase):
         }}}
         self.assertFalse(align_bot.plan_indicateur(r)["available"])
 
-    def test_tradingview_mtf_readings_merge_into_existing_align_context(self):
-        r = {"dirs": [0] * 11, "rsis": [50.0] * 11, "tv_indicator_mtf": {
-            "activeTimeframe": "M15", "snapshots": {"M15": {"fresh": True, "robotV12": {
-                "lecture_1m": "LONG", "lecture_5m": "SHORT", "lecture_15m": "LONG",
-                "lecture_60m": "LONG", "rsi_5m": 31.5, "rsi_15m": 62
-            }}}
-        }}
+    def test_tradingview_mtf_snapshot_does_not_mutate_align_context(self):
+        dirs, rsis = [0] * 11, [50.0] * 11
+        r = {"dirs": list(dirs), "rsis": list(rsis), "confirme": 0, "dirPlan": 0,
+             "tv_indicator_mtf": {"activeTimeframe": "M15", "snapshots": {"M15": {"fresh": True, "robotV12": {
+                 "lecture_1m": "LONG", "lecture_5m": "SHORT", "lecture_15m": "LONG",
+                 "lecture_60m": "LONG", "rsi_5m": 31.5, "rsi_15m": 62
+             }}}}}
         align_bot.fusionne_lectures_tradingview(r)
-        self.assertEqual([r["dirs"][i] for i in (0, 2, 4, 7)], [1, -1, 1, 1])
-        self.assertEqual(r["rsis"][2], 31.5)
-        self.assertEqual(r["rsis"][4], 62)
+        self.assertEqual(r["dirs"], dirs)
+        self.assertEqual(r["rsis"], rsis)
+        self.assertEqual(r["confirme"], 0)
+        self.assertEqual(r["dirPlan"], 0)
+        self.assertEqual(r["tv_robot_v12"]["lecture_5m"], "SHORT")
+        self.assertEqual(r["tv_robot_v12_timeframe"], "M15")
+        self.assertTrue(r["tv_robot_v12_fresh"])
 
     def test_tradingview_links_select_market_and_requested_timeframe(self):
         btc = align_bot.url_tradingview("BTC", 5)
@@ -154,6 +158,37 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertIn("interval=5", btc)
         self.assertIn("FOREXCOM%3AXAUUSD", gold)
         self.assertIn("interval=240", gold)
+
+    def test_sendmessage_429_is_queued_once_for_retry(self):
+        state = {}
+        previous = align_bot._ETAT_COURANT.get("etat")
+        align_bot._ETAT_COURANT["etat"] = state
+        align_bot.TELEGRAM_RETRY_UNTIL.clear()
+        try:
+            with unittest.mock.patch.object(align_bot, "TOKEN", "test-token"), \
+                 unittest.mock.patch.object(align_bot, "http_json", side_effect=RuntimeError("HTTP Error 429: retry after 30")):
+                with self.assertRaises(RuntimeError):
+                    align_bot.telegram("sendMessage", chat_id="123", text="Signal test")
+                with self.assertRaises(RuntimeError):
+                    align_bot.telegram("sendMessage", chat_id="123", text="Signal test")
+            self.assertEqual(len(state.get("telegram_outbox", [])), 1)
+            self.assertEqual(state["telegram_outbox"][0]["chat_id"], "123")
+            self.assertGreaterEqual(state["telegram_outbox"][0]["next_t"], 0)
+        finally:
+            align_bot.TELEGRAM_RETRY_UNTIL.clear()
+            if previous is None:
+                align_bot._ETAT_COURANT.pop("etat", None)
+            else:
+                align_bot._ETAT_COURANT["etat"] = previous
+
+    def test_telegram_outbox_removes_message_after_successful_retry(self):
+        state = {"telegram_outbox": [{
+            "key": "retry-test", "chat_id": "123", "method": "sendMessage",
+            "params": {"chat_id": "123", "text": "Signal à renvoyer"}, "tries": 1, "next_t": 100
+        }]}
+        with unittest.mock.patch.object(align_bot, "telegram", return_value={"ok": True, "result": {"message_id": 7}}):
+            self.assertEqual(align_bot.traiter_file_telegram(state, maintenant=101), 1)
+        self.assertEqual(state["telegram_outbox"], [])
 
     def test_failed_telegram_analysis_delivery_is_not_marked_as_sent(self):
         state = {}
@@ -1480,8 +1515,8 @@ class AlignMtfRulesTest(unittest.TestCase):
             "Le prix est dans une zone Daily/Weekly extrême. Attendre un meilleur prix."
         )):
             message = align_bot.texte_apercu("BTC", r, {})
-        self.assertLess(message.index("⛔ NE PAS ENTRER"), message.index("Biais à surveiller"))
-        self.assertIn("Biais à surveiller : SHORT", message)
+        self.assertLess(message.index("⛔ NE PAS ENTRER"), message.index("Biais de fond à surveiller"))
+        self.assertIn("Biais de fond à surveiller : SHORT", message)
         self.assertIn("Le biais n'est pas une autorisation d'entrée", message)
         self.assertIn("Attendre un nouveau message explicite", message)
         self.assertNotIn("Prochaine entrée SHORT", message)

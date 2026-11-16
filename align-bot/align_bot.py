@@ -101,27 +101,19 @@ def _direction_tv(value):
 
 
 def fusionne_lectures_tradingview(r):
-    """Fusionne uniquement les lectures MTF explicitement envoyées par ROBOT V12."""
+    """Conserve le snapshot ROBOT V12 séparé : il ne doit pas modifier une analyse ALIGN déjà calculée."""
     bridge = r.get("tv_indicator_mtf") or {}
     snap = (bridge.get("snapshots") or {}).get(bridge.get("activeTimeframe")) or {}
     robot = snap.get("robotV12") or {}
     if not robot or not snap.get("fresh"):
         return r
-    for field, index in (("lecture_1m", 0), ("lecture_5m", 2), ("lecture_15m", 4), ("lecture_60m", 7)):
-        direction = _direction_tv(robot.get(field))
-        if direction is not None:
-            r["dirs"][index] = direction
-    for field, index in (("rsi_1m", 0), ("rsi_5m", 2), ("rsi_15m", 4), ("rsi_60m", 7)):
-        try:
-            value = float(robot.get(field))
-            if 0 <= value <= 100:
-                r["rsis"][index] = value
-        except (TypeError, ValueError):
-            pass
-    # Recompute the existing ALIGN bias/profile from the merged real MTF readings.
-    d1h, d4h = r["dirs"][7], r["dirs"][9]
-    r["confirme"] = d4h if d4h and d1h == d4h else 0
+    # Sécurité de cohérence : analyser() a déjà calculé dirs, RSI, dirPlan, stratégie et
+    # niveaux depuis un même jeu de bougies. Remplacer seulement M1/M5/M15/H1 ici
+    # fabriquait un mélange TradingView + flux local sans recalculer les champs dérivés.
+    # Le plan ROBOT V12 reste consultable séparément via plan_indicateur().
     r["tv_robot_v12"] = robot
+    r["tv_robot_v12_timeframe"] = bridge.get("activeTimeframe")
+    r["tv_robot_v12_fresh"] = True
     return r
 
 
@@ -792,8 +784,8 @@ def calculer_analyse(S, stable=None, comp_prev=None):
     explBas = sqzC1 == 1 and sqzC == 0 and mom < 0 and bear > bull
     sigHaut = ((fortHaut or explHaut) and longT >= 1) or (zoneHaut and longT >= 0)
     sigBas = ((fortBas or explBas) and longT <= -1) or (zoneBas and longT <= 0)
-    # v24.1 (= indicateur) : la tendance des grosses UT passe AVANT une zone de retournement isolée
-    dirBrut = 1 if longT >= 2 else -1 if longT <= -2 else 1 if zoneHaut else -1 if zoneBas else 1 if retHaut else -1 if retBas else sens
+    # Parité Pine v24 : une zone de retournement valide est prioritaire ; sinon les grosses UT décident.
+    dirBrut = 1 if zoneHaut else -1 if zoneBas else 1 if longT >= 2 else -1 if longT <= -2 else 1 if retHaut else -1 if retBas else sens
     dirPlan = dirBrut if stable is None else stable
     strat_plan = strategie_alignement(dirs, dirPlan, etat_ut(w1)[0] if len(w1) >= 50 else 0)[0]
     nom = ("★ ACHAT FORT" if fortHaut else "EXPLOSION ▲" if explHaut else "ZONE DE REBOND ▲") if sigHaut else \
@@ -1186,6 +1178,23 @@ def profil_strategie(r):
                       else "PRÉPARATION — attendre l’alignement ou le retournement M5"}
 
 
+def mouvement_recent_m1(r, nb=5):
+    """Décrit le mouvement réellement observé sur les dernières clôtures M1, séparément du biais H1/H4."""
+    bars = r.get("m1") or []
+    if len(bars) < nb + 1:
+        return "📈 Mouvement court terme M1 : données insuffisantes"
+    try:
+        depart = float(bars[-nb - 1]["c"])
+        actuel = float(bars[-1]["c"])
+        if depart <= 0:
+            raise ValueError("prix de référence invalide")
+    except (KeyError, TypeError, ValueError):
+        return "📈 Mouvement court terme M1 : données indisponibles"
+    variation = (actuel / depart - 1) * 100
+    sens = "HAUSSE" if variation > 0 else "BAISSE" if variation < 0 else "STABLE"
+    return f"📈 Mouvement court terme ({nb} clôtures M1) : {sens} {variation:+.2f}%"
+
+
 def texte_etat(nom_marche, r, cle=None, vip=True):
     """Carte Telegram complète : mise en page uniquement, aucune rubrique d'analyse supprimée."""
     # Codes visuels constants : vert = hausse, rouge = baisse, orange = neutre.
@@ -1208,7 +1217,7 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
              "🔴 Biais baissier confirmé" if maj == -1 else
              "🟠 Pas de biais confirmé en 1h / 4h")
     l = [entete, "━━━━━━━━━━━━━━━━━━", "📡 LECTURE DU MARCHÉ",
-         "BIAIS GÉNÉRAL", biais,
+         mouvement_recent_m1(r), "BIAIS DE FOND (H1 / H4)", biais,
          "━━━━━━━━━━━━━━━━━━", "📊 INDICATEURS PAR UNITÉ DE TEMPS",
          "  /  ".join(f"{nom} {fl(D[i])}" for nom, i in ut),
          "━━━━━━━━━━━━━━━━━━", "📈 RSI PAR UNITÉ DE TEMPS",
@@ -2844,7 +2853,72 @@ def _telegram_enregistre_429(chat_id, erreur, maintenant=None):
     return delai
 
 
+def _telegram_file_ajouter(params):
+    """Met en attente un sendMessage refusé par un 429 ; clé stable = pas de doublon dans la file."""
+    try:
+        etat = _ETAT_COURANT.get("etat")
+    except NameError:
+        etat = None
+    if not isinstance(etat, dict):
+        return False
+    cid = str(params.get("chat_id", ""))
+    if not cid or not params.get("text"):
+        return False
+    try:
+        brut = json.dumps(params, ensure_ascii=False, sort_keys=True, default=str)
+    except Exception:
+        return False
+    cle = hashlib.sha256((cid + "|" + brut).encode("utf-8")).hexdigest()[:24]
+    file = etat.setdefault("telegram_outbox", [])
+    if any(x.get("key") == cle for x in file):
+        return True
+    if len(file) >= 500:
+        print(f"TELEGRAM_OUTBOX_FULL chat={cid}", flush=True)
+        return False
+    file.append({"key": cle, "chat_id": cid, "method": "sendMessage", "params": dict(params),
+                 "tries": 0, "next_t": float(TELEGRAM_RETRY_UNTIL.get(cid, 0))})
+    print(f"TELEGRAM_OUTBOX_QUEUED chat={cid} pending={len(file)}", flush=True)
+    return True
+
+
+def traiter_file_telegram(etat, maintenant=None, limite=20):
+    """Réessaie les messages refusés par Telegram après le cooldown, sans renvoyer les messages déjà acceptés."""
+    maintenant = time.time() if maintenant is None else float(maintenant)
+    file = etat.setdefault("telegram_outbox", [])
+    envoyes = 0
+    for item in list(file)[:max(1, int(limite))]:
+        cid = str(item.get("chat_id", ""))
+        if not cid or float(item.get("next_t", 0) or 0) > maintenant:
+            continue
+        restant = _telegram_cooldown_restant(cid, maintenant)
+        if restant > 0:
+            item["next_t"] = maintenant + restant
+            continue
+        try:
+            telegram(item.get("method") or "sendMessage", **(item.get("params") or {}))
+        except Exception as ex:
+            erreur = str(ex).lower()
+            if any(x in erreur for x in ("bot was blocked", "chat not found", "user is deactivated", "chat_id is empty")):
+                file.remove(item)
+                print(f"TELEGRAM_OUTBOX_DROP chat={cid} reason=recipient_unavailable", flush=True)
+                continue
+            if "http error 400" in erreur or "bad request" in erreur:
+                file.remove(item)
+                print(f"TELEGRAM_OUTBOX_DROP chat={cid} reason=bad_request", flush=True)
+                continue
+            item["tries"] = int(item.get("tries", 0)) + 1
+            attente = min(900, 5 * (2 ** min(item["tries"], 7)))
+            item["next_t"] = max(maintenant + attente, float(TELEGRAM_RETRY_UNTIL.get(cid, 0)))
+            print(f"TELEGRAM_OUTBOX_RETRY chat={cid} tries={item['tries']} in={int(item['next_t']-maintenant)}s", flush=True)
+        else:
+            file.remove(item)
+            envoyes += 1
+            print(f"TELEGRAM_OUTBOX_SENT chat={cid} remaining={len(file)}", flush=True)
+    return envoyes
+
+
 def telegram(methode, **params):
+    params_initiaux = dict(params)
     if methode == "answerCallbackQuery":
         callback_id = str(params.get("callback_query_id", ""))
         if callback_id and callback_id in CALLBACKS_ACKNOWLEDGED:
@@ -2879,15 +2953,19 @@ def telegram(methode, **params):
     # Sans chat (getUpdates, setMyName…) : blocage PAR MÉTHODE. Un 429 de plusieurs heures sur setMyName
     # ne doit jamais rendre le bot sourd (getUpdates bloqué = boutons sans réponse).
     cle_cooldown = chat_id if chat_id is not None else f"__{methode}__"
-    _telegram_verifie_cooldown(cle_cooldown)
     url = f"https://api.telegram.org/bot{TOKEN}/{methode}"
     try:
+        _telegram_verifie_cooldown(cle_cooldown)
         resultat = http_json(url, urllib.parse.urlencode(params).encode())
     except Exception as ex:
         if "HTTP Error 429" in str(ex):
             delai = _telegram_enregistre_429(cle_cooldown, ex)
             if delai:
-                print(f"telegram rate limit chat={chat_id}: pause {delai}s; envoi suspendu sans nouvel appel")
+                print(f"telegram rate limit chat={chat_id}: pause {delai}s; message mis en attente")
+        if methode == "sendMessage" and chat_id is not None and (
+            "HTTP Error 429" in str(ex) or "cooldown actif" in str(ex).lower()
+        ):
+            _telegram_file_ajouter(params_initiaux)
         raise
     if methode in ("sendMessage", "editMessageText", "sendPhoto", "copyMessage") and resultat.get("ok"):
         payload = resultat.get("result") or {}
@@ -4191,7 +4269,8 @@ def texte_apercu(m, r, cle, vip=True):
     lignes = [
         f"{ICONE.get(m, '📊')} {m} — {px(prix)}",
         f"🚦 {decision}",
-        f"🧭 Biais à surveiller : {direction}" + (f" ({type_})" if type_ and not direction.startswith(('AUCUNE', 'Non confirmée', 'À confirmer')) else ""),
+        f"🧭 Biais de fond à surveiller : {direction}" + (f" ({type_})" if type_ and not direction.startswith(('AUCUNE', 'Non confirmée', 'À confirmer')) else ""),
+        mouvement_recent_m1(r),
         (f"⏰ Réouverture : {r['ferme_txt']} (heure de Paris)" + (" • ta position est en pause, je la reprends à la réouverture" if tr else ""))
         if r.get("ferme_txt") else "⚠️ Le biais n'est pas une autorisation d'entrée." if not tr else "📍 Position ouverte : suis les alertes du coach.",
         "",
@@ -4217,7 +4296,7 @@ def texte_apercu(m, r, cle, vip=True):
         lignes += [""] + jour_
     elif r.get("news") and vip:
         lignes += [news_courte(r["news"])]
-    lignes += ["", "👇 Détails : boutons ci-dessous", "ℹ️ Aucun ordre n'est envoyé automatiquement à ton broker."]
+    lignes += ["", "👇 Détails : boutons ci-dessous", "ℹ️ Cette carte ne passe aucun ordre. Le module broker est séparé et dépend de ses réglages ADMIN / TEST / RÉEL."]
     return "\n".join(lignes)
 
 DERNIERS = {}               # dernière analyse de chaque marché (pour le chrono)
@@ -9877,18 +9956,57 @@ def live_actif(etat):
     return LIVE_24H or bool(etat.get("live_on"))
 
 def live_publier(texte):
-    """Envoie une ligne au graphique du live. Ne bloque jamais le bot (échec = ignoré)."""
+    """Ajoute une ligne à la file persistante du live ; l'envoi réseau est traité séparément."""
     if not LIVE_SUJET or not texte:
         return False
     try:
-        req = urllib.request.Request("https://ntfy.sh/" + urllib.parse.quote(LIVE_SUJET),
-                                     data=str(texte)[:3800 if str(texte).startswith("IA:") else 200].encode("utf-8"),   # v8.9 : le lot IA (JSON) était coupé à 200 caractères → illisible
-                                     headers={"User-Agent": "align-bot"})
-        with urllib.request.urlopen(req, timeout=8):
-            return True
-    except Exception as ex:
-        print("live publier", ex)
+        etat = _ETAT_COURANT.get("etat")
+    except NameError:
+        etat = None
+    if not isinstance(etat, dict):
+        print("LIVE_OUTBOX_UNAVAILABLE: état du bot non initialisé", flush=True)
         return False
+    contenu = str(texte)[:3800 if str(texte).startswith("IA:") else 200]
+    cle = hashlib.sha256(contenu.encode("utf-8")).hexdigest()[:24]
+    file = etat.setdefault("live_outbox", [])
+    if any(x.get("key") == cle for x in file):
+        return True
+    if len(file) >= 300:
+        print("LIVE_OUTBOX_FULL", flush=True)
+        return False
+    file.append({"key": cle, "text": contenu, "tries": 0, "next_t": 0})
+    return True
+
+
+def traiter_file_live(etat, maintenant=None, limite=30):
+    """Publie la file ntfy avec reprises bornées ; un échec réseau ne supprime plus le message immédiatement."""
+    maintenant = time.time() if maintenant is None else float(maintenant)
+    if not LIVE_SUJET:
+        return 0
+    file = etat.setdefault("live_outbox", [])
+    envoyes = 0
+    for item in list(file)[:max(1, int(limite))]:
+        if float(item.get("next_t", 0) or 0) > maintenant:
+            continue
+        try:
+            req = urllib.request.Request("https://ntfy.sh/" + urllib.parse.quote(LIVE_SUJET),
+                                         data=str(item.get("text") or "").encode("utf-8"),
+                                         headers={"User-Agent": "align-bot"})
+            with urllib.request.urlopen(req, timeout=8):
+                pass
+        except Exception as ex:
+            item["tries"] = int(item.get("tries", 0)) + 1
+            if item["tries"] >= 8:
+                file.remove(item)
+                print(f"LIVE_OUTBOX_DROP tries={item['tries']} error={type(ex).__name__}", flush=True)
+                continue
+            attente = min(300, 5 * (2 ** min(item["tries"], 6)))
+            item["next_t"] = maintenant + attente
+            print(f"LIVE_OUTBOX_RETRY tries={item['tries']} in={attente}s error={type(ex).__name__}", flush=True)
+        else:
+            file.remove(item)
+            envoyes += 1
+    return envoyes
 
 def live_pnl(etat, m, cle, r, now=None):
     """Demande d'Adel (15/11) : fenêtre « 💰 ALIGN EN DIRECT » sur le live avec le gain RÉEL en cours des comptes,
@@ -10762,6 +10880,8 @@ def un_tour(etat, chats):
     demandes_servies = set()
     if TOKEN:
         recevoir_updates_telegram(etat, chats, demandes)
+        traiter_file_telegram(etat, limite=20)
+        traiter_file_live(etat, limite=30)
         if SHUTDOWN_REQUESTED.is_set():
             return
         if etat.get("clavier") != 9:
@@ -11214,6 +11334,8 @@ def main():
         while TOKEN and time.time() < min(prochain, debut + DUREE_SEC) and not SHUTDOWN_REQUESTED.is_set():
             demandes = []
             recevoir_updates_telegram(etat, chats, demandes)
+            traiter_file_telegram(etat, limite=10)
+            traiter_file_live(etat, limite=10)
             for marche, derniere in list(DERNIERS.items()):
                 try:
                     maj_chronos(etat, marche, derniere)
