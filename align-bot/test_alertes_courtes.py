@@ -72,7 +72,7 @@ class Sessions(unittest.TestCase):
 
     def test_free_gets_only_15min_notice_of_london_and_new_york_opens(self):
         envois = []
-        etat = {"prospects": ["900"]}
+        etat = {"prospects": ["900"], "coach_optin": {"GOLD": ["900"], "BTC": ["900"], "NASDAQ": ["900"]}}
         with patch.object(ab, "TOKEN", "x"), patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append((str(c), k["text"]))), patch.object(ab, "destinataires_message", return_value=["canal"]):
             ab.alertes_courtes(etat, set(), {}, utc(2026, 11, 11, 14, 15))      # Wall Street 15 min
             ab.alertes_courtes(etat, set(), {}, utc(2026, 11, 11, 14, 26))      # palier 5 : VIP seulement
