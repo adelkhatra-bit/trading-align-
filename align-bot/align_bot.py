@@ -3026,7 +3026,9 @@ REGLES = ("📌 RÈGLES — ALIGN Signaux\n"
           "👉 https://t.me/align_mtf_adel_bot")
 
 def epingler(etat, cid):
-    """Envoie les règles et les épingle en haut de la conversation (une seule fois par conversation)."""
+    """Envoie les règles aux abonnés qui ont validé un marché, ou dans la chaîne VIP."""
+    if str(cid) != str(etat.get("canal") or "") and not marches_notifications(etat, cid):
+        return
     if cid in etat.setdefault("epingles_v5", []):
         return
     try:                                  # mémoire perdue (redémarrage) : on regarde ce qui est DÉJÀ épinglé — jamais deux fois les mêmes règles
@@ -5187,6 +5189,8 @@ def renvoyer_claviers(etat, chats):
         return
     vus = etat.setdefault("clavier_v", {})
     for cid in sorted(({str(c) for c in chats} | {str(c) for c in etat.get("prospects", [])}) - {str(etat.get("canal") or "")})[:30]:
+        if not marches_notifications(etat, cid):
+            continue
         if vus.get(cid) == CLAVIER_VERSION:
             continue
         vus[cid] = CLAVIER_VERSION               # marqué avant l'envoi : jamais 2 fois, même si Telegram répond mal
@@ -7166,7 +7170,8 @@ def destinataires_radar(etat, chats):
                 out.add(str(cid))
     for cid in {str(c) for c in chats}:
         try:
-            if autorise(etat, cid, cid) and len(marches_choisis(etat, cid)) >= 2:
+            abonnes = marches_notifications(etat, cid)
+            if autorise(etat, cid, cid) and len(abonnes) >= 2:
                 out.add(cid)
         except Exception:
             pass
@@ -7694,7 +7699,7 @@ def envoyer_prospects(etat, texte, signal, clavier=None):
     vus = etat.setdefault("masque_vu", {})
     ref = f"{m}:{(tr or {}).get('cree') or int(time.time() // 1800)}"
     for cid in destinataires_gratuits(etat):
-        if not marche_autorise(etat, cid, m):
+        if not notifications_actives(etat, cid, m) or not marche_autorise(etat, cid, m):
             continue
         if TOUT_GRATUIT:                   # v7.4 (décision d'Adel) : tout gratuit pour le moment → chaque position en temps réel, une fois
             if not bot_on(etat, cid) or vus.get(cid) == ref:
@@ -11345,7 +11350,8 @@ def un_tour(etat, chats):
         if TOKEN and partage_du(etat):
             txt, kb = message_partage(etat)
             for cid in destinataires_gratuits(etat):
-                _envoi_sur(cid, text=txt, reply_markup=kb)
+                if marches_notifications(etat, cid):
+                    _envoi_sur(cid, text=txt, reply_markup=kb)
     except Exception as ex:
         print("annonces", ex)
     if TOKEN:
