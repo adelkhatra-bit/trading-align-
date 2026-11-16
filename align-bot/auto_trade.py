@@ -189,17 +189,34 @@ def executer(etat, signal, journal=print):
             r = _api("POST", f"{compte}/trade", ordre)
             code = str(r.get("stringCode") or "")
             ok = code in ("TRADE_RETCODE_DONE", "TRADE_RETCODE_DONE_PARTIAL", "TRADE_RETCODE_PLACED", "ERR_NO_ERROR")
-            pending = code == "TRADE_RETCODE_PLACED"
+            pending = True                         # le fill broker est confirmé séparément, jamais déduit du seul retour HTTP
             tp1_mt5 = round(prix + (1 if signal["sens"] == "LONG" else -1) * abs(signal["tp"] - signal["e"]), 2)
             item = {"compte": compte, "ok": ok, "pending": pending, "reponse": r, "ordre": ordre,
                     "prix_entree": prix, "sl": sl_mt5, "tp1": tp1_mt5, "tp2": tp_mt5}
             if ok:
-                etat.setdefault("mt5_plan", {})[compte] = {
-                    "marche": m, "sens": signal["sens"], "sym": sym, "e": prix, "sl": sl_mt5,
-                    "tp": tp_mt5, "tp1": tp1_mt5, "tp2": tp_mt5,
-                    "taille": float(spec.get("contractSize", 1)), "pas": float(spec.get("volumeStep", 0.01)),
-                    "be": False, "rachats": 0, "budget": budget, "pending": pending,
-                    "cree": time.time(), "order_id": r.get("orderId") or r.get("id")}
+                plan = {"marche": m, "sens": signal["sens"], "sym": sym, "e": prix, "sl": sl_mt5,
+                        "tp": tp_mt5, "tp1": tp1_mt5, "tp2": tp_mt5,
+                        "taille": float(spec.get("contractSize", 1)), "pas": float(spec.get("volumeStep", 0.01)),
+                        "be": False, "rachats": 0, "budget": budget, "pending": True,
+                        "cree": time.time(), "order_id": r.get("orderId") or r.get("id")}
+                etat.setdefault("mt5_plan", {})[compte] = plan
+                try:
+                    apres = [p for p in (_api("GET", f"{compte}/positions") or [])
+                             if p.get("symbol") == sym and "ALIGN" in str(p.get("comment", ""))]
+                except Exception:
+                    apres = []
+                if apres:
+                    vol = sum(float(p.get("volume", 0) or 0) for p in apres)
+                    if vol > 0:
+                        entree_reelle = sum(float(p.get("openPrice", prix)) * float(p.get("volume", 0) or 0) for p in apres) / vol
+                        delta = entree_reelle - prix
+                        plan["e"] = entree_reelle
+                        plan["tp1"] = round(tp1_mt5 + delta, 2)
+                    plan["sl"] = next((float(p["stopLoss"]) for p in apres if p.get("stopLoss")), sl_mt5)
+                    plan["tp"] = next((float(p["takeProfit"]) for p in apres if p.get("takeProfit")), tp_mt5)
+                    plan["tp2"] = plan["tp"]
+                    plan["pending"] = False
+                    item.update(pending=False, prix_entree=plan["e"], sl=plan["sl"], tp1=plan["tp1"], tp2=plan["tp2"])
             else:
                 item["raison"] = r.get("message") or r.get("errorMessage") or code or "ordre refusé par MetaApi"
             res.append(item)
@@ -254,11 +271,15 @@ def gerer(etat, journal=print):
                 msgs.append(f"⚠️ MetaApi {plan['marche']} : aucune position broker retrouvée — ordre non confirmé ou position terminée")
                 continue
             if plan.get("pending"):
+                ancienne_entree = float(plan["e"])
                 vol = sum(float(p.get("volume", 0) or 0) for p in pos)
                 if vol > 0:
                     plan["e"] = sum(float(p.get("openPrice", plan["e"])) * float(p.get("volume", 0) or 0) for p in pos) / vol
+                delta = float(plan["e"]) - ancienne_entree
+                plan["tp1"] = round(float(plan.get("tp1", plan["tp"])) + delta, 2)
                 plan["sl"] = next((float(p["stopLoss"]) for p in pos if p.get("stopLoss")), plan["sl"])
                 plan["tp"] = next((float(p["takeProfit"]) for p in pos if p.get("takeProfit")), plan["tp"])
+                plan["tp2"] = plan["tp"]
                 plan["pending"] = False
             q = _api("GET", f"{compte}/symbols/{plan['sym']}/current-price")
             prix = float(q["bid"] if plan["sens"] == "LONG" else q["ask"])
