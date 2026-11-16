@@ -416,7 +416,7 @@ class AlignMtfRulesTest(unittest.TestCase):
 
     def test_multi_timeframe_watcher_only_notifies_the_blocking_timeframe(self):
         from unittest.mock import patch
-        state = {"veille_cloture": {"GOLD": {"123": {
+        state = {"coach_optin": {"GOLD": ["123"]}, "veille_cloture": {"GOLD": {"123": {
             "multi": True, "derniers_t": {"5m": 300, "15m": 900, "1h": 3600, "4h": 14400},
             "expire": 999999
         }}}}
@@ -701,7 +701,7 @@ class AlignMtfRulesTest(unittest.TestCase):
 
     def test_closed_candle_notifier_sends_once_per_new_candle(self):
         from unittest.mock import patch
-        state = {"veille_cloture": {"BTC": {"123": {"tf": "5m", "dernier_t": 300, "restants": 1}}}}
+        state = {"coach_optin": {"BTC": ["123"]}, "veille_cloture": {"BTC": {"123": {"tf": "5m", "dernier_t": 300, "restants": 1}}}}
         r = {"b5": [candle(300), candle(600, o=100, h=103, l=99, c=102)],
              "confirme": 0, "dirs": [0] * 11, "rsis": [50] * 11}
         with patch.object(align_bot, "verdict", return_value=("ATTENDRE", "pas de confirmation")), \
