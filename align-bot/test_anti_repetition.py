@@ -119,7 +119,7 @@ if __name__ == "__main__":
 
 class RoutageParCompte(unittest.TestCase):
     """Demande d'Adel : si je ne coche que GOLD et NASDAQ, je ne reçois QUE ces marchés (messages, lignes, sessions)."""
-    ETAT = {"marches_par_chat": {"adel": ["GOLD", "NASDAQ"], "btc": ["BTC"], "tous": ["BTC", "GOLD", "NASDAQ"]}}
+    ETAT = {"marches_par_chat": {"adel": ["GOLD", "NASDAQ"], "btc": ["BTC"], "tous": ["BTC", "GOLD", "NASDAQ"]}, "telegram_optin_chats": ["adel", "btc", "tous"]}
 
     def test_message_tague_n_est_plus_devine_depuis_le_texte(self):
         avis = ab.taguer("🧠 L'avis de l'IA ALIGN\nLe cours monte, prudence.", "BTC")           # aucun marché dans le texte
