@@ -854,3 +854,30 @@ class LiveMarketNarrationFallback(unittest.TestCase):
 
     def test_fallback_never_invents_market_without_data(self):
         self.assertEqual(ab.commentaires_live_de_secours({"marches": {}}), "")
+
+
+class LiveMarketPartialAiCoverage(unittest.TestCase):
+    def test_partial_ai_reply_is_completed_for_every_available_market(self):
+        data = {"marches": {
+            "BTC": {"biais_plan": "haussier", "confirmation_4h_1h": "alignées à la hausse",
+                    "rsi_15m": 54.0},
+            "GOLD": {"biais_plan": "baissier", "confirmation_4h_1h": "non alignées",
+                     "rsi_15m": 28.0, "volume_15m_vs_moyenne": 0.5},
+            "NASDAQ": {"biais_plan": "neutre", "confirmation_4h_1h": "alignées à la baisse",
+                       "rsi_15m": 72.0}
+        }}
+        published = []
+        state = {}
+        with (
+            mock.patch.object(ab, "LIVE_IA_INTERVALLE", 180),
+            mock.patch.object(ab, "live_actif", return_value=True),
+            mock.patch.object(ab, "contexte_technique_live", return_value=data),
+            mock.patch.object(ab, "ia", return_value="BTC | Les acheteurs gardent la main mais la reprise doit confirmer. | Buyers remain in control but the recovery must confirm."),
+            mock.patch.object(ab, "live_publier", side_effect=lambda message: published.append(message) or True)
+        ):
+            self.assertTrue(ab.live_phrases_ia(state, 1000, {}))
+        self.assertEqual(len(published), 1)
+        payload = json.loads(published[0][3:])
+        self.assertEqual(set(payload), {"BTC", "GOLD", "NASDAQ"})
+        self.assertTrue(all(len(payload[m]) == 2 for m in payload))
+        self.assertIn("biais reste baissier", payload["GOLD"][0][0].lower())
