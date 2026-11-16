@@ -7018,9 +7018,9 @@ def evenements_pine(etat, m, r, cle, now):
     ev, e = [], hb_etat_surveille(r)
     d, n, comp = e["d"], e["n"], int(r.get("comp", 0))
     base = dict(m=m, ic=ICONE.get(m, ""), seuil=MIN_ALIGN, n=n, c=comp)
-    if statut != "ouvert":
+    if statut != "ouvert" or not donnees_mtf_fraiches(m, r):
         mem.update(n=n, comp=comp)
-        return ev                                      # marché fermé ou données périmées : aucune alerte inventée
+        return ev                                      # marché fermé ou MTF périmé : aucune alerte technique inventée
     prev_n, prev_c = mem.get("n"), mem.get("comp")
     if prev_n is not None and not cle.get("trade") and now - mem.get("t_align", 0) >= 1800:   # 7↔8 qui clignote : au plus 1 alerte / 30 min
         franchit_haut, franchit_bas = n >= MIN_ALIGN > prev_n, n < MIN_ALIGN <= prev_n
@@ -7035,7 +7035,6 @@ def evenements_pine(etat, m, r, cle, now):
         elif prev_c >= MIN_SQZ and comp <= MIN_SQZ - 2:
             ev.append(dict(kind="relache", **base))
     mem.update(n=n, comp=comp)
-    entree_fraiche = donnees_mtf_fraiches(m, r)
     b15, atr_ = r.get("b15") or [], float(r.get("atr") or 0)
     if len(b15) >= 3 and atr_ > 0:                      # impulsion : dernière bougie 15 min CLÔTURÉE, grande et pleine
         x = b15[-2]; rng = x["h"] - x["l"]
@@ -7048,7 +7047,7 @@ def evenements_pine(etat, m, r, cle, now):
     elif rd and not rc and not mem.get("rd"):
         ev.append(dict(kind="ret_cancel", **base))
     mem["rc"], mem["rd"] = rc, bool(rd)
-    sn = r.get("sniper") if entree_fraiche else None
+    sn = r.get("sniper")
     if sn and not cle.get("trade"):                      # entrée sniper en cascade : une fois par UT et par niveau, 30 min mini ; s'ajoute au plan, ne le remplace pas
         cle_sn = f"{sn['d']}:{sn['ut']}:{round(sn['niveau'] / max(sn['niveau'] * 0.0004, 1e-9))}"
         if mem.get("sn_cle") != cle_sn and now - mem.get("sn_t", 0) >= 1800:
@@ -7072,7 +7071,7 @@ def evenements_pine(etat, m, r, cle, now):
     if m in ("GOLD", "NASDAQ"):
         dirs_confirmation = r.get("dirs") or []
         alignement_ok = alignement_ok and len(dirs_confirmation) > 9 and dirs_confirmation[7] == d and dirs_confirmation[9] == d
-    if entree_fraiche and d and zp and strat and not cle.get("trade") and alignement_ok:
+    if d and zp and strat and not cle.get("trade") and alignement_ok:
         barres = (r.get("m1") if strat == "SCALPING" else r.get("b5")) or []           # même bougie que le trait de l'indicateur (vue du plan)
         if len(barres) >= 3:
             c1, c0, t1 = barres[-2]["c"], barres[-3]["c"], barres[-2]["t"]
