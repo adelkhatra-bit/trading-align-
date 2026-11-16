@@ -4588,7 +4588,10 @@ def boucle_chronos(etat):
 
 
 def inscrire_auto(etat, cid, m, notifier=True):
-    """Active le suivi de la prochaine position sans faire croire qu'un ordre broker est placé."""
+    """Activation explicite du suivi de la prochaine position pour ce marché."""
+    optins = etat.setdefault("telegram_optin_chats", [])
+    if str(cid) not in {str(x) for x in optins}:
+        optins.append(str(cid))
     liste = etat.setdefault("auto", {}).setdefault(m, [])
     if cid not in liste:
         liste.append(cid)
@@ -4748,8 +4751,10 @@ def regler_bot(etat, cid, on):
 def entrer_inscrits(etat, m, tr, chats=()):
     """Le bot vient d'entrer : il fait entrer automatiquement tous les membres dont le bot est ON,
     plus ceux qui ont appuyé sur 🎯, au prix d'entrée du bot (coach + résultats comptés)."""
-    auto = [c for c in chats if bot_on(etat, c) and marche_autorise(etat, c, m) and not vue_gratuite(etat, c) and c != etat.get("canal")]
-    for cid in list(dict.fromkeys(etat.get("auto", {}).pop(m, []) + auto)):
+    auto = [str(c) for c in chats if bot_on(etat, c) and marche_autorise(etat, c, m) and not vue_gratuite(etat, c) and str(c) != str(etat.get("canal"))]
+    suivis = [str(c) for c in etat.get("auto", {}).pop(m, [])
+              if notifications_on(etat, c) and marche_autorise(etat, c, m)]
+    for cid in list(dict.fromkeys(suivis + auto)):
         if isinstance(tr.setdefault("qui", {}).get(cid), dict):
             continue
         if vue_gratuite(etat, cid):
@@ -5416,6 +5421,9 @@ def notifier_coach_live(etat, m, r, cle):
         return
     b = bars[-1]
     for cid, info in list(abonnes.items()):
+        if not notifications_on(etat, cid) or not marche_autorise(etat, cid, m):
+            abonnes.pop(cid, None)
+            continue
         if dans_chaine(etat, cid, m):
             abonnes.pop(cid, None)
             _envoi_sur(cid, text=f"🎙 Ton commentateur {ICONE.get(m, '')} {m}\n👉 Il est dans ta chaîne\n🔕 Ici, plus de doublon",
@@ -5449,7 +5457,7 @@ def notifier_clotures(etat, m, r, cle):
     """Envoie les clôtures nouvelles une fois chacune, sur les UT suivies par l'utilisateur."""
     champs = TF_CHAMPS
     for cid, suivi in list(etat.get("veille_cloture", {}).get(m, {}).items()):
-        if not marche_autorise(etat, cid, m):
+        if not notifications_on(etat, cid) or not marche_autorise(etat, cid, m):
             etat["veille_cloture"][m].pop(cid, None)
             continue
         if suivi.get("multi"):
