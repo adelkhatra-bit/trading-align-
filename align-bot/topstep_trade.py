@@ -220,9 +220,17 @@ def dernier_prix(jeton, contrat_id):
 
 def _stop_ouvert(jeton, contrat_id):
     for o in _api("/Order/searchOpen", {"accountId": int(COMPTE)}, jeton).get("orders") or []:
-        if o.get("contractId") == contrat_id and o.get("type") == 4:
+        if str(o.get("contractId")) == str(contrat_id) and o.get("type") == 4:
             return o
     return None
+
+
+def _ordre_par_id(jeton, order_id, cree):
+    """Relit l'état broker de l'ordre (Open/Filled/Cancelled/Rejected) avant toute annulation."""
+    debut = datetime.datetime.fromtimestamp(float(cree) - 5, datetime.timezone.utc).isoformat()
+    fin = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    rep = _api("/Order/search", {"accountId": int(COMPTE), "startTimestamp": debut, "endTimestamp": fin}, jeton)
+    return next((o for o in (rep.get("orders") or []) if str(o.get("id")) == str(order_id)), None)
 
 
 def gerer(etat, prix=None, journal=print):
@@ -244,10 +252,27 @@ def gerer(etat, prix=None, journal=print):
         if not broker_pos:
             if pos.get("pending"):
                 age = time.time() - float(pos.get("cree", time.time()))
+                order_id = pos.get("order_id")
+                ordre_broker = None
+                if order_id:
+                    try:
+                        ordre_broker = _ordre_par_id(jeton, order_id, pos.get("cree", time.time()))
+                    except Exception:
+                        ordre_broker = None
+                statut_ordre = ordre_broker.get("status") if ordre_broker else None
+                if statut_ordre == 2:                 # Filled, mais la position n'est pas encore visible
+                    if age < 60:
+                        return []
+                    prix_rempli = ordre_broker.get("filledPrice")
+                    etat.pop("topstep_pos", None)
+                    prix_txt = px(float(prix_rempli)) if prix_rempli is not None else "prix non remonté"
+                    return [f"⚠️ Topstep {m} : ordre rempli à {prix_txt}, mais aucune position ouverte n'est retrouvée. Vérifie l'historique broker."]
+                if statut_ordre in (3, 4, 5):
+                    etat.pop("topstep_pos", None)
+                    return [f"⚠️ Topstep {m} : ordre broker non exécuté (statut {statut_ordre}), suivi annulé"]
                 if age < 30:
                     return []
-                order_id = pos.get("order_id")
-                if order_id:
+                if order_id and statut_ordre in (1, 6):
                     try:
                         ann = _api("/Order/cancel", {"accountId": int(COMPTE), "orderId": order_id}, jeton)
                     except Exception:
@@ -261,8 +286,8 @@ def gerer(etat, prix=None, journal=print):
                 return []
             etat.pop("topstep_pos", None)
             return [f"🏁 Topstep {m} : aucune position broker ouverte — position clôturée ou annulée"]
-        if pos.get("pending"):
-            _confirmer_remplissage(pos, broker_pos)
+        if pos.get("pending") and not _confirmer_remplissage(pos, broker_pos):
+            return []                         # prix moyen non remonté : ne pas gérer sur un prix estimé
         pos["n"] = int(broker_pos.get("size") or pos.get("n", 1))
     p = prix if prix is not None else prix_futures(m)
     if p is None:
