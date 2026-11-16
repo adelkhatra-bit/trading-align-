@@ -485,7 +485,7 @@
     const pool = Object.keys(iaPools).length ? (iaPools[m] || []) : iaPool;  // commentaires du marché affiché uniquement
     if (!pool.length) return;
     montrer(pool[iaN++ % pool.length], false, 1);
-  }, 150 * 1000);
+  }, 55 * 1000);
   let astuceN = 0;
   const astuceT = setInterval(() => {
     if (occupe || file.length) return;            // jamais par-dessus une vraie info (TP, SL, news…)
