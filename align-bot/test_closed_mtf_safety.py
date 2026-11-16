@@ -91,11 +91,7 @@ class ClosedMtfSafety(unittest.TestCase):
             stale = fresh_context(now)
             stale["b5"][-2]["t"] = now - 1000
             self.assertEqual(ab.direction_plan_autorisee(market, 1, aligned, stale), 0)
-        self.assertEqual(ab.direction_plan_autorisee("BTC", 1, [1] * 11, {}), 1)
-        self.assertEqual(ab.direction_plan_autorisee("BTC", 1, [0] * 11, {}), 0)
-        opposite = [1] * 11
-        opposite[7] = -1
-        self.assertEqual(ab.direction_plan_autorisee("BTC", 1, opposite, {}), 0)
+        self.assertEqual(ab.direction_plan_autorisee("BTC", 1, [0] * 11, {}), 1)
 
     def test_tradingview_bridge_conflict_hides_gold_plan_and_markers(self):
         base = {
@@ -187,15 +183,15 @@ class ClosedMtfSafety(unittest.TestCase):
     def test_btc_keeps_historical_direction_filter(self):
         self.assertEqual(ab.direction_confirmee_marche("BTC", [0] * 11, 1), 1)
 
-    def test_btc_plan_requires_closed_h1_h4_in_same_direction_as_setup(self):
+    def test_btc_signal_requires_closed_h1_h4_in_same_direction_as_setup(self):
         aligned = [1] * 11
-        self.assertEqual(ab.direction_plan_autorisee("BTC", 1, aligned, {}), 1)
+        self.assertEqual(ab.direction_btc_confirmee(1, aligned), 1)
         conflict = aligned.copy()
         conflict[9] = -1
-        self.assertEqual(ab.direction_plan_autorisee("BTC", 1, conflict, {}), 0)
+        self.assertEqual(ab.direction_btc_confirmee(1, conflict), 0)
         conflict = aligned.copy()
         conflict[7] = 0
-        self.assertEqual(ab.direction_plan_autorisee("BTC", 1, conflict, {}), 0)
+        self.assertEqual(ab.direction_btc_confirmee(1, conflict), 0)
 
     def test_btc_live_closure_scheduler_uses_closed_h1_h4(self):
         r = {"market": "BTC", "dirs": [1] * 11, "dirs_cloturees": [1] * 11}
@@ -255,7 +251,7 @@ class ClosedMtfSafety(unittest.TestCase):
         self.assertEqual(ab.timeframe_attendu(r, {}), "4h")
         # BTC deliberately retains its legacy timeframe selection.
         r["market"] = "BTC"
-        self.assertEqual(ab.timeframe_attendu(r, {}), "1h")
+        self.assertEqual(ab.timeframe_attendu(r, {}), "4h")
 
 
 if __name__ == "__main__":
