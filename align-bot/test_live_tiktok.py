@@ -950,8 +950,8 @@ class LiveNarrationPrioritizesLiquiditySweep(unittest.TestCase):
         ):
             self.assertTrue(ab.live_phrases_ia({}, 1000, {}))
         payload = json.loads(published[0][3:])
-        self.assertIn("balayage sous le support", payload["GOLD"][1][0])
-        self.assertIn("not yet a confirmed signal", payload["GOLD"][1][1])
+        self.assertIn("balayage du support", payload["GOLD"][1][0])
+        self.assertIn("not yet confirmed", payload["GOLD"][1][1])
 
 
 
