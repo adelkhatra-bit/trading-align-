@@ -1806,7 +1806,19 @@ def etire(r, d):
     return (r5 >= 80 or p - e > 2 * a) if d == 1 else (r5 <= 20 or e - p > 2 * a)
 
 def prochaine(r, cle):
-    """Prochaine entrée attendue, avec la flèche et la couleur."""
+    """Prochaine entrée attendue ; GOLD/NASDAQ n'annoncent un sens qu'après quatre clôtures concordantes."""
+    if r.get("market") in ("GOLD", "NASDAQ"):
+        D = r.get("dirs_cloturees") or r.get("dirs") or []
+        if len(D) < 10:
+            return "🔜 Prochaine entrée : attente des clôtures M5 / M15 / H1 / H4"
+        d4, d1, d15, d5 = D[9], D[7], D[4], D[2]
+        if not d4:
+            return "🔜 Prochaine entrée : attente d'une direction claire en H4"
+        if d1 != d4:
+            return f"🔜 Prochaine entrée : attente H1 — H4 {SENS[d4]}, H1 pas encore alignée"
+        if d15 != d4 or d5 != d4:
+            etat = lambda x: "haussière" if x == 1 else "baissière" if x == -1 else "neutre"
+            return f"🔜 Prochaine entrée : ATTENTE — H1/H4 {SENS[d4]}, M15 {etat(d15)}, M5 {etat(d5)}. Pas de position avant l'accord des quatre clôtures."
     d = r["confirme"]; R = dict(zip(UT, r["rsis"]))
     if d and etire(r, d):
         # Grosses UT en excès : le retournement est possible
@@ -4499,7 +4511,7 @@ def raison_attente(r, cle):
         return "Une position est déjà ouverte : le coach surveille le stop et les objectifs."
     if r.get("annonce"):
         return "Une annonce économique approche : aucune nouvelle entrée pendant cette période de risque."
-    dirs = r.get("dirs", [0] * 11)
+    dirs = (r.get("dirs_cloturees") or r.get("dirs") or [0] * 11) if r.get("market") in ("GOLD", "NASDAQ") else r.get("dirs", [0] * 11)
     d4h, d1h = dirs[9], dirs[7]
     if not d4h:
         return "La bougie 4 h ne donne pas de direction nette : le marché est neutre. Aucun LONG ni SHORT n'est proposé."
@@ -4507,6 +4519,10 @@ def raison_attente(r, cle):
     if d1h != d4h:
         etat_1h = "neutre" if not d1h else "dans le sens opposé"
         return f"La tendance 4 h est {sens}, mais la 1 h est {etat_1h}. J'attends une clôture 1 h qui confirme la 4 h."
+    if r.get("market") in ("GOLD", "NASDAQ") and (dirs[2] != d4h or dirs[4] != d4h):
+        etat_m5 = "haussière" if dirs[2] == 1 else "baissière" if dirs[2] == -1 else "neutre"
+        etat_m15 = "haussière" if dirs[4] == 1 else "baissière" if dirs[4] == -1 else "neutre"
+        return f"Le fond H4/H1 est {sens}, mais M15 est {etat_m15} et M5 {etat_m5}. J'attends que les quatre unités clôturent dans le même sens. Aucune position pour l'instant."
     d = r.get("confirme") or d4h
     if etire(r, d):
         return f"La tendance {sens} est confirmée, mais le mouvement est déjà trop étendu. Je n'achète/vends pas au prix actuel : j'attends un repli."
@@ -8491,10 +8507,14 @@ def fmt_trade(m, tr, p=None):
                 "⛔ Ne pas anticiper la clôture de confirmation. Le SL reste obligatoire.\n")
     if tr.get("retour"):
         tete = f"✅ RETOURNEMENT CONFIRMÉ : {'LONG' if d == 1 else 'SHORT'}\n" + tete
+    alignement_txt = ("🧭 Clôtures M5 + M15 + H1 + H4 concordantes" if m in ("GOLD", "NASDAQ")
+                      else "🧭 Fond H4 • confirmation H1 • préparation M15 • timing M5")
+    timing_txt = ("⏱ M15 confirme le sens • M5 déclenche après sa clôture" if m in ("GOLD", "NASDAQ")
+                  else "⏱ Vue d'entrée : 5 minutes (15M = préparation, M5 = timing après clôture confirmée)")
     return (f"{tete}\n"
             + resume +
-            f"🧭 Fond H4 • confirmation H1 • préparation M15 • timing M5\n"
-            f"⏱ Vue d'entrée : 5 minutes (15M = préparation, M5 = timing après clôture confirmée)\n\n"
+            f"{alignement_txt}\n"
+            f"{timing_txt}\n\n"
             f"🕯 EN BOUGIES (marche sur toutes les plateformes) :\n"
             f"1️⃣ 👀 Mets-toi en vue 5 minutes pour l'entrée\n"
             + (f"2️⃣ 🛑 SL : un tout petit peu {meche_sl(tr)} (structure 5 min)\n"
@@ -9567,6 +9587,7 @@ def suivre_apres_sl(out, m, r, cle, hi, lo):
 
 def agent(m, r, cle, ferme):
     """BTC conserve H4/H1 + déclencheur M5 ; GOLD/NASDAQ exigent M5/M15/H1/H4 clôturés concordants."""
+    r.setdefault("market", m)
     out = []
     tr = cle.get("trade")
     depuis = cle.get("t1m", 0)
