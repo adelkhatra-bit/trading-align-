@@ -80,7 +80,7 @@ class LiveTikTok(unittest.TestCase):
         self.assertTrue(self.publie[0].startswith("BULLE:"))
         self.assertIsNone(re.search(r"\d{3,}", self.publie[0]))
         self.assertTrue(self.publie[0].startswith("BULLE:🎯 Le prix arrive dans une zone clé 👀 • ⏱ verdict dans "))
-        self.assertTrue(self.publie[0].endswith("les infos en temps réel : lien en bio 🎁 gratuit"))
+        self.assertTrue(self.publie[0].endswith("Ouvre le lien en bio pour voir le plan complet."))
         for mot in ("GOLD", "SHORT", "LONG", "ZONE", "position"):
             self.assertNotIn(mot, self.publie[0])
 
