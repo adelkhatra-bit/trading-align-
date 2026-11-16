@@ -11365,26 +11365,30 @@ def commentaires_live_de_secours(donnees):
         else:
             suite, suite_en = "Attendons une clôture claire avant de conclure.", "Let's wait for a clear close before drawing a conclusion."
         reversal = c.get("surveillance_retournement") or {}
-        unite_reversal = reversal.get("timeframe") or "M15"
-        divergence = " avec divergence RSI" if reversal.get("divergence_rsi") else ""
+        divergence_note = " avec divergence RSI" if reversal.get("divergence_rsi") else ""
         volume_ratio = reversal.get("volume_ratio")
-        volume_note = " et volume en hausse" if isinstance(volume_ratio, (int, float)) and volume_ratio >= 1.5 else ""
+        source_volume = str(c.get("source_volume") or "")
+        volume_label = "volume Kraken" if "Kraken" in source_volume else "volume proxy"
+        volume_note = f" et {volume_label} fort" if isinstance(volume_ratio, (int, float)) and volume_ratio >= 1.5 else ""
+        divergence_note_en = " with RSI divergence" if reversal.get("divergence_rsi") else ""
+        volume_label_en = "Kraken volume" if "Kraken" in source_volume else "proxy volume"
+        volume_note_en = f" and strong {volume_label_en}" if isinstance(volume_ratio, (int, float)) and volume_ratio >= 1.5 else ""
+        timeframe_prefix = "Unité courte" if reversal.get("timeframe") == "M5" else "Clôture de référence"
+        timeframe_prefix_en = "Short timeframe" if reversal.get("timeframe") == "M5" else "Reference close"
         if reversal.get("conflit"):
             fr2, en2 = (
-                "Le M5 et le M15 montrent des réactions opposées : le marché hésite, attendons une clôture cohérente.",
-                "M5 and M15 show opposite reactions: the market is undecided, let's wait for a consistent close."
+                "Les unités courtes et de référence divergent : marché hésitant, attendons une clôture cohérente.",
+                "Short and reference timeframes disagree: the market is undecided; wait for a consistent close."
             )
         elif reversal.get("direction") == 1:
-            prefixe = "Le M5 repère tôt" if unite_reversal == "M5" else "Le M15 confirme une première réaction"
             fr2, en2 = (
-                f"{prefixe} un balayage sous le support{divergence}{volume_note}, puis une clôture au-dessus : possible reprise haussière, pas encore un signal confirmé.",
-                f"{unite_reversal} detects a sweep below support{(' with RSI divergence' if reversal.get('divergence_rsi') else '')}{(' and rising volume' if volume_note else '')}, followed by a close above: possible bullish recovery, not yet a confirmed signal."
+                f"{timeframe_prefix} : balayage du support{divergence_note}{volume_note}, reprise au-dessus ; retournement à confirmer.",
+                f"{timeframe_prefix_en} swept support{divergence_note_en}{volume_note_en}, then reclaimed it; reversal possible, not yet confirmed."
             )
         elif reversal.get("direction") == -1:
-            prefixe = "Le M5 repère tôt" if unite_reversal == "M5" else "Le M15 confirme une première réaction"
             fr2, en2 = (
-                f"{prefixe} un balayage au-dessus de la résistance{divergence}{volume_note}, puis une clôture dessous : possible rejet baissier, pas encore un signal confirmé.",
-                f"{unite_reversal} detects a sweep above resistance{(' with RSI divergence' if reversal.get('divergence_rsi') else '')}{(' and rising volume' if volume_note else '')}, followed by a close below: possible bearish rejection, not yet a confirmed signal."
+                f"{timeframe_prefix} : balayage de la résistance{divergence_note}{volume_note}, rejet dessous ; retournement à confirmer.",
+                f"{timeframe_prefix_en} swept resistance{divergence_note_en}{volume_note_en}, then rejected below; reversal possible, not yet confirmed."
             )
         else:
             fr2, en2 = f"{momentum} et {flux} ; {suite}", f"{momentum_en} and {flux_en}; {suite_en}"
