@@ -126,6 +126,59 @@ class DirectionSafety(unittest.TestCase):
             ab.tendance_armee(r, cle)
             self.assertEqual(r["confirme"], d)
 
+    def test_confluence_finale_gold_nasdaq_exige_m5_m15_h1_h4_dans_les_deux_sens(self):
+        for market in ("GOLD", "NASDAQ"):
+            for d in (1, -1):
+                dirs = [0] * 11
+                for i in (2, 4, 7, 9):
+                    dirs[i] = d
+                r = {"market": market, "dirs": dirs}
+                self.assertTrue(ab.confluence_entree_mtf(market, r, d))
+                for i in (2, 4, 7, 9):
+                    bad = list(dirs)
+                    bad[i] = 0
+                    self.assertFalse(ab.confluence_entree_mtf(market, {"dirs": bad}, d), (market, d, i))
+        self.assertTrue(ab.confluence_entree_mtf("BTC", {"dirs": [0]}, 1))
+
+    def test_reprise_position_gold_nasdaq_revalide_les_unites_actuelles(self):
+        for market in ("GOLD", "NASDAQ"):
+            for d in (1, -1):
+                e, sl, tp = 100.0, 98.0, 104.0
+                if d == -1:
+                    sl, tp = 102.0, 96.0
+                dirs = [0] * 11
+                for i in (2, 4, 7, 9):
+                    dirs[i] = d
+                bars = [candle(0, o=99 if d == 1 else 101, c=100), candle(300)]
+                r = {"t": 10000, "m1": [candle(0, c=e)], "b5": bars, "atr": 1.0, "dirs": dirs}
+                cle = {"reprise": {"t": 9990, "d": d, "e": e, "sl": sl, "tp1": tp}}
+                self.assertIn("REPRISE À L'ENTRÉE", ab.reprise_entree(market, r, cle))
+                dirs[4] = -d
+                cle = {"reprise": {"t": 9990, "d": d, "e": e, "sl": sl, "tp1": tp}}
+                self.assertIsNone(ab.reprise_entree(market, dict(r, dirs=dirs), cle))
+
+    def test_agent_ne_peut_pas_contourner_m15_par_cassure_ou_fvg(self):
+        r = {
+            "m1": [candle(0, c=100.0)], "r5": [50.0, 50.0], "posD": 0.5, "posW": 0.5,
+            "confirme": 1, "dirs": [1, 1, 1, 0, -1, 0, 0, 1, 0, 1, 1],
+            "t": 5000, "fermeture": False,
+        }
+        with mock.patch.object(ab, "manipulation"), \\
+             mock.patch.object(ab, "meche_suspecte"), \\
+             mock.patch.object(ab, "niveaux_cles"), \\
+             mock.patch.object(ab, "resistance_fvg"), \\
+             mock.patch.object(ab, "suivre_apres_sl"), \\
+             mock.patch.object(ab, "reprise_entree", return_value=None), \\
+             mock.patch.object(ab, "entree_retest", return_value=None), \\
+             mock.patch.object(ab, "radar_climax", return_value=None), \\
+             mock.patch.object(ab, "retournement_marche", return_value=None), \\
+             mock.patch.object(ab, "plan_cassure") as cassure, \\
+             mock.patch.object(ab, "point_entree") as fvg:
+            out = ab.agent("GOLD", r, {}, "")
+        cassure.assert_not_called()
+        fvg.assert_not_called()
+        self.assertTrue(any("ANTICIPATION uniquement" in x for x in out))
+
     def test_gold_nasdaq_climax_is_watch_only_without_h1_h4_confluence(self):
         dirs = [0] * 11
         dirs[7], dirs[9] = -1, -1
