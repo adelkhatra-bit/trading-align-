@@ -95,33 +95,36 @@ class DirectionSafety(unittest.TestCase):
         self.assertEqual(strat, "SCALPING")
         self.assertEqual(status, "CONFIRMÉ")
 
-    def test_gold_nasdaq_h1_neutre_ne_rearme_pas_une_tendance(self):
+    def test_gold_nasdaq_h1_neutre_ne_rearme_pas_une_tendance_dans_les_deux_sens(self):
         for market in ("GOLD", "NASDAQ"):
-            r = {"market": market, "confirme": 0, "dirs": [0] * 11}
-            r["dirs"][9] = 1  # H4 haussier
-            r["dirs"][7] = 0  # H1 neutre : pas une confirmation
-            cle = {"arme": 1}
-            ab.tendance_armee(r, cle)
-            self.assertEqual(r["confirme"], 0, market)
-            self.assertEqual(cle["arme"], 0, market)
+            for d in (1, -1):
+                r = {"market": market, "confirme": 0, "dirs": [0] * 11}
+                r["dirs"][9] = d
+                r["dirs"][7] = 0
+                cle = {"arme": d}
+                ab.tendance_armee(r, cle)
+                self.assertEqual(r["confirme"], 0, (market, d))
+                self.assertEqual(cle["arme"], 0, (market, d))
 
-    def test_gold_nasdaq_h1_h4_alignes_peuvent_conserver_le_repli(self):
+    def test_gold_nasdaq_h1_h4_alignes_peuvent_conserver_le_repli_dans_les_deux_sens(self):
         for market in ("GOLD", "NASDAQ"):
-            r = {"market": market, "confirme": 0, "dirs": [0] * 11}
-            r["dirs"][9] = 1
-            r["dirs"][7] = 1
-            cle = {"arme": 1}
-            ab.tendance_armee(r, cle)
-            self.assertEqual(r["confirme"], 1, market)
-            self.assertTrue(r.get("repli"))
+            for d in (1, -1):
+                r = {"market": market, "confirme": 0, "dirs": [0] * 11}
+                r["dirs"][9] = d
+                r["dirs"][7] = d
+                cle = {"arme": d}
+                ab.tendance_armee(r, cle)
+                self.assertEqual(r["confirme"], d, (market, d))
+                self.assertTrue(r.get("repli"))
 
     def test_btc_garde_la_tolerance_h1_neutre_historique(self):
-        r = {"market": "BTC", "confirme": 0, "dirs": [0] * 11}
-        r["dirs"][9] = 1
-        r["dirs"][7] = 0
-        cle = {"arme": 1}
-        ab.tendance_armee(r, cle)
-        self.assertEqual(r["confirme"], 1)
+        for d in (1, -1):
+            r = {"market": "BTC", "confirme": 0, "dirs": [0] * 11}
+            r["dirs"][9] = d
+            r["dirs"][7] = 0
+            cle = {"arme": d}
+            ab.tendance_armee(r, cle)
+            self.assertEqual(r["confirme"], d)
 
     def test_gold_nasdaq_climax_is_watch_only_without_h1_h4_confluence(self):
         dirs = [0] * 11
