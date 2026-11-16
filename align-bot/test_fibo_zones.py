@@ -1,49 +1,102 @@
-"""Régression Fibonacci : affichage progressif sur TradingView, jamais dans Telegram."""
+"""Régression : Fibonacci réservé à l'intelligence du commentateur live, sans nouvel indicateur graphique ni message Telegram."""
 from pathlib import Path
 import unittest
+from unittest import mock
 
 import align_bot as ab
 
 ROOT = Path(__file__).resolve().parent
-PINE = ROOT / "pine" / "ALIGN_MTF_PRO_v24_5_FIBO_PROPOSITION.pine"
-REFERENCE = ROOT / "pine" / "ALIGN_MTF_PRO_v24.pine"
+PINE = ROOT / "pine" / "ALIGN_MTF_PRO_v24.pine"
+BOT = ROOT / "align_bot.py"
+LIVE_JS = ROOT.parent / "docs" / "live" / "align-bande-live.user.js"
 
 
-class FibonacciTradingView(unittest.TestCase):
+def mouvement_hausse(n=48):
+    return [
+        dict(t=i, o=100 + i * 100 / (n - 1), h=100 + i * 100 / (n - 1),
+             l=100 + i * 100 / (n - 1), c=100 + i * 100 / (n - 1), v=10)
+        for i in range(n)
+    ]
+
+
+class FibonacciCommentateurLive(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.pine = PINE.read_text(encoding="utf-8")
-        cls.reference = REFERENCE.read_text(encoding="utf-8")
-        cls.bot = (ROOT / "align_bot.py").read_text(encoding="utf-8")
+        cls.bot = BOT.read_text(encoding="utf-8")
+        cls.js = LIVE_JS.read_text(encoding="utf-8")
 
-    def test_fibonacci_is_not_sent_as_a_telegram_message(self):
-        self.assertFalse(hasattr(ab, "fibo_zones"))
-        self.assertNotIn("FIBO_UT", self.bot)
-        self.assertNotIn("fibo_zones(", self.bot)
-        self.assertNotIn("ZONE FIBONACCI", self.bot)
+    def test_no_new_fibonacci_indicator_is_added_to_the_chart(self):
+        self.assertIn("voirFibo = input.bool(true, \"Zone d'entrée + Fibonacci\"", self.pine)
+        self.assertNotIn("voirFiboProgression", self.pine)
+        self.assertNotIn("FIBO —", self.pine)
+        self.assertNotIn("request.security(", self.bot)
 
-    def test_progress_is_visible_on_tradingview_and_updates_in_the_status_bar(self):
-        self.assertIn('voirFiboProgression = input.bool(true,', self.pine)
-        self.assertIn('ligne += "\\n📐 FIBO — "', self.pine)
-        self.assertIn('f_fibo_txt("15 min"', self.pine)
-        self.assertIn('f_fibo_txt("1h"', self.pine)
-        self.assertIn('f_fibo_txt("4h"', self.pine)
-        self.assertIn('⚠ ZONE CLÉ', self.pine)
-        self.assertIn('_pct >= 61.8 and _pct <= 78.6', self.pine)
+    def test_existing_pine_entry_zone_is_preserved(self):
+        self.assertIn("def zone_pine(", self.bot)
+        self.assertIn("f50, f618, f786", self.bot)
+        self.assertIn("def pine_entree(", self.bot)
+        self.assertIn('src="Fibonacci 50 → 78,6 % (indicateur ALIGN)"', self.bot)
 
-    def test_lookbacks_match_the_previous_fibonacci_rule(self):
-        self.assertIn('request.security(syminfo.tickerid, "15", [ta.highest(high, 48)[1]', self.pine)
-        self.assertIn('request.security(syminfo.tickerid, "60", [ta.highest(high, 48)[1]', self.pine)
-        self.assertIn('request.security(syminfo.tickerid, "240", [ta.highest(high, 30)[1]', self.pine)
-        self.assertIn('request.security(syminfo.tickerid, "15", [ta.highest(high, 24)[1], ta.lowest(low, 24)[1]])', self.pine)
+    def test_fibonacci_is_internal_live_context_not_a_telegram_alert(self):
+        self.assertIn("def progression_fibonacci_live(r):", self.bot)
+        self.assertIn("def contexte_technique_live(derniers):", self.bot)
+        self.assertIn("def live_phrases_ia(etat, maintenant, derniers=None):", self.bot)
+        self.assertNotIn("def fibo_zones(", self.bot)
+        self.assertNotIn("ZONE FIBONACCI —", self.bot)
 
-    def test_no_duplicate_15m_midpoint_label_or_repeated_security_calls(self):
-        self.assertNotIn("voirF50x", self.pine)
-        self.assertEqual(self.pine.count('ligne += "\\n📐 FIBO — "'), 1)
-        base_calls = self.reference.count("request.security(")
-        new_calls = self.pine.count("request.security(")
-        self.assertEqual(new_calls, base_calls + 1)
-        self.assertLessEqual(new_calls, 40)
+    def test_existing_bars_are_reused_without_new_market_requests(self):
+        self.assertIn("b15_long=m15[-90:]", self.bot)
+        self.assertIn("b1h_long=h1[-60:]", self.bot)
+        self.assertIn("b4h_long=h4[-40:]", self.bot)
+        self.assertEqual(self.bot.count("live_phrases_ia(etat, int(time.time()), derniers)"), 1)
+
+    def test_fibonacci_retracement_is_calculated_from_closed_m15_bars(self):
+        bars = mouvement_hausse(48)
+        bars.append(dict(t=49, o=132, h=133, l=131, c=132, v=10))
+        r = {"m1": [dict(c=132)], "b15_long": bars}
+        result = ab.progression_fibonacci_live(r)
+        self.assertAlmostEqual(result["M15"]["retracement_pct"], 68.0, places=1)
+        self.assertTrue(result["M15"]["zone_cle_61_8_78_6"])
+        self.assertEqual(result["M15"]["fenetre_bougies_cloturees"], 48)
+
+    def test_live_ai_receives_market_context_and_publishes_market_scoped_phrases(self):
+        r = {
+            "m1": [dict(c=132)],
+            "b15_long": mouvement_hausse(48) + [dict(t=49, o=132, h=133, l=131, c=132, v=10)],
+            "dirs": [1] * 11, "dirPlan": 1, "strat": "SWING", "rC": 54,
+        }
+        brut = ("BTC | Le retracement Fibonacci teste une zone profonde, la tendance reste à confirmer | "
+                "The Fibonacci pullback tests a deep zone, trend confirmation is still needed")
+        with mock.patch.object(ab, "live_actif", return_value=True), \
+             mock.patch.object(ab, "ia", return_value=brut) as ia_mock, \
+             mock.patch.object(ab, "live_publier", return_value=True) as publish_mock:
+            state = {}
+            self.assertTrue(ab.live_phrases_ia(state, 10000, {"BTC": r}))
+        donnees = ia_mock.call_args.args[2]
+        self.assertIn("fibonacci", donnees["marches"]["BTC"])
+        self.assertIn("BTC", publish_mock.call_args.args[0])
+        self.assertNotIn("ZONE FIBONACCI", publish_mock.call_args.args[0])
+
+    def test_market_specific_live_phrases_are_filtered_and_clean(self):
+        brut = (
+            "BTC | Le retracement Fibonacci approche une zone de réaction | The Fibonacci pullback approaches a reaction zone\n"
+            "GOLD | Les acheteurs défendent leur support après un repli | Buyers defend support after a pullback\n"
+            "NASDAQ | Le marché attend une confirmation des unités longues | The market awaits higher timeframe confirmation"
+        )
+        result = ab.phrases_bande_par_marche(brut)
+        self.assertEqual(set(result), {"BTC", "GOLD", "NASDAQ"})
+        self.assertEqual(len(result["BTC"]), 1)
+        self.assertNotIn("BTC", ab.phrases_bande_par_marche(
+            "BTC | Le retracement est à 68 % | The retracement is 68 %"
+        ))
+
+    def test_live_script_selects_commentary_for_the_current_market_without_visual_changes(self):
+        self.assertIn("iaPools[codeMarche()]", self.js)
+        self.assertIn("const pool = Object.keys(iaPools).length ? (iaPools[m] || []) : iaPool", self.js)
+        self.assertIn("montrer(pool[iaN++ % pool.length], false, 1)", self.js)
+        self.assertNotIn("speechSynthesis", self.js)
+        self.assertNotIn("voirFiboProgression", self.js)
 
 
 if __name__ == "__main__":
