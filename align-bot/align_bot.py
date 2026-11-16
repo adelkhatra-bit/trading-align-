@@ -11065,7 +11065,10 @@ def texte_ecran(m, typ, d, minutes, r, cle, ligne=""):
 def ecran_vers_telegram(etat):
     """Lit les événements de l'écran du live et les publie en détail dans la chaîne du marché (sans son)."""
     for brut in ecran_lire():
-        p = brut.split("|")        # EVT|BTC|pression|-1|7
+        p = brut.split("|")        # EVT|BTC|pression|-1|7 ou PING|LIVE_SCREEN|timestamp
+        if len(p) >= 2 and p[0] == "PING" and p[1] == "LIVE_SCREEN":
+            etat["live_screen_seen_t"] = time.time()
+            continue
         if len(p) < 4 or p[0] != "EVT" or p[1] not in MARCHES:
             continue
         m, typ = p[1], p[2]
@@ -11440,14 +11443,21 @@ def live_callback(etat, chats, cb, choix, mk, qui):
         _envoi_sur(qui, text=texte_live(etat, anglais))
         return True
     if choix == "liveboost":
+        # Le bouton ne promet jamais un prénom à l'écran sans heartbeat récent du userscript TradingView.
+        vu_ecran = float(etat.get("live_screen_seen_t", 0) or 0)
+        if time.time() - vu_ecran > 90:
+            _envoi_sur(qui, text=("⚠️ The live screen is not connected. Refresh the TradingView live tab and try again."
+                                  if anglais else "⚠️ L'écran du live n'est pas connecté. Actualise l'onglet TradingView du live puis réessaie."))
+            return True
         if time.time() - _LIVE_BOOSTS.get(qui, 0) < LIVE_BOOST_PAUSE:
             _envoi_sur(qui, text=("⏳ One boost every 2 min" if anglais else "⏳ 1 boost toutes les 2 min"))
             return True
-        _LIVE_BOOSTS[qui] = time.time()
         p = etat.get("prenoms", {}).get(qui) or ("A viewer" if anglais else "Un abonné")
         ok = live_publier(f"🙏 MERCI {p.upper()} ! {p} BOOSTE LE LIVE 🚀 ABONNE-TOI • PARTAGE")
-        _envoi_sur(qui, text=(("🚀 Your name is on screen! Look at the live 👀" if anglais else "🚀 Ton prénom passe à l'écran ! Regarde le live 👀")
-                              if ok else ("⚠️ The live screen is not reachable right now" if anglais else "⚠️ L'écran du live ne répond pas pour l'instant")))
+        if ok:
+            _LIVE_BOOSTS[qui] = time.time()
+        _envoi_sur(qui, text=(("🚀 Boost sent to the live screen. Your name should appear shortly 👀" if anglais else "🚀 Boost envoyé à l'écran du live. Ton prénom doit apparaître dans quelques secondes 👀")
+                              if ok else ("⚠️ The live screen could not accept the boost. Try again later." if anglais else "⚠️ L'écran du live n'a pas accepté le boost. Réessaie plus tard.")))
         return True
     if mk not in LIVE_CHOIX:
         return True
