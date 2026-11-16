@@ -4,6 +4,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import align_bot as ab
 
 CONTRE = [-1, -1, -1, -1, 1, 1, 1, 1, 1, 1, 1]
+ALIGNE = [1] * 11
 
 
 def r_(dirs, p, bougie15=-1, bougie5=1, t=1000):
@@ -18,9 +19,10 @@ class Coupe(unittest.TestCase):
         l = ab.coupe_et_reprends("GOLD", r_(CONTRE, 109), cle, tr, 109)
         self.assertTrue(any("encaisse TOUT" in x for x in l))
         self.assertIsNone(ab.coupe_et_reprends("GOLD", r_(CONTRE, 109), cle, tr, 109))   # une seule fois
-        self.assertIsNone(ab.reprise_entree("GOLD", r_(CONTRE, 104), cle))              # pas encore revenu
-        t = ab.reprise_entree("GOLD", r_(CONTRE, 100.5, t=2000), cle)
+        self.assertIsNone(ab.reprise_entree("GOLD", r_(ALIGNE, 104), cle))              # biais validé, prix pas encore revenu
+        t = ab.reprise_entree("GOLD", r_(ALIGNE, 100.5, t=2000), cle)
         self.assertIn("REPRISE À L'ENTRÉE : LONG", t); self.assertIn("SL ≈ 95", t)
+        self.assertIn("TP2 ≈ 116", t)
         self.assertNotIn("reprise", cle)
 
     def test_pas_de_coupe_si_unites_ok(self):
