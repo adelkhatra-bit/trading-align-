@@ -1288,7 +1288,7 @@ function renderSignal(live) {
     // Couleur CSS directionnelle SEULEMENT si setup exécutable (canEnter + sl + tp)
     // Sinon neutre — évite rouge/vert trompeur quand canEnter=false
     var _sigExecSl = Number((live && live.execution && live.execution.sl) || (coach.execution && coach.execution.sl) || 0);
-    var _sigExecTp = Number((live && live.execution && live.execution.tp) || (coach.execution && coach.execution.tp) || 0);
+    var _sigExecTp = Number((live && live.execution && (live.execution.tp || live.execution.tp1 || live.execution.tp2)) || (coach.execution && (coach.execution.tp || coach.execution.tp1 || coach.execution.tp2)) || 0);
     var _sigExecutable = canEnter && _sigExecSl > 0 && _sigExecTp > 0;
     var _cfSnap2 = ((live && live.coach && live.coach.analysisSnapshot && live.coach.analysisSnapshot.sourceSummary) || (live && live.analysisSnapshot && live.analysisSnapshot.sourceSummary) || {});
     var _sigConflict    = !!_cfSnap2.conflictDetected;      // tout blocage (qualité, RSI, conf...)
@@ -1361,7 +1361,7 @@ function closeConfirmedSignal() {
 }
 
 function showConfirmedSignal(live, coach, instantTrade, rec) {
-  var execution = (live && live.execution) || (coach && coach.execution) || {};
+  var execution = Object.assign({}, (coach && coach.execution) || {}, (live && live.execution) || {});
   var entry = execution.entry ?? execution.e ?? instantTrade.entry ?? instantTrade.price;
   var sl = execution.sl ?? instantTrade.sl;
   var tp1 = execution.tp1 ?? instantTrade.tp1;
