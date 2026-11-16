@@ -26,7 +26,7 @@ class PlanFVG(unittest.TestCase):
         self.assertAlmostEqual(rBot, 104)
         self.assertAlmostEqual(rTop, 106)
         self.assertAlmostEqual(hH, 110)
-        fv = ab.plan_fvg(-1, st, 120, 125, 90, 80, "5 min")
+        fv = ab.plan_fvg(-1, st, 120, 125, 90, 80, "5 min", market="GOLD")
         self.assertIsNotNone(fv)
         self.assertAlmostEqual(fv["e"], 105.8)                                   # entrée = order block juste au-dessus de la FVG rouge
         self.assertAlmostEqual(fv["sl"], max(110 + max(0.3 * a, 0.03), 105.8 + 1.0 * a))   # un peu au-dessus de la mèche du dernier plus haut
@@ -40,7 +40,7 @@ class PlanFVG(unittest.TestCase):
     def test_long_miroir(self):
         inv = [bougie(-x["o"], -x["l"], -x["h"], -x["c"], x["t"]) for x in serie_short()]
         st = ab.structure_fvg(inv)
-        fv = ab.plan_fvg(1, st, -120, -125, -90, -80, "5 min")
+        fv = ab.plan_fvg(1, st, -120, -125, -90, -80, "5 min", market="GOLD")
         self.assertAlmostEqual(fv["e"], -105.8)
         self.assertLess(fv["sl"], -110)
         self.assertIn("FVG verte 5 min", fv["src"])
@@ -60,7 +60,7 @@ class PlanFVG(unittest.TestCase):
         st = ab.structure_fvg(b5)
         pl = dict(e=120, sl=125, tp1=90, n1="15m", tp2=80, n2="1h", rr=6)
         b15 = [bougie(100 + i, 101 + i, 99 + i, 100.5 + i, i) for i in range(30)]
-        r = dict(b15=b15, b5=b5, planH=pl, planB=pl, dirPlan=-1, strat="DAY", struct_ut={"5": st, "3": None, "15": None, "1h": None})
+        r = dict(market="GOLD", b15=b15, b5=b5, planH=pl, planB=pl, dirPlan=-1, strat="DAY", struct_ut={"5": st, "3": None, "15": None, "1h": None})
         pe = ab.pine_entree(r, -1)
         if pe is None:
             self.skipTest("zone du plan indisponible sur ces bougies")
@@ -73,7 +73,7 @@ class PlanFVG(unittest.TestCase):
         st = ab.structure_fvg(b5)
         pl = dict(e=120, sl=125, tp1=90, n1="15m", tp2=80, n2="1h", rr=6)
         b15 = [bougie(100 + i, 101 + i, 99 + i, 100.5 + i, i) for i in range(30)]
-        r = dict(b15=b15, b5=b5, planH=pl, planB=pl, dirPlan=-1, strat="DAY", dirs=[-1] * 11,
+        r = dict(market="GOLD", b15=b15, b5=b5, planH=pl, planB=pl, dirPlan=-1, strat="DAY", dirs=[-1] * 11,
                  struct_ut={"5": st, "3": None, "15": None, "1h": None})
         if ab.pine_entree(r, -1) is None:
             self.skipTest("zone du plan indisponible sur ces bougies")
