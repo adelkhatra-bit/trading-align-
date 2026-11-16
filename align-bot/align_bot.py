@@ -11280,7 +11280,7 @@ def commentaires_live_de_secours(donnees):
             accord, accord_en = "les unités longues confirment la baisse", "the higher timeframes confirm the decline"
         else:
             accord, accord_en = "les unités longues ne confirment pas encore le mouvement", "the higher timeframes do not confirm the move yet"
-        fr1, en1 = f"{direction}, mais {accord}.", f"{direction_en}, but {accord}."
+        fr1, en1 = f"{direction}, mais {accord}.", f"{direction_en}, but {accord_en}."
         rsi = c.get("rsi_15m")
         if isinstance(rsi, (int, float)):
             if rsi >= 68:
