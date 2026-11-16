@@ -1149,7 +1149,7 @@
     let lecture;
     if (balayageBas) lecture = 'La dernière bougie clôturée est passée sous un ancien creux puis a réintégré la zone avec un rejet acheteur. Possible chasse de liquidité vendeuse ; ce n’est pas encore un signal LONG, on attend la confirmation M5, M15, H1 et H4.';
     else if (balayageHaut) lecture = 'La dernière bougie clôturée est passée au-dessus d’un ancien sommet puis a réintégré la zone avec un rejet vendeur. Possible chasse de liquidité acheteuse ; ce n’est pas encore un signal SHORT, on attend la confirmation M5, M15, H1 et H4.';
-    if (dFond > 0 && dRecent < 0) lecture = 'La tendance récente reste orientée à la hausse, mais les dernières bougies corrigent. Les acheteurs doivent défendre leur mouvement ; on attend une clôture avant de conclure.';
+    else if (dFond > 0 && dRecent < 0) lecture = 'La tendance récente reste orientée à la hausse, mais les dernières bougies corrigent. Les acheteurs doivent défendre leur mouvement ; on attend une clôture avant de conclure.';
     else if (dFond < 0 && dRecent > 0) lecture = 'Le mouvement de fond reste orienté à la baisse, mais le marché tente un rebond. Les vendeurs doivent encore montrer s’ils gardent la main ; aucune anticipation.';
     else if (dFond > 0 && dRecent >= 0) lecture = 'Les acheteurs gardent l’avantage sur les dernières bougies. Je surveille si l’impulsion se prolonge ou si le marché commence à souffler.';
     else if (dFond < 0 && dRecent <= 0) lecture = 'Les vendeurs gardent la pression sur les dernières bougies. Je surveille si la baisse continue ou si les acheteurs commencent à réagir.';
