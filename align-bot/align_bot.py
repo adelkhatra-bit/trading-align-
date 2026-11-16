@@ -5161,7 +5161,7 @@ def signature_analyse(m, r, cle):
 
 def timeframe_attendu(r, cle):
     """Retourne l'unité qui bloque réellement la décision, avant les déclencheurs d'entrée."""
-    dirs = r.get("dirs") or []
+    dirs = ((r.get("dirs_cloturees") or r.get("dirs")) if r.get("market") in ("GOLD", "NASDAQ") else r.get("dirs")) or []
     d1h = dirs[7] if len(dirs) > 7 else 0
     d4h = dirs[9] if len(dirs) > 9 else 0
 
