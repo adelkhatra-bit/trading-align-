@@ -202,6 +202,27 @@ class DirectionSafety(unittest.TestCase):
         r = dict(b15_long=bars, dirs=dirs, t=50000)
         self.assertIsNone(ab.radar_climax("GOLD", r, {}))
 
+    def test_gold_nasdaq_radar_never_bypasses_m5_m15_even_when_h1_h4_align(self):
+        for market, source in (("GOLD", "COMEX GC=F Yahoo proxy"), ("NASDAQ", "CME NQ=F Yahoo proxy")):
+            bars = [dict(candle(i * 900), volume_source=source) for i in range(80)]
+            bars[-2] = dict(candle(78 * 900, o=100, h=102, l=97, c=101, v=500), volume_source=source)
+            dirs = [0] * 11
+            dirs[7], dirs[9] = 1, 1  # H1/H4 align, M5/M15 do not
+            msg = ab.radar_climax(market, dict(b15_long=bars, dirs=dirs, t=50000), {})
+            self.assertIn("RADAR CLIMAX — SURVEILLANCE", msg)
+            self.assertIn("M5", msg)
+            self.assertNotIn("prenable", msg)
+            self.assertNotIn("Entrée ≈", msg)
+
+    def test_gold_nasdaq_radar_yields_to_full_entry_when_all_four_units_align(self):
+        for market, source in (("GOLD", "COMEX GC=F Yahoo proxy"), ("NASDAQ", "CME NQ=F Yahoo proxy")):
+            bars = [dict(candle(i * 900), volume_source=source) for i in range(80)]
+            bars[-2] = dict(candle(78 * 900, o=100, h=102, l=97, c=101, v=500), volume_source=source)
+            dirs = [0] * 11
+            for i in (2, 4, 7, 9):
+                dirs[i] = 1
+            self.assertIsNone(ab.radar_climax(market, dict(b15_long=bars, dirs=dirs, t=50000), {}))
+
     def test_gold_nasdaq_reversal_is_observation_only_btc_keeps_legacy(self):
         for market in ("GOLD", "NASDAQ"):
             msg = ab.retournement_marche(market, reversal_r(LONG_GOLD, 500), {})
