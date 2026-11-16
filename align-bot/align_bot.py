@@ -5475,6 +5475,17 @@ def notifier_coach_live(etat, m, r, cle):
             info["dernier_t"] = int(b["t"])       # clôture consommée uniquement après acceptation Telegram
 
 
+def initialiser_debut_coach_live(etat, maintenant=None):
+    """Ancre une seule fois les anciens abonnements avant le prochain calcul de position."""
+    maintenant = time.time() if maintenant is None else float(maintenant)
+    for abonnes in (etat.get("coach_live") or {}).values():
+        if not isinstance(abonnes, dict):
+            continue
+        for info in abonnes.values():
+            if isinstance(info, dict):
+                info.setdefault("started_t", maintenant)
+
+
 def activer_coach_live(etat, cid, m, actif=True):
     abonnes = etat.setdefault("coach_live", {}).setdefault(m, {})
     if actif:
@@ -12089,6 +12100,7 @@ def main():
     global TELEGRAM_PULL_MODE
     TELEGRAM_PULL_MODE = True
     etat = charger_etat()
+    initialiser_debut_coach_live(etat)
     LANG_EN.clear(); LANG_EN.update(etat.get("en", []))
     MEMOIRE[:] = etat.get("memoire", []); LECONS[:] = etat.get("lecons_ia", [])
     maintenant_paris = datetime.datetime.now(PARIS)
