@@ -212,6 +212,19 @@ class DirectionSafety(unittest.TestCase):
         self.assertEqual(seen["market"], "GOLD")
         sniper.assert_called_once_with(out)
 
+    def test_gold_nasdaq_wait_messages_do_not_announce_a_long_during_m5_m15_drop(self):
+        dirs = [1] * 11
+        dirs[2], dirs[4] = -1, -1
+        r = {"market": "GOLD", "dirs": dirs, "dirs_cloturees": dirs, "confirme": 0,
+             "r5": [50, 45, 40], "rsis": [50] * 11, "posD": 0.5, "posW": 0.5,
+             "m1": [candle(900, c=100)], "atr": 1.0, "ema5": 100, "ema15": 100}
+        nxt = ab.prochaine(r, {})
+        why = ab.raison_attente(r, {})
+        self.assertIn("ATTENTE", nxt)
+        self.assertIn("M15 baissière", nxt)
+        self.assertIn("M5 baissière", nxt)
+        self.assertIn("Aucune position pour l'instant", why)
+
     def test_gold_nasdaq_trigger_uses_last_closed_m5_not_forming_candle(self):
         closed = candle(300, o=100, h=100.5, l=99.5, c=100)
         forming = candle(600, o=100.2, h=100.9, l=99.5, c=100.8)
