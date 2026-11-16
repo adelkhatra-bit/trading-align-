@@ -21,7 +21,7 @@ class EcranVersTelegram(unittest.TestCase):
         etat = {"canaux_marche": {"BTC": -5}}
         with mock.patch.object(ab, "ecran_lire", return_value=["EVT|BTC|manip|1|4", "EVT|BTC|manip|1|4", "n'importe quoi"]), \
              mock.patch.dict(ab.DERNIERS, {"BTC": self.r()}), \
-             mock.patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append((c, k["text"]))), \
+             mock.patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append((c, k["text"])) or {"ok": True}), \
              mock.patch.object(ab, "boutons_chaine_marche", return_value='{"inline_keyboard": []}'):
             ab._LIVE_DERNIER.pop("ecranBTCmanip1", None)
             ab.ecran_vers_telegram(etat)
@@ -62,7 +62,7 @@ class UneAnnonceParQuart(unittest.TestCase):
         r = {"m1": [{"c": 95.5}], "b15": [{"t": i, "o": 100, "h": 101, "l": 99, "c": 100} for i in range(10)]}
         with mock.patch.object(ab, "ecran_lire", return_value=["EVT|BTC|pression|-1|9", "EVT|BTC|pression|-1|7"]), \
              mock.patch.dict(ab.DERNIERS, {"BTC": r}), mock.patch.object(ab.time, "time", return_value=900 * 5000 + 10), \
-             mock.patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append(k["text"])), \
+             mock.patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append(k["text"]) or {"ok": True}), \
              mock.patch.object(ab, "boutons_chaine_marche", return_value='{"inline_keyboard": []}'):
             ab.ecran_vers_telegram({"canaux_marche": {"BTC": -5}})
         self.assertEqual(len(envois), 1)
