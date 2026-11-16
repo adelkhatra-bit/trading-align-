@@ -3085,6 +3085,9 @@ def activer_coach_optin(etat, cid, marche, actif=True):
         etat.setdefault("auto", {})[marche] = [str(x) for x in etat.get("auto", {}).get(marche, []) if str(x) != cid]
         etat.setdefault("veille_cloture", {}).setdefault(marche, {}).pop(cid, None)
         etat.setdefault("coach_live", {}).setdefault(marche, {}).pop(cid, None)
+        trade = (etat.get(marche) or {}).get("trade") or {}
+        if isinstance(trade.get("qui"), dict):
+            trade["qui"].pop(cid, None)  # arrête aussi le suivi des positions déjà prises, sans fermer la position
 
 
 def selectionner_coach_optin(etat, cid, marches):
