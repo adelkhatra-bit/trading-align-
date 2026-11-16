@@ -3080,6 +3080,10 @@ def activer_coach_optin(etat, cid, marche, actif=True):
     if actif:
         if cid not in {str(x) for x in liste}:
             liste.append(cid)
+        # Le bouton d'activation ajoute ce marché à la sélection sans désabonner les autres.
+        selection = set(marches_choisis(etat, cid))
+        selection.add(marche)
+        etat.setdefault("marches_par_chat", {})[cid] = sorted(selection)
     else:
         etat["coach_optin"][marche] = [str(x) for x in liste if str(x) != cid]
         etat.setdefault("auto", {})[marche] = [str(x) for x in etat.get("auto", {}).get(marche, []) if str(x) != cid]
