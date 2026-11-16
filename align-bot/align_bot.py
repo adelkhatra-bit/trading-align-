@@ -5940,13 +5940,13 @@ def capturer_snapshot_audit(etat, m, r, cle, messages=None):
             "confirm": r.get("confirme"), "sens": r.get("sens"), "score": r.get("score"),
             "pct": r.get("pctH"), "trend": r.get("trendS"), "momentum": r.get("momS"),
             "mtf": mtf, "tradingview": tv, "trade": plan,
-            "messages": [str(x[0] if isinstance(x, tuple) else x)[:500] for x in (messages or [])[:8]]
+            "messages": [str(x[0] if isinstance(x, tuple) else x)[:350] for x in (messages or [])[:5]]
         }
         hist = etat.setdefault("audit_mtf", {}).setdefault(m, [])
         # Un seul snapshot par timestamp de cycle et marché.
         if not hist or hist[-1].get("t") != now:
             hist.append(snap)
-        del hist[:-1200]
+        del hist[:-600]
     except Exception as ex:
         # Le journal d'audit ne doit jamais interrompre le moteur de trading.
         print("audit MTF snapshot", m, ex, flush=True)
