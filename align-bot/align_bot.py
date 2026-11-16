@@ -2290,7 +2290,9 @@ TRAD.update({
     "Choisis une action ALIGN": "Choose an ALIGN action",
     "7️⃣ ⚖️ Risque conseillé : 0,5 à 1 % du compte par position ; jamais sans SL": "7️⃣ ⚖️ Suggested risk: 0.5 to 1% of the account per position; never trade without an SL",
 
-    "🧑‍🏫 Coach : préviens-moi": "🧑‍🏫 Coach: warn me", "🎙 Coach commentateur (en direct)": "🎙 Live commentator coach", "⏹ Arrêter le commentateur": "⏹ Stop commentator",
+    "🧑‍🏫 Coach : préviens-moi": "🧑‍🏫 Coach: warn me", "🧑‍🏫 Activer le coach": "🧑‍🏫 Activate the coach",
+    "🔕 Désactiver le coach": "🔕 Deactivate the coach",
+    "🎙 Coach commentateur (en direct)": "🎙 Live commentator coach", "⏹ Arrêter le commentateur": "⏹ Stop commentator",
     "✅ Publier": "✅ Publish",
     "❌ Refuser": "❌ Decline",
     "✅ Accepter": "✅ Accept",
