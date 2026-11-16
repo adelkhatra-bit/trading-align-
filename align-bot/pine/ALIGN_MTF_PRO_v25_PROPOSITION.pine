@@ -38,6 +38,11 @@ f_etat() =>
     sqz = (basis + dev) < (kc + rng) and (basis - dev) > (kc - rng)
     [d, sqz ? 1 : 0, ta.rsi(close, lenRsi)]
 
+// Valeurs MTF non-repaint : chaque unité renvoie sa dernière bougie entièrement clôturée.
+f_etat_precedent() =>
+    [d, sqz, rsiVal] = f_etat()
+    [d[1], sqz[1], rsiVal[1]]
+
 [d1, s1, r1]       = request.security(syminfo.tickerid, "1",   f_etat())
 [d2, s2, r2]       = request.security(syminfo.tickerid, "3",   f_etat())
 [d5, s5, r5]       = request.security(syminfo.tickerid, "5",   f_etat())
@@ -46,8 +51,8 @@ f_etat() =>
 [d30, s30, r30]    = request.security(syminfo.tickerid, "30",  f_etat())
 [d45, s45, r45]    = request.security(syminfo.tickerid, "45",  f_etat())
 [d60, s60, r60]    = request.security(syminfo.tickerid, "60",  f_etat())
-[d120, s120, r120] = request.security(syminfo.tickerid, "120", f_etat())
-[d240, s240, r240] = request.security(syminfo.tickerid, "240", f_etat())
+[d120, s120, r120] = request.security(syminfo.tickerid, "120", f_etat_precedent(), lookahead=barmerge.lookahead_on)
+[d240, s240, r240] = request.security(syminfo.tickerid, "240", f_etat_precedent(), lookahead=barmerge.lookahead_on)
 [dD, sD, rD]       = request.security(syminfo.tickerid, "D",   f_etat())
 [dW, sW, rW]       = request.security(syminfo.tickerid, "W",   f_etat())
 
@@ -256,15 +261,26 @@ u1  = nz(d1) == dP
 oW  = nz(dW) == -dP
 o4  = nz(d240) == -dP
 o1h = nz(d60) == -dP
-swOk  = dP != 0 and uD and not oW and u1h and not o4
+// Détection des marchés qui imposent une confluence stricte H1 + H4.
+tickerUpper = str.upper(syminfo.ticker)
+descriptionUpper = str.upper(syminfo.description)
+isGoldMarket = str.contains(tickerUpper, "XAU") or str.contains(tickerUpper, "GOLD") or str.contains(tickerUpper, "GC1!") or str.contains(tickerUpper, "MGC1!") or str.contains(descriptionUpper, "GOLD")
+isNasdaqMarket = str.contains(tickerUpper, "NAS100") or str.contains(tickerUpper, "US100") or str.contains(tickerUpper, "USTEC") or str.contains(tickerUpper, "NDX") or str.contains(tickerUpper, "NQ1!") or str.contains(tickerUpper, "MNQ1!") or str.contains(descriptionUpper, "NASDAQ") or str.contains(descriptionUpper, "US TECH 100")
+strictHtfMarket = isGoldMarket or isNasdaqMarket
+h1h4Confirmed = u1h and u4
+swOk  = dP != 0 and uD and not oW and u1h and not o4 and (not strictHtfMarket or h1h4Confirmed)
 swAtt = dP != 0 and uD and not oW and not u4 and not u1h
-dyOk  = dP != 0 and not o4 and u1h and u5
+dyOk  = dP != 0 and not o4 and u1h and u5 and (not strictHtfMarket or h1h4Confirmed)
 dyAtt = dP != 0 and not o4 and u1h and not u15 and not u5
-scOk  = dP != 0 and not o1h and u15 and u5 and u1
+scOk  = dP != 0 and not o1h and u15 and u5 and u1 and (not strictHtfMarket or h1h4Confirmed)
 scAtt = dP != 0 and not o1h and u15 and u5 and not u1
 strat = swOk ? "SWING" : dyOk ? "DAY" : scOk ? "SCALPING" : swAtt ? "SWING" : dyAtt ? "DAY" : scAtt ? "SCALPING" : ""
 etatS = swOk or dyOk or scOk ? "CONFIRMÉ" : strat != "" ? "EN ATTENTE" : "AUCUNE"
 motifS = strat == "SWING" ? (swOk ? "D1 ✔ H1 ✔ " + (u4 ? "H4 ✔" : "H4 en retracement") + " : reprise confirmée" : "Retracement H4 détecté, H1 non confirmé : aucune entrée pour le moment") : strat == "DAY" ? (dyOk ? "H1 ✔ M5 ✔ " + (u15 ? "M15 ✔" : "M15 en retracement") + (u4 ? " H4 ✔" : " H4 neutre") : "Retracement M15 en cours, M5 non confirmé : attendre la clôture 5 min") : strat == "SCALPING" ? (scOk ? "M15 ✔ M5 ✔ M1 ✔" + (u1h ? " H1 ✔" : " H1 neutre") : "M15 et M5 alignés, déclenchement M1 manquant") : "Pas d'alignement conforme aux règles SCALPING / DAY / SWING"
+if strictHtfMarket and dP != 0 and not h1h4Confirmed
+    strat := ""
+    etatS := "EN ATTENTE"
+    motifS := "ANTICIPATION uniquement : H1 et H4 doivent clôturer dans le même sens que le plan."
 profNiv = strat == "SWING" ? 3 : strat == "DAY" ? 2 : strat == "SCALPING" ? 1 : 0
 // Niveaux : 0-3 = 15 min • 4-7 = 1h • 8-11 = 4h • 12-15 = Daily
 sMinP = profNiv == 3 ? 4 : profNiv == 2 ? 4 : profNiv == 1 ? 0 : 4
