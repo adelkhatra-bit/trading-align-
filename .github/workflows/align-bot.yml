@@ -233,6 +233,20 @@ jobs:
                   payload = json.loads(response.read().decode("utf-8"))
               if payload.get("ok") is not True or not isinstance(payload.get("snapshots"), dict):
                   raise SystemExit("ÉCHEC: réponse bridge invalide pour " + symbol)
+              required_timeframes = ("M5", "M15", "H1", "H4", "D1", "W1")
+              snapshots = payload["snapshots"]
+              missing_or_stale = [
+                  tf for tf in required_timeframes
+                  if not isinstance(snapshots.get(tf), dict)
+                  or snapshots[tf].get("fresh") is not True
+                  or not isinstance(snapshots[tf].get("robotV12"), dict)
+                  or not snapshots[tf].get("robotV12")
+              ]
+              if missing_or_stale:
+                  raise SystemExit(
+                      "ÉCHEC: snapshots absents/périmés pour " + symbol
+                      + " : " + ", ".join(missing_or_stale)
+                  )
               active = str(payload.get("activeTimeframe") or "").upper()
               if payload.get("activeTimeframeFresh") is not True or active not in {"M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"}:
                   raise SystemExit("ÉCHEC: aucune unité TradingView active et fraîche pour " + symbol)
@@ -246,7 +260,7 @@ jobs:
               print(f"BRIDGE_CONFIRMED symbol={symbol} active={active} age_ms={payload.get('activeTimeframeAgeMs')} received={','.join(payload.get('receivedTimeframes', []))} fresh_snapshot=true robot_v12=true")
           PY
 
-      - name: Analyse BTC + Gold et envoi Telegram
+      - name: Analyse BTC + Gold + NASDAQ et envoi Telegram
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
