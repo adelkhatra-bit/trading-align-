@@ -2853,7 +2853,72 @@ def _telegram_enregistre_429(chat_id, erreur, maintenant=None):
     return delai
 
 
+def _telegram_file_ajouter(params):
+    """Met en attente un sendMessage refusé par un 429 ; clé stable = pas de doublon dans la file."""
+    try:
+        etat = _ETAT_COURANT.get("etat")
+    except NameError:
+        etat = None
+    if not isinstance(etat, dict):
+        return False
+    cid = str(params.get("chat_id", ""))
+    if not cid or not params.get("text"):
+        return False
+    try:
+        brut = json.dumps(params, ensure_ascii=False, sort_keys=True, default=str)
+    except Exception:
+        return False
+    cle = hashlib.sha256((cid + "|" + brut).encode("utf-8")).hexdigest()[:24]
+    file = etat.setdefault("telegram_outbox", [])
+    if any(x.get("key") == cle for x in file):
+        return True
+    if len(file) >= 500:
+        print(f"TELEGRAM_OUTBOX_FULL chat={cid}", flush=True)
+        return False
+    file.append({"key": cle, "chat_id": cid, "method": "sendMessage", "params": dict(params),
+                 "tries": 0, "next_t": float(TELEGRAM_RETRY_UNTIL.get(cid, 0))})
+    print(f"TELEGRAM_OUTBOX_QUEUED chat={cid} pending={len(file)}", flush=True)
+    return True
+
+
+def traiter_file_telegram(etat, maintenant=None, limite=20):
+    """Réessaie les messages refusés par Telegram après le cooldown, sans renvoyer les messages déjà acceptés."""
+    maintenant = time.time() if maintenant is None else float(maintenant)
+    file = etat.setdefault("telegram_outbox", [])
+    envoyes = 0
+    for item in list(file)[:max(1, int(limite))]:
+        cid = str(item.get("chat_id", ""))
+        if not cid or float(item.get("next_t", 0) or 0) > maintenant:
+            continue
+        restant = _telegram_cooldown_restant(cid, maintenant)
+        if restant > 0:
+            item["next_t"] = maintenant + restant
+            continue
+        try:
+            telegram(item.get("method") or "sendMessage", **(item.get("params") or {}))
+        except Exception as ex:
+            erreur = str(ex).lower()
+            if any(x in erreur for x in ("bot was blocked", "chat not found", "user is deactivated", "chat_id is empty")):
+                file.remove(item)
+                print(f"TELEGRAM_OUTBOX_DROP chat={cid} reason=recipient_unavailable", flush=True)
+                continue
+            if "http error 400" in erreur or "bad request" in erreur:
+                file.remove(item)
+                print(f"TELEGRAM_OUTBOX_DROP chat={cid} reason=bad_request", flush=True)
+                continue
+            item["tries"] = int(item.get("tries", 0)) + 1
+            attente = min(900, 5 * (2 ** min(item["tries"], 7)))
+            item["next_t"] = max(maintenant + attente, float(TELEGRAM_RETRY_UNTIL.get(cid, 0)))
+            print(f"TELEGRAM_OUTBOX_RETRY chat={cid} tries={item['tries']} in={int(item['next_t']-maintenant)}s", flush=True)
+        else:
+            file.remove(item)
+            envoyes += 1
+            print(f"TELEGRAM_OUTBOX_SENT chat={cid} remaining={len(file)}", flush=True)
+    return envoyes
+
+
 def telegram(methode, **params):
+    params_initiaux = dict(params)
     if methode == "answerCallbackQuery":
         callback_id = str(params.get("callback_query_id", ""))
         if callback_id and callback_id in CALLBACKS_ACKNOWLEDGED:
@@ -2888,15 +2953,19 @@ def telegram(methode, **params):
     # Sans chat (getUpdates, setMyName…) : blocage PAR MÉTHODE. Un 429 de plusieurs heures sur setMyName
     # ne doit jamais rendre le bot sourd (getUpdates bloqué = boutons sans réponse).
     cle_cooldown = chat_id if chat_id is not None else f"__{methode}__"
-    _telegram_verifie_cooldown(cle_cooldown)
     url = f"https://api.telegram.org/bot{TOKEN}/{methode}"
     try:
+        _telegram_verifie_cooldown(cle_cooldown)
         resultat = http_json(url, urllib.parse.urlencode(params).encode())
     except Exception as ex:
         if "HTTP Error 429" in str(ex):
             delai = _telegram_enregistre_429(cle_cooldown, ex)
             if delai:
-                print(f"telegram rate limit chat={chat_id}: pause {delai}s; envoi suspendu sans nouvel appel")
+                print(f"telegram rate limit chat={chat_id}: pause {delai}s; message mis en attente")
+        if methode == "sendMessage" and chat_id is not None and (
+            "HTTP Error 429" in str(ex) or "cooldown actif" in str(ex).lower()
+        ):
+            _telegram_file_ajouter(params_initiaux)
         raise
     if methode in ("sendMessage", "editMessageText", "sendPhoto", "copyMessage") and resultat.get("ok"):
         payload = resultat.get("result") or {}
@@ -10772,6 +10841,7 @@ def un_tour(etat, chats):
     demandes_servies = set()
     if TOKEN:
         recevoir_updates_telegram(etat, chats, demandes)
+        traiter_file_telegram(etat, limite=20)
         if SHUTDOWN_REQUESTED.is_set():
             return
         if etat.get("clavier") != 9:
@@ -11224,6 +11294,7 @@ def main():
         while TOKEN and time.time() < min(prochain, debut + DUREE_SEC) and not SHUTDOWN_REQUESTED.is_set():
             demandes = []
             recevoir_updates_telegram(etat, chats, demandes)
+            traiter_file_telegram(etat, limite=10)
             for marche, derniere in list(DERNIERS.items()):
                 try:
                     maj_chronos(etat, marche, derniere)
