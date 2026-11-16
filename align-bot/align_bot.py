@@ -8010,6 +8010,10 @@ def menu_marches(etat, cid, message_id=None):
              "📡 MES MARCHÉS\n━━━━━━━━━━━━━━━\n👆 Touche pour cocher / décocher\n"
              f"☑️ Cochés en ce moment : {coches}\n🔔 Tu reçois uniquement les marchés cochés\n"
              "📍 Le prix peut différer de quelques points selon ton broker : suis les bougies (mèches)")
+    if str(cid) in {str(x) for x in etat.get("coach_pending", [])}:
+        texte += ("\n\nAll three markets are selected by default. Untick any market you do not want."
+                  if anglais else
+                  "\n\nPar défaut, BTC, GOLD et NASDAQ sont cochés. Décoche les marchés que tu ne souhaites pas suivre.")
     clavier = json.dumps({"inline_keyboard": lignes})
     if message_id:
         try:
