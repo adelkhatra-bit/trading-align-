@@ -11284,10 +11284,14 @@ def un_tour(etat, chats):
             recevoir_updates_telegram(etat, chats, demandes)
             if SHUTDOWN_REQUESTED.is_set():
                 return
-            r["market"] = nom_marche  # applique les confirmations H1/H4 spécifiques à GOLD/NASDAQ avant le SNIPER
-            r["sniper"] = entree_sniper(r)  # recalcul après attribution du marché : calculer_analyse ne connaît pas encore GOLD/NASDAQ
+            r["market"] = nom_marche
             r["tv_indicator_mtf"] = fetch_tv_mtf(pair)
             fusionne_lectures_tradingview(r)
+            # Revalider après lecture du bridge : le SNIPER et le coach doivent voir le même accord local + TradingView.
+            r["confirme"] = direction_confirmee_marche(
+                nom_marche, r.get("dirs_cloturees") or r.get("dirs"), r.get("confirme"), r
+            )
+            r["sniper"] = entree_sniper(r)
         except Exception as ex:
             print(nom_marche, "erreur", ex)
             if TOKEN:
