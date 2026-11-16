@@ -102,5 +102,16 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
 
 
 
+    def test_reversal_observation_is_forwarded_to_live_banner(self):
+        message = "👀 RETOURNEMENT EN OBSERVATION — GOLD\\nM5 et M15 se retournent."
+        with unittest.mock.patch.object(align_bot, "live_bande") as banner:
+            align_bot.live_annonces({}, "GOLD", [message])
+        banner.assert_called_once()
+        args, kwargs = banner.call_args
+        self.assertIn("petites unités se retournent", args[1])
+        self.assertEqual(args[2], "retGOLD")
+
+
+
 if __name__ == "__main__":
     unittest.main()
