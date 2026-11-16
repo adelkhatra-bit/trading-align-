@@ -196,7 +196,7 @@ class SensDansLeGratuit(unittest.TestCase):
 
     def test_free_preparation_keeps_the_bias_without_levels(self):
         envois = []
-        etat = {"prospects": ["900"]}
+        etat = {"prospects": ["900"], "coach_optin": {"GOLD": ["900"]}}
         with patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append(k["text"])), patch.object(ab, "bot_on", return_value=True):
             ab.alerte_gratuite_preparation(etat, "🔔 JE PRÉPARE UNE POSITION — 🥇 GOLD\n🟥 SHORT ⬇️ descend\n📌 Entrée : 4012,5")
         self.assertIn("Biais : baissier", envois[0]); self.assertNotIn("4012", envois[0]); self.assertNotIn("SHORT", envois[0])
