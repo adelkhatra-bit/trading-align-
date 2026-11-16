@@ -142,11 +142,18 @@ var DIALOGUES = {
     ["{m} : mise en place en cours, biais {biais}.", "On garde la tête froide, le plan passe avant l'envie."],
     ["Le scénario {profil} prend forme sur {m}.", "Et il peut s'annuler à la prochaine clôture, comme toujours."]
   ],
+  signal: [
+    ["Signal ALIGN confirmé sur {m} : biais {biais}, {ut}/11 unités alignées.", "Un signal n'est pas encore une position broker : on attend la confirmation d'exécution."],
+    ["Le plan {profil} est validé sur {m}.", "Le prix d'entrée, le SL et les TP sont vérifiés dans le bot avant de parler d'ordre."]
+  ],
+  ordre_en_attente: [
+    ["Ordre transmis au broker sur {m}.", "On attend le prix réellement exécuté : pas de position annoncée avant confirmation."],
+    ["{m} : ordre en attente de remplissage.", "Le stop et les objectifs ne sont annoncés comme actifs qu'après confirmation du broker."]
+  ],
   entree: [
-    ["Une position est en cours sur {m}.", "Les niveaux sont dans Telegram, le suivi aussi. Ici on commente seulement."],
-    ["{m} : l'entrée a été validée par l'indicateur.", "Chacun reste responsable de sa gestion du risque."],
-    ["Sur {m}, le plan {profil} est actif.", "On surveille les clôtures, pas les émotions."],
-    ["{m} est en mouvement, biais {biais}.", "Le stop existe pour protéger le capital, on le respecte."]
+    ["Une position broker est confirmée sur {m}.", "Le suivi réel du trade est en cours ; on surveille le SL, le BE et les objectifs."],
+    ["{m} : l'exécution broker est confirmée.", "On suit le prix réellement exécuté, pas une estimation."],
+    ["Sur {m}, la position {profil} est ouverte sur le compte connecté.", "Le stop existe pour protéger le capital, on le respecte."]
   ],
   ferme: [
     ["{m} est fermé pour le moment.", "On profite pour préparer la reprise, sans rien inventer."],
