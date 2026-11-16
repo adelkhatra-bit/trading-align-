@@ -555,6 +555,14 @@ tpRetour = tp1Hit and (dirVu == -1 ? close > tp1Mem : close < tp1Mem)
 tpVu1 = tp1Hit ? tp1Mem : tpD1
 tpVu2 = tp1Hit ? tp2Mem : tp2Calc
 
+// ═════════ v24.5 : consommation progressive des zones FVG / ORDER BLOCK ═════════
+// Mesure la pénétration maximale depuis le bord d'arrivée : vert = depuis le haut, rouge = depuis le bas.
+// Les retours successifs ne s'additionnent pas ; une mèche qui traverse toute la zone vaut 100 %.
+f_zone_pct(top, bottom, sens) =>
+    hauteur = math.max(top - bottom, syminfo.mintick)
+    penetration = sens == 1 ? top - math.max(bottom, ta.lowest(low, 25)) : math.min(top, ta.highest(high, 25)) - bottom
+    int(math.round(math.max(0.0, math.min(100.0, 100.0 * penetration / hauteur))))
+
 // ═════════ LIGNES DU PLAN (TP1, TP2, STOP) ═════════
 var line lTP1 = na
 var line lTP2 = na
@@ -579,7 +587,10 @@ if barstate.islast
     obH_ = dirVu == -1 ? obRH : obGH
     obL_ = dirVu == -1 ? obRL : obGL
     if voirPlan and dirVu != 0 and not siOn and not na(obH_) and not na(obL_) and str.contains(srcD, "Order block")
-        bOB := box.new(bar_index - 25, obH_, bar_index + 20, obL_, border_color=color.new(dirVu == -1 ? color.orange : color.aqua, 30), bgcolor=color.new(dirVu == -1 ? color.orange : color.aqua, 88), border_style=line.style_dashed, extend=extend.right, text="ORDER BLOCK", text_color=color.new(dirVu == -1 ? color.orange : color.aqua, 10), text_size=size.small, text_halign=text.align_right)
+        sensOB = dirVu == 1 ? 1 : -1
+        pctOB = f_zone_pct(obH_, obL_, sensOB)
+        colOB = dirVu == -1 ? color.orange : color.aqua
+        bOB := box.new(bar_index - 25, obH_, bar_index + 20, obL_, border_color=color.new(colOB, 30 - int(pctOB * 0.25)), bgcolor=color.new(colOB, 88 - int(pctOB * 0.45)), border_style=line.style_dashed, extend=extend.right, text="ORDER BLOCK • " + str.tostring(pctOB) + "% consommé", text_color=color.new(colOB, 10), text_size=size.small, text_halign=text.align_right)
     box.delete(bRisque)
     line.delete(lF50)
     line.delete(lF618)
@@ -792,12 +803,11 @@ if voirFvg and barstate.isconfirmed
     if high < low[2] and low[2] - high >= fvgMin
         array.push(fvgs, box.new(bar_index - 2, low[2], bar_index, high, border_color=color.new(color.red, 60), bgcolor=color.new(color.red, 85), extend=extend.right, text="FVG", text_color=color.new(color.red, 20), text_size=size.tiny, text_halign=text.align_left))
         array.push(fvgSens, -1)
-    // comblé = le prix a traversé tout le gap → on l'efface
+    // Comblée en entier, OU trop loin du prix (> 1,5 %) : suppression conservée.
     i = array.size(fvgs) - 1
     while i >= 0
         b = array.get(fvgs, i)
         sv = array.get(fvgSens, i)
-        // comblée, OU trop loin du prix (> 1,5 %) : on l'efface — une vieille FVG lointaine écrasait l'échelle du graphique (« ça monte tout en haut »)
         if (sv == 1 and low <= box.get_bottom(b)) or (sv == -1 and high >= box.get_top(b)) or math.abs((box.get_top(b) + box.get_bottom(b)) / 2 - close) > close * 0.015
             box.delete(b)
             array.remove(fvgs, i)
@@ -806,3 +816,14 @@ if voirFvg and barstate.isconfirmed
     while array.size(fvgs) > 8
         box.delete(array.shift(fvgs))
         array.shift(fvgSens)
+
+// Affichage actualisé même entre deux clôtures : le pourcentage reflète la mèche la plus profonde.
+if voirFvg and barstate.islast and array.size(fvgs) > 0
+    for i = 0 to array.size(fvgs) - 1
+        b = array.get(fvgs, i)
+        sv = array.get(fvgSens, i)
+        pct = f_zone_pct(box.get_top(b), box.get_bottom(b), sv)
+        base = sv == 1 ? color.lime : color.red
+        box.set_text(b, "FVG • " + str.tostring(pct) + "% consommée")
+        box.set_bgcolor(b, color.new(base, 85 - int(pct * 0.45)))
+        box.set_border_color(b, color.new(base, 60 - int(pct * 0.4)))
