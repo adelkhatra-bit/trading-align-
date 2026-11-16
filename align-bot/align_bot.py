@@ -11341,12 +11341,16 @@ def commentaires_live_de_secours(donnees):
         else:
             momentum, momentum_en = "Le momentum demande encore confirmation", "Momentum still needs confirmation"
         volume = c.get("volume_15m_vs_moyenne")
-        if isinstance(volume, (int, float)) and volume >= 1.5:
-            flux, flux_en = "le volume accélère", "volume is picking up"
-        elif isinstance(volume, (int, float)) and volume <= 0.7:
-            flux, flux_en = "le volume reste discret", "volume remains quiet"
+        etiquette_volume = "le volume Kraken" if marche == "BTC" else "le volume proxy"
+        etiquette_volume_en = "Kraken volume" if marche == "BTC" else "proxy volume"
+        if not isinstance(volume, (int, float)):
+            flux, flux_en = "le volume n'est pas disponible, je ne le prends pas comme confirmation", "volume is unavailable, so I am not treating it as confirmation"
+        elif volume >= 1.5:
+            flux, flux_en = f"{etiquette_volume} accélère", f"{etiquette_volume_en} is picking up"
+        elif volume <= 0.7:
+            flux, flux_en = f"{etiquette_volume} reste discret", f"{etiquette_volume_en} remains quiet"
         else:
-            flux, flux_en = "le volume accompagne le mouvement", "volume is accompanying the move"
+            flux, flux_en = f"{etiquette_volume} accompagne le mouvement", f"{etiquette_volume_en} is accompanying the move"
         fib = c.get("fibonacci") or {}
         unite = next((u for u in ("H1", "M15", "H4") if isinstance(fib.get(u), dict)), None)
         lecture = fib.get(unite, {}).get("lecture") if unite else None
