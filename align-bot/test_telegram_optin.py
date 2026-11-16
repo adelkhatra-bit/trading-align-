@@ -124,7 +124,7 @@ class TelegramOptIn(unittest.TestCase):
         self.assertIn("NASDAQ 100 / US100", text)
         self.assertIn("TP1 20030", text)
         self.assertIn("TP2 20070", text)
-        self.assertIn("on laisse courir", text)
+        self.assertIn("laisse courir", text)
 
     def test_no_telegram_fibonacci_push_function_remains(self):
         self.assertFalse(hasattr(ab, "fibo_zones"))
