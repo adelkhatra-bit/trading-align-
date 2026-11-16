@@ -252,8 +252,8 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("PING|LIVE_SCREEN|", source)
         self.assertIn("setInterval(pingEcran, 25000)", source)
         self.assertIn("clearInterval(heartbeatT)", source)
-        self.assertIn("🔇 Voix OFF", source)
-        self.assertIn("🔊 Voix ON", source)
+        self.assertIn("🔊 ACTIVER LE COMMENTATEUR", source)
+        self.assertIn("🔊 COMMENTATEUR ACTIF", source)
         self.assertIn("voixBtn.remove()", source)
         self.assertIn("parlerLive(m)", source)
 
