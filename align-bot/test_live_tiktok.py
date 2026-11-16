@@ -443,13 +443,13 @@ class LiveOutbox(unittest.TestCase):
         with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True), \
              mock.patch.object(ab, "http_json", side_effect=faux_http):
             resultat = ab._envoi_sur_demande("42", text="Analyse demandée")
+            self.assertFalse(ab._telegram_sortant_autorise(
+                "sendMessage", {"chat_id": "42", "text": "Message spontané"}))
+            self.assertFalse(ab._telegram_sortant_autorise(
+                "sendMessage", {"chat_id": "43", "text": "Analyse demandée"}))
 
         self.assertTrue(resultat["ok"])
         self.assertEqual(observations, [True])
-        self.assertFalse(ab._telegram_sortant_autorise(
-            "sendMessage", {"chat_id": "42", "text": "Message spontané"}))
-        self.assertFalse(ab._telegram_sortant_autorise(
-            "sendMessage", {"chat_id": "43", "text": "Analyse demandée"}))
 
 
 
