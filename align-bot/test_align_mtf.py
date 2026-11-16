@@ -3420,3 +3420,11 @@ class TelegramExplicitCoachOptInTest(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertEqual(state["differe"], [])
         tg.assert_not_called()
+
+
+    def test_position_auto_enrollment_only_includes_explicit_coach_subscribers(self):
+        state = {"marches_par_chat": {"11": "BTC", "22": "BTC"}, "auto": {"BTC": ["22"]}}
+        trade = {"d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "qui": {}}
+        with unittest.mock.patch.object(align_bot, "_envoi_sur", return_value={"ok": True}):
+            align_bot.entrer_inscrits(state, "BTC", trade, {"11", "22"})
+        self.assertEqual(set(trade["qui"]), {"22"})
