@@ -1515,8 +1515,8 @@ class AlignMtfRulesTest(unittest.TestCase):
             "Le prix est dans une zone Daily/Weekly extrême. Attendre un meilleur prix."
         )):
             message = align_bot.texte_apercu("BTC", r, {})
-        self.assertLess(message.index("⛔ NE PAS ENTRER"), message.index("Biais à surveiller"))
-        self.assertIn("Biais à surveiller : SHORT", message)
+        self.assertLess(message.index("⛔ NE PAS ENTRER"), message.index("Biais de fond à surveiller"))
+        self.assertIn("Biais de fond à surveiller : SHORT", message)
         self.assertIn("Le biais n'est pas une autorisation d'entrée", message)
         self.assertIn("Attendre un nouveau message explicite", message)
         self.assertNotIn("Prochaine entrée SHORT", message)
