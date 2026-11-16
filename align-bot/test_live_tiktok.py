@@ -127,6 +127,15 @@ class LiveTikTok(unittest.TestCase):
         self.assertEqual([b["text"] for b in kb[2]], ["🟠 BTC", "🥇 Gold", "💠 NASDAQ"])
         self.assertIn("capture", ab.texte_live(self.etat))
 
+    def test_bande_live_reste_integralement_en_francais(self):
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")
+        src = open(path, encoding="utf-8").read()
+        self.assertIn("function langueBande() { return 'fr'; }", src)
+        self.assertIn("BASE.slice(0, iEN)", src)
+        self.assertIn("const fr = true;", src)
+        self.assertIn("items.push({ texte: '🇫🇷 ' + plateforme(texte)", src)
+        self.assertNotIn("i >= nPass / 2 ? '🇬🇧 '", src)
+
     def test_paiement_refuse_si_live_eteint(self):
         p24 = mock.patch.object(ab, "LIVE_24H", False)
         p24.start()
