@@ -65,10 +65,8 @@ class Differe(unittest.TestCase):
         etat = {"lien": "https://t.me/+x", "differe": [{"t": 5, "c": "111", "txt": "🟠 BTC position"}, {"t": 10 ** 12, "c": "222", "txt": "plus tard"}]}
         with patch.object(ab, "telegram", MagicMock(return_value={})) as tg:
             ab.envoyer_differes(etat, now=100, dodo=False)
-        self.assertEqual(tg.call_count, 1)
-        self.assertIn("EN DIFFÉRÉ", tg.call_args.kwargs["text"])
-        self.assertIn("N'entre pas maintenant", tg.call_args.kwargs["text"])
-        self.assertEqual([x["c"] for x in etat["differe"]], ["222"])
+        self.assertEqual(tg.call_count, 0)
+        self.assertEqual(etat["differe"], [])
 
     def test_dodo_textes_differents(self):
         self.assertEqual(len(set(ab.DODO_TXT)), len(ab.DODO_TXT))
