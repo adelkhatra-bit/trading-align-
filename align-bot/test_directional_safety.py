@@ -103,6 +103,21 @@ class DirectionSafety(unittest.TestCase):
         msg_btc = ab.retournement_marche("BTC", reversal_r(LONG_BTC), {})
         self.assertIn("Cible 1", msg_btc)
 
+    def test_manual_telegram_analysis_assigns_market_before_sniper(self):
+        result = {"dirs": [0] * 11, "dirPlan": 0}
+        with mock.patch.object(ab, "analyser", return_value=result) as analyser, \
+             mock.patch.object(ab, "entree_sniper", return_value=None) as sniper, \
+             mock.patch.object(ab, "tendance_armee"), \
+             mock.patch.object(ab, "annonce_proche", return_value=""), \
+             mock.patch.object(ab, "news_txt", return_value=""), \
+             mock.patch.object(ab, "contexte_macro", return_value=""):
+            out = ab.analyse_marche({"GOLD": {}}, "XAUUSD")
+        analyser.assert_called_once()
+        self.assertEqual(analyser.call_args.args[0], "XAUUSD")
+        self.assertEqual(analyser.call_args.kwargs["market"], "GOLD")
+        self.assertEqual(out["market"], "GOLD")
+        sniper.assert_called_once_with(out)
+
     def test_gold_nasdaq_confirmation_alert_requires_h1_and_h4(self):
         bars = [candle(0, c=98), candle(300, c=99), candle(600, c=101), candle(900, c=102)]
         for market in ("GOLD", "NASDAQ"):
