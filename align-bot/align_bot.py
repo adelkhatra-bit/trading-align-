@@ -1749,10 +1749,14 @@ def verdict(r, cle):
     if tr:
         p = r["m1"][-1]["c"]
         sens = "⬆️ ACHAT" if tr["d"] == 1 else "⬇️ VENTE"
-        prog = tr["d"] * (p - tr["e"]) / max(abs(tr["tp1"] - tr["e"]), 1e-9)
-        if tr["statut"] == "entree" and prog < 0.25 and not tr.get("tard"):
-            return (f"🟢 TU PEUX ENTRER\n{SENS[tr['d']]}", f"👀 Vue {tr.get('sl_ut', '5 min')}\n🛑 SL un peu {meche_sl(tr)}\n🙅 Jamais pile sur la mèche\n📍 Repère prix : SL ≈ {px(tr['sl'])} • TP1 ≈ {px(tr['tp1'])}\n📍 Si tu prends cette position, active son suivi avec le bouton ci-dessous.")
-        return ("🔴🔴 N'ENTRE PAS", f"⏰ Trop tard : la position {sens} est déjà partie\n⏳ J'attends le prochain setup")
+        valide, rr = entree_reste_valide(tr, p)
+        if tr["statut"] == "entree" and valide and not tr.get("tard"):
+            return (f"🟢 ENTRÉE ENCORE POSSIBLE — R/R x{rr:.1f}\n{SENS[tr['d']]}",
+                    f"📍 Entrée indicative actuelle : {px(p)}\n🛑 SL : {px(tr['sl'])}\n"
+                    f"🎯 TP1 : {px(tr['tp1'])}\n🏁 TP2 : {px(tr['tp2']) if tr.get('tp2') is not None else 'non défini'}\n"
+                    f"📐 Gain/risque restant : x{rr:.1f}\n⚠️ Vérifie l'écart de cotation de ta plateforme avant d'agir.")
+        return ("🔴🔴 N'ENTRE PAS",
+                f"⏰ Trop tard : {sens} — R/R restant x{rr:.1f}, minimum x{GAIN_MIN:.1f}\n⏳ J'attends le prochain setup")
     if r.get("annonce"):
         return ("🔴🔴 N'ENTRE PAS", "📰 News dans moins de 15 min\n💥 Le prix peut bouger très fort")
     al = r["confirme"]
@@ -6522,30 +6526,54 @@ def commande_auto(etat, cid, txt):
     _envoi_sur(cid, text="\n".join(l), reply_markup=json.dumps({"inline_keyboard": boutons}))
 
 
-def auto_entree(etat, m, trx, contre=False):
-    """Le bot vient d'entrer : il prend la même position sur les comptes (FundedNext puis Topstep) et prévient le propriétaire.
-    contre=True : ↩ scalp contre-tendance vers l'entrée du plan principal (risque plafonné à 60 $).
-    Pause de réflexion après 2 SL de suite sur ce marché : aucune nouvelle position automatique pendant 2 h."""
+def auto_entree(etat, m, trx, contre=False, notifier=True):
+    """Exécute le plan et retourne les résultats bruts pour distinguer réussite, attente et refus."""
     if en_pause(etat, m):
         print("AUTO_TRADE", m, "pause de réflexion après SL")
-        return
-    sig = {"marche": m, "sens": "LONG" if trx["d"] == 1 else "SHORT", "e": trx["e"], "sl": trx["sl"], "tp": trx["tp1"], "tp2": trx.get("tp2"),
-           "contre": contre}
-    lignes = []
-    for nom, robot in (("FundedNext", auto_trade), ("Topstep", topstep_trade)):
+        return [{"plateforme": "AUTO", "ok": False, "raison": "pause de réflexion après 2 SL"}]
+    d = 1 if trx["d"] == 1 else -1
+    sig = {"marche": m, "sens": "LONG" if d == 1 else "SHORT", "e": trx["e"], "sl": trx["sl"],
+           "tp": trx["tp1"], "tp2": trx.get("tp2"), "contre": contre}
+    lignes, resultats = [], []
+    plan = (f"📍 Entrée graphique : {px(sig['e'])}\n🛑 SL : {px(sig['sl'])}\n"
+            f"🎯 TP1 : {px(sig['tp'])}\n🏁 TP2 : {px(sig['tp2']) if sig.get('tp2') is not None else 'non défini'}")
+    for nom, robot in (("FundedNext / MetaApi", auto_trade), ("Topstep / ProjectX", topstep_trade)):
         if not robot:
+            continue
+        if nom in trx.get("auto_ok", []):
             continue
         try:
             r = robot.executer(etat, sig)
             r = r if isinstance(r, list) else [r]
+            terminal_plateforme = bool(r) and all(x.get("ok") or x.get("test") or x.get("pending") for x in r)
+            if terminal_plateforme:
+                trx.setdefault("auto_ok", []).append(nom)
             for x in r:
-                lignes.append(f"{'✅' if x.get('ok') else '⏸'} {nom} : " + ("ordre TEST préparé" if x.get("test") else "ordre envoyé" if x.get("ok") else x.get("raison", "?")))
+                resultats.append({"plateforme": nom, **x})
+                if x.get("test"):
+                    statut = "mode TEST — aucun ordre réel"
+                elif x.get("pending"):
+                    statut = "ordre accepté — remplissage en attente"
+                elif x.get("ok"):
+                    statut = "ordre accepté par le broker"
+                else:
+                    statut = "refus : " + str(x.get("raison") or "motif non fourni")
+                details = ""
+                if x.get("prix_entree") is not None:
+                    details = (f" • entrée {px(float(x['prix_entree']))}"
+                               + (f" • SL {px(float(x['sl']))}" if x.get("sl") is not None else "")
+                               + (f" • TP1 {px(float(x['tp1']))}" if x.get("tp1") is not None else "")
+                               + (f" • TP2 {px(float(x['tp2']))}" if x.get("tp2") is not None else ""))
+                lignes.append(f"{'✅' if x.get('ok') else '⏸'} {nom} : {statut}{details}")
         except Exception as ex:
+            resultats.append({"plateforme": nom, "ok": False, "raison": f"erreur temporaire : {ex}"})
             lignes.append(f"⚠️ {nom} : erreur {ex}")
     print("AUTO_TRADE", m, lignes)
-    if any("éteint" not in l_ for l_ in lignes):
+    if notifier and lignes and any("éteint" not in l_.lower() for l_ in lignes):
         for p_ in proprio(etat):
-            _envoi_sur(p_, text=f"🤖 {ICONE.get(m, '')} {m} {sig['sens']}{' ↩ contre-tendance (60 $ max)' if contre else ''} — trading automatique\n" + "\n".join(lignes))
+            _envoi_sur(p_, text=(f"🤖 {ICONE.get(m, '')} {m} {sig['sens']}{' ↩ contre-tendance (60 $ max)' if contre else ''} — trading automatique\n"
+                                + plan + "\n\n" + "\n".join(lignes)))
+    return resultats
 
 
 def topstep_horaires(etat):
@@ -6560,12 +6588,15 @@ def topstep_horaires(etat):
             live_bande(etat, a_["bande"], "topstep_" + a_["type"], 600, toujours=True)
         jour = datetime.datetime.now(topstep_trade.CHICAGO).strftime("%Y-%m-%d")
         if topstep_trade.phase() == "fermeture" and etat.get("topstep_plat") != jour:
-            etat["topstep_plat"] = jour
-            topstep_trade.tout_fermer()
-            etat.pop("topstep_pos", None)
-        if auto_trade:                                     # économies MetaApi : en service seulement quand une entrée approche
+            fermeture = topstep_trade.tout_fermer()
+            if fermeture is not None or not getattr(topstep_trade, "REEL", False):
+                etat["topstep_plat"] = jour
+                etat.pop("topstep_pos", None)
+            else:
+                print("TOPSTEP : clôture non confirmée, nouvelle tentative au prochain cycle")
+        if auto_trade:                                     # pré-déploiement dès qu'un ordre valide existe, avant que le prix touche la zone
             on_ = {k for k, v in (etat.get("auto_marches") or {}).items() if v}
-            besoin_ = any((etat.get(k) or {}).get("prep") or (etat.get(k) or {}).get("trade") for k in on_)
+            besoin_ = any((etat.get(k) or {}).get("ordre") or (etat.get(k) or {}).get("prep") or (etat.get(k) or {}).get("trade") for k in on_)
             auto_trade.gerer_deploiement(etat, besoin_)
         for msg_ in (auto_trade.gerer(etat) if auto_trade else []):   # FundedNext : rachats sur repli (100 $ max au total) + BE
             for p_ in proprio(etat):
@@ -7421,7 +7452,7 @@ LIVE_BRANCHE, LIVE_FICHIER = "live-data", "live.json"
 LIVE_INTERVALLE, LIVE_RAFRAICHIR = 120, 300      # tentative toutes les 2 min ; republication forcée au plus toutes les 5 min
 
 def construire_live(etat, derniers, now=None):
-    """Contenu public : marché, biais probable, UT alignées x/11, profil, état, heure. Rien d'autre."""
+    """Données publiques du live : état réel du signal/exécution, mouvement, volume disponible et compte à rebours. Aucun prix ni niveau."""
     now = now or time.time()
     marches = []
     for m in MARCHES:
@@ -7431,12 +7462,52 @@ def construire_live(etat, derniers, now=None):
         cle = etat.get(m, {})
         statut, _ = etat_marche_hb(m, r, now)
         e = hb_etat_surveille(r)
-        etat_l = ("ferme" if statut == "ferme" else "perime" if statut == "perime" else "entree" if cle.get("trade") else
-                  "preparation" if (cle.get("ordre") or cle.get("prep") or e["strat"]) else "calme")
+        top = etat.get("topstep_pos") or {}
+        top_reel = top.get("marche") == m and not top.get("test") and not top.get("pending")
+        mt5_reel = any(p.get("marche") == m and not p.get("pending") for p in (etat.get("mt5_plan") or {}).values())
+        attente = ((top.get("marche") == m and top.get("pending")) or
+                   any(p.get("marche") == m and p.get("pending") for p in (etat.get("mt5_plan") or {}).values()))
+        if statut == "ferme":
+            etat_l = "ferme"
+        elif statut == "perime":
+            etat_l = "perime"
+        elif top_reel or mt5_reel:
+            etat_l = "entree"
+        elif attente:
+            etat_l = "ordre_en_attente"
+        elif cle.get("trade"):
+            etat_l = "signal"
+        elif cle.get("ordre") or cle.get("prep") or e["strat"]:
+            etat_l = "preparation"
+        else:
+            etat_l = "calme"
+        bars = (r.get("b5") or [])[-22:]
+        mouvement = volume_ratio = atr_pct = None
+        bougie = "indisponible"
+        volume_source = ""
+        if len(bars) >= 2:
+            derniere, precedente = bars[-1], bars[-2]
+            base = float(precedente.get("c") or 0)
+            if base:
+                mouvement = round((float(derniere["c"]) - base) / base * 100, 3)
+            if derniere.get("c") is not None and derniere.get("o") is not None:
+                bougie = "haussiere" if derniere["c"] > derniere["o"] else "baissiere" if derniere["c"] < derniere["o"] else "neutre"
+            volume_source = str(derniere.get("volume_source") or "")
+            volumes = [float(x["v"]) for x in bars[:-1] if x.get("v") is not None and float(x["v"]) > 0]
+            if derniere.get("v") is not None and volumes:
+                moyenne = sum(volumes[-20:]) / len(volumes[-20:])
+                if moyenne > 0:
+                    volume_ratio = round(float(derniere["v"]) / moyenne, 1)
+        prix_ref = float((r.get("m1") or [{}])[-1].get("c") or 0)
+        atr_ref = float(r.get("atr5") or r.get("atr") or 0)
+        if prix_ref > 0 and atr_ref > 0:
+            atr_pct = round(atr_ref / prix_ref * 100, 3)
         marches.append({"m": m, "etat": etat_l, "biais": {1: "haussier", -1: "baissier", 0: "indecis"}[e["sens"]],
                         "ut": int(e["n"]), "seuil": MIN_ALIGN,
-                        "profil": {"SWING": "SWING", "DAY": "INTRADAY", "SCALPING": "SCALP"}.get(e["strat"], "aucun")})
-    return {"v": 1, "maj": int(now), "bot": "@" + str(etat.get("bot") or "align_mtf_adel_bot"), "marches": marches}
+                        "profil": {"SWING": "SWING", "DAY": "INTRADAY", "SCALPING": "SCALP"}.get(e["strat"], "aucun"),
+                        "mouvement5m_pct": mouvement, "bougie5m": bougie, "volume_ratio": volume_ratio,
+                        "volume_source": volume_source, "atr5_pct": atr_pct, "reste15": 900 - int(now) % 900})
+    return {"v": 2, "maj": int(now), "bot": "@" + str(etat.get("bot") or "align_mtf_adel_bot"), "marches": marches}
 
 def _api_github(chemin, methode="GET", corps=None):
     req = urllib.request.Request(f"https://api.github.com/repos/{LIVE_DEPOT}{chemin}",
@@ -9091,14 +9162,32 @@ def manipulation(out, m, r, cle):
         l.append(statut_txt(0 if r["confirme"] == dm else -1, cle.get("ordre") if r["confirme"] == dm else None).strip())
     out.append(("\n".join(l), bouton_auto(m)) if not tr else "\n".join(l))
 
+def entree_reste_valide(tr, p):
+    """Une nouvelle entrée reste permise si le SL n'est pas touché et si le gain restant vaut au moins 2× le risque restant."""
+    d = int(tr.get("d") or 0)
+    sl, tp1 = tr.get("sl"), tr.get("tp1")
+    if d not in (-1, 1) or sl is None or tp1 is None:
+        return False, 0.0
+    risque_restant = d * (float(p) - float(sl))
+    gain_restant = d * (float(tp1) - float(p))
+    if risque_restant <= 0 or gain_restant <= 0:
+        return False, 0.0
+    rr = gain_restant / risque_restant
+    return rr >= GAIN_MIN, rr
+
+
 def statut_position(tr, p):
-    """Position déjà ouverte : dire clairement si un nouvel arrivant peut encore entrer (comme les grandes salles de trading)."""
-    d, e, t1 = tr["d"], tr["e"], tr.get("tp1") or tr["e"]
-    couleur = "🟢 LONG ⬆️" if d == 1 else "🔴 SHORT ⬇️"
-    progres = d * (p - e) / max(abs(t1 - e), 1e-9)
-    if progres < 0.25:
-        return f"✅ ENTRÉE ENCORE POSSIBLE — {couleur}\n📍 Le prix est encore près de l'entrée"
-    return f"⛔ TROP TARD POUR ENTRER — {couleur} déjà parti\n🧑‍🏫 Si tu es dedans : je te suis jusqu'au TP"
+    """Ne bloque plus arbitrairement à 25 % du TP1 : vérifie le vrai rapport gain/risque restant."""
+    couleur = "🟢 LONG ⬆️" if tr["d"] == 1 else "🔴 SHORT ⬇️"
+    valide, rr = entree_reste_valide(tr, p)
+    if valide:
+        return (f"✅ ENTRÉE ENCORE POSSIBLE — {couleur}\n"
+                f"📍 Entrée indicative actuelle : {px(p)}\n"
+                f"🛑 SL : {px(tr['sl'])} • TP1 : {px(tr['tp1'])}\n"
+                f"🏁 TP2 : {px(tr['tp2']) if tr.get('tp2') is not None else 'non défini'} • R/R restant x{rr:.1f}")
+    return (f"⛔ TROP TARD POUR ENTRER — {couleur}\n"
+            f"📐 R/R restant : x{rr:.1f} (minimum x{GAIN_MIN:.1f})\n"
+            "🧑‍🏫 Si tu es dedans : je te suis jusqu'au TP")
 
 def approche_tp(m, r, d, cible, nom):
     """Près d'un TP : « direction TP » si les petites unités poussent encore, sinon « petite perturbation » expliquée."""
@@ -9891,25 +9980,19 @@ def live_publier(texte):
         return False
 
 def live_pnl(etat, m, cle, r, now=None):
-    """Demande d'Adel (15/11) : fenêtre « 💰 ALIGN EN DIRECT » sur le live avec le gain RÉEL en cours des comptes,
-    affichée seulement quand le prix a fait au moins la moitié du chemin vers le TP1 (trop tard pour entrer → pas de passager clandestin),
-    et seulement s'il y a de VRAIES positions (jamais de chiffre inventé). Mise à jour au plus toutes les 60 s."""
+    """Affiche le PnL dès qu'une vraie position broker existe ; aucun montant simulé ni prix public."""
     now = time.time() if now is None else now
     tr = cle.get("trade")
     cle_ = f"pnl{m}"
     montre = (etat.get("pnl_montre") or {}).get(m)
     def eteindre():
-        if montre:
+        if montre and live_publier(f"CMD:pnl:off:{m}"):
             etat.setdefault("pnl_montre", {})[m] = False
-            live_publier(f"CMD:pnl:off:{m}")
+        return None
     if not tr or not r.get("m1"):
-        return eteindre()
-    p, e, t1, d = r["m1"][-1]["c"], tr["e"], tr["tp1"], tr["d"]
-    if abs(t1 - e) <= 0 or d * (p - e) / abs(t1 - e) < 0.5:
         return eteindre()
     if now - _LIVE_DERNIER.get(cle_, 0) < 60:
         return None
-    _LIVE_DERNIER[cle_] = now
     total, vu = 0.0, False
     for robot in (auto_trade, topstep_trade):
         try:
@@ -9921,8 +10004,10 @@ def live_pnl(etat, m, cle, r, now=None):
             total, vu = total + x, True
     if not vu:
         return eteindre()
+    if not live_publier(f"CMD:pnl:{total:+.2f}:{m}"):
+        return None
     etat.setdefault("pnl_montre", {})[m] = True
-    live_publier(f"CMD:pnl:{total:+.2f}:{m}")
+    _LIVE_DERNIER[cle_] = now
     return total
 
 # ───── NEWS DE DERNIÈRE MINUTE (demande d'Adel 15/11) : sources GRATUITES + vraie IA qui juge l'impact ─────
@@ -9999,11 +10084,12 @@ def live_bande(etat, texte, cle=None, pause=60, toujours=False):
     toujours=True : TP / SL / entrée partent même si le live n'a pas été déclaré (la bande n'existe que sur l'écran du live)."""
     if not live_actif(etat) and not toujours:
         return False
-    if cle:
-        if time.time() - _LIVE_DERNIER.get(cle, 0) < pause:
-            return False
+    if cle and time.time() - _LIVE_DERNIER.get(cle, 0) < pause:
+        return False
+    ok = live_publier(texte)
+    if ok and cle:
         _LIVE_DERNIER[cle] = time.time()
-    return live_publier(texte)
+    return ok
 
 # ───── v8.5 « SPECTACLE » (demande d'Adel 15/11) : IA gratuite + agenda (discours, annonces, ouvertures) sur la bande ─────
 LIVE_IA_INTERVALLE = int(os.environ.get("LIVE_IA_INTERVALLE", "1800"))      # 1 lot de phrases IA / 30 min (quota gratuit)
@@ -10032,7 +10118,6 @@ def live_phrases_ia(etat, maintenant):
     """Toutes les 30 min, l'IA GRATUITE (Gemini gratuit / Groq / IA sans clé) invente un lot de phrases FR + EN pour la bande."""
     if not live_actif(etat) or maintenant - etat.get("live_ia_t", 0) < LIVE_IA_INTERVALLE:
         return False
-    etat["live_ia_t"] = maintenant
     h = datetime.datetime.fromtimestamp(maintenant, PARIS).hour
     moment = "nuit" if h < 7 else "matin" if h < 12 else "après-midi" if h < 18 else "soirée"
     consigne = ("Écris 6 phrases pour la bande qui défile d'un live TikTok / YouTube de trading (BTC, Gold, NASDAQ). "
@@ -10054,8 +10139,12 @@ def live_phrases_ia(etat, maintenant):
     if not paires:
         etat["live_ia_t"] = maintenant - LIVE_IA_INTERVALLE + 300     # v8.8 : échec → on réessaie dans 5 min (pas 30)
         return False
-    etat["live_ia_paires"] = paires
-    return live_publier("IA:" + json.dumps(paires, ensure_ascii=False))
+    if live_publier("IA:" + json.dumps(paires, ensure_ascii=False)):
+        etat["live_ia_t"] = maintenant
+        etat["live_ia_paires"] = paires
+        return True
+    etat["live_ia_t"] = maintenant - LIVE_IA_INTERVALLE + 300
+    return False
 
 
 def live_agenda(etat, maintenant):
@@ -10361,8 +10450,8 @@ def live_news(etat, maintenant):
         etape, texte = textes_live_news(e.get("titre"), e["t"] - maintenant)
         cle = f"live{etape}{e['t']}{e.get('titre')}"
         if etape and cle not in vus:
-            vus.append(cle)
-            live_bande(etat, texte, toujours=True)
+            if live_publier(texte):
+                vus.append(cle)
 
 
 TOPSTEP_CODE = os.environ.get("TOPSTEP_CODE", "TS-K3VLYHY9EORJ2")   # code de parrainage Topstep d'Adel (valable 90 j, à régénérer)
@@ -10895,10 +10984,29 @@ def un_tour(etat, chats):
         recevoir_updates_telegram(etat, chats, demandes)
         if SHUTDOWN_REQUESTED.is_set():
             return
-        if TOKEN and cle.get("trade") and not cle["trade"].get("auto_fait"):
-            cle["trade"]["auto_fait"] = True
+        if TOKEN and cle.get("trade") and not cle["trade"].get("auto_fait") and time.time() >= float(cle["trade"].get("auto_retry_t", 0)):
             trx = cle["trade"]
-            auto_entree(etat, nom_marche, trx)
+            essais = int(trx.get("auto_tentatives", 0))
+            resultats_auto = auto_entree(etat, nom_marche, trx, notifier=(essais == 0))
+            ok_auto = any(x.get("ok") or x.get("test") or x.get("pending") for x in resultats_auto)
+            raisons = [str(x.get("raison") or "").lower() for x in resultats_auto]
+            definitif = bool(raisons) and all(
+                any(mot in raison for mot in ("éteint", "pause de réflexion", "perte du jour", "perte totale",
+                                                "gain visé", "sl trop large", "position opposée", "déjà 4 positions",
+                                                "position est déjà ouverte", "fermeture du marché", "auto oco brackets",
+                                                "topstep pas encore branché", "metaapi pas encore branché"))
+                for raison in raisons)
+            if ok_auto or definitif or not resultats_auto:
+                trx["auto_fait"] = True
+                trx.pop("auto_retry_t", None)
+            else:
+                trx["auto_tentatives"] = essais + 1
+                if trx["auto_tentatives"] >= 3:
+                    trx["auto_fait"] = True
+                    for p_ in proprio(etat):
+                        _envoi_sur(p_, text=f"⚠️ {ICONE.get(nom_marche, '')} {nom_marche} : exécution automatique non confirmée après 3 tentatives. Aucun ordre supplémentaire ne sera envoyé. Vérifie les plateformes.")
+                else:
+                    trx["auto_retry_t"] = time.time() + 15
             t_ = None if not IA_AUTO else ia(etat, "Le bot vient d'entrer en position selon le plan de l'indicateur. Analyse ce plan (stratégie, SL, TP1, TP2) : dis si tu le valides en bougies ou si tu le déconseilles (« je déconseille » + raison), sans jamais proposer d'autres niveaux, et rappelle de mettre le SL tout de suite. " + IA_TON_JEUNE,
                     dict(donnees_ia(nom_marche, r, cle), position={"sens": "LONG" if trx["d"] == 1 else "SHORT", "entrée": round(trx["e"], 2),
                                                                     "SL": round(trx["sl"], 2), "TP1": round(trx["tp1"], 2), "type": trx.get("src")}), premium=True)
