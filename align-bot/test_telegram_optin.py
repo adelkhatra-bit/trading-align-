@@ -53,7 +53,8 @@ class TelegramOptIn(unittest.TestCase):
     def test_desactivation_coach_efface_abonnement_et_alertes_en_attente(self):
         etat = {"coach_optin": {"GOLD": ["10"]}, "auto": {"GOLD": ["10"]},
                 "veille_cloture": {"GOLD": {"10": {"tf": "15 min"}}},
-                "coach_live": {"GOLD": {"10": {"active": True}}}}
+                "coach_live": {"GOLD": {"10": {"active": True}}},
+                "GOLD": {"trade": {"qui": {"10": {"e": 3900.0, "d": 1}}}}}
         ab.activer_coach_optin(etat, "10", "GOLD", False)
         self.assertFalse(ab.coach_abonne(etat, "10", "GOLD"))
         self.assertEqual(etat["auto"]["GOLD"], [])
