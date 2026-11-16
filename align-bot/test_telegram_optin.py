@@ -29,7 +29,16 @@ class TelegramOptIn(unittest.TestCase):
         etat = {"auto": {"GOLD": ["10"]}, "coach_optin": {},
                 "marches_par_chat": {"10": ["GOLD"]}, "bot_off": []}
         self.assertFalse(ab.coach_abonne(etat, "10", "GOLD"))
-        self.assertEqual(ab.destinataires_message(etat, ["10"], "🥇 GOLD\\nTP1 : 3900"), [])
+        self.assertEqual(ab.destinataires_message(etat, ["10"], "🥇 GOLD\nTP1 : 3900"), [])
+
+    def test_activation_persistante_sur_un_marche_et_pas_les_autres(self):
+        etat = {"auto": {}, "coach_optin": {}, "bot_off": []}
+        ab.activer_coach_optin(etat, "10", "GOLD", True)
+        self.assertTrue(ab.coach_abonne(etat, "10", "GOLD"))
+        self.assertFalse(ab.coach_abonne(etat, "10", "NASDAQ"))
+        ab.selectionner_coach_optin(etat, "10", ["NASDAQ"])
+        self.assertFalse(ab.coach_abonne(etat, "10", "GOLD"))
+        self.assertTrue(ab.coach_abonne(etat, "10", "NASDAQ"))
 
     def test_arret_bot_coupe_immediatement_le_flux_prive(self):
         etat = {"auto": {}, "coach_optin": {"GOLD": ["10"]}, "marches_par_chat": {"10": ["GOLD"]}, "bot_off": ["10"]}
