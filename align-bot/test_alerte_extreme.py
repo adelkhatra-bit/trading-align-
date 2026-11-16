@@ -17,7 +17,7 @@ def lecture(t, posW=0.10):
 class AlerteExtreme(unittest.TestCase):
     def tour(self, cle, t, posW=0.10):
         with patch.object(ab, "manipulation"), patch.object(ab, "meche_suspecte"), patch.object(ab, "niveaux_cles"), \
-             patch.object(ab, "bloque_dw", return_value=True):
+             patch.object(ab, "bloque_dw", return_value=True), patch.object(ab, "pause_entree_marche", return_value=None):
             return [x for x in ab.agent("GOLD", lecture(t, posW), cle, "") if "zone extrême" in x]
 
     def test_une_seule_alerte_pendant_toute_la_situation(self):
