@@ -138,6 +138,16 @@ class TelegramOptIn(unittest.TestCase):
         self.assertIn("Aucune alerte privée avant activation du coach", envoyes[0]["text"])
         self.assertIn("Activer le coach GOLD", envoyes[0]["reply_markup"])
 
+    def test_coach_live_respecte_bot_off(self):
+        etat = {"bot_off": ["10"], "coach_live": {"GOLD": {"10": {"expire": 9999999999, "dernier_t": 0}}}}
+        r = {"b15": [{"t": 0, "o": 1, "h": 2, "l": 0, "c": 1}, {"t": 900, "o": 1, "h": 2, "l": 0, "c": 1}]}
+        with (
+            mock.patch.object(ab, "dans_chaine", return_value=False),
+            mock.patch.object(ab, "_envoi_sur") as send,
+        ):
+            ab.notifier_coach_live(etat, "GOLD", r, {})
+        send.assert_not_called()
+
     def test_texte_telegram_de_preparation_ne_parle_pas_de_fibonacci(self):
         tr = dict(d=-1, e=3900.0, sl=3910.0, tp1=3880.0, tp2=3860.0,
                   rr=2.0, strat="SWING", src="Fibonacci 50 → 78,6 %", n1="support 4h", n2="projection 2R", sl_ut="15 min", sl_h="02:00", za=3898.0, zb=3902.0)
