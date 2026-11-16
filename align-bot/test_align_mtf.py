@@ -159,6 +159,37 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertIn("FOREXCOM%3AXAUUSD", gold)
         self.assertIn("interval=240", gold)
 
+    def test_sendmessage_429_is_queued_once_for_retry(self):
+        state = {}
+        previous = align_bot._ETAT_COURANT.get("etat")
+        align_bot._ETAT_COURANT["etat"] = state
+        align_bot.TELEGRAM_RETRY_UNTIL.clear()
+        try:
+            with unittest.mock.patch.object(align_bot, "TOKEN", "test-token"), \
+                 unittest.mock.patch.object(align_bot, "http_json", side_effect=RuntimeError("HTTP Error 429: retry after 30")):
+                with self.assertRaises(RuntimeError):
+                    align_bot.telegram("sendMessage", chat_id="123", text="Signal test")
+                with self.assertRaises(RuntimeError):
+                    align_bot.telegram("sendMessage", chat_id="123", text="Signal test")
+            self.assertEqual(len(state.get("telegram_outbox", [])), 1)
+            self.assertEqual(state["telegram_outbox"][0]["chat_id"], "123")
+            self.assertGreaterEqual(state["telegram_outbox"][0]["next_t"], 0)
+        finally:
+            align_bot.TELEGRAM_RETRY_UNTIL.clear()
+            if previous is None:
+                align_bot._ETAT_COURANT.pop("etat", None)
+            else:
+                align_bot._ETAT_COURANT["etat"] = previous
+
+    def test_telegram_outbox_removes_message_after_successful_retry(self):
+        state = {"telegram_outbox": [{
+            "key": "retry-test", "chat_id": "123", "method": "sendMessage",
+            "params": {"chat_id": "123", "text": "Signal à renvoyer"}, "tries": 1, "next_t": 100
+        }]}
+        with unittest.mock.patch.object(align_bot, "telegram", return_value={"ok": True, "result": {"message_id": 7}}):
+            self.assertEqual(align_bot.traiter_file_telegram(state, maintenant=101), 1)
+        self.assertEqual(state["telegram_outbox"], [])
+
     def test_failed_telegram_analysis_delivery_is_not_marked_as_sent(self):
         state = {}
         market = "GOLD"
