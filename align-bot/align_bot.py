@@ -10289,6 +10289,7 @@ def suivre_apres_sl(out, m, r, cle, hi, lo):
 def agent(m, r, cle, ferme):
     """BTC conserve H4/H1 + déclencheur M5 ; GOLD/NASDAQ exigent M5/M15/H1/H4 clôturés concordants."""
     r.setdefault("market", m)
+    r.setdefault("confirme", 0)
     # Sans flux M1, l'agent ne peut ni calculer le prix ni valider une entrée ; il reste silencieux et ne plante pas.
     if not (r.get("m1") or []) or len(r.get("r5") or []) < 2:
         print(f"{m}: flux M1/RSI5 indisponible — aucune nouvelle position")
