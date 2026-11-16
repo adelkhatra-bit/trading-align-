@@ -3121,8 +3121,10 @@ def tendance_armee(r, cle):
 
 def analyse_marche(etat, pair):
     m = next((k for k, v in MARCHES.items() if v == pair), None)
-    r = analyser(pair, (etat or {}).setdefault(m, {}).setdefault("pine", {}) if m else None)
+    r = analyser(pair, (etat or {}).setdefault(m, {}).setdefault("pine", {}) if m else None, market=m)
     if m:
+        r["market"] = m
+        r["sniper"] = entree_sniper(r)
         tendance_armee(r, (etat or {}).setdefault(m, {}))
     r["annonce"] = annonce_proche(etat or {}, int(time.time()))
     r["news"] = news_txt(etat or {})
