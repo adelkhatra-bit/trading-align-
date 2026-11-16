@@ -455,7 +455,7 @@
   EN.push([' hésite… donnez-moi vos avis en commentaire : ça monte ou ça descend ? votre avis m\'intéresse 👇', ' is hesitating… give me your opinion in the comments: up or down? I want to know 👇'], [' : merci pour les tapotements la team ! continuez 👆 je lis tous vos commentaires 👀', ': thanks for the taps team! keep going 👆 I read all your comments 👀'], [' : dites-moi maintenant… envoyez vos avis dans le lien en bio, je vous réponds 😉 • et là-bas tout arrive en temps réel ⚡', ': tell me now… send your opinion via the link in bio, I\'ll answer you 😉 • and there everything comes in real time ⚡']);
   let coachN = 0, convN = 0;
   const coachT = setInterval(() => {
-    if (occupe || file.length || retour || Date.now() - derniereTend < 100000 || Date.now() - derniereCoach < 120000) return;   // v9.2 (demande d'Adel) : marché mou = on a le temps de parler, ~40 s   // les vraies infos du marché passent toujours avant
+    if (occupe || file.length || retour || Date.now() - derniereTend < 40000 || Date.now() - derniereCoach < 120000) return;   // v9.2 (demande d'Adel) : marché mou = on a le temps de parler, ~40 s   // les vraies infos du marché passent toujours avant
     const k3 = coachN % 3, P = k3 === 2 ? COACH.conv : k3 === 1 ? COACH.humour : COACH.anim;   // v9.2 : la discussion avec les abonnés suit son ordre (avis → merci → lien en bio)
     montrer((k3 === 2 ? P[convN++ % P.length] : P[Math.floor(coachN / 3) % P.length]).replace('{m}', nomMarche()), false, 1);
     coachN++; derniereCoach = Date.now();
