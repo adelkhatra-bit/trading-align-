@@ -5925,7 +5925,7 @@ def capturer_snapshot_audit(etat, m, r, cle, messages=None):
                 tv["snapshots"][str(tf)]["robotV12"] = {
                     k: robot.get(k) for k in champs_tv if k in robot
                 }
-        trade = cle.get("trade") or ((cle.get("fin") or [None])[0] if cle.get("fin") else None)
+        trade = cle.get("trade") or ((cle.get("fin") or [None])[0] if cle.get("fin") else None) or cle.get("ordre")
         plan = {}
         if isinstance(trade, dict):
             for k in ("d", "e", "sl", "sl0", "tp1", "tp2", "cree", "statut", "src", "type",
@@ -9643,7 +9643,7 @@ def agent(m, r, cle, ferme):
     except Exception as ex:
         print("radar_climax", ex)
     try:
-        rv_ = retournement_marche(m, r, cle) if (not tr or m == "BTC") else None  # aucune alerte inverse Gold/NASDAQ pendant une position ouverte
+        rv_ = retournement_marche(m, r, cle)  # surveillance active aussi pendant les positions GOLD/NASDAQ : alerte uniquement, aucune clôture automatique
         if rv_ and not (tr and tr.get("d") == (1 if "LONG" in rv_.split("\n")[0] else -1)):
             out.append(rv_)
     except Exception as ex:
