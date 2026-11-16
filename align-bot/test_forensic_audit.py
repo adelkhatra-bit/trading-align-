@@ -38,7 +38,8 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
         r = {"t": 1000, "m1": [{"c": 1.0}], "dirs": [], "rsis": []}
         align_bot.capturer_snapshot_audit(etat, "GOLD", r, {})
         self.assertEqual(len(etat["audit_mtf"]["GOLD"]), 600)
-        self.assertEqual(etat["audit_mtf"]["GOLD"][-1]["t"], 1000)
+        self.assertEqual(etat["audit_mtf"]["GOLD"][-1]["bar_t"], 1000)
+        self.assertIsNotNone(etat["audit_mtf"]["GOLD"][-1]["t"])
 
 
     def test_gold_and_nasdaq_reversal_watch_remains_available(self):
@@ -175,6 +176,53 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
         self.assertFalse(ok)
         save.assert_not_called()
         self.assertIn("Coche au moins un marché", send.call_args.kwargs["text"])
+
+
+
+    def test_snapshot_records_decision_reason_and_closed_market_bars(self):
+        etat = {}
+        r = {
+            "t": 1700000400, "decision_ts": 1700000500,
+            "m1": [{"t": 1700000460, "o": 100, "h": 101, "l": 99, "c": 100.5, "v": 10}],
+            "b5": [{"t": 1700000100, "o": 99, "h": 101, "l": 98, "c": 100, "v": 200,
+                    "volume_source": "Kraken BTC"}],
+            "b15": [{"t": 1700000100, "o": 99, "h": 101, "l": 98, "c": 100, "v": 500}],
+            "b1h": [{"t": 1699996800, "o": 98, "h": 102, "l": 97, "c": 100}],
+            "b4h": [{"t": 1699987200, "o": 95, "h": 103, "l": 94, "c": 100}],
+            "bd": [{"t": 1699920000, "o": 90, "h": 105, "l": 88, "c": 100}],
+            "bw": [{"t": 1699488000, "o": 85, "h": 110, "l": 80, "c": 100}],
+            "dirs": [1] * 11, "rsis": [55.0] * 11, "confirme": 1,
+            "sens": 1, "score": 0.5, "pctH": 75, "trendS": 0.5, "momS": 1,
+            "dirPlan": 1, "dirW": 1
+        }
+        cle = {"ordre": {"d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0, "src": "FVG"}}
+        with unittest.mock.patch.object(align_bot, "raison_attente", return_value="J'attends la clôture M5"), \
+             unittest.mock.patch.object(align_bot, "verdict", return_value=("PATIENCE", "Clôture M5 manquante")):
+            align_bot.capturer_snapshot_audit(etat, "BTC", r, cle)
+        snap = etat["audit_mtf"]["BTC"][0]
+        self.assertEqual(snap["t"], 1700000500)
+        self.assertEqual(snap["bar_t"], 1700000100)
+        self.assertEqual(snap["decision"]["reason"], "J'attends la clôture M5")
+        self.assertEqual(snap["decision"]["verdict"], "PATIENCE")
+        self.assertEqual(snap["data"]["5m"]["last"]["volume_source"], "Kraken BTC")
+        self.assertEqual(snap["data"]["5m"]["bar_close_t"], 1700000400)
+        self.assertTrue(snap["data"]["15m"]["closed"])
+        self.assertEqual(snap["trade"]["plan_source"], "ordre_en_preparation")
+
+    def test_snapshot_deduplicates_same_m5_bar_unless_decision_changes(self):
+        etat = {}
+        r = {"t": 1700000400, "decision_ts": 1700000500,
+             "b5": [{"t": 1700000100, "o": 1, "h": 2, "l": 0, "c": 1}],
+             "m1": [{"c": 1}], "dirs": [0] * 11, "rsis": [50] * 11}
+        cle = {}
+        with unittest.mock.patch.object(align_bot, "raison_attente", return_value="A"), \
+             unittest.mock.patch.object(align_bot, "verdict", return_value=("N", "D")):
+            align_bot.capturer_snapshot_audit(etat, "BTC", r, cle)
+            align_bot.capturer_snapshot_audit(etat, "BTC", r, cle)
+            self.assertEqual(len(etat["audit_mtf"]["BTC"]), 1)
+            r["confirme"] = 1
+            align_bot.capturer_snapshot_audit(etat, "BTC", r, cle)
+        self.assertEqual(len(etat["audit_mtf"]["BTC"]), 2)
 
 
 
