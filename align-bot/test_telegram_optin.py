@@ -44,6 +44,34 @@ class TelegramOptIn(unittest.TestCase):
         etat = {"auto": {}, "coach_optin": {"GOLD": ["10"]}, "marches_par_chat": {"10": ["GOLD"]}, "bot_off": ["10"]}
         self.assertEqual(ab.destinataires_message(etat, ["10"], "🥇 GOLD\nTP1 : 3900"), [])
 
+    def test_une_personne_dans_chats_ne_recoit_pas_une_position_sans_optin(self):
+        etat = {"auto": {}, "coach_optin": {}, "bot_off": [], "marches_par_chat": {"10": ["GOLD"]}}
+        trade = {"d": 1, "e": 3900.0, "sl": 3890.0, "tp1": 3920.0, "tp2": 3940.0, "qui": {}, "sl_h": "mèche basse"}
+        with mock.patch.object(ab, "_envoi_sur") as send:
+            ab.entrer_inscrits(etat, "GOLD", trade, {"10"})
+        self.assertEqual(trade["qui"], {})
+        send.assert_not_called()
+
+    def test_optin_coach_persistant_recoit_la_position_du_marche_choisi(self):
+        etat = {"auto": {}, "coach_optin": {"GOLD": ["10"]}, "bot_off": [],
+                "marches_par_chat": {"10": ["GOLD"], "20": ["NASDAQ"]}}
+        trade = {"d": 1, "e": 3900.0, "sl": 3890.0, "tp1": 3920.0, "tp2": 3940.0, "qui": {}, "sl_h": "mèche basse"}
+        with mock.patch.object(ab, "_envoi_sur") as send:
+            ab.entrer_inscrits(etat, "GOLD", trade, {"10", "20"})
+        self.assertIn("10", trade["qui"])
+        self.assertNotIn("20", trade["qui"])
+        self.assertEqual(send.call_count, 1)
+
+    def test_file_auto_ponctuelle_issue_d_un_clic_reste_valide_une_fois(self):
+        etat = {"auto": {"GOLD": ["10"]}, "coach_optin": {}, "bot_off": [],
+                "marches_par_chat": {"10": ["GOLD"]}}
+        trade = {"d": -1, "e": 3900.0, "sl": 3910.0, "tp1": 3880.0, "tp2": 3860.0, "qui": {}, "sl_h": "mèche haute"}
+        with mock.patch.object(ab, "_envoi_sur") as send:
+            ab.entrer_inscrits(etat, "GOLD", trade, set())
+        self.assertIn("10", trade["qui"])
+        self.assertEqual(send.call_count, 1)
+        self.assertEqual(etat["auto"]["GOLD"], [])
+
     def test_prospects_et_rappels_gratuits_sont_silencieux_sans_optin(self):
         etat = {"prospects": ["10", "11"], "auto": {}, "coach_optin": {}, "bot_off": []}
         self.assertEqual(ab.destinataires_gratuits(etat), [])
