@@ -10052,7 +10052,7 @@ def resistance_fvg(out, m, r, cle):
     zones = []
     for v, n in (r.get("niveaux") or []):
         if v is not None and n in ("1h", "4h", "Daily", "D"):
-            zones.append((v, v, "Daily" if n == "D" else n, "niv"))
+            zones.append((v, v, "Daily" if n == "D" else n, "niv", None))
     for lo, hi, ut, dd in (r.get("fvg") or []):
         zones.append((lo, hi, ut.replace("m", " min"), "fvg", dd))
     # Les order blocks associés aux FVG sont des zones à part entière : surveiller leur test et leur mitigation.
