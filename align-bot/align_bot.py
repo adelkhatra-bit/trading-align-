@@ -5586,10 +5586,12 @@ def noter(etat, cid, m, pos, sortie, motif):
                 etat.setdefault("veille_cloture", {}).setdefault(marche, {}).pop(cid, None)
                 (etat.get("coach_live", {}).get(marche) or {}).pop(cid, None)
             texte += "\n\n⏸ Coach mis en pause : aucune nouvelle position ni commentaire automatique.\nSouhaites-tu rechercher une autre position ?"
-            clavier = json.dumps({"inline_keyboard": [
+            boutons_fin = json.loads(clavier).get("inline_keyboard", [])
+            boutons_fin += [
                 [{"text": "✅ Oui, chercher une position", "callback_data": "next:yes"}],
                 [{"text": "⏸ Non, rester en pause", "callback_data": "next:no"}]
-            ]})
+            ]
+            clavier = json.dumps({"inline_keyboard": boutons_fin})
     _envoi_sur(cid, reply_markup=clavier, text=texte)
 
 def texte_team(bj):
@@ -8090,7 +8092,8 @@ def coach_actif(etat, cid, marche):
 
 def destinataires_message(etat, chats, texte):
     """Une seule destination privée : le bot ALIGN ; seuls les messages explicitement liés à un marché sont poussés."""
-    ens = set(getattr(texte, "marches", ()) or marches_message(texte)) & set(MARCHES)
+    tag = set(getattr(texte, "marches", ()) or ())
+    ens = (marches_message(texte) if not tag or "*" in tag else tag) & set(MARCHES)
     canal = str(etat.get("canal") or "")
     # Pas de diffusion privée pour news, agenda, DXY ou messages globaux :
     # l'utilisateur les consulte dans l'analyse demandée ou le live public.
