@@ -802,6 +802,7 @@ class TestLiveBoostCallbackDispatch(unittest.TestCase):
 
 
 class LiveMarketNarrationFallback(unittest.TestCase):
+    """Regression tests for factual commentary when external AI providers fail."""
     def test_fallback_comments_all_markets_from_actual_context(self):
         data = {"marches": {
             "BTC": {"biais_plan": "haussier", "confirmation_4h_1h": "alignées à la hausse",
