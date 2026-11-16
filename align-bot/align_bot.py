@@ -10125,7 +10125,7 @@ SESSIONS_LIVE = (("🇯🇵 TOKYO", 1, 0), ("🇬🇧 LONDRES", 9, 0), ("🇺�
 MOTS_DISCOURS = ("Speaks", "Speech", "Powell", "Testifies", "Press Conference", "FOMC")
 
 
-def progression_fibonacci_live(r):
+def progression_fibonacci_live(r, market=None):
     """Lecture Fibonacci interne du commentateur : bougies déjà chargées, aucune requête réseau ni affichage graphique."""
     prix = (r.get("m1") or [{}])[-1].get("c") or r.get("prix")
     if prix is None:
@@ -10140,8 +10140,14 @@ def progression_fibonacci_live(r):
         bougies = list(serie[:-1])[-fenetre:] if len(serie) > 1 else []
         if len(bougies) < 10:
             continue
-        i_haut = max(range(len(bougies)), key=lambda i: bougies[i]["h"])
-        i_bas = min(range(len(bougies)), key=lambda i: bougies[i]["l"])
+        if market in ("GOLD", "NASDAQ"):
+            # En cas d'extrêmes répétés, prendre la dernière occurrence pour respecter le dernier swing confirmé.
+            i_haut = max(range(len(bougies)), key=lambda i: (bougies[i]["h"], i))
+            i_bas = min(range(len(bougies)), key=lambda i: (bougies[i]["l"], -i))
+        else:
+            # BTC conserve strictement la sélection historique.
+            i_haut = max(range(len(bougies)), key=lambda i: bougies[i]["h"])
+            i_bas = min(range(len(bougies)), key=lambda i: bougies[i]["l"])
         haut, bas = bougies[i_haut]["h"], bougies[i_bas]["l"]
         amplitude = haut - bas
         if amplitude <= 0:
@@ -10191,8 +10197,9 @@ def contexte_technique_live(derniers):
             "strategie": r.get("strat") or "aucune stratégie confirmée",
             "rsi_15m": round(float(r.get("rC")), 1) if isinstance(r.get("rC"), (int, float)) else None,
             "compression_unites": r.get("comp"),
-            "fibonacci": progression_fibonacci_live(r),
         }
+        if marche in ("GOLD", "NASDAQ"):
+            contexte["fibonacci"] = progression_fibonacci_live(r, marche)
         barres = (r.get("b15_long") or r.get("b15") or [])[:-1]
         volumes = [x.get("v") for x in barres[-41:] if isinstance(x.get("v"), (int, float)) and x.get("v") is not None]
         if len(volumes) >= 21:
