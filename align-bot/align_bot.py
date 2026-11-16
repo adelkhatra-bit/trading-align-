@@ -6653,19 +6653,26 @@ def traiter(etat, chats, updates):
             if choix in ("coachlive", "coachstop") and mk in MARCHES:
                 activer_coach_live(etat, qui, mk, choix == "coachlive")
                 r_now = DERNIERS.get(mk)
-                if choix == "coachlive" and r_now and len(r_now.get("b15") or []) > 1:
-                    try:
-                        _envoi_sur(qui, text=texte_coach_live(mk, r_now["b15"][-2], r_now, etat.get(mk, {}), positions_bot(etat)),
-                                   reply_markup=markup_analyse(etat, mk, r_now, qui))
-                    except Exception as ex:
-                        print("coach live immédiat", ex)
                 try:
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text=("🔴 Coach en direct activé" if choix == "coachlive" else "⏹ Coach en direct arrêté"))
                 except Exception:
                     pass
-                _envoi_sur(qui, text=(f"🎙 COACH COMMENTATEUR ACTIVÉ\n{ICONE.get(mk, '')} {mk}\n🕯 Je commente chaque clôture 15 min pendant 2 h\n"
-                                      "📺 Mets le live à côté : je t'explique ce qui se passe sur le graphique\n⏹ Pour m'arrêter : le bouton sous mes messages")
-                           if choix == "coachlive" else f"⏹ COACH EN DIRECT ARRÊTÉ — {ICONE.get(mk, '')} {mk}\n😴 Je ne t'envoie plus les clôtures")
+                if choix == "coachlive":
+                    intro = (f"🎙 COACH COMMENTATEUR ACTIVÉ — {ICONE.get(mk, '')} {mk}\n"
+                             "🕯 Je commente chaque clôture 15 min pendant 2 h\n"
+                             "📺 Garde le LIVE à côté : tu reçois l'explication avec les boutons d'analyse.\n"
+                             "⏹ Pour arrêter : le bouton sous mes messages.")
+                    contenu = intro
+                    clavier = None
+                    if r_now and len(r_now.get("b15") or []) > 1:
+                        try:
+                            contenu = texte_coach_live(mk, r_now["b15"][-2], r_now, etat.get(mk, {}), positions_bot(etat)) + "\n\n" + intro
+                            clavier = markup_analyse(etat, mk, r_now, qui)
+                        except Exception as ex:
+                            print("coach live immédiat", ex)
+                    _envoi_sur(qui, text=contenu, **({"reply_markup": clavier} if clavier else {}))
+                else:
+                    _envoi_sur(qui, text=f"⏹ COACH EN DIRECT ARRÊTÉ — {ICONE.get(mk, '')} {mk}\n😴 Je ne t'envoie plus les clôtures")
                 continue
             if choix == "auto" and mk in MARCHES:
                 # Le marché est déjà connu depuis le bouton de l'analyse : activation en un seul appui.
@@ -11174,10 +11181,14 @@ def clavier_live(etat, cid, anglais=False):
     lignes = []
     if live_actif(etat):
         lignes.append([{"text": "📺 Watch the live" if anglais else "📺 Regarder le live", "url": LIVE_LIEN}])
+        lignes.append([{"text": "🔎 Faire une analyse" if not anglais else "🔎 Research markets",
+                        "callback_data": "analysechoice:BOTH"}])
+        lignes.append([{"text": "📡 Sélectionner mes marchés" if not anglais else "📡 Select my markets",
+                        "callback_data": "marketsmenu:x"}])
         lignes.append([{"text": "🚀 Boost the live" if anglais else "🚀 Booster le live", "callback_data": "liveboost:x"}])
         lignes.append([{"text": LIVE_CHOIX[k][2], "callback_data": f"livemain:{k}"} for k in ("BTC", "GOLD", "NASDAQ")])
         lignes.append([{"text": LIVE_CHOIX[k][2], "callback_data": f"livemain:{k}"} for k in ("1", "5", "15", "60")])
-        lignes.append([{"text": f"🎙 {k}", "callback_data": f"coachlive:{k}"} for k in ("BTC", "GOLD", "NASDAQ")])
+        lignes.append([{"text": f"🎙 Coach {k}", "callback_data": f"coachlive:{k}"} for k in ("BTC", "GOLD", "NASDAQ")])
     if str(cid) in {str(x) for x in proprio(etat)}:
         # v8.8 (demande d'Adel) : objectif de likes affiché à l'écran, puis « objectif atteint » avec feu d'artifice
         lignes.append([{"text": f"🎯 {k} likes", "callback_data": f"likeobj:{k}"} for k in ("1K", "5K", "10K", "20K")])
