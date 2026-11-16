@@ -675,6 +675,8 @@ class LiveOutbox(unittest.TestCase):
         self.assertIn("Possible chasse de liquidité acheteuse", bande)
         self.assertIn("ce n’est pas encore un signal LONG", bande)
         self.assertIn("ce n’est pas encore un signal SHORT", bande)
+        self.assertIn("else if (dFond > 0 && dRecent < 0)", bande)
+        self.assertLess(bande.index("if (balayageBas)"), bande.index("else if (dFond > 0 && dRecent < 0)"))
 
     def test_market_narration_is_factual_and_runs_independently_of_generic_coach(self):
         bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
