@@ -12,7 +12,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '11.8';  // v11.8 : narration marché calée à 55 s, au plus près du cooldown d'affichage de 52 s  // v11.7 : narration technique factuelle toutes les ~75 s, horloges séparées et activation vocale explicite  // v10.8 : commentaires IA ancrés sur les données réelles du marché affiché  // v10.7 : « ÇA PLONGE 🌊 » quand ça coule (en plus de la fusée) ; v10.6 : NEWS DE DERNIÈRE MINUTE prioritaire (coupe la bande) ; v10.5 : fusée 🚀 + sourire quand le bot entre / quand ça accélère ; v10.4 : bot en position = blagues taquines (je suis dedans avec vous, qui est rentré ? tapote, partage) ; v10.3 : blagues quand le marché dort (petit film, café, ouvertures, tapote MDR) ; v10.2 : « prépare-toi ≠ vas-y 😝 » ; v10.1 : l'animateur remet gentiment les petits malins à leur place (feu vert, discipline 😝) ; v10.0 : après un TP → « une rose ou un like » + « crée ton compte démo » ; v9.9 : fenêtre « 💰 ALIGN EN DIRECT » (gain réel en cours, après la moitié du chemin vers le TP1) ; v9.8 : « active ton coach en temps réel » + « un clic sur Mon bot pour arrêter » ; v9.7 : texte de la ligne du bas plus gros (taille des %) ; v9.6 : ligne du bas qui clignote vert ▲ LONG ? / rouge ▼ SHORT ? (plus vite quand une entrée approche) ; v9.5 : ligne du bas du tableau rouge ↔ vert en boucle + « LONG OU SHORT ? » (le sens ne se voit plus) ; v9.4 : « crée ton compte démo, teste gratuitement » + codes prop firms (lien en bio) ; v9.3 : titres de bulle drôles liés au marché (fin de « LE GRAPH BALANCE ») ; v9.2 : plus de spectacle quand le marché hésite (l'animateur parle toutes les ~40 s, discussion avis → merci → lien en bio), bulle « 🤫 PSST… LE GRAPH BALANCE » ; v9.1 : plus aucune flèche ni sens (monter / baisser) sur la bande ; v9.0 : « tu préfères BTC, Gold ou NASDAQ ? une autre unité de temps ? lien en bio » ; v8.9 : « ALIGN est dedans depuis le début… trop tard pour rentrer, on ne court jamais après le prix » ; v8.8  // v8.8 : l'animateur parle toutes les ~90 s (humour, nouveaux arrivants, commentaires), feu d'artifice « objectif de likes atteint » ; v8.7  // v8.7 : « je t'avais prévenu » après le chrono de grosse distribution / accumulation ; v8.6  // v8.6 : marché calme → l'animateur (vrai trader) parle aux spectateurs : questions rebond / cassure, pression pour taper et commenter ; v8.5  // v8.5 : phrases IA gratuites toujours nouvelles (FR/EN), chrono « une position arrive » + agenda (discours, annonces, ouvertures) venant du bot, chrono posé AU-DESSUS des colonnes 1 min / 3 min / 5 min ; v8.4   // v8.4 : ligne du bas du tableau revenue à sa couleur d'origine (v8.2), texte 13 px ; v8.3  // v8.3 : (étiquettes posées par-dessus désactivées, à faire dans le Pine), ligne du bas du tableau en couleur neutre, plus grosse, « tu peux rentrer ? 👍 » ; v8.2  // v8.2 : prix cachés dans la ligne du bas du tableau (❓ + lien en bio) ; v8.1  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
+  const VERSION = '11.9';  // v11.8 : narration marché calée à 55 s, au plus près du cooldown d'affichage de 52 s  // v11.7 : narration technique factuelle toutes les ~75 s, horloges séparées et activation vocale explicite  // v10.8 : commentaires IA ancrés sur les données réelles du marché affiché  // v10.7 : « ÇA PLONGE 🌊 » quand ça coule (en plus de la fusée) ; v10.6 : NEWS DE DERNIÈRE MINUTE prioritaire (coupe la bande) ; v10.5 : fusée 🚀 + sourire quand le bot entre / quand ça accélère ; v10.4 : bot en position = blagues taquines (je suis dedans avec vous, qui est rentré ? tapote, partage) ; v10.3 : blagues quand le marché dort (petit film, café, ouvertures, tapote MDR) ; v10.2 : « prépare-toi ≠ vas-y 😝 » ; v10.1 : l'animateur remet gentiment les petits malins à leur place (feu vert, discipline 😝) ; v10.0 : après un TP → « une rose ou un like » + « crée ton compte démo » ; v9.9 : fenêtre « 💰 ALIGN EN DIRECT » (gain réel en cours, après la moitié du chemin vers le TP1) ; v9.8 : « active ton coach en temps réel » + « un clic sur Mon bot pour arrêter » ; v9.7 : texte de la ligne du bas plus gros (taille des %) ; v9.6 : ligne du bas qui clignote vert ▲ LONG ? / rouge ▼ SHORT ? (plus vite quand une entrée approche) ; v9.5 : ligne du bas du tableau rouge ↔ vert en boucle + « LONG OU SHORT ? » (le sens ne se voit plus) ; v9.4 : « crée ton compte démo, teste gratuitement » + codes prop firms (lien en bio) ; v9.3 : titres de bulle drôles liés au marché (fin de « LE GRAPH BALANCE ») ; v9.2 : plus de spectacle quand le marché hésite (l'animateur parle toutes les ~40 s, discussion avis → merci → lien en bio), bulle « 🤫 PSST… LE GRAPH BALANCE » ; v9.1 : plus aucune flèche ni sens (monter / baisser) sur la bande ; v9.0 : « tu préfères BTC, Gold ou NASDAQ ? une autre unité de temps ? lien en bio » ; v8.9 : « ALIGN est dedans depuis le début… trop tard pour rentrer, on ne court jamais après le prix » ; v8.8  // v8.8 : l'animateur parle toutes les ~90 s (humour, nouveaux arrivants, commentaires), feu d'artifice « objectif de likes atteint » ; v8.7  // v8.7 : « je t'avais prévenu » après le chrono de grosse distribution / accumulation ; v8.6  // v8.6 : marché calme → l'animateur (vrai trader) parle aux spectateurs : questions rebond / cassure, pression pour taper et commenter ; v8.5  // v8.5 : phrases IA gratuites toujours nouvelles (FR/EN), chrono « une position arrive » + agenda (discours, annonces, ouvertures) venant du bot, chrono posé AU-DESSUS des colonnes 1 min / 3 min / 5 min ; v8.4   // v8.4 : ligne du bas du tableau revenue à sa couleur d'origine (v8.2), texte 13 px ; v8.3  // v8.3 : (étiquettes posées par-dessus désactivées, à faire dans le Pine), ligne du bas du tableau en couleur neutre, plus grosse, « tu peux rentrer ? 👍 » ; v8.2  // v8.2 : prix cachés dans la ligne du bas du tableau (❓ + lien en bio) ; v8.1  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
   // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
@@ -1118,6 +1118,7 @@
   // Aucun prix ni niveau n'est prononcé ; la voix et la bande racontent la même lecture.
   function commentaireMarcheEnDirect(B, moyR, moyV, m) {
     if (!Array.isArray(B) || B.length < 25) return null;
+    const cur = B[B.length - 1], prev = B.slice(-21, -1);
     const c = B.slice(-12).map(x => Number(x[4]));
     const fond = c[c.length - 1] - c[0];
     const recent = c[c.length - 1] - c[c.length - 4];
@@ -1191,7 +1192,22 @@
       // 0b) v7.5 : le prix entre dans une zone FVG / ORDER BLOCK → explication dans la bande + pastille (une fois par quart d'heure)
       for (const z of zonesAlign()) {
         const dedans = cur[4] <= z.hi && cur[4] >= z.lo, avant = B[B.length - 2][4] > z.hi || B[B.length - 2][4] < z.lo;
-        if (dedans && avant && uneFois('zone' + z.id + q15)) { montrer(texteZone(z.t, m), false, 1, 'alerte'); coeurs(1, [/FVG/i.test(z.t) ? '🧲' : '🏦'], cur[4] > B[B.length - 2][4] ? 1 : -1); lueur(0); versBot('ligne', cur[4] > B[B.length - 2][4] ? 1 : -1, '', /FVG/i.test(z.t) ? 'FVG' : 'OB'); return; }
+        if (dedans && avant && uneFois('zone' + z.id + q15)) {
+          const label = String(z.t || '').toUpperCase();
+          const expliciteHaussier = /(?:LONG|BULL|HAUSSIER|BUY|DEMAND|SUPPORT|FVG\\s*UP|OB\\s*UP|▲)/.test(label);
+          const expliciteBaissier = /(?:SHORT|BEAR|BAISSIER|SELL|SUPPLY|RESIST|FVG\\s*DOWN|OB\\s*DOWN|▼)/.test(label);
+          // La géométrie donne un biais seulement si la zone est clairement sous / au-dessus du prix.
+          const sensZone = expliciteHaussier && !expliciteBaissier ? 1
+            : expliciteBaissier && !expliciteHaussier ? -1
+            : z.hi < cur[4] ? 1 : z.lo > cur[4] ? -1 : 0;
+          const typeZone = /FVG/i.test(label) ? 'FVG' : /ORDER|\\bOB\\b/i.test(label) ? 'OB' : 'ZONE';
+          montrer(texteZone(z.t, m), false, 1, 'alerte');
+          coeurs(1, [typeZone === 'FVG' ? '🧲' : '🏦'], sensZone);
+          lueur(sensZone);
+          // Le type "zone" est accepté par le bot ; "ligne" rejetait FVG/OB comme des étiquettes inconnues.
+          versBot('zone', sensZone, '', typeZone);
+          return;
+        }
       }
       // 0c) v8.0 (demande d'Adel) : le prix touche son dernier plus haut / plus bas alors que le plan attend ailleurs → on taquine + on fait commenter
       { const hh0 = Math.max(...prev.map(x => x[2])), ll0 = Math.min(...prev.map(x => x[3])), versHaut = (hh0 - cur[4]) < 0.4 * moyR, versBas = (cur[4] - ll0) < 0.4 * moyR;
@@ -1263,7 +1279,7 @@
           : larg < 3.2 ? PHRASES.range : pente > 1.2 ? PHRASES.hausse : pente < -1.2 ? PHRASES.baisse : PHRASES.range;
         if (bandeShow(L[Math.floor(tendN / 3) % L.length].replace('{m}', m))) {
           if (L === PHRASES.ennui) teteEnnui();
-          if (L === PHRASES.bas_zone || L === PHRASES.haut_zone) versBot('zone', L === PHRASES.bas_zone ? -1 : 1);   // la vraie réponse part dans la chaîne du marché
+          if (L === PHRASES.bas_zone || L === PHRASES.haut_zone) versBot('zone', L === PHRASES.bas_zone ? 1 : -1);   // la vraie réponse part dans la chaîne du marché
           derniereTend = Date.now(); tendN++;
           coeurs(8, L === PHRASES.commente ? ['💬'] : L === PHRASES.branche ? ['📲', '📡', '⚡', '🧠'] : L === PHRASES.baisse ? ['🔴', '📉', '🌊'] : L === PHRASES.hausse ? ['🟢', '📈', '🚀'] : ['👀', '❤️', '🔥']);
         }
@@ -1374,7 +1390,7 @@
   #align-masque.mystere{background:linear-gradient(115deg,#c62828 0%,#c62828 40%,#ffd54f 50%,#2e7d32 60%,#2e7d32 100%)!important;background-size:300% 100%!important;
     animation:mystere 2.4s ease-in-out infinite alternate}
   @keyframes mystere{from{background-position:0% 50%}to{background-position:100% 50%}}
-  html.align-cache #align-masque{visibility:hidden!important}`;
+  html.align-cache #align-masque{visibility:visible!important}`;
   let masqueN = 0;
   function celluleSens() {
     try { const mod = chart()._chartWidget.model().model(); let res = null;
@@ -1388,7 +1404,7 @@
   }
   function poserMasque() {
     try {
-      const cel = celluleSens(); if (!cel) { masque.style.display = 'none'; return; }
+      const cel = celluleSens(); if (!cel) return; // conserver le dernier masque valide pendant les rafraîchissements TradingView
       const A0 = ((cel.bgc >>> 24) & 255) / 255; let R0 = cel.bgc & 255, G0 = (cel.bgc >> 8) & 255, B0 = (cel.bgc >> 16) & 255;   // v8.4 : couleur parfois transparente
       const cv = document.querySelector('.chart-markup-table .chart-gui-wrapper canvas'); if (!cv) return;
       const R = cv.getBoundingClientRect(), k = cv.width / R.width, W = cv.width, y0 = Math.floor(cv.height * 0.55);
