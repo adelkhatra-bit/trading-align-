@@ -24,7 +24,7 @@ class LiveTikTok(unittest.TestCase):
                   mock.patch.object(ab, "telegram", side_effect=lambda m, **kw: self.tg.append((m, kw)) or {"ok": True})]
         for x in self.p:
             x.start()
-        self.etat = {"proprio": ["1"], "prenoms": {"2": "Karim"}, "prospects": ["3"]}
+        self.etat = {"proprio": ["1"], "prenoms": {"2": "Karim"}, "prospects": ["3"], "coach_optin": {"GOLD": ["2"], "BTC": ["3"]}}
 
     def tearDown(self):
         for x in self.p:
