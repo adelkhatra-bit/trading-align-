@@ -344,9 +344,10 @@
     "📉 Astuce : en vue 15 min, repère le dernier plus bas • s'il casse en CLÔTURE, le mouvement peut continuer • lien en bio 🎁",
     "🎯 Astuce : l'étiquette ENTRÉE = la zone que le coach surveille • on attend la clôture 15 min • lien en bio 🎁",
     "🕯 Astuce : une mèche seule ne suffit pas • c'est la CLÔTURE de la bougie 15 min qui décide • lien en bio 🎁",
-    "🔵 Astuce : ligne bleue = TP • ligne rouge = SL • le coach te dit quand ça s'approche • lien en bio 🎁",
-    "📊 Astuce : regarde le tableau en bas • plus il y a d'unités alignées, plus le mouvement est solide • lien en bio 🎁"
+    "🔵 Astuce : ligne bleue = TP • ligne rouge = SL • le coach te dit quand ça s'approche • lien en bio 🎁",,
+    "🔎 Pour l'analyse complète de BTC, GOLD et NASDAQ, ouvre le lien dans la bio • le LIVE continue ici 🎙"
   ];
+  EN.push(["Pour l'analyse complète de BTC, GOLD et NASDAQ, ouvre le lien dans la bio", "For the full BTC, GOLD and NASDAQ analysis, open the link in the bio"]);
   // v8.5 (demande d'Adel) : phrases inventées par l'IA gratuite du bot (FR | EN), toujours nouvelles, jamais de prix
   const HAUT_TABLEAU = 3.4;   // hauteur du tableau des unités ≈ 3,4 × la ligne du bas
   // v8.5 (constat d'Adel) : la bande ne dit « ça encaisse / vous êtes rentrés ? » QUE si le bot a vraiment donné la position (Telegram)
