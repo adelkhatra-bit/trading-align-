@@ -12,9 +12,11 @@ class LiveVoiceDisplayLanguage(unittest.TestCase):
         self.assertIn("const anglais = langueBande() === 'en';", source)
         self.assertIn("if (!!item.en !== anglais) return;", source)
         start = source.index("function suivant() {")
-        queue = source[start:start + 1200]
-        self.assertLess(queue.index("flash.className ="), queue.index("bande.classList.add('on')"))
-        self.assertLess(queue.index("bande.classList.add('on')"), queue.index("parlerLive(m);"))
+        render = source.index("flash.className =", start)
+        show = source.index("bande.classList.add('on')", start)
+        speak = source.index("parlerLive(m);", start)
+        self.assertLess(render, show)
+        self.assertLess(show, speak)
 
     def test_voice_stays_locked_to_the_language_currently_shown(self):
         source = LIVE_JS.read_text(encoding="utf-8")
