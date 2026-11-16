@@ -73,5 +73,34 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
 
 
 
+    def test_agent_checks_reversal_while_gold_and_nasdaq_trade_is_open(self):
+        alert = "↩️ RETOURNEMENT LONG ⬆️ — test"
+        r = {
+            "m1": [{"t": 1000, "o": 100.0, "h": 101.0, "l": 99.0, "c": 100.0}],
+            "r5": [50.0, 50.0], "confirme": -1, "t": 1000,
+            "posD": 0.5, "posW": 0.5, "dirs": [0] * 11,
+            "atr": 1.0, "b15": [{"t": 900, "c": 100.0}],
+            "b5": [{"t": 900, "o": 100.0, "h": 101.0, "l": 99.0, "c": 100.0}]
+        }
+        for market in ("GOLD", "NASDAQ"):
+            trade = {"d": -1, "e": 100.0, "sl": 102.0, "tp1": 96.0, "tp2": 94.0,
+                     "statut": "entree", "cree": 1000, "encore": 1, "be_dit": True}
+            cle = {"trade": trade}
+            with unittest.mock.patch.object(align_bot, "manipulation"), \
+                 unittest.mock.patch.object(align_bot, "meche_suspecte"), \
+                 unittest.mock.patch.object(align_bot, "niveaux_cles"), \
+                 unittest.mock.patch.object(align_bot, "resistance_fvg"), \
+                 unittest.mock.patch.object(align_bot, "suivre_apres_sl"), \
+                 unittest.mock.patch.object(align_bot, "radar_climax", return_value=None), \
+                 unittest.mock.patch.object(align_bot, "retournement_marche", return_value=alert) as watch, \
+                 unittest.mock.patch.object(align_bot, "alerte_retournement", return_value=None), \
+                 unittest.mock.patch.object(align_bot, "frole_tp", return_value=None), \
+                 unittest.mock.patch.object(align_bot, "retour_entree", return_value=None):
+                out = align_bot.agent(market, r, cle, "")
+            watch.assert_called_once_with(market, r, cle)
+            self.assertTrue(any(alert in str(item) for item in out), market)
+
+
+
 if __name__ == "__main__":
     unittest.main()
