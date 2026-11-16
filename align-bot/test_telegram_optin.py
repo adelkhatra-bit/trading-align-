@@ -41,6 +41,15 @@ class TelegramOptIn(unittest.TestCase):
         self.assertFalse(ab.coach_abonne(etat, "10", "GOLD"))
         self.assertTrue(ab.coach_abonne(etat, "10", "NASDAQ"))
 
+    def test_carte_affiche_activer_ou_desactiver_le_coach_selon_le_consentement(self):
+        import json
+        actif = json.loads(ab.markup_analyse({"coach_optin": {"GOLD": ["10"]}}, "GOLD", {}, "10"))
+        callbacks_actif = [b["callback_data"] for row in actif["inline_keyboard"] for b in row]
+        self.assertIn("coachoff:GOLD", callbacks_actif)
+        inactif = json.loads(ab.markup_analyse({"coach_optin": {}}, "GOLD", {}, "10"))
+        callbacks_inactif = [b["callback_data"] for row in inactif["inline_keyboard"] for b in row]
+        self.assertIn("auto:GOLD", callbacks_inactif)
+
     def test_desactivation_coach_efface_abonnement_et_alertes_en_attente(self):
         etat = {"coach_optin": {"GOLD": ["10"]}, "auto": {"GOLD": ["10"]},
                 "veille_cloture": {"GOLD": {"10": {"tf": "15 min"}}},
