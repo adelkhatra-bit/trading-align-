@@ -1,4 +1,4 @@
-"""Safety regressions: Gold/NASDAQ must not publish countertrend entries."""
+"""Régressions directionnelles : GOLD/NASDAQ ne publient pas d'entrées contre H1/H4."""
 import os
 import sys
 import unittest
@@ -15,12 +15,26 @@ def candle(t, o=100.0, h=101.0, l=99.0, c=100.0, v=100):
 def retest_r(h4):
     bars = [candle(i * 900) for i in range(40)]
     bars[20]["h"] = 102.0
-    for i in range(33, 38):
+    for i in range(34, 38):
         bars[i] = candle(i * 900, o=102.5, h=104.0, l=102.2, c=103.0)
     bars[38] = candle(38 * 900, o=102.2, h=103.0, l=101.9, c=102.5)
     dirs = [0] * 11
     dirs[2], dirs[4], dirs[7], dirs[9] = 1, 1, 1, h4
     return dict(b15=bars, dirs=dirs, atr=1.0, t=40000)
+
+
+def reversal_r(dirs, volume_last=100, price=100.0):
+    b5 = [candle(i * 300, 100 - (i % 3)) for i in range(20)]
+    b15 = [candle(i * 900) for i in range(50)]
+    b15[-2]["v"] = volume_last
+    b1 = [candle(i * 3600, 100, h=110, l=90) for i in range(10)]
+    b4 = [candle(i * 14400, 100, h=130, l=70) for i in range(10)]
+    return dict(dirs=dirs, b5=b5, b15=b15, b15_long=b15,
+                b1h=b1, b4h=b4, m1=[candle(0, price)], t=10000)
+
+
+LONG_GOLD = [1, 1, 1, 0, 1, 0, -1, -1, -1, -1, -1]
+LONG_BTC = [1, 1, 1, 0, 1, 1, 1, 1, -1, -1, -1]
 
 
 class DirectionSafety(unittest.TestCase):
@@ -37,12 +51,13 @@ class DirectionSafety(unittest.TestCase):
 
     def test_sniper_requires_both_h1_and_h4_for_gold_nasdaq(self):
         for market in ("GOLD", "NASDAQ"):
-            r = {"market": market, "dirPlan": 1, "dirs": [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]}
-            proposal, reason = ab._sniper(r)
-            self.assertIsNone(proposal)
-            self.assertIn("CONFLUENCE_H1_H4", reason)
-        btc = {"market": "BTC", "dirPlan": 1, "dirs": [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]}
-        _, reason_btc = ab._sniper(btc)
+            for h1, h4 in ((1, 0), (0, 1), (-1, -1), (1, -1)):
+                dirs = [0] * 11
+                dirs[7], dirs[9] = h1, h4
+                proposal, reason = ab._sniper({"market": market, "dirPlan": 1, "dirs": dirs})
+                self.assertIsNone(proposal)
+                self.assertIn("CONFLUENCE_H1_H4", reason)
+        _, reason_btc = ab._sniper({"market": "BTC", "dirPlan": 1, "dirs": [0,0,0,0,0,0,0,1,0,0,0]})
         self.assertNotIn("CONFLUENCE_H1_H4", reason_btc)
 
     def test_gold_nasdaq_climax_is_watch_only_without_h1_h4_confluence(self):
@@ -58,8 +73,19 @@ class DirectionSafety(unittest.TestCase):
             self.assertNotIn("Entrée ≈", msg)
             self.assertNotIn("prenable", msg)
 
+    def test_gold_nasdaq_reversal_is_observation_only_btc_keeps_legacy(self):
+        for market in ("GOLD", "NASDAQ"):
+            msg = ab.retournement_marche(market, reversal_r(LONG_GOLD, 500), {})
+            self.assertIn("RETOURNEMENT EN OBSERVATION", msg)
+            self.assertIn("PAS DE POSITION", msg)
+            self.assertNotIn("Entrée ≈", msg)
+            self.assertNotIn("Cible 1", msg)
+            self.assertIsNone(ab.retournement_marche(market, reversal_r([1,1,1,0,1,0,0,1,0,1,0]), {}))
+        msg_btc = ab.retournement_marche("BTC", reversal_r(LONG_BTC), {})
+        self.assertIn("Cible 1", msg_btc)
+
     def test_gold_nasdaq_do_not_emit_inverse_scalp_events_btc_keeps_legacy(self):
-        r = dict(comp=0, dirs=[0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1],
+        r = dict(comp=0, dirs=[0,0,1,0,1,0,0,1,0,1,1],
                  sniper=None, dirPlan=1, strat="", zone_pine=None)
         fake_si = dict(d=-1, e=100.0)
         for market in ("GOLD", "NASDAQ"):
