@@ -4675,13 +4675,13 @@ def menu_bot(etat, cid):
     on = bot_on(etat, cid)
     # Lecture sans écriture : ce menu peut être affiché pendant une analyse en cours.
     st = etat.get("stats_bot", {}).get(str(cid), {"arrets": 0, "auto": 0})
-    _envoi_sur(cid, text=(f"🤖 MON BOT   {'▶️ ON' if on else '⏸ OFF'}\n━━━━━━━━━━━━\n"
-                          + ("✅ Il entre tout seul dans chaque position\n👀 Vue 15 min • SL un peu sous / au-dessus de la mèche\n🎯 Le coach te suit jusqu'au TP\n"
-                             if on else "⏸ Il n'entre plus pour toi\n🔔 Tu reçois quand même les positions\n")
-                          + f"━━━━━━━━━━━━\n🤖 Positions prises par ton bot   {st['auto']}\n⏸ Arrêts manuels   {st['arrets']}"
+    _envoi_sur(cid, text=(f"🤖 MON BOT   {'▶️ ALERTES ON' if on else '🔕 ALERTES OFF'}\n━━━━━━━━━━━━\n"
+                          + ("🔔 Alertes automatiques activées sur les marchés cochés\n📩 Tu peux les suspendre à tout moment et consulter sur demande\n"
+                             if on else "🔕 Plus de nouvelles alertes automatiques\n📊 Tu peux demander une analyse à tout moment avec « Faire une analyse »\n")
+                          + f"━━━━━━━━━━━━\n🤖 Positions suivies   {st['auto']}\n⏸ Arrêts manuels   {st['arrets']}"
                           + "\n\n" + texte_suivi(etat, cid)),
-               reply_markup=json.dumps({"inline_keyboard": [[{"text": "⏸ Arrêter mon bot", "callback_data": "botoff:x"} if on
-                                                            else {"text": "▶️ Relancer mon bot", "callback_data": "boton:x"}],
+               reply_markup=json.dumps({"inline_keyboard": [[{"text": "🔕 Suspendre les alertes", "callback_data": "botoff:x"} if on
+                                                            else {"text": "🔔 Réactiver les alertes", "callback_data": "boton:x"}],
                                                            [{"text": "📡 Choisir mes marchés", "callback_data": "marketsmenu:x"}],
                                                            [{"text": "🔔 Son pièce", "callback_data": "son:piece"}],
                                                            [bouton_plateforme(etat, cid)]]
@@ -4705,8 +4705,8 @@ def regler_bot(etat, cid, on):
             txt += f"\n🎯 Ta position {', '.join(dedans)} reste suivie jusqu'au TP / SL"
         _envoi_sur(cid, reply_markup=CLAVIER_VISITEUR, text=txt)
         return
-    _envoi_sur(cid, reply_markup=CLAVIER, text=("▶️ Ton bot est relancé\n🤖 Il entre tout seul dans la prochaine position" if on
-                                                else "⏸ Ton bot est arrêté\n🔔 Tu reçois toujours les positions\n▶️ Relance-le avec 🤖 Mon bot"))
+    _envoi_sur(cid, reply_markup=CLAVIER, text=("🔔 Tes alertes sont réactivées\n📡 Tu recevras les alertes des marchés cochés"
+                                                if on else "🔕 Alertes automatiques suspendues\n📊 Tu peux toujours demander une analyse avec « Faire une analyse »\n▶️ Réactive les alertes depuis 🤖 Mon bot"))
 
 def entrer_inscrits(etat, m, tr, chats=()):
     """Le bot vient d'entrer : il fait entrer automatiquement tous les membres dont le bot est ON,
@@ -5886,10 +5886,83 @@ def noter_cloture(etat, m, tr):
     del f[:-300]
 
 
+def cle_audit_trade(m, tr):
+    """Identifiant stable reliant les snapshots MTF à une position, sans dépendre du prix de sortie."""
+    return f"{m}|{int(tr.get('d') or 0)}|{round(float(tr.get('e') or 0), 8)}|{int(float(tr.get('cree') or 0))}"
+
+
+def capturer_snapshot_audit(etat, m, r, cle, messages=None):
+    """Journal forensique compact : état ALIGN + Pine par UT + décision, à chaque cycle."""
+    try:
+        now = int(r.get("t") or time.time())
+        dirs = r.get("dirs") or []
+        rsis = r.get("rsis") or []
+        mtf = {}
+        for i, ut in enumerate(UT):
+            mtf[ut] = {
+                "direction": dirs[i] if i < len(dirs) else None,
+                "rsi": round(float(rsis[i]), 2) if i < len(rsis) and rsis[i] is not None else None
+            }
+        bridge = r.get("tv_indicator_mtf") or {}
+        tv = {"available": bridge.get("available") is True,
+              "reason": bridge.get("reason"),
+              "activeTimeframe": bridge.get("activeTimeframe"),
+              "activeTimeframeAgeMs": bridge.get("activeTimeframeAgeMs"),
+              "receivedTimeframes": bridge.get("receivedTimeframes") or [],
+              "snapshots": {}}
+        champs_tv = ("fresh", "timestamp", "updatedAt", "time", "confirmed", "signal", "verdict",
+                     "entry", "sl", "tp", "long_score", "short_score", "macro_bull", "macro_bear",
+                     "anticipation", "anticipation_force", "zone_proche", "liq_haute_active")
+        for tf, snap in (bridge.get("snapshots") or {}).items():
+            if not isinstance(snap, dict):
+                continue
+            robot = snap.get("robotV12") or {}
+            tv["snapshots"][str(tf)] = {
+                k: snap.get(k) for k in ("fresh", "timestamp", "updatedAt", "time", "confirmed", "ageMs")
+                if k in snap
+            }
+            if isinstance(robot, dict):
+                tv["snapshots"][str(tf)]["robotV12"] = {
+                    k: robot.get(k) for k in champs_tv if k in robot
+                }
+        trade_actif = cle.get("trade")
+        trade_clos = ((cle.get("fin") or [None])[0] if cle.get("fin") else None)
+        ordre = cle.get("ordre")
+        trade = trade_actif or trade_clos or ordre
+        plan = {}
+        if isinstance(trade, dict):
+            for k in ("d", "e", "sl", "sl0", "tp1", "tp2", "cree", "statut", "src", "type",
+                      "sl_ut", "sl_h", "n1", "n2", "rr", "za", "zb", "zmil"):
+                if k in trade:
+                    v = trade[k]
+                    if isinstance(v, (str, int, float, bool)) or v is None:
+                        plan[k] = v
+            plan["plan_source"] = ("position_ouverte" if trade_actif else
+                                   "cloture_dans_ce_cycle" if trade_clos else "ordre_en_preparation")
+            if trade_actif or trade_clos:
+                plan["audit_key"] = cle_audit_trade(m, trade)
+        snap = {
+            "t": now, "price": r.get("m1", [{}])[-1].get("c") if r.get("m1") else None,
+            "confirm": r.get("confirme"), "sens": r.get("sens"), "score": r.get("score"),
+            "pct": r.get("pctH"), "trend": r.get("trendS"), "momentum": r.get("momS"),
+            "mtf": mtf, "tradingview": tv, "trade": plan,
+            "messages": [str(x[0] if isinstance(x, tuple) else x)[:350] for x in (messages or [])[:5]]
+        }
+        hist = etat.setdefault("audit_mtf", {}).setdefault(m, [])
+        # Un seul snapshot par timestamp de cycle et marché.
+        if not hist or hist[-1].get("t") != now:
+            hist.append(snap)
+        del hist[:-600]
+    except Exception as ex:
+        # Le journal d'audit ne doit jamais interrompre le moteur de trading.
+        print("audit MTF snapshot", m, ex, flush=True)
+
+
 def journal_trade(etat, m, tr, sortie, motif, gain):
     j = etat.setdefault("journal_trades", [])
     j.append({"m": m, "d": tr.get("d"), "e": round(float(tr["e"]), 2), "s": round(float(sortie), 2), "g": round(float(gain), 2),
-              "pips": pips(m, sortie - tr["e"]), "t": int(time.time()), "motif": str(motif)[:40]})
+              "pips": pips(m, sortie - tr["e"]), "t": int(time.time()), "motif": str(motif)[:40],
+              "audit_key": cle_audit_trade(m, tr)})
     del j[:-100]
 
 
@@ -7908,6 +7981,10 @@ def valider_et_suivre_marches(etat, cid, user_id, message_id=None):
                    **({"reply_markup": bouton_payer(etat)} if etat.get("lien") else {}))
         return False
     choisis = [m for m in MARCHES if m in marches_choisis(etat, cid)]
+    if not choisis:
+        _envoi_sur(cid, text=("Select at least one market to follow." if anglais else
+                              "Coche au moins un marché pour activer les alertes."))
+        return False
     selectionner_marches_suivi(etat, cid, choisis)
     for m in choisis:
         inscrire_auto(etat, cid, m, notifier=False)
@@ -7930,9 +8007,10 @@ def basculer_marche(etat, cid, marche):
     selectionner_marches_suivi(etat, cid, sorted(actuels))
 
 def marches_choisis(etat, cid):
-    """Marchés cochés par la personne ; sans choix : tous les marchés."""
-    brut = etat.setdefault("marches_par_chat", {}).get(str(cid))
-    return _vers_ensemble(brut) or set(MARCHES)
+    """Marchés cochés par la personne ; anciens comptes sans préférence explicite conservent le réglage historique."""
+    preferences = etat.setdefault("marches_par_chat", {})
+    brut = preferences.get(str(cid))
+    return set(MARCHES) if brut is None else _vers_ensemble(brut)
 
 def marche_selection(etat, cid):
     """Compatibilité : « BTC », « GOLD », « BOTH » (BTC + GOLD) ou la liste des marchés cochés."""
@@ -8004,8 +8082,10 @@ def texte_suivi(etat, cid):
     return "\n".join(lignes)
 
 def menu_marches(etat, cid, message_id=None):
-    """Cases à cocher : chaque personne choisit ses marchés (ex. GOLD + NASDAQ, rien du BTC).
-    Avec message_id, le même menu est mis à jour sur place (pas de nouveau message à chaque case)."""
+    """Cases à cocher : les nouveaux abonnés choisissent explicitement leurs marchés; les anciens réglages restent inchangés."""
+    cid = str(cid)
+    if cid in {str(x) for x in etat.get("coach_pending", [])} and cid not in etat.setdefault("marches_par_chat", {}):
+        etat["marches_par_chat"][cid] = []  # opt-in explicite : aucun marché poussé par défaut aux nouveaux abonnés
     choisis = marches_choisis(etat, cid)
     anglais = str(cid) in LANG_EN
     tout = set(MARCHES) <= set(choisis)
@@ -8021,9 +8101,9 @@ def menu_marches(etat, cid, message_id=None):
              f"☑️ Cochés en ce moment : {coches}\n🔔 Tu reçois uniquement les marchés cochés\n"
              "📍 Le prix peut différer de quelques points selon ton broker : suis les bougies (mèches)")
     if str(cid) in {str(x) for x in etat.get("coach_pending", [])}:
-        texte += ("\n\nAll three markets are selected by default. Untick any market you do not want."
+        texte += ("\n\nNew subscribers start with no market selected. Tick only the markets you want alerts for."
                   if anglais else
-                  "\n\nPar défaut, BTC, GOLD et NASDAQ sont cochés. Décoche les marchés que tu ne souhaites pas suivre.")
+                  "\n\nAucun marché n'est suivi par défaut pour un nouvel abonné. Coche uniquement ceux pour lesquels tu souhaites recevoir des alertes.")
     clavier = json.dumps({"inline_keyboard": lignes})
     if message_id:
         try:
@@ -9576,7 +9656,7 @@ def agent(m, r, cle, ferme):
     except Exception as ex:
         print("radar_climax", ex)
     try:
-        rv_ = retournement_marche(m, r, cle) if (not tr or m == "BTC") else None  # aucune alerte inverse Gold/NASDAQ pendant une position ouverte
+        rv_ = retournement_marche(m, r, cle)  # surveillance active aussi pendant les positions GOLD/NASDAQ : alerte uniquement, aucune clôture automatique
         if rv_ and not (tr and tr.get("d") == (1 if "LONG" in rv_.split("\n")[0] else -1)):
             out.append(rv_)
     except Exception as ex:
@@ -9611,7 +9691,7 @@ def agent(m, r, cle, ferme):
             return out
         # ── Entrée sur CASSURE confirmée (clôture 5 min au-delà du niveau) ──
         pc = plan_cassure(r, d)
-        if pc and pc["t15"] != cle.get("cassure_t") and not r.get("annonce"):
+        if pc and pc.get("rr", 0) >= GAIN_MIN and pc["t15"] != cle.get("cassure_t") and not r.get("annonce"):
             cle["cassure_t"] = pc["t15"]
             tr = dict(pc, statut="entree", cree=r["t"], encore=0, atr_e=r["atr"], sl0=pc.get("sl"))
             tr["profil"] = profil_trade(m, tr, r)
@@ -10668,8 +10748,10 @@ def live_annonces(etat, m, textes):
         elif "RETOUR VERS L'ENTRÉE" in t:
             live_bande(etat, f"BULLE:🔁 {ic} {m} revient vers l'entrée : on respire 😎 • le bot est protégé 🛡 • "
                              f"⏱ clôture dans {min_avant_cloture15()} min" + FIN_BANDE, f"retour{m}", 900, toujours=True)
-        elif "RETOURNEMENT EN PRÉPARATION" in t:
-            live_bande(etat, f"BULLE:↩ {ic} {m} : regarde la ligne RETOURNEMENT • le marché peut se retourner" + FIN_BANDE, f"ret{m}", 900, toujours=True)
+        elif ("RETOURNEMENT EN OBSERVATION" in t or "RETOURNEMENT EN PRÉPARATION" in t
+              or "RETOURNEMENT LONG" in t or "RETOURNEMENT SHORT" in t):
+            live_bande(etat, f"BULLE:↩ {ic} {m} : les petites unités se retournent • on attend la confirmation des grandes unités" + FIN_BANDE,
+                       f"ret{m}", 900, toujours=True)
         elif "MANIPULATION" in t or "MÈCHE SUSPECTE" in t:
             live_bande(etat, f"BULLE:🎣 {ic} {m} : grosse mèche = chasse aux stops • on attend la clôture" + FIN_BANDE, f"meche{m}", 900, toujours=True)
 
@@ -11273,6 +11355,7 @@ def un_tour(etat, chats):
         if cle.get("trade") and deja_cloture(etat, nom_marche, cle["trade"]):
             cle.pop("trade")             # vieille mémoire rechargée : ce trade est déjà clos, on ne le rejoue pas (pas de 2e « STOP TOUCHÉ »)
         nouveaux = [taguer(x, nom_marche) for x in agent(nom_marche, r, cle, ferme)]
+        capturer_snapshot_audit(etat, nom_marche, r, cle, nouveaux)
         live_annonces(etat, nom_marche, nouveaux)
         try:
             canal_resultats(etat, nom_marche, nouveaux)
