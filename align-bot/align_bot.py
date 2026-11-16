@@ -4050,6 +4050,10 @@ def reprise_entree(m, r, cle):
     if r.get("t", 0) - rp["t"] > 6 * 3600:
         cle.pop("reprise", None)
         return None
+    p_actuel = r["m1"][-1]["c"] if r.get("m1") else None
+    if p_actuel is not None and (p_actuel - rp["sl"]) * rp["d"] <= 0:
+        cle.pop("reprise", None)                       # le plan est cassé : même si les UT ne sont pas alignées
+        return None
     if m in ("GOLD", "NASDAQ") and direction_confirmee_marche(m, r.get("dirs_cloturees") or r.get("dirs"), rp.get("d")) != rp.get("d"):
         return None
     b5 = (r.get("b5") or [])[:-1]
