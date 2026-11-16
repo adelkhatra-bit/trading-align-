@@ -1166,7 +1166,7 @@ def profil_strategie(r):
         direction, mode, horizon = 0, "ATTENTE", "aucune durée de position à annoncer"
         contexte, contre = "pas de confluence exploitable entre les unités", False
     # Source unique : le nom de stratégie vient du moteur SCALPING / DAY / SWING (identique à TradingView).
-    strat_, etat_s, motif_s = strategie_alignement(D, direction, r.get("dirW") or 0) if direction else ("", "", "")
+    strat_, etat_s, motif_s = strategie_alignement(D, direction, r.get("dirW") or 0, r.get("market")) if direction else ("", "", "")
     if strat_:
         mode = {"SWING": "SWING", "DAY": "DAY TRADING", "SCALPING": "SCALPING"}[strat_] + (" CONTRE-TENDANCE" if contre and strat_ == "SCALPING" else "")
         horizon = {"SWING": "plusieurs jours si la structure H4 / D1 reste valide",
