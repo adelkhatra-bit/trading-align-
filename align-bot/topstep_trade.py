@@ -154,19 +154,53 @@ def executer(etat, signal, journal=print):
         fut = None
     ecart = (fut - signal["e"]) if fut else 0.0
     d = 1 if signal["sens"] == "LONG" else -1
-    etat["topstep_pos"] = {"marche": m, "d": d, "n": n, "etape": 0, "contractId": c["id"], "tick": ts,
-                           "e": arrondi_tick(signal["e"] + ecart, ts), "sl": arrondi_tick(signal["e"] + ecart - d * tk * ts, ts),
-                           "tp1": arrondi_tick(signal["tp"] + ecart, ts),
-                           "tp2": arrondi_tick((signal.get("tp2") or signal["tp"] + (signal["tp"] - signal["e"])) + ecart, ts),
-                           "test": not REEL}
+    e_plan = arrondi_tick(signal["e"] + ecart, ts)
+    tp1_plan = arrondi_tick(signal["tp"] + ecart, ts)
+    tp2_plan = arrondi_tick((signal.get("tp2") or signal["tp"] + (signal["tp"] - signal["e"])) + ecart, ts)
+    plan = {"marche": m, "d": d, "n": n, "etape": 0, "contractId": c["id"], "tick": ts,
+            "e": e_plan, "sl": arrondi_tick(e_plan - d * tk * ts, ts),
+            "tp1": tp1_plan, "tp2": tp2_plan, "test": not REEL,
+            "signal_e": float(signal["e"]), "tp1_distance": abs(float(signal["tp"]) - float(signal["e"])),
+            "tp2_distance": abs(float(signal.get("tp2") or signal["tp"] + (signal["tp"] - signal["e"])) - float(signal["e"])),
+            "ticks_sl": tk}
     if not REEL:
-        journal(f"TOPSTEP TEST {ordre} plan {etat['topstep_pos']}")
-        return {"ok": True, "test": True, "ordre": ordre}
+        etat["topstep_pos"] = plan
+        journal(f"TOPSTEP TEST {ordre} plan {plan}")
+        return {"ok": True, "test": True, "ordre": ordre, "prix_entree": e_plan,
+                "sl": plan["sl"], "tp1": tp1_plan, "tp2": tp2_plan}
     r = _api("/Order/place", ordre, jeton)
     journal(f"TOPSTEP {m} {signal['sens']} → {r}")
     if not r.get("success"):
-        etat.pop("topstep_pos", None)
-    return {"ok": bool(r.get("success")), "reponse": r, "ordre": ordre}
+        raison = str(r.get("errorMessage") or r.get("message") or r.get("errorCode") or "ordre refusé par Topstep")
+        if "bracket" in raison.lower() or "position brackets" in raison.lower() or "oco" in raison.lower():
+            raison += " — vérifie le réglage du compte Topstep : Auto OCO Brackets doit être activé pour accepter stopLossBracket."
+        return {"ok": False, "raison": raison, "reponse": r, "ordre": ordre}
+    plan.update(pending=True, cree=time.time(), order_id=r.get("orderId") or r.get("id"), test=False)
+    etat["topstep_pos"] = plan
+    positions = _api("/Position/searchOpen", {"accountId": int(COMPTE)}, jeton).get("positions") or []
+    remplie = next((p for p in positions if str(p.get("contractId")) == str(c["id"])), None)
+    if remplie:
+        _confirmer_remplissage(plan, remplie)
+    return {"ok": True, "pending": bool(plan.get("pending")), "reponse": r, "ordre": ordre,
+            "prix_entree": plan["e"], "sl": plan["sl"], "tp1": plan["tp1"], "tp2": plan["tp2"]}
+
+
+def _confirmer_remplissage(plan, position):
+    """Remplace le prix estimé par le vrai prix moyen d'exécution du broker."""
+    prix = position.get("averagePrice") or position.get("avgPrice") or position.get("openPrice")
+    if prix is None:
+        return False
+    prix = float(prix)
+    delta = prix - float(plan.get("e", prix))
+    plan["e"] = arrondi_tick(prix, float(plan["tick"]))
+    plan["sl"] = arrondi_tick(float(plan["sl"]) + delta, float(plan["tick"]))
+    plan["tp1"] = arrondi_tick(float(plan["tp1"]) + delta, float(plan["tick"]))
+    plan["tp2"] = arrondi_tick(float(plan["tp2"]) + delta, float(plan["tick"]))
+    plan["n"] = int(position.get("size") or plan.get("n", 1))
+    plan["pending"] = False
+    plan["fill_confirme"] = True
+    plan.pop("cree", None)
+    return True
 
 
 def nb_contrats(tk, valeur_tick):
@@ -192,52 +226,114 @@ def _stop_ouvert(jeton, contrat_id):
 
 
 def gerer(etat, prix=None, journal=print):
-    """À chaque tour du bot : gère la position Topstep ouverte (TP1 → 50 % coupés + BE, TP2 → tout fermé, SL → fin).
-    Renvoie les messages à envoyer au propriétaire. En mode TEST, rien n'est envoyé à Topstep, on suit seulement le plan."""
+    """Suit la position Topstep : confirmation du fill, TP1/BE puis TP2. En réel, seul le broker confirme une clôture."""
     pos = etat.get("topstep_pos")
     if not pos:
         return []
-    p = prix if prix is not None else prix_futures(pos["marche"])
+    d, m = pos["d"], pos["marche"]
+    jeton = connexion() if REEL else None
+    if REEL and not jeton:
+        return []                         # connexion perdue : ne jamais déclarer un TP/SL ni effacer le suivi
+    broker_pos = None
+    if REEL:
+        rep = _api("/Position/searchOpen", {"accountId": int(COMPTE)}, jeton)
+        if rep.get("success") is False:
+            return []
+        broker_pos = next((x for x in (rep.get("positions") or [])
+                           if str(x.get("contractId")) == str(pos.get("contractId"))), None)
+        if not broker_pos:
+            if pos.get("pending"):
+                age = time.time() - float(pos.get("cree", time.time()))
+                if age < 30:
+                    return []
+                order_id = pos.get("order_id")
+                if order_id:
+                    try:
+                        ann = _api("/Order/cancel", {"accountId": int(COMPTE), "orderId": order_id}, jeton)
+                    except Exception:
+                        ann = {}
+                    if ann.get("success"):
+                        etat.pop("topstep_pos", None)
+                        return [f"⚠️ Topstep {m} : ordre non exécuté après 30 s, annulation confirmée"]
+                if not pos.get("pending_warned"):
+                    pos["pending_warned"] = True
+                    return [f"⚠️ Topstep {m} : ordre accepté mais remplissage non confirmé ; suivi conservé, vérification en cours"]
+                return []
+            etat.pop("topstep_pos", None)
+            return [f"🏁 Topstep {m} : aucune position broker ouverte — position clôturée ou annulée"]
+        if pos.get("pending"):
+            _confirmer_remplissage(pos, broker_pos)
+        pos["n"] = int(broker_pos.get("size") or pos.get("n", 1))
+    p = prix if prix is not None else prix_futures(m)
     if p is None:
         return []
-    d, m, msgs = pos["d"], pos["marche"], []
-    jeton = connexion() if REEL else None
-    if REEL and jeton and not _api("/Position/searchOpen", {"accountId": int(COMPTE)}, jeton).get("positions"):
+    msgs = []
+    if pos.get("be_pending") and REEL:
+        o = _stop_ouvert(jeton, pos["contractId"])
+        if not o:
+            return [f"⚠️ Topstep {m} : TP1 atteint mais stop BE introuvable — position conservée, vérification nécessaire"]
+        mod = _api("/Order/modify", {"accountId": int(COMPTE), "orderId": o["id"],
+                                     "stopPrice": pos["e"], "size": pos.get("be_size", pos["n"])}, jeton)
+        if not mod.get("success"):
+            return [f"⚠️ Topstep {m} : déplacement du SL à BE refusé par le broker — suivi conservé"]
+        pos.update(sl=pos["e"], be_pending=False)
+        msgs.append(f"🔒 Topstep {m} : SL à BE confirmé par le broker")
+    if not REEL and (p - pos["sl"]) * d <= 0:
         etat.pop("topstep_pos", None)
-        return [f"🏁 Topstep {m} : position terminée (SL / BE touché ou fermée)"]
-    if (p - pos["sl"]) * d <= 0:
-        etat.pop("topstep_pos", None)
-        return [f"🛑 Topstep {m} : {'BE touché, 0 risque' if pos['etape'] else 'SL touché'} ({'test' if not REEL else 'réel'})"]
+        return [f"🛑 Topstep {m} : {'BE touché, 0 risque' if pos['etape'] else 'SL touché'} (test)"]
     if pos["etape"] == 0 and (p - pos["tp1"]) * d >= 0:
-        if REEL and jeton:
+        restant = pos["n"] - (pos["n"] // 2 if pos["n"] > 1 else 0)
+        if REEL:
             if pos["n"] > 1:
-                _api("/Position/partialCloseContract", {"accountId": int(COMPTE), "contractId": pos["contractId"], "size": pos["n"] // 2}, jeton)
+                part = _api("/Position/partialCloseContract", {"accountId": int(COMPTE), "contractId": pos["contractId"],
+                                                                "size": pos["n"] // 2}, jeton)
+                if not part.get("success"):
+                    return msgs + [f"⚠️ Topstep {m} : TP1 touché mais clôture partielle refusée — vérification nécessaire"]
             o = _stop_ouvert(jeton, pos["contractId"])
-            if o:
-                _api("/Order/modify", {"accountId": int(COMPTE), "orderId": o["id"], "stopPrice": pos["e"]}, jeton)
-        pos.update(etape=1, sl=pos["e"])
-        msgs.append(f"🎯 Topstep {m} : TP1 touché → " + ("50 % encaissés + " if pos["n"] > 1 else "") + f"SL à l'entrée (BE), on vise le TP2 ({'test' if not REEL else 'réel'})")
+            if not o:
+                pos.update(etape=1, be_pending=True, be_size=restant)
+                return msgs + [f"⚠️ Topstep {m} : TP1 touché, mais stop broker introuvable — je ne prétends pas que le BE est posé"]
+            mod = _api("/Order/modify", {"accountId": int(COMPTE), "orderId": o["id"],
+                                         "stopPrice": pos["e"], "size": restant}, jeton)
+            if not mod.get("success"):
+                pos.update(etape=1, be_pending=True, be_size=restant)
+                return msgs + [f"⚠️ Topstep {m} : TP1 encaissé, mais le broker n'a pas confirmé le SL à BE"]
+        pos.update(etape=1, sl=pos["e"], be_pending=False)
+        msgs.append(f"🎯 Topstep {m} : TP1 touché → " + ("50 % encaissés + " if pos["n"] > 1 else "") +
+                    f"SL à l'entrée (BE) confirmé, on vise le TP2 ({'test' if not REEL else 'réel'})")
     elif pos["etape"] == 1 and (p - pos["tp2"]) * d >= 0:
-        if REEL and jeton:
-            _api("/Position/closeContract", {"accountId": int(COMPTE), "contractId": pos["contractId"]}, jeton)
+        if REEL:
+            fermeture = _api("/Position/closeContract", {"accountId": int(COMPTE), "contractId": pos["contractId"]}, jeton)
+            if not fermeture.get("success"):
+                return msgs + [f"⚠️ Topstep {m} : TP2 atteint mais clôture broker non confirmée — suivi conservé"]
         etat.pop("topstep_pos", None)
-        msgs.append(f"🏆 Topstep {m} : TP2 touché, tout est encaissé ({'test' if not REEL else 'réel'})")
+        msgs.append(f"🏆 Topstep {m} : TP2 touché, clôture broker confirmée ({'test' if not REEL else 'réel'})")
     for x in msgs:
         journal(x)
     return msgs
 
 
 def tout_fermer(journal=print):
-    """Fermeture obligatoire avant la limite Topstep : ferme chaque position ouverte du compte."""
+    """Fermeture obligatoire avant la limite Topstep. None signifie que la connexion ou une clôture n'est pas confirmée."""
     if not COMPTE or not os.environ.get("TOPSTEP_API_KEY"):
-        return []
-    jeton = connexion()
+        return [] if not REEL else None
+    try:
+        jeton = connexion()
+    except Exception as ex:
+        journal(f"TOPSTEP fermeture : connexion impossible ({type(ex).__name__})")
+        return None
     if not jeton:
-        return []
+        return None if REEL else []
+    rep = _api("/Position/searchOpen", {"accountId": int(COMPTE)}, jeton)
+    if rep.get("success") is False:
+        return None
     fait = []
-    for p in _api("/Position/searchOpen", {"accountId": int(COMPTE)}, jeton).get("positions") or []:
+    for p in rep.get("positions") or []:
         if REEL:
-            _api("/Position/closeContract", {"accountId": int(COMPTE), "contractId": p["contractId"]}, jeton)
+            r = _api("/Position/closeContract", {"accountId": int(COMPTE), "contractId": p["contractId"]}, jeton)
+            if not r.get("success"):
+                journal(f"TOPSTEP fermeture refusée pour {p.get('contractId')}")
+                return None
         fait.append(p["contractId"])
     journal(f"TOPSTEP fermeture avant la limite : {fait} ({'réel' if REEL else 'test'})")
     return fait
@@ -259,10 +355,10 @@ _CACHE_PRIX = {}
 
 
 def prix_futures(m, maintenant=None):
-    """Dernier prix du micro-contrat Topstep du marché (cache 60 s). None si Topstep n'est pas branché."""
+    """Dernier prix du micro-contrat Topstep (cache 5 s ; refuse une bougie historique trop ancienne)."""
     t = maintenant or time.time()
     c = _CACHE_PRIX.get(m)
-    if c and t - c[0] < 60:
+    if c and t - c[0] < 5:
         return c[1]
     if m not in SYMBOLES or not os.environ.get("TOPSTEP_API_KEY"):
         return None
@@ -280,7 +376,18 @@ def prix_futures(m, maintenant=None):
     barres = r.get("bars") or []
     if not barres:
         return None
-    p = float(max(barres, key=lambda b: str(b.get("t", "")))["c"])
+    derniere = max(barres, key=lambda b: str(b.get("t", "")))
+    horodatage = derniere.get("t")
+    if horodatage:
+        try:
+            dt = datetime.datetime.fromisoformat(str(horodatage).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=datetime.timezone.utc)
+            if (datetime.datetime.now(datetime.timezone.utc) - dt).total_seconds() > 120:
+                return None
+        except ValueError:
+            return None
+    p = float(derniere["c"])
     _CACHE_PRIX[m] = (t, p)
     return p
 
