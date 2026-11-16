@@ -1002,3 +1002,53 @@ class LiveNarrationPrioritizesM5M15Conflict(unittest.TestCase):
         payload = json.loads(published[0][3:])
         self.assertIn("unités courtes et de référence divergent", payload["NASDAQ"][1][0])
         self.assertIn("timeframes disagree", payload["NASDAQ"][1][1])
+
+
+class LiveDirectionAndMaskRegression(unittest.TestCase):
+    def test_live_commentary_has_current_and_previous_candles(self):
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")
+        source = open(path, encoding="utf-8").read()
+        start = source.index("function commentaireMarcheEnDirect(")
+        end = source.index("let tendN =", start)
+        body = source[start:end]
+        self.assertIn("const cur = B[B.length - 1]", body)
+        self.assertIn("prev = B.slice(-21, -1)", body)
+
+    def test_support_zone_is_forwarded_as_bullish_and_resistance_as_bearish(self):
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")
+        source = open(path, encoding="utf-8").read()
+        self.assertIn("L === PHRASES.bas_zone ? 1 : -1", source)
+        self.assertNotIn("L === PHRASES.bas_zone ? -1 : 1", source)
+
+    def test_fvg_ob_events_use_zone_route_not_line_route(self):
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")
+        source = open(path, encoding="utf-8").read()
+        self.assertIn("versBot('zone', sensZone", source)
+        self.assertIn("const typeZone = /FVG/i.test(label)", source)
+
+    def test_entry_price_mask_stays_visible_during_refresh_and_dialogs(self):
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")
+        source = open(path, encoding="utf-8").read()
+        self.assertIn("if (!cel) return; // conserver le dernier masque valide", source)
+        self.assertIn("html.align-cache #align-masque{visibility:visible!important}", source)
+        self.assertNotIn("if (!cel) { masque.style.display = 'none'; return; }", source)
+
+    def test_pull_mode_allows_only_the_registered_spectacle_channel(self):
+        previous = getattr(ab.TELEGRAM_PULL_CONTEXT, "live_channel_id", None)
+        try:
+            with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True):
+                ab.TELEGRAM_PULL_CONTEXT.live_channel_id = "-100-market"
+                self.assertTrue(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "-100-market", "text": "live event"}))
+                self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "-100-other", "text": "live event"}))
+                self.assertFalse(ab._telegram_sortant_autorise("sendPhoto", {"chat_id": "-100-market", "photo": "x"}))
+        finally:
+            ab.TELEGRAM_PULL_CONTEXT.live_channel_id = previous
+
+    def test_micro_reversal_and_radar_observation_are_sent_to_live_banner(self):
+        with mock.patch.object(ab, "live_bande") as banner:
+            ab.live_annonces({}, "GOLD", [
+                "↩️ PRÉ-ALERTE RETOURNEMENT LONG — GOLD",
+                "👀 RADAR CLIMAX — SURVEILLANCE / SCÉNARIO LONG EN PRÉPARATION — GOLD"
+            ])
+        self.assertGreaterEqual(banner.call_count, 1)
+        self.assertTrue(any("retGOLD" in str(call) for call in banner.call_args_list))
