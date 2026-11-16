@@ -5886,10 +5886,77 @@ def noter_cloture(etat, m, tr):
     del f[:-300]
 
 
+def cle_audit_trade(m, tr):
+    """Identifiant stable reliant les snapshots MTF à une position, sans dépendre du prix de sortie."""
+    return f"{m}|{int(tr.get('d') or 0)}|{round(float(tr.get('e') or 0), 8)}|{int(float(tr.get('cree') or 0))}"
+
+
+def capturer_snapshot_audit(etat, m, r, cle, messages=None):
+    """Journal forensique compact : état ALIGN + Pine par UT + décision, à chaque cycle."""
+    try:
+        now = int(r.get("t") or time.time())
+        dirs = r.get("dirs") or []
+        rsis = r.get("rsis") or []
+        mtf = {}
+        for i, ut in enumerate(UT):
+            mtf[ut] = {
+                "direction": dirs[i] if i < len(dirs) else None,
+                "rsi": round(float(rsis[i]), 2) if i < len(rsis) and rsis[i] is not None else None
+            }
+        bridge = r.get("tv_indicator_mtf") or {}
+        tv = {"available": bridge.get("available") is True,
+              "reason": bridge.get("reason"),
+              "activeTimeframe": bridge.get("activeTimeframe"),
+              "activeTimeframeAgeMs": bridge.get("activeTimeframeAgeMs"),
+              "receivedTimeframes": bridge.get("receivedTimeframes") or [],
+              "snapshots": {}}
+        champs_tv = ("fresh", "timestamp", "updatedAt", "time", "confirmed", "signal", "verdict",
+                     "entry", "sl", "tp", "long_score", "short_score", "macro_bull", "macro_bear",
+                     "anticipation", "anticipation_force", "zone_proche", "liq_haute_active")
+        for tf, snap in (bridge.get("snapshots") or {}).items():
+            if not isinstance(snap, dict):
+                continue
+            robot = snap.get("robotV12") or {}
+            tv["snapshots"][str(tf)] = {
+                k: snap.get(k) for k in ("fresh", "timestamp", "updatedAt", "time", "confirmed", "ageMs")
+                if k in snap
+            }
+            if isinstance(robot, dict):
+                tv["snapshots"][str(tf)]["robotV12"] = {
+                    k: robot.get(k) for k in champs_tv if k in robot
+                }
+        trade = cle.get("trade") or ((cle.get("fin") or [None])[0] if cle.get("fin") else None)
+        plan = {}
+        if isinstance(trade, dict):
+            for k in ("d", "e", "sl", "sl0", "tp1", "tp2", "cree", "statut", "src", "type",
+                      "sl_ut", "sl_h", "n1", "n2", "rr"):
+                if k in trade:
+                    v = trade[k]
+                    if isinstance(v, (str, int, float, bool)) or v is None:
+                        plan[k] = v
+            plan["audit_key"] = cle_audit_trade(m, trade)
+        snap = {
+            "t": now, "price": r.get("m1", [{}])[-1].get("c") if r.get("m1") else None,
+            "confirm": r.get("confirme"), "sens": r.get("sens"), "score": r.get("score"),
+            "pct": r.get("pctH"), "trend": r.get("trendS"), "momentum": r.get("momS"),
+            "mtf": mtf, "tradingview": tv, "trade": plan,
+            "messages": [str(x[0] if isinstance(x, tuple) else x)[:500] for x in (messages or [])[:8]]
+        }
+        hist = etat.setdefault("audit_mtf", {}).setdefault(m, [])
+        # Un seul snapshot par timestamp de cycle et marché.
+        if not hist or hist[-1].get("t") != now:
+            hist.append(snap)
+        del hist[:-1200]
+    except Exception as ex:
+        # Le journal d'audit ne doit jamais interrompre le moteur de trading.
+        print("audit MTF snapshot", m, ex, flush=True)
+
+
 def journal_trade(etat, m, tr, sortie, motif, gain):
     j = etat.setdefault("journal_trades", [])
     j.append({"m": m, "d": tr.get("d"), "e": round(float(tr["e"]), 2), "s": round(float(sortie), 2), "g": round(float(gain), 2),
-              "pips": pips(m, sortie - tr["e"]), "t": int(time.time()), "motif": str(motif)[:40]})
+              "pips": pips(m, sortie - tr["e"]), "t": int(time.time()), "motif": str(motif)[:40],
+              "audit_key": cle_audit_trade(m, tr)})
     del j[:-100]
 
 
@@ -11273,6 +11340,7 @@ def un_tour(etat, chats):
         if cle.get("trade") and deja_cloture(etat, nom_marche, cle["trade"]):
             cle.pop("trade")             # vieille mémoire rechargée : ce trade est déjà clos, on ne le rejoue pas (pas de 2e « STOP TOUCHÉ »)
         nouveaux = [taguer(x, nom_marche) for x in agent(nom_marche, r, cle, ferme)]
+        capturer_snapshot_audit(etat, nom_marche, r, cle, nouveaux)
         live_annonces(etat, nom_marche, nouveaux)
         try:
             canal_resultats(etat, nom_marche, nouveaux)
