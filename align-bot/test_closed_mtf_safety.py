@@ -78,6 +78,21 @@ class ClosedMtfSafety(unittest.TestCase):
         ctx["tv_indicator_mtf"]["snapshots"]["M5"]["robotV12"]["lecture_60m"] = "SHORT"
         self.assertEqual(ab.direction_confirmee_marche("GOLD", [1] * 11, 1, ctx), 0)
 
+    def test_gold_nasdaq_plan_direction_requires_all_four_fresh_closed_timeframes(self):
+        now = int(time.time())
+        ctx = fresh_context(now)
+        aligned = [1] * 11
+        for market in ("GOLD", "NASDAQ"):
+            self.assertEqual(ab.direction_plan_autorisee(market, 1, aligned, ctx), 1)
+            for idx in (2, 4, 7, 9):
+                conflicting = aligned.copy()
+                conflicting[idx] = -1
+                self.assertEqual(ab.direction_plan_autorisee(market, 1, conflicting, ctx), 0)
+            stale = fresh_context(now)
+            stale["b5"][-2]["t"] = now - 1000
+            self.assertEqual(ab.direction_plan_autorisee(market, 1, aligned, stale), 0)
+        self.assertEqual(ab.direction_plan_autorisee("BTC", 1, [0] * 11, {}), 1)
+
     def test_strategy_blocks_gold_nasdaq_when_m5_or_m15_conflicts_but_preserves_btc(self):
         aligned = [1] * 11
         for market in ("GOLD", "NASDAQ"):
