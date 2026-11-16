@@ -10,7 +10,7 @@ def bar(t, c, h=None, l=None, v=100):
 def r_(dirs, vol_dernier=100, prix=100.0):
     b5 = [bar(i * 300, 100 - (i % 3)) for i in range(20)]
     b15 = [bar(i * 900, 100) for i in range(50)]
-    b15[-2]["v"] = vol_dernier
+    b15[-1]["v"] = vol_dernier
     b1 = [bar(i * 3600, 100, h=110, l=90) for i in range(10)]
     b4 = [bar(i * 14400, 100, h=130, l=70) for i in range(10)]
     return dict(dirs=dirs, b5=b5, b15=b15, b1h=b1, b4h=b4, m1=[bar(0, prix)], t=10000)
@@ -32,6 +32,16 @@ class RetournementParMarche(unittest.TestCase):
         self.assertNotIn("Cible 1", t)
         self.assertNotIn("TP1", t)
         self.assertIsNone(ab.retournement_marche("GOLD", r_(LONG_GOLD), cle))
+
+    def test_only_explicitly_forming_bars_are_excluded(self):
+        base = r_(LONG_GOLD)
+        expected = ab.retournement_marche("GOLD", base, {})
+        live = r_(LONG_GOLD)
+        for key in ("b5", "b15", "b1h", "b4h"):
+            last = dict(live[key][-1])
+            last.update(t=last["t"] + 999999, h=999.0, l=1.0, forming=True)
+            live[key] = live[key] + [last]
+        self.assertEqual(ab.retournement_marche("GOLD", live, {}), expected)
 
     def test_gold_ne_declenche_plus_de_veille_si_h1_h4_ont_confirme(self):
         dirs = list(LONG_GOLD)
