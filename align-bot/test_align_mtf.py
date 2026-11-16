@@ -2245,7 +2245,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
         self.assertTrue(align_bot.marche_autorise(state, "202", "GOLD"))
 
     def test_market_message_routing_keeps_btc_and_gold_separate(self):
-        state = {"marches_par_chat": {"101": "BTC", "202": "GOLD", "303": "BOTH"}, "canal": "-1000"}
+        state = {"marches_par_chat": {"101": "BTC", "202": "GOLD", "303": "BOTH"}, "telegram_optin_chats": ["101", "202", "303"], "canal": "-1000"}
         chats = {"101", "202", "303"}
         btc = align_bot.destinataires_message(state, chats, "🟠 BTC — SIGNAL EN ATTENTE\\nPrix 70000")
         gold = align_bot.destinataires_message(state, chats, "🥇 GOLD — SIGNAL CONFIRMÉ\\nPrix 4000")
@@ -2347,8 +2347,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
         state = {"prospects": ["7", "8"], "bot_off": ["7"], "marches_par_chat": {"8": "BTC"}, "GOLD": {"trade": {"cree": 5}}}
         with patch.object(align_bot, "telegram") as tg, patch.object(align_bot, "PROPRIO_VUE_GRATUITE", False):
             align_bot.envoyer_prospects(state, "🥇 GOLD — J'ENTRE MAINTENANT\nEntrée 3990.50", True)
-        self.assertEqual([c.kwargs["chat_id"] for c in tg.call_args_list], ["7"])
-        self.assertIn("OFF", tg.call_args_list[0].kwargs["text"])
+        self.assertEqual(tg.call_args_list, [])  # Bot OFF et aucun opt-in : silence total
 
     def test_share_reminder_once_per_planned_day(self):
         import datetime
@@ -2361,7 +2360,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
 
     def test_mixed_market_macro_alert_goes_to_each_concerned_account_with_only_its_markets(self):
         """Règle remplacée (demande d'Adel) : un message multi-marchés arrive à chaque compte concerné, mais réduit à SES marchés cochés."""
-        state = {"marches_par_chat": {"101": "BTC", "202": "GOLD", "303": "BOTH", "404": ["NASDAQ"]}}
+        state = {"marches_par_chat": {"101": "BTC", "202": "GOLD", "303": "BOTH", "404": ["NASDAQ"]}, "telegram_optin_chats": ["101", "202", "303", "404"]}
         texte = "💵 DOLLAR EN FORTE HAUSSE\n🥇 GOLD : prudence\n🟠 BTC : prudence"
         recipients = align_bot.destinataires_message(state, {"101", "202", "303", "404"}, texte)
         self.assertEqual(set(recipients), {"101", "202", "303"})                  # 404 (NASDAQ seul) n'est pas concerné
