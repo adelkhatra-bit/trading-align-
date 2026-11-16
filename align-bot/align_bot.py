@@ -566,14 +566,12 @@ def plan_fvg(d, st, ent, sl, tp1, tp2, ut_nom="", tick=0.01):
         c2 = swL if e - swL >= rq else None
         if c1 is None and c2 is None:
             t1, n1 = (tp1, "objectif du plan") if tp1 is not None and e - tp1 >= rq else (e - 2 * (s - e), "2 x le risque")
+            t2, n2 = (tp2, "TP2 du plan") if tp2 is not None and e - tp2 > e - t1 else (e - 3 * (s - e), "projection 3 x le risque")
         elif c1 is None or c2 is None:
             t1, n1 = (c1, f"FVG verte {ut_nom}") if c1 is not None else (c2, f"dernier plus bas {ut_nom}")
+            t2, n2 = (tp2, "TP2 du plan") if tp2 is not None and tp2 < t1 else (tp1, "TP1 du plan") if tp1 is not None and tp1 < t1 else (e - 3 * (s - e), "projection 3 x le risque")
         else:
             t1, n1 = (c1, f"FVG verte {ut_nom}") if c1 >= c2 else (c2, f"dernier plus bas {ut_nom}")
-        if c1 is None or c2 is None:
-            t2 = min(t1, tp1) if tp1 is not None else t1
-            n2 = "objectif du plan" if t2 != t1 else n1
-        else:
             t2 = min(c1, c2); n2 = f"FVG verte {ut_nom}" if t2 == c1 else f"dernier plus bas {ut_nom}"
         src = f"{'FVG rouge' if obRL is None else 'Order block + FVG rouge'} {ut_nom}"
     else:
@@ -586,18 +584,17 @@ def plan_fvg(d, st, ent, sl, tp1, tp2, ut_nom="", tick=0.01):
         c2 = swH if swH - e >= rq else None
         if c1 is None and c2 is None:
             t1, n1 = (tp1, "objectif du plan") if tp1 is not None and tp1 - e >= rq else (e + 2 * (e - s), "2 x le risque")
+            t2, n2 = (tp2, "TP2 du plan") if tp2 is not None and tp2 - e > t1 - e else (e + 3 * (e - s), "projection 3 x le risque")
         elif c1 is None or c2 is None:
             t1, n1 = (c1, f"FVG rouge {ut_nom}") if c1 is not None else (c2, f"dernier plus haut {ut_nom}")
+            t2, n2 = (tp2, "TP2 du plan") if tp2 is not None and tp2 > t1 else (tp1, "TP1 du plan") if tp1 is not None and tp1 > t1 else (e + 3 * (e - s), "projection 3 x le risque")
         else:
             t1, n1 = (c1, f"FVG rouge {ut_nom}") if c1 <= c2 else (c2, f"dernier plus haut {ut_nom}")
-        if c1 is None or c2 is None:
-            t2 = max(t1, tp1) if tp1 is not None else t1
-            n2 = "objectif du plan" if t2 != t1 else n1
-        else:
             t2 = max(c1, c2); n2 = f"FVG rouge {ut_nom}" if t2 == c1 else f"dernier plus haut {ut_nom}"
         src = f"{'FVG verte' if obGH is None else 'Order block + FVG verte'} {ut_nom}"
-    if d * (t2 - t1) < 0:
-        t2, n2 = t1, n1
+    if d * (t2 - t1) <= 0:
+        t2 = t1 + d * max(2 * abs(t1 - e), 2 * aS, 3 * tick)
+        n2 = "projection 3 x le risque"
     if d * (e - s) <= 0 or d * (t1 - e) <= 0:
         return None                                         # sécurité du Pine : SL / TP du mauvais côté → plan d'origine
     za, zb = (e, s - 0.25 * (s - e)) if d == -1 else (s + 0.25 * (e - s), e)
