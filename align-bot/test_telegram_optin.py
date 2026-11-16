@@ -88,6 +88,12 @@ class TelegramOptIn(unittest.TestCase):
         self.assertEqual(etat["veille_cloture"]["GOLD"], {})
         send.assert_not_called()
 
+    def test_clavier_de_demarrage_n_est_pas_pousse_sans_optin(self):
+        etat = {"prospects": ["10"], "coach_optin": {}, "auto": {}, "clavier_v": {}}
+        with mock.patch.object(ab, "TOKEN", "test"), mock.patch.object(ab, "_envoi_sur") as send:
+            ab.renvoyer_claviers(etat, {"10"})
+        send.assert_not_called()
+
     def test_jauge_ne_cree_aucun_message_sans_optin(self):
         etat = {"auto": {}, "coach_optin": {}, "marches_par_chat": {"10": ["GOLD"]}}
         with mock.patch.object(ab, "telegram") as tg:
