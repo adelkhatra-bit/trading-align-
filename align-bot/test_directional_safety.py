@@ -230,6 +230,14 @@ class DirectionSafety(unittest.TestCase):
         self.assertIn("M5 baissière", nxt)
         self.assertIn("Aucune position pour l'instant", why)
 
+        aligned = [1] * 11
+        live_against = {"market": "NASDAQ", "dirs": aligned, "dirs_cloturees": aligned, "confirme": 0,
+                        "r5": [50, 45, 40], "rsis": [50] * 11, "posD": 0.5, "posW": 0.5,
+                        "b5": [candle(0, c=100), candle(300, c=100)], "atr5": 1.0,
+                        "m1": [candle(int(__import__("time").time()), c=98.9)]}
+        self.assertIn("cours en direct", ab.prochaine(live_against, {}).lower())
+        self.assertIn("cours direct", ab.raison_attente(live_against, {}).lower())
+
     def test_gold_nasdaq_live_price_invalidates_stale_direction_or_stale_feed(self):
         dirs = [1] * 11
         ctx = {"m1": [candle(int(__import__("time").time()), c=98.9)],
