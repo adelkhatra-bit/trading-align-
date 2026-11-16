@@ -84,9 +84,8 @@ function pad(n) { return (n < 10 ? "0" : "") + n; }
 function heure(t) { var d = new Date(t * 1000); return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
 
 function pct(v, n) { return v == null ? "n/d" : (v > 0 ? "+" : "") + Number(v).toFixed(n).replace(".", ",") + " %"; }
-function chrono15(m, age) {
-  if (m.reste15 == null) return "n/d";
-  var s = Math.max(0, Math.floor(Number(m.reste15) - age));
+function chrono15() {
+  var s = 900 - Math.floor(Date.now() / 1000) % 900;
   return pad(Math.floor(s / 60)) + ":" + pad(s % 60);
 }
 function rendre() {
@@ -106,7 +105,7 @@ function rendre() {
       ((String(m.volume_source || "").toLowerCase().indexOf("proxy") >= 0 || String(m.volume_source || "").toLowerCase().indexOf("paxg") >= 0) ? " indicatif" : "");
     var atr = pct(m.atr5_pct, 3);
     var bougie = m.bougie5m || "indisponible";
-    var chrono = chrono15(m, age);
+    var chrono = chrono15();
     c.innerHTML = '<div class="ligne1"><div class="nom">' + (ICONES[m.m] || "") + " " + m.m + '</div><div class="badge b-' + etat + '">' + (ETATS[etat] || ETATS.calme) + "</div></div>" +
       '<div class="detail"><span>Biais : ' + m.biais + "</span><span>UT alignées : " + m.ut + "/11 (seuil " + m.seuil + ")</span><span>Profil : " + m.profil + "</span></div>" +
       '<div class="detail compteurs"><span>Mouvement 5m : <strong>' + mouvement + '</strong></span><span>Bougie : <strong>' + bougie + '</strong></span>' +
@@ -114,7 +113,7 @@ function rendre() {
       '<div class="barre">' + barre + "</div>";
     cartes.appendChild(c);
   });
-  if (prep.length) { ann.style.display = "block"; ann.textContent = "🔔 Suivi actif : " + prep.join(" • ") + " → niveaux et détails sur le Telegram gratuit " + BOT; }
+  if (prep.length) { ann.style.display = "block"; ann.textContent = "🔔 Position en préparation sur " + prep.join(" • ") + " → niveaux et détails sur le Telegram gratuit " + BOT; }
 }
 
 /* ─────────── Les deux animateurs : phrases composées à partir des données, jamais deux fois la même de suite ─────────── */
@@ -144,16 +143,16 @@ var DIALOGUES = {
   ],
   signal: [
     ["Signal ALIGN confirmé sur {m} : biais {biais}, {ut}/11 unités alignées.", "Un signal n'est pas encore une position broker : on attend la confirmation d'exécution."],
-    ["Le plan {profil} est validé sur {m}.", "Le prix d'entrée, le SL et les TP sont vérifiés dans le bot avant de parler d'ordre."]
+    ["Le plan {profil} est validé sur {m}.", "Le prix d'entrée et les objectifs sont vérifiés dans le bot avant de parler d'ordre."]
   ],
   ordre_en_attente: [
     ["Ordre transmis au broker sur {m}.", "On attend le prix réellement exécuté : pas de position annoncée avant confirmation."],
     ["{m} : ordre en attente de remplissage.", "Le stop et les objectifs ne sont annoncés comme actifs qu'après confirmation du broker."]
   ],
   entree: [
-    ["Une position broker est confirmée sur {m}.", "Le suivi réel du trade est en cours ; on surveille le SL, le BE et les objectifs."],
+    ["Une position broker est confirmée sur {m}.", "Le suivi réel du trade est en cours ; on surveille la protection et les objectifs."],
     ["{m} : l'exécution broker est confirmée.", "On suit le prix réellement exécuté, pas une estimation."],
-    ["Sur {m}, la position {profil} est ouverte sur le compte connecté.", "Le stop existe pour protéger le capital, on le respecte."]
+    ["Sur {m}, la position {profil} est ouverte sur le compte connecté.", "La protection existe pour préserver le capital, on la respecte."]
   ],
   ferme: [
     ["{m} est fermé pour le moment.", "On profite pour préparer la reprise, sans rien inventer."],
@@ -199,9 +198,9 @@ function charger() {
 var demo = /[?&]demo=1/.test(location.search);
 if (demo) {
   donnees = { maj: Math.floor(Date.now() / 1000), bot: BOT, marches: [
-    { m: "BTC", etat: "calme", biais: "indecis", ut: 5, seuil: 8, profil: "aucun", mouvement5m_pct: 0.012, bougie5m: "neutre", volume_ratio: 1.1, volume_source: "Kraken", atr5_pct: 0.08, reste15: 420 },
-    { m: "GOLD", etat: "preparation", biais: "baissier", ut: 6, seuil: 8, profil: "INTRADAY", mouvement5m_pct: -0.034, bougie5m: "baissiere", volume_ratio: 1.4, volume_source: "PAXG proxy", atr5_pct: 0.05, reste15: 310 },
-    { m: "NASDAQ", etat: "ferme", biais: "haussier", ut: 7, seuil: 8, profil: "SWING", mouvement5m_pct: 0.0, bougie5m: "neutre", volume_ratio: null, volume_source: "", atr5_pct: null, reste15: 180 }] };
+    { m: "BTC", etat: "calme", biais: "indecis", ut: 5, seuil: 8, profil: "aucun", mouvement5m_pct: 0.012, bougie5m: "neutre", volume_ratio: 1.1, volume_source: "Kraken", atr5_pct: 0.08 },
+    { m: "GOLD", etat: "preparation", biais: "baissier", ut: 6, seuil: 8, profil: "INTRADAY", mouvement5m_pct: -0.034, bougie5m: "baissiere", volume_ratio: 1.4, volume_source: "PAXG proxy", atr5_pct: 0.05 },
+    { m: "NASDAQ", etat: "ferme", biais: "haussier", ut: 7, seuil: 8, profil: "SWING", mouvement5m_pct: 0.0, bougie5m: "neutre", volume_ratio: null, volume_source: "", atr5_pct: null }] };
   rendre();
 } else { charger(); setInterval(charger, 30000); }
 setInterval(rendre, 15000);
