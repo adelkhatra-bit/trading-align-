@@ -1222,14 +1222,19 @@
     if (bas < 0) return;   // v8.4 : si la ligne n'est pas retrouvée un instant, le cache RESTE en place (jamais de prix qui réapparaît)
       Object.assign(masque.style, { display: 'flex', left: (g / k + R.left) + 'px', top: ((top + y0) / k + R.top) + 'px', width: ((dr - g + 2) / k) + 'px',
         height: ((bas - top + 1) / k) + 'px', fontSize: Math.max(13, Math.round((bas - top + 1) / k * 0.8)) + 'px' });   // v9.7 (Adel) : même taille que les % du tableau
-      // v9.6 (demande d'Adel) : la ligne CLIGNOTE vert « ▲ LONG ? » / rouge « ▼ SHORT ? » (plus vite quand une entrée approche) → impossible de deviner le sens
-      const vert = Math.floor(Date.now() / (arme ? 600 : 1200)) % 2 === 0;
-      masque.classList.remove('mystere'); masque.style.background = vert ? '#1b9e4b' : '#d32f2f';
-      const en = langueBande() === 'en', sens = (cel.t.match(/[▼▲]?\s*(SHORT|LONG)[^E\d]*/) || [''])[0].trim();
+      // Sens réel de la cellule TradingView : LONG = flèche verte vers le haut ; SHORT = flèche rouge vers le bas.
+      const en = langueBande() === 'en';
+      const matchSens = String(cel.t || '').match(/[▼▲]?\s*(SHORT|LONG)\b/i);
+      const direction = matchSens ? matchSens[1].toUpperCase() : '';
+      const vert = direction === 'LONG';
+      masque.classList.remove('mystere');
+      masque.style.background = direction ? (vert ? '#1b9e4b' : '#d32f2f') : '#5b6479';
       masque.innerHTML = (masqueN++ % 12 < 8)
-        ? '<span class="cle">' + (vert ? '▲' : '▼') + '</span> ' + (vert ? 'LONG ?' : 'SHORT ?') + ' • ' + (en ? 'ENTRY' : 'ENTRÉE') + ' <span class="cle">❓</span> • TP <span class="cle">❓</span> • SL <span class="cle">❓</span>'   // v9.6 : LONG vert / SHORT rouge en alternance
+        ? (direction
+            ? '<span class="cle">' + (vert ? '▲' : '▼') + '</span> ' + direction + ' • ' + (en ? 'ENTRY' : 'ENTRÉE') + ' <span class="cle">❓</span> • TP <span class="cle">❓</span> • SL <span class="cle">❓</span>'
+            : '<span class="cle">⏳</span> ' + (en ? 'DIRECTION NOT CONFIRMED' : 'SENS NON CONFIRMÉ') + ' • ' + (en ? 'ENTRY' : 'ENTRÉE') + ' ❓ • TP ❓ • SL ❓')
         : (arme ? '<span class="cle">⏳</span> ' + (en ? 'IT\'S ALMOST TIME… CAN YOU GET IN? 👍 LINK IN BIO, HURRY!' : 'ÇA VA ÊTRE LE MOMENT… TU PEUX RENTRER ? 👍 LIEN EN BIO, VITE !')
-          : '<span class="cle">🤔</span> ' + (en ? 'WANT TO KNOW IF YOU CAN GET IN? 👍 LINK IN BIO' : 'TU VEUX SAVOIR SI TU PEUX RENTRER ? 👍 LIEN EN BIO'));   // v8.3 : « vite » seulement quand le spectacle a vraiment annoncé un mouvement (pas de fake)
+          : '<span class="cle">🤔</span> ' + (en ? 'WANT TO KNOW IF YOU CAN GET IN? 👍 LINK IN BIO' : 'TU VEUX SAVOIR SI TU PEUX RENTRER ? 👍 LIEN EN BIO'));
     } catch (e) {}
   }
   // v8.3 (demande d'Adel) : les GROSSES étiquettes ENTRÉE / SL / TP1 / TP2 (à gauche, avec les prix) sont recouvertes
