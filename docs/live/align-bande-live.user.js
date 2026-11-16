@@ -27,7 +27,7 @@
     '📲 RESTE CONNECTÉ • CONNECTE-TOI : LIEN EN BIO 🎁',
     '🎁 TOUTES LES POSITIONS SONT GRATUITES • les annonces arrivent en temps réel sur ton portable • lien en bio',   // v7.6 (demande d'Adel)
     '📢 ANNONCE À VENIR… 😏 tu veux savoir avant que ça parte ? • lien en bio 🎁',
-    '⚡ DÉPÊCHE-TOI : UNE ENTRÉE SE PRÉPARE • ABONNE-TOI, LIEN EN BIO • LES RETARDATAIRES ONT TOUJOURS TORT 😉',
+    '⚡ UNE ENTRÉE SE PRÉPARE • attends la confirmation, ne cours pas après le prix • lien en bio',
     '🔔 ACTIVE TES NOTIFICATIONS • lien en bio : on te prévient dès que le marché se prépare 🎁',
     '📩 VA DANS LE LIEN EN BIO • tu reçois l\'alerte en temps réel sur le marché, avec les détails et les news 🎁',   // v7.3 : l'avantage de venir chez nous
     '🤖 ACTIVE TON COACH EN TEMPS RÉEL • il entre avec le bot, te suit jusqu\'au TP et t\'envoie toutes les news • gratuit • lien en bio 🎁',   // v9.8 (demande d'Adel)
@@ -41,7 +41,7 @@
     '📲 STAY CONNECTED • CONNECT: LINK IN BIO 🎁',
     '🎁 ALL POSITIONS ARE FREE • announcements land in real time on your phone • link in bio',
     '📢 ANNOUNCEMENT COMING… 😏 want to know before it moves? • link in bio 🎁',
-    '⚡ HURRY: AN ENTRY IS GETTING READY • FOLLOW, LINK IN BIO • LATECOMERS ARE ALWAYS WRONG 😉',
+    '⚡ A TRADE IS GETTING READY • wait for confirmation, never chase price • link in bio',
     '📩 GO TO THE LINK IN BIO • get real-time market alerts with the details and the news 🎁',
     '🔔 TURN ON YOUR NOTIFICATIONS • link in bio: we\'ll tell you as soon as the market gets ready 🎁',
     '📲 CONNECTED TO THE MARKET IN REAL TIME FROM YOUR PHONE • every candle explained live • link in bio 🎁',
@@ -437,7 +437,7 @@
     coachN++; derniereTend = Date.now();
   }, 15000);
   let iaPool = [], iaPools = {}, iaN = 0;
-  EN.push(['⚡ UNE POSITION SE PRÉPARE • dépêche-toi, les retardataires ont toujours tort 😉 • lien en bio', '⚡ A TRADE IS GETTING READY • hurry up, latecomers are always wrong 😉 • link in bio']);
+  EN.push(['⚡ UNE POSITION SE PRÉPARE • attends la confirmation, ne cours pas après le prix • lien en bio', '⚡ A TRADE IS GETTING READY • wait for confirmation, never chase price • link in bio']);
   function recuIA(json) {
     try {
       const donnees = JSON.parse(json);
@@ -809,7 +809,7 @@
     [/🏦/, ['🏦 Les gros sont là', '🏦 Big players here'], ['👀 Zone des gros', '👀 Smart-money zone']],
     [/🧲/, ['🧲 Le marché comble le trou', '🧲 Filling the gap'], ['👀 Zone aimant', '👀 Magnet zone']],
     // v7.6 (demande d'Adel) : on nargue avec humour quand une annonce se prépare (pro, sûr de lui)
-    [/📢/, ['📢 Annonce à venir… 😏', '📢 Announcement coming… 😏'], ['🤫 Le coach sait déjà où ça va', '🤫 The coach already knows'], ['😎 Toi tu regardes, eux ils sont prévenus', '😎 You watch, they get the alert'], ['🧐 Décision prise. Lien en bio', '🧐 Decision made. Link in bio'], ['🏃 Les retardataires ont toujours tort 😉', '🏃 Latecomers are always wrong 😉'], ['⚡ Dépêche-toi, une entrée arrive', '⚡ Hurry, an entry is coming']],
+    [/📢/, ['📢 Annonce à venir… 😏', '📢 Announcement coming… 😏'], ['🤫 Le coach sait déjà où ça va', '🤫 The coach already knows'], ['😎 Toi tu regardes, eux ils sont prévenus', '😎 You watch, they get the alert'], ['🧐 Décision prise. Lien en bio', '🧐 Decision made. Link in bio'], ['🧭 On attend le feu vert avant toute entrée', '🧭 Wait for the green light before any entry'], ['⚡ Pas d’entrée sans confirmation', '⚡ No entry without confirmation']],
     [/↩️/, ['↩️ Rebond sur zone clé', 'Bounce on key zone'], ['👀 Réaction du marché', 'Market reaction']],
     [/👆/, ['👆 Tapote, le marché dort encore 😴', '👆 Tap, the market is still asleep 😴'], ['😅 Pas d\'entrée ? Tapote en attendant', '😅 No entry yet? Tap meanwhile'], ['🫵 Toi là, tapote un peu 😄', '🫵 Hey you, give it a tap 😄']],
     [/./, ['❤️ Tapote l\'écran', 'Tap the screen'], ['🔔 Abonne-toi', 'Follow'], ['💪 La team ALIGN', 'Team ALIGN'], ['🎯 Reste concentré', 'Stay focused']]
@@ -1202,7 +1202,7 @@
     const s = Math.floor(Date.now() / 1000), reste = 900 - (s % 900), r = zoneGraphique();
     const enAttente = arme && arme.quart === Math.floor(s / 900);
     // v5.8 (demande d'Adel) : le chrono n'est pas là tout le temps : il surgit dans la DERNIÈRE MINUTE puis disparaît à la clôture
-    // v8.5 (demande d'Adel) : le bot annonce qu'une position arrive → chrono « dépêche-toi, lien en bio » jusqu'au verdict
+    // Le compte à rebours informe de la clôture ; il ne pousse jamais à entrer avant confirmation.
     const pa = window.__ALIGN_POS__ && window.__ALIGN_POS__.fin > Date.now() ? window.__ALIGN_POS__ : null;
     if (((reste <= 45 || (enAttente && reste <= 60)) || pa) && !retour) {
       chrono.style.display = 'flex'; chrono.classList.toggle('urgent', reste <= (enAttente ? 30 : 10));
@@ -1210,10 +1210,10 @@
       const fr = Math.floor(reste / 3) % 2 === 0;
       const lbl = enAttente
         ? (arme.d === -1 ? (fr ? '🔴 GROSSE DISTRIBUTION<br>' : '🔴 BIG SELL-OFF<br>') : (fr ? '🟢 GROSSE ACCUMULATION<br>' : '🟢 BIG ACCUMULATION<br>'))
-          + (reste <= 20 ? (fr ? 'C\'EST MAINTENANT !' : 'IT\'S NOW!') : (fr ? 'abonne-toi • partage 🎁' : 'follow • share 🎁'))
+          + (reste <= 20 ? (fr ? 'CLÔTURE EN COURS' : 'CANDLE CLOSING') : (fr ? 'attends la confirmation • lien en bio' : 'wait for confirmation • link in bio'))
         : (fr ? '⏱ CLÔTURE 15 MIN<br>ça va se décider 👀' : '⏱ 15 MIN CLOSE<br>it\'s about to decide 👀');
       const rr = pa ? Math.max(0, Math.ceil((pa.fin - Date.now()) / 1000)) : reste;
-      const lbl2 = pa ? plateforme(fr ? '⚡ UNE POSITION ARRIVE<br>dépêche-toi 👉 lien en bio' : '⚡ A TRADE IS COMING<br>hurry up 👉 link in bio') : lbl;
+      const lbl2 = pa ? plateforme(fr ? '⚡ UNE POSITION SE PRÉPARE<br>attends la confirmation • lien en bio' : '⚡ A TRADE IS GETTING READY<br>wait for confirmation • link in bio') : lbl;
       chrono.innerHTML = Math.floor(rr / 60) + ':' + String(rr % 60).padStart(2, '0') + '<small>' + lbl2 + '</small>';
       // v5.7 (demande d'Adel) : en bas à droite, côté prix, juste au-dessus du tableau de bord (TikTok coupe le haut gauche)
       // v8.3 (demande d'Adel) : le chrono se met en bas à GAUCHE du tableau, à côté de l'unité 1 min (plus jamais sur un message)
@@ -1331,7 +1331,7 @@
       const en = langueBande() === 'en', sens = (cel.t.match(/[▼▲]?\s*(SHORT|LONG)[^E\d]*/) || [''])[0].trim();
       masque.innerHTML = (masqueN++ % 12 < 8)
         ? '<span class="cle">' + (vert ? '▲' : '▼') + '</span> ' + (vert ? 'LONG ?' : 'SHORT ?') + ' • ' + (en ? 'ENTRY' : 'ENTRÉE') + ' <span class="cle">❓</span> • TP <span class="cle">❓</span> • SL <span class="cle">❓</span>'   // v9.6 : LONG vert / SHORT rouge en alternance
-        : (arme ? '<span class="cle">⏳</span> ' + (en ? 'IT\'S ALMOST TIME… CAN YOU GET IN? 👍 LINK IN BIO, HURRY!' : 'ÇA VA ÊTRE LE MOMENT… TU PEUX RENTRER ? 👍 LIEN EN BIO, VITE !')
+        : (arme ? '<span class="cle">⏳</span> ' + (en ? 'WAIT FOR CONFIRMATION • VIEW THE PLAN IN BIO' : 'ATTENDS LA CONFIRMATION • VOIR LE PLAN EN BIO')
           : '<span class="cle">🤔</span> ' + (en ? 'WANT TO KNOW IF YOU CAN GET IN? 👍 LINK IN BIO' : 'TU VEUX SAVOIR SI TU PEUX RENTRER ? 👍 LIEN EN BIO'));   // v8.3 : « vite » seulement quand le spectacle a vraiment annoncé un mouvement (pas de fake)
     } catch (e) {}
   }
@@ -1391,7 +1391,7 @@
       const xCol = Math.min(...vis.map(x => x.box.l)), larg = Math.max(...vis.map(x => x.box.r)) - xCol, en = langueBande() === 'en';
       const pNow = ((barres(1)[0]) || [])[4] || 0; etiqN++;
       const proche = x => pNow && Math.abs(pNow - x.o.y) / pNow < 0.002;
-      const defi = x => { const L = proche(x) ? (en ? ['⚡ GETTING CLOSE!', '👉 LINK IN BIO, HURRY!'] : ['⚡ ÇA APPROCHE !', '👉 LIEN EN BIO, VITE !'])
+      const defi = x => { const L = proche(x) ? (en ? ['⚡ KEY ZONE APPROACHING', '👉 VIEW THE PLAN'] : ['⚡ ZONE CLÉ EN APPROCHE', '👉 VOIR LE PLAN'])
         : (en ? ['👀 LINK IN BIO', '🤔 WANNA KNOW?', '😏 DARE YOU?'] : ['👀 LIEN EN BIO', '🤔 T\'AS ENVIE DE SAVOIR ?', '😏 CAP OU PAS CAP ?']); return L[Math.floor(etiqN / 12) % L.length]; };
       etiqBox.innerHTML = vis.map(x => '<div class="etq' + (proche(x) ? ' chaud' : '') + '" style="left:' + (xCol - 2) + 'px;top:' + (x.box.t - 2) + 'px;width:' + (larg + 4) + 'px;height:' + (x.box.b - x.box.t + 4) + 'px;background:' + x.col + ';color:' + x.tc + '">'
         + (x.n === 'ENTRÉE' && en ? 'ENTRY' : x.n) + ' <b>❓</b> <span>' + defi(x) + '</span></div>').join('');
