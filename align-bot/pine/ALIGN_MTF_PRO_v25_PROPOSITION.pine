@@ -481,10 +481,12 @@ if barstate.islast
         x1 = bar_index - 25
         x2 = bar_index + 3
         lTP1 := line.new(x1, tp1, x2, tp1, color= color.aqua, width=2, extend=extend.right)
+        lTP2 := line.new(x1, tp2, x2, tp2, color=color.new(color.aqua, 20), width=1, style=line.style_dashed, extend=extend.right)
         lSL  := line.new(x1, sl, x2, sl, color= color.red, width=2, extend=extend.right)
         lE   := line.new(x1, ent, x2, ent, color= al135 ? color.lime : color.yellow, width=2, style=line.style_dotted, extend=extend.right)
         eE   := label.new(x1, ent, "ENTRÉE " + px(ent), style=label.style_label_right, color= color.new(al135 ? color.lime : color.yellow, 10), textcolor= color.black, size=size.small, tooltip="Point d'entrée : " + tEnt + "\nJuste devant la zone 1h / 4h, dans le sens des grosses UT")
         eTP1 := label.new(x1, tp1, "TP1 " + px(tp1), style=label.style_label_right, color= color.new(color.aqua, 20), textcolor= color.black, size=size.small, tooltip="Objectif 1 : " + tTP1 + "\nObjectif 2 : " + px(tp2) + " (" + tTP2 + ")\nGain/risque ≈ " + str.tostring(rr, "#.#"))
+        eTP2 := label.new(x1, tp2, "TP2 " + px(tp2), style=label.style_label_right, color=color.new(color.aqua, 15), textcolor=color.white, size=size.small, tooltip="Objectif final : " + tTP2 + "\nNiveau : " + px(tp2) + "\nGain/risque TP2 ≈ " + str.tostring(math.abs(tp2 - ent) / math.max(math.abs(ent - sl), syminfo.mintick), "#.#"))
         if voirFibo and fR > 0
             // Zone verte transparente = on peut rentrer de tel prix à tel prix
             bZone := box.new(x1, zHaut, bar_index + 20, zBas, border_color= color.new(color.lime, 60), bgcolor= color.new(color.lime, 85), extend=extend.right)
@@ -503,7 +505,7 @@ if barstate.islast
         eSL  := label.new(x1, sl, "STOP " + px(sl), style=label.style_label_right, color= color.new(color.red, 20), textcolor= color.white, size=size.small, tooltip="Stop placé derrière la " + (dirPlan == 1 ? "zone de support" : "zone de résistance") + " 1h / 4h la plus proche (+ marge 0,3 ATR)")
 
 // ═════════ BARRE (en bas, propre, explications au clic) ═════════
-var table t = table.new(pos, 11, 3, border_width=1, frame_color= color.new(color.gray, 70), frame_width=1)
+var table t = table.new(pos, 12, 3, border_width=1, frame_color= color.new(color.gray, 70), frame_width=1)
 varip int tick = 0
 if barstate.isrealtime
     tick += 1
@@ -527,13 +529,22 @@ if barstate.islast
         tip = array.get(nomsL, i) + " — " + sensUT + "\n━━━━━━━━━━━━\nTendance : " + tendUT + "\nRSI : " + str.tostring(rv, "#") + " — " + rsiUT + "\nCompression : " + (sq ? "OUI ⚡ prêt à exploser (attendre la direction)" : "non") + "\nRôle : " + roleUT + (minUT > 0 ? "\nClôture dans : " + f_mmss(f_reste(minUT)) : "") + "\n━━━━━━━━━━━━\n" + planUT + (dirPlan != 0 and dv == -dirPlan and i <= 4 ? "\n↩ VOYANT RETOURNEMENT allumé : " + str.tostring(nVoy) + "/5 petites unités (1 à 15 min) ont tourné contre le plan\n3/5 = le retournement se prépare • confirmé quand le 15 min ET la 1h clôturent dans le nouveau sens" : "")
         table.cell(t, i, 0, array.get(noms, i), width=largCol, bgcolor=rv >= 70 ?  color.rgb(120, 20, 30) : rv <= 30 ?  color.rgb(0, 90, 50) :  color.rgb(30, 34, 45), text_color=rv >= 70 or rv <= 30 ?  color.white :  color.gray, text_size=size.small, tooltip=tip)
         table.cell(t, i, 1, sym, width=largCol, bgcolor=bg, text_color= color.white, text_size=size.normal, tooltip=tip)
+    // Weekly is displayed as context only; it does not change the existing 11-UT score.
+    dvW = nz(dW)
+    sqW = nz(sW) == 1
+    rvW = nz(rW, 50)
+    symW = (dvW == 1 ? "▲" : dvW == -1 ? "▼" : "—") + (rvW >= 70 or rvW <= 30 ? "!" : "")
+    bgW = sqW ? color.rgb(230, 130, 0) : dvW == 1 ? color.rgb(0, 140, 70) : dvW == -1 ? color.rgb(190, 30, 45) : color.rgb(90, 90, 90)
+    tipW = "Weekly — " + (dvW == 1 ? "HAUSSE ▲" : dvW == -1 ? "BAISSE ▼" : "NEUTRE —") + "\nTendance EMA 20 / EMA 50\nRSI : " + str.tostring(rvW, "#") + (rvW >= 70 ? " — SURACHAT" : rvW <= 30 ? " — SURVENTE" : " — équilibré") + "\nCompression : " + (sqW ? "OUI ⚡" : "non") + "\nRôle : contexte hebdomadaire, ne modifie pas le score des 11 UT."
+    table.cell(t, 11, 0, "W", width=largCol, bgcolor=rvW >= 70 ? color.rgb(120, 20, 30) : rvW <= 30 ? color.rgb(0, 90, 50) : color.rgb(30, 34, 45), text_color=color.white, text_size=size.small, tooltip=tipW)
+    table.cell(t, 11, 1, symW, width=largCol, bgcolor=bgW, text_color=color.white, text_size=size.normal, tooltip=tipW)
     titre = zoneBas ? "RETOURNEMENT ▼" : zoneHaut ? "REBOND ▲" : fortHaut ? "★ ACHAT FORT" : fortBas ? "★ VENTE FORTE" : retHaut ? "RETOURNEMENT ▲" : retBas ? "RETOURNEMENT ▼" : rsiOB >= 3 ? "RSI SURACHAT " + str.tostring(rsiOB) + "/11" : rsiOS >= 3 ? "RSI SURVENTE " + str.tostring(rsiOS) + "/11" : surcharge ? "⚡ SURCHARGE" : sens == 1 ? "HAUSSE" : sens == -1 ? "BAISSE" : "ATTENDRE"
     ligne = (retDir != 0 and not retConf ? "↩ RETOURNEMENT  " : nFort == 2 ? "↩ CASSURE 5m+15m  " : nDep == 2 ? "↩ DÉPART 1m+3m  " : nVoy >= 3 ? "↩ " + str.tostring(nVoy) + "/5  " : "") + (dirPlan == 1 ? "▲ LONG" : dirPlan == -1 ? "▼ SHORT" : "ATTENDRE") + (dirPlan != 0 ? (strat != "" ? " • " + (strat == "SCALPING" ? "SCALP" : strat) + (etatS == "CONFIRMÉ" and scoreV >= 75 ? " ✅ " : " ⏳ ") + str.tostring(scoreV) : "") + "  E " + px(ent) + "  TP " + px(tp1) + "  SL " + px(sl) : "   " + titre)
     plan = (retTxt != "" ? retTxt + "\n\n" : "") + (dirPlan != 0 ? "STRATÉGIE : " + (strat == "" ? "aucune" : strat + " — " + etatS) + "\nScore : " + str.tostring(scoreV) + " / 100\n• Alignement : " + str.tostring(ptsAlign) + " / 25\n• Structure : " + str.tostring(ptsStruct) + " / 20\n• Zone d'entrée : " + str.tostring(ptsZone) + " / 20\n• Volume : " + str.tostring(ptsVol) + " / 15" + (volOk ? "" : " (indisponible)") + "\n• Indicateurs : " + str.tostring(ptsInd) + " / 10\n• Risque / rendement : " + str.tostring(ptsRR) + " / 10\n⏱ Clôture de validation " + (strat == "SWING" ? "1h" : strat == "DAY" ? "5 min" : strat == "SCALPING" ? "1 min" : "15 min") + " dans " + f_mmss(f_reste((strat == "SWING" ? 60 : strat == "DAY" ? 5 : strat == "SCALPING" ? 1 : 15))) + "\nDécision : " + decisionS + "\nMotif : " + motifS + "\nPlan : " + calePlan + "\n\n" : "") + "SENS PROBABLE : " + (sens == 1 ? "HAUSSE " : sens == -1 ? "BAISSE " : "INDÉCIS ") + str.tostring(pctH) + "% hausse / " + str.tostring(100 - pctH) + "% baisse\n" + str.tostring(bull) + " UT en hausse • " + str.tostring(bear) + " en baisse • " + str.tostring(comp) + " comprimées\nRSI : " + str.tostring(rsiOB) + " UT en surachat (>70) • " + str.tostring(rsiOS) + " en survente (<30)" + (rsiOB >= 3 ? "\nSURCHARGE RSI HAUTE : éviter d'acheter, retournement baissier possible" : rsiOS >= 3 ? "\nSURCHARGE RSI BASSE : éviter de vendre, rebond possible" : "") + (retHaut ? "\nLes petites UT montent avant les grandes : retournement HAUSSIER en préparation" : retBas ? "\nLes petites UT baissent avant les grandes : retournement BAISSIER en préparation" : "") + (zoneBas ? "\nPrix sur une résistance " + tH1 + " : risque de retournement à la baisse" : zoneHaut ? "\nPrix sur un support " + tB1 + " : rebond possible" : "") + (dirPlan != 0 ? "\n\nPLAN " + (dirPlan == 1 ? "ACHAT" : "VENTE") + "\nEntrée " + px(ent) + " (" + tEnt + ")\nTP1 " + px(tp1) + " (" + tTP1 + ")\nTP2 " + px(tp2) + " (" + tTP2 + ")\nStop " + px(sl) + "\nGain/risque ≈ " + str.tostring(rr, "#.#") : "")
     vbg0 = zoneBas or zoneHaut ?  color.rgb(170, 130, 0) : dirPlan == 1 ?  color.rgb(0, 140, 70) : dirPlan == -1 ?  color.rgb(190, 30, 45) :  color.rgb(60, 60, 60)
     actif = zoneBas or zoneHaut or fortHaut or fortBas or retHaut or retBas or surcharge
     table.cell(t, 0, 2, ligne, bgcolor=actif and clignote ? color.new(vbg0, 50) : vbg0, text_color= color.white, text_size=size.normal, tooltip=titre + "\n" + plan)
-    table.merge_cells(t, 0, 2, 10, 2)
+    table.merge_cells(t, 0, 2, 11, 2)
 
 // ═════════ ALERTES (créer une alerte « N'importe quel appel alert() ») ═════════
 if sigHaut
