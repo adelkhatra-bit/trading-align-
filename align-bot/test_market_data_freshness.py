@@ -51,6 +51,23 @@ class MarketDataFreshness(unittest.TestCase):
         r.update({"market": "NASDAQ", "dirPlan": 1})
         self.assertEqual(ab._sniper(r), (None, "DONNEES_MTF_PERIMEES"))
 
+    def test_pine_events_do_not_publish_any_technical_alert_on_stale_mtf(self):
+        now = 100000.0
+        r = snapshot(now, "CME NQ=F Yahoo proxy", age5=600)
+        r.update({
+            "comp": 0, "dirs": [1, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1],
+            "sniper": {"d": 1, "ut": "M5", "niveau": 100.0, "za": 99.0, "zb": 101.0,
+                       "sl": 98.0, "tp1": 104.0, "tp2": 106.0, "rr": 2.0, "rr_plan": 2.0},
+            "dirPlan": 1, "strat": "DAY", "zone_pine": {"zmil": 100.0}, "atr": 1.0,
+            "ret_dir": 1, "ret_conf": True,
+        })
+        with (
+            mock.patch.object(ab, "etat_marche_hb", return_value=("ouvert", None)),
+            mock.patch.object(ab, "hb_etat_surveille", return_value={"d": 1, "n": 9, "comp": 0}),
+        ):
+            events = ab.evenements_pine({}, "NASDAQ", r, {}, now)
+        self.assertEqual(events, [])
+
     def test_agent_ne_cree_aucune_position_sur_bougies_yahoo_retardees(self):
         now = 100000.0
         r = snapshot(now, "CME NQ=F Yahoo proxy", age5=600)
