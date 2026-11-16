@@ -4067,6 +4067,8 @@ def coupe_et_reprends(m, r, cle, tr, p):
     """Demande d'Adel (15/11) : après le TP1, si les indicateurs annoncent un retour vers l'entrée (4/5 petites unités
     contre la position + dernière bougie 15 min clôturée contre nous), mieux vaut TOUT encaisser maintenant, puis reprendre
     la même position quand le prix revient à l'entrée (max de profit). Une seule fois par position."""
+    if not donnees_mtf_fraiches(m, r):
+        return None
     if tr.get("coupe_dit") or int(tr.get("n_tp") or 2) != 2:
         return None
     dirs, b = r.get("dirs") or [], (r.get("b15") or [])[:-1]
@@ -5522,6 +5524,8 @@ def canal_resultats(etat, m, textes):
 
 def notifier_coach_live(etat, m, r, cle):
     """Envoie la carte « coach en direct » à chaque nouvelle clôture 15 min, aux abonnés qui l'ont activé pour ce marché."""
+    if not donnees_mtf_fraiches(m, r):
+        return
     abonnes = etat.get("coach_live", {}).get(m) or {}
     bars = (r.get("b15") or [])[:-1]                 # la dernière bougie est en formation
     if not abonnes or not bars:
@@ -5565,6 +5569,8 @@ def activer_coach_live(etat, cid, m, actif=True):
 
 def notifier_clotures(etat, m, r, cle):
     """Envoie les clôtures nouvelles une fois chacune, sur les UT suivies par l'utilisateur."""
+    if not donnees_mtf_fraiches(m, r):
+        return
     champs = TF_CHAMPS
     for cid, suivi in list(etat.get("veille_cloture", {}).get(m, {}).items()):
         if not coach_abonne(etat, cid, m) or not marche_autorise(etat, cid, m):
