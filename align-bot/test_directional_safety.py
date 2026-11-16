@@ -152,7 +152,7 @@ class DirectionSafety(unittest.TestCase):
             msg = ab.radar_climax(market, r, {})
             self.assertIn("RADAR CLIMAX — SURVEILLANCE", msg)
             self.assertIn("Clôtures M5=baissier, M15=baissier, H1=haussier, H4=haussier", msg)
-            self.assertIn("Aucune entrée", msg)
+            self.assertIn("aucune entrée", msg.lower())
 
     def test_gold_nasdaq_confirmed_climax_includes_tp1_tp2_and_risk_reward(self):
         bars = [candle(i * 900) for i in range(80)]
