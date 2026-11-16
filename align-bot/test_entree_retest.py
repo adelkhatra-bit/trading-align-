@@ -21,7 +21,7 @@ class Retest(unittest.TestCase):
         t = ab.entree_retest("GOLD", serie(), cle)
         self.assertIn("ENTRÉE POSSIBLE SUR RETEST : LONG", t); self.assertIn("devient support", t)
         self.assertIn("TP1 :", t); self.assertIn("TP2 :", t); self.assertIn("Gain/risque", t)
-        self.assertIn("SL juste sous la mèche : 99,70", t); self.assertIn("DYOR", t)
+        self.assertIn("SL : 99,70", t); self.assertIn("DYOR", t)
         self.assertIsNone(ab.entree_retest("GOLD", serie(), cle))
 
     def test_pas_de_retest_rien(self):
