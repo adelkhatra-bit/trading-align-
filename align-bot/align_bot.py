@@ -4053,9 +4053,17 @@ def coupe_et_reprends(m, r, cle, tr, p):
             f"🔁 Je te préviens si le prix revient sur {px(e)} pour reprendre la même position",
             "⚠️ Ceci n'est pas un conseil en investissement (DYOR)"]
 
+def confluence_entree_mtf(m, r, d):
+    """Validation finale avant toute nouvelle position Gold/NASDAQ : M5, M15, H1 et H4 doivent être alignés."""
+    if m not in ("GOLD", "NASDAQ"):
+        return True
+    dirs = r.get("dirs") or []
+    return d in (-1, 1) and len(dirs) > 9 and all(dirs[i] == d for i in (2, 4, 7, 9))
+
+
 def reprise_entree(m, r, cle):
-    """Suite de « COUPE ET REPRENDS » : le prix revient sur l'entrée et la bougie 5 min clôture de nouveau dans notre sens
-    → on reprend la même position (même entrée, SL d'origine). Valable 6 h, une seule fois."""
+    """Suite de « COUPE ET REPRENDS » uniquement si la confluence actuelle est toujours valide.
+    Le suivi ponctuel ne réutilise jamais un ancien sens si les unités de temps ont changé."""
     rp = cle.get("reprise")
     if not rp:
         return None
@@ -4068,6 +4076,8 @@ def reprise_entree(m, r, cle):
     if not b5 or p is None or atr <= 0:
         return None
     d, e = rp["d"], rp["e"]
+    if not confluence_entree_mtf(m, r, d):
+        return None
     if (p - rp["sl"]) * d <= 0:
         cle.pop("reprise", None)                       # le plan est cassé : on ne reprend pas
         return None
@@ -9622,6 +9632,15 @@ def agent(m, r, cle, ferme):
                 cle["perdue_t"] = r["t"]
                 out.append(f"⚪ {m} : confirmation 1h / tendance 4h perdue. Ordre annulé, j'attends.")
             cle["aligne"] = 0; cle["prep"] = False; cle.pop("ordre", None)
+            return out
+        # Gold/NASDAQ : aucun chemin (cassure, FVG, repli) ne contourne M15 + H1 + H4.
+        if not confluence_entree_mtf(m, r, d):
+            cle["prep"] = False
+            cle.pop("ordre", None)
+            cle["aligne"] = d
+            if r["t"] - cle.get("mtf_attente_t", 0) >= 3600:
+                cle["mtf_attente_t"] = r["t"]
+                out.append(f"⏳ {ICONE.get(m, '')} {m} : biais H1/H4 détecté, mais M5/M15 ne confirment pas encore ensemble. ANTICIPATION uniquement — aucune position.")
             return out
         # Extrême Daily/Weekly : aucune poursuite dans le sens de la tendance.
         # On attend une correction ou un retournement confirmé ; on ne vend pas à découvert sans signal opposé validé.
