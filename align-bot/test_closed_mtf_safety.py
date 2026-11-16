@@ -26,16 +26,20 @@ def fresh_context(now=None):
 
 
 class ClosedMtfSafety(unittest.TestCase):
-    def test_closed_directions_ignore_forming_m5_m15_h1_h4(self):
+    def test_closed_directions_use_latest_closed_mtf_and_ignore_only_flagged_live_minute(self):
         series = {}
         for key in ab.UT:
             bars = [bar(i * 60, o=100 + i, h=101 + i, l=99 + i, c=100 + i) for i in range(60)]
-            if key in {"1", "5", "15", "30", "1h", "4h", "D"}:
+            if key == "1":
+                bars[-1]["forming"] = True
+            elif key in {"5", "15", "30", "1h", "4h", "D"}:
+                # Cette bougie est déjà clôturée par le contrat des adaptateurs de données.
                 bars[-1] = bar(60 * 60, o=200, h=201, l=50, c=51)
             series[key] = bars
         dirs = ab.directions_cloturees(series)
+        self.assertEqual(dirs[0], ab.etat_ut(series["1"][:-1])[0])
         for idx, key in ((2, "5"), (4, "15"), (7, "1h"), (9, "4h")):
-            self.assertEqual(dirs[idx], ab.etat_ut(series[key][:-1])[0])
+            self.assertEqual(dirs[idx], ab.etat_ut(series[key])[0])
 
     def test_gold_nasdaq_require_all_four_closed_timeframes_for_long_and_short(self):
         for market in ("GOLD", "NASDAQ"):
