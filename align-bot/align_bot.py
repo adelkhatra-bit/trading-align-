@@ -121,33 +121,43 @@ def fusionne_lectures_tradingview(r):
 
 
 def plan_indicateur(r):
-    """Utilise le plan du timeframe réellement actif sur TradingView, jamais une UT supposée."""
+    """Utilise le plan du timeframe réellement actif sur TradingView, avec TP1/TP2 distincts."""
     bridge = r.get("tv_indicator_mtf") or {}
     preferred = str(bridge.get("activeTimeframe") or "").upper()
     snap = (bridge.get("snapshots") or {}).get(preferred) or {}
     robot = snap.get("robotV12") or {}
     try:
-        entry, sl, tp = float(robot.get("entry")), float(robot.get("sl")), float(robot.get("tp"))
-    except (TypeError, ValueError):
+        entry, sl = float(robot.get("entry")), float(robot.get("sl"))
+        raw_tp1 = robot.get("tp1")
+        if raw_tp1 in (None, ""):
+            raw_tp1 = robot.get("tp")
+        tp1 = float(raw_tp1)
+        raw_tp2 = robot.get("tp2")
+        tp2 = float(raw_tp2) if raw_tp2 not in (None, "") else None
+    except (TypeError, ValueError, KeyError):
         return {"timeframe": preferred or None, "available": False,
                 "reason": "aucun plan ROBOT V12 complet pour l'unité TradingView active"}
     if not snap.get("fresh"):
         return {"timeframe": preferred, "available": False, "reason": "plan ROBOT V12 périmé"}
     signal = str(robot.get("signal") or robot.get("verdict") or "").upper()
     direction = _direction_tv(signal)
-    if direction not in (-1, 1) or min(entry, sl, tp) <= 0:
+    if direction not in (-1, 1) or min(entry, sl, tp1) <= 0 or (tp2 is not None and tp2 <= 0):
         return {"timeframe": preferred, "available": False, "reason": "direction ou niveaux ROBOT V12 invalides"}
-    if (direction == 1 and not sl < entry < tp) or (direction == -1 and not tp < entry < sl):
+    if direction == 1:
+        geometrie_ok = sl < entry < tp1 and (tp2 is None or tp2 > tp1)
+    else:
+        geometrie_ok = tp1 < entry < sl and (tp2 is None or tp2 < tp1)
+    if not geometrie_ok:
         return {"timeframe": preferred, "available": False, "reason": "géométrie entrée/SL/TP incohérente"}
-    return {"timeframe": preferred, "available": True, "direction": direction, "entry": entry, "sl": sl, "tp": tp,
+    return {"timeframe": preferred, "available": True, "direction": direction, "entry": entry, "sl": sl,
+            "tp": tp1, "tp1": tp1, "tp2": tp2,
             "confirmed": snap.get("confirmed") is True, "verdict": robot.get("verdict"),
             "macro_bull": robot.get("macro_bull"), "macro_bear": robot.get("macro_bear"),
             "long_score": robot.get("long_score"), "short_score": robot.get("short_score"),
             "anticipation": robot.get("anticipation"), "anticipation_force": robot.get("anticipation_force"),
             "zone_proche": robot.get("zone_proche"), "liq_haute_active": robot.get("liq_haute_active"),
             "liq_basse_active": robot.get("liq_basse_active"),
-            "timestamp": robot.get("receivedAt") or snap.get("timestamp"), "ageMs": snap.get("ageMs")}
-
+            "timestamp": robot.get("receivedAt") or snap.get("timestamp"), "ageMs": robot.get("ageMs")}
 
 TTL_KRAKEN = {1: 5, 5: 10, 15: 30, 30: 60, 60: 120, 240: 300, 1440: 900, 10080: 1800}
 
@@ -1230,7 +1240,8 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
     if tv_plan["available"]:
         l += ["━━━━━━━━━━━━━━━━━━", "📡 PLAN DE L'INDICATEUR TRADINGVIEW",
               f"Unité sélectionnée : {tv_plan['timeframe']}",
-              f"Entrée indicateur : {px(tv_plan['entry'])} • SL : {px(tv_plan['sl'])} • TP : {px(tv_plan['tp'])}",
+              f"Entrée indicateur : {px(tv_plan['entry'])} • SL : {px(tv_plan['sl'])} • TP1 : {px(tv_plan.get('tp1') if tv_plan.get('tp1') is not None else tv_plan.get('tp'))}" +
+              (f" • TP2 : {px(tv_plan['tp2'])}" if tv_plan.get("tp2") is not None else " • TP2 : non fourni par le bridge"),
               "Clôture confirmée par l'indicateur : " + ("OUI" if tv_plan["confirmed"] else "NON / NON FOURNIE"),
               "⚠️ Plan indicateur séparé du verdict de sécurité ALIGN."]
     elif r.get("tv_indicator_mtf", {}).get("available"):
@@ -1276,8 +1287,13 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
         sens = "🟩 LONG" if tr["d"] == 1 else "🟥 SHORT"
         l.append(f"🎯 POSITION EN COURS : {sens} | Entrée {px(tr['e'])} | SL {px(tr['sl'])} | TP1 {px(tr['tp1'])} | TP2 {px(tr['tp2'])}")
     elif o:
-        sens = "🟩 LONG" if o.get("d", r["confirme"]) == 1 else "🟥 SHORT"
-        l.append(f"🎯 POINT VISÉ : {sens} | Entrée ≈ {px(o['e'])} | TP1 {px(o['tp1'])} | SL {px(o['sl'])}")
+        d_ordre = o.get("d", r["confirme"])
+        sens = "🟩 LONG" if d_ordre == 1 else "🟥 SHORT"
+        tp2_ordre = o.get("tp2")
+        tp2_txt = (f" | TP2 {px(tp2_ordre)}"
+                   if tp2_affichable(d_ordre, o.get("tp1"), tp2_ordre)
+                   else " | TP2 non disponible (plan incomplet)")
+        l.append(f"🎯 POINT VISÉ : {sens} | Entrée ≈ {px(o['e'])} | SL {px(o['sl'])} | TP1 {px(o['tp1'])}{tp2_txt}")
     elif r["confirme"]:
         sens = "🟩 LONG" if r["confirme"] == 1 else "🟥 SHORT"
         l.append(f"🎯 DIRECTION À SURVEILLER : {sens} | Point d'entrée après validation du déclencheur")
