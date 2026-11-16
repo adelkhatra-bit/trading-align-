@@ -27,7 +27,7 @@ def retest_r(h4):
         b15=bars, b5=[candle(now - 600), candle(now - 300)],
         b1h=[candle(now - 7200), candle(now - 3600)],
         b4h=[candle(now - 28800), candle(now - 14400)],
-        m1=[candle(now - 30)], r5=[50, 50, 50], atr=1.0, atr5=1.0, t=now
+        m1=[candle(now - 30)], r5=[50, 50, 50], grosses=[(110.0, "4h"), (120.0, "Daily")], atr=1.0, atr5=1.0, t=now
     )
 
 
@@ -52,7 +52,7 @@ class DirectionSafety(unittest.TestCase):
 
     def test_nasdaq_retest_requires_h4_confirmation(self):
         self.assertIsNone(ab.entree_retest("NASDAQ", retest_r(0), {}))
-        self.assertIn("ENTRÉE SUR RETEST : LONG", ab.entree_retest("NASDAQ", retest_r(1), {}))
+        self.assertIn("ENTRÉE POSSIBLE SUR RETEST : LONG", ab.entree_retest("NASDAQ", retest_r(1), {}))
 
     def test_btc_retest_rule_is_unchanged(self):
         self.assertIn("ENTRÉE SUR RETEST : LONG", ab.entree_retest("BTC", retest_r(0), {}))
