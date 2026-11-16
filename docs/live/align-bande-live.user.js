@@ -180,7 +180,7 @@
   const voixBtn = document.createElement('button');
   voixBtn.id = 'align-live-voice';
   voixBtn.type = 'button';
-  voixBtn.textContent = '🔇 Voix OFF';
+  voixBtn.textContent = '🔊 ACTIVER LA VOIX DU COACH';
   voixBtn.title = 'Activer le commentateur vocal du live';
   voixBtn.style.cssText = 'position:fixed;right:18px;top:104px;z-index:10001;padding:8px 12px;border:1px solid rgba(255,255,255,.55);border-radius:18px;background:rgba(18,18,28,.82);color:#fff;font:700 13px system-ui;cursor:pointer;pointer-events:auto';
   document.body.appendChild(voixBtn);
@@ -207,10 +207,17 @@
     if (voixActive) {
       window.speechSynthesis.cancel();
       window.speechSynthesis.resume();
-      voixBtn.textContent = '🔊 Voix ON';
+      voixBtn.textContent = '🔊 COACH VOCAL ON';
+      // Le clic explicite déverrouille la synthèse vocale du navigateur pour le direct.
+      const accueil = new SpeechSynthesisUtterance(voixLangue === 'fr' ? 'Le coach ALIGN est en direct. Je commente maintenant ce que fait le marché.' : 'The ALIGN coach is live. I am now commenting on market action.');
+      accueil.lang = voixLangue === 'fr' ? 'fr-FR' : 'en-US';
+      accueil.rate = 1.02;
+      window.speechSynthesis.speak(accueil);
+      voixTexte = accueil.text;
+      voixDerniere = Date.now();
     } else {
       window.speechSynthesis.cancel();
-      voixBtn.textContent = '🔇 Voix OFF';
+      voixBtn.textContent = '🔇 VOIX DU COACH OFF';
     }
   });
   function parlerLive(item) {
@@ -445,10 +452,10 @@
   EN.push([' hésite… donnez-moi vos avis en commentaire : ça monte ou ça descend ? votre avis m\'intéresse 👇', ' is hesitating… give me your opinion in the comments: up or down? I want to know 👇'], [' : merci pour les tapotements la team ! continuez 👆 je lis tous vos commentaires 👀', ': thanks for the taps team! keep going 👆 I read all your comments 👀'], [' : dites-moi maintenant… envoyez vos avis dans le lien en bio, je vous réponds 😉 • et là-bas tout arrive en temps réel ⚡', ': tell me now… send your opinion via the link in bio, I\'ll answer you 😉 • and there everything comes in real time ⚡']);
   let coachN = 0, convN = 0;
   const coachT = setInterval(() => {
-    if (occupe || file.length || retour || Date.now() - derniereTend < 40000) return;   // v9.2 (demande d'Adel) : marché mou = on a le temps de parler, ~40 s   // les vraies infos du marché passent toujours avant
+    if (occupe || file.length || retour || Date.now() - derniereTend < 100000 || Date.now() - derniereCoach < 120000) return;   // v9.2 (demande d'Adel) : marché mou = on a le temps de parler, ~40 s   // les vraies infos du marché passent toujours avant
     const k3 = coachN % 3, P = k3 === 2 ? COACH.conv : k3 === 1 ? COACH.humour : COACH.anim;   // v9.2 : la discussion avec les abonnés suit son ordre (avis → merci → lien en bio)
     montrer((k3 === 2 ? P[convN++ % P.length] : P[Math.floor(coachN / 3) % P.length]).replace('{m}', nomMarche()), false, 1);
-    coachN++; derniereTend = Date.now();
+    coachN++; derniereCoach = Date.now();
   }, 15000);
   let iaPool = [], iaPools = {}, iaN = 0;
   EN.push(['⚡ UNE POSITION SE PRÉPARE • attends la confirmation, ne cours pas après le prix • lien en bio', '⚡ A TRADE IS GETTING READY • wait for confirmation, never chase price • link in bio']);
@@ -1095,7 +1102,36 @@
     range: ['😴 {m} se compresse… avant le gros mouvement ? ⚡ tiens-toi prêt • lien en bio 🎁',
             '🧲 {m} hésite… la prochaine clôture peut tout décider ⏱ lien en bio 🎁']
   };
-  let tendN = 0, derniereTend = Date.now(), arme = null;   // arme = mouvement annoncé à l'avance (chrono jusqu'à la clôture)
+  // Commentaire factuel du graphique : tendance de fond, respiration récente, compression et volume.
+  // Aucun prix ni niveau n'est prononcé ; la voix et la bande racontent la même lecture.
+  function commentaireMarcheEnDirect(B, moyR, moyV, m) {
+    if (!Array.isArray(B) || B.length < 25) return null;
+    const c = B.slice(-12).map(x => Number(x[4]));
+    const fond = c[c.length - 1] - c[0];
+    const recent = c[c.length - 1] - c[c.length - 4];
+    const seuil = Math.max(moyR * 0.35, 1e-9);
+    const dFond = Math.abs(fond) <= seuil ? 0 : Math.sign(fond);
+    const dRecent = Math.abs(recent) <= seuil * 0.45 ? 0 : Math.sign(recent);
+    const rangeRecent = B.slice(-4).reduce((a, x) => a + Math.max(0, x[2] - x[3]), 0) / 4;
+    const rangeAvant = B.slice(-20, -4).reduce((a, x) => a + Math.max(0, x[2] - x[3]), 0) / 16;
+    const hh = Math.max(...B.slice(-20).map(x => x[2]));
+    const ll = Math.min(...B.slice(-20).map(x => x[3]));
+    const pos = (B[B.length - 1][4] - ll) / Math.max(hh - ll, 1e-9);
+    const volume = B[B.length - 1][5] || 0;
+    const volumeFort = moyV > 0 && volume >= 1.8 * moyV;
+    let lecture;
+    if (dFond > 0 && dRecent < 0) lecture = 'La tendance récente reste orientée à la hausse, mais les dernières bougies corrigent. Les acheteurs doivent défendre leur mouvement ; on attend une clôture avant de conclure.';
+    else if (dFond < 0 && dRecent > 0) lecture = 'Le mouvement de fond reste orienté à la baisse, mais le marché tente un rebond. Les vendeurs doivent encore montrer s’ils gardent la main ; aucune anticipation.';
+    else if (dFond > 0 && dRecent >= 0) lecture = 'Les acheteurs gardent l’avantage sur les dernières bougies. Je surveille si l’impulsion se prolonge ou si le marché commence à souffler.';
+    else if (dFond < 0 && dRecent <= 0) lecture = 'Les vendeurs gardent la pression sur les dernières bougies. Je surveille si la baisse continue ou si les acheteurs commencent à réagir.';
+    else if (rangeAvant > 0 && rangeRecent < 0.65 * rangeAvant) lecture = 'Le marché se resserre : les bougies perdent de l’amplitude et les deux camps attendent. La prochaine clôture aidera à départager acheteurs et vendeurs.';
+    else lecture = 'Le marché évolue en range : acheteurs et vendeurs se neutralisent pour le moment. Je surveille une sortie confirmée plutôt que de deviner le prochain mouvement.';
+    if (pos > 0.85) lecture += ' Le prix travaille le haut de sa zone récente : attention à une réaction ou à une cassure confirmée.';
+    else if (pos < 0.15) lecture += ' Le prix travaille le bas de sa zone récente : attention à une réaction ou à une cassure confirmée.';
+    if (volumeFort) lecture += ' Le volume est nettement supérieur à sa moyenne récente.';
+    return '🎙 ' + m + ' : ' + lecture;
+  }
+  let tendN = 0, derniereTend = Date.now(), derniereCoach = 0, arme = null;   // horloges séparées : l'animateur ne bloque plus le commentaire du marché
   function regarder() {
     try {
       if (retour) return;                                   // un abonné a la main : on ne parle pas par-dessus
@@ -1188,7 +1224,7 @@
       }
       // 4) toutes les ~7 min : la bande dit où le marché a l'air d'aller (sans prix) et renvoie vers le lien en bio
       // v6.1 : marché calme = on parle plus souvent (toutes les ~3 min) : direction, où est le prix, « branche-toi au marché »
-      if (Date.now() - derniereTend > 2.4 * 60000) {   // v7.6 : spectacle +10 %
+      if (Date.now() - derniereTend > 75000) {   // v7.6 : spectacle +10 %
         const c10 = B.slice(-10).map(x => x[4]), pente = (c10[9] - c10[0]) / moyR, larg = (Math.max(...B.slice(-10).map(x => x[2])) - Math.min(...B.slice(-10).map(x => x[3]))) / moyR;
         const pos = (cur[4] - ll) / Math.max(hh - ll, 1e-9), tour = tendN % 4;   // v8.0 : 4e tour = on fait commenter
         // marché très calme (bougies récentes bien plus petites que d'habitude) → message « va te faire un café » selon l'heure
@@ -1196,7 +1232,8 @@
         const h = new Date().getHours(), calme = r10 < 0.6 * r40 && tour !== 2;
         const CAL = h < 6 || h >= 23 ? PHRASES.calme_nuit : h < 11 ? PHRASES.calme_matin : h < 14 ? PHRASES.calme_midi : h < 19 ? PHRASES.calme_aprem : PHRASES.calme_soir;
         // v8.6 (demande d'Adel) : marché calme → un VRAI trader anime le live : questions, pression gentille, « tapote », « commente »
-    const L = calme ? (pos < 0.25 ? COACH.rebond : pos > 0.75 ? COACH.cassure : [COACH.anim, COACH.anim, PHRASES.ennui, CAL][tendN % 4]) : tour === 3 ? PHRASES.commente : tour === 2 ? PHRASES.branche
+    const narration = commentaireMarcheEnDirect(B, moyR, moyV, m);
+        const L = (tendN % 4 !== 3 && narration) ? [narration] : calme ? (pos < 0.25 ? COACH.rebond : pos > 0.75 ? COACH.cassure : [COACH.anim, COACH.anim, PHRASES.ennui, CAL][tendN % 4]) : tour === 3 ? PHRASES.commente : tour === 2 ? PHRASES.branche
           : tour === 1 ? (pos < 0.2 ? PHRASES.bas_zone : pos > 0.8 ? PHRASES.haut_zone : PHRASES.milieu)
           : larg < 3.2 ? PHRASES.range : pente > 1.2 ? PHRASES.hausse : pente < -1.2 ? PHRASES.baisse : PHRASES.range;
         if (bandeShow(L[Math.floor(tendN / 3) % L.length].replace('{m}', m))) {
