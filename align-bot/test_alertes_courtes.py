@@ -103,8 +103,9 @@ class EvenementsPine(unittest.TestCase):
         if not r.get("_vieux"):
             r = dict(r)
             delta = now - self.NOW
-            for key in ("b5", "b15", "b1h", "b4h"):
-                r[key] = [dict(x, t=x["t"] + delta) for x in (r.get(key) or [])]
+            if delta >= 300:  # ne déplacer les bougies que lorsqu'un nouveau cycle de marché est simulé
+                for key in ("b5", "b15", "b1h", "b4h"):
+                    r[key] = [dict(x, t=x["t"] + delta) for x in (r.get(key) or [])]
             r["m1"] = [{"t": now - 30, "o": 100, "h": 101, "l": 99, "c": 100.5}] * 5
         with patch.object(ab, "cme_ouvert", return_value=True):
             return ab.evenements_pine(etat, m, r, etat.setdefault(m, {}), now)
