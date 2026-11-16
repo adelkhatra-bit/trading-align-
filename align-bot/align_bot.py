@@ -4607,8 +4607,7 @@ def bot_on(etat, cid):
     if cid in {str(x) for x in etat.get("bot_off", [])}:
         return False
     return (cid in {str(x) for x in etat.get("notifications_on", [])}
-            or any(cid in {str(x) for x in etat.get("auto", {}).get(m, [])} for m in MARCHES)
-            or any(cid in {str(x) for x in (etat.get("coach_live", {}).get(m) or {})} for m in MARCHES))
+            or any(cid in {str(x) for x in etat.get("auto", {}).get(m, [])} for m in MARCHES))
 
 def stats_bot(etat, cid):
     return etat.setdefault("stats_bot", {}).setdefault(cid, {"arrets": 0, "auto": 0})
