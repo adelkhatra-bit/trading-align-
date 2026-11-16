@@ -327,7 +327,8 @@ def nasdaq_direct():
         v = float(http_json("https://scanner.tradingview.com/symbol?symbol=CME_MINI:NQ1%21&fields=close")["close"])
     except Exception as ex:
         print("nasdaq direct", ex)
-        return c[1] if c else None
+        # Ne jamais recycler indéfiniment un ancien cours : au-delà de 60 s, la source live est considérée indisponible.
+        return c[1] if c and time.time() - c[0] <= 60 else None
     _CACHE["nq_live"] = (time.time(), v)
     return v
 
@@ -462,14 +463,27 @@ def directions_cloturees(series):
     return out
 
 
-def direction_confirmee_marche(m, dirs, d):
-    """Filtre d'entrée : GOLD/NASDAQ exigent les clôtures M5 + M15 + H1 + H4 dans le même sens."""
+def direction_confirmee_marche(m, dirs, d, contexte=None):
+    """Filtre d'entrée : GOLD/NASDAQ exigent quatre clôtures concordantes, un prix live frais et pas de déplacement live marqué contre le sens."""
     if d not in (1, -1):
         return 0
     if m in ("GOLD", "NASDAQ"):
         D = list(dirs or [])
         if len(D) < 10 or any(D[i] != d for i in (2, 4, 7, 9)):
             return 0
+        if contexte is not None:
+            m1 = contexte.get("m1") or []
+            b5 = contexte.get("b5") or []
+            atr5 = contexte.get("atr5") or contexte.get("atr") or 0
+            if not m1 or len(b5) < 2 or atr5 <= 0:
+                return 0
+            # Le flux M1 doit être frais ; NASDAQ ne doit jamais trader sur un cours direct périmé.
+            if time.time() - m1[-1]["t"] > 120:
+                return 0
+            # Le cours live ne doit pas avoir déjà retracé de plus de 0,75 ATR M5 contre la dernière clôture.
+            ecart_live = m1[-1]["c"] - b5[-2]["c"]
+            if d * ecart_live < -0.75 * atr5:
+                return 0
     return d
 
 def pivots(b, g=5):
@@ -827,7 +841,8 @@ def calculer_analyse(S, stable=None, comp_prev=None, market=None):
     # BTC conserve sa règle historique. GOLD/NASDAQ : seules les clôtures M5/M15/H1/H4 concordantes arment une direction.
     if market in ("GOLD", "NASDAQ"):
         d1c, d4c = dirs_cloturees[7], dirs_cloturees[9]
-        confirme = direction_confirmee_marche(market, dirs_cloturees, d4c) if d4c != 0 and d1c == d4c else 0
+        ctx_live = {"m1": m1, "b5": m5, "atr5": atr(m5[:-1], 14)[-1] if len(m5) >= 16 else 0}
+        confirme = direction_confirmee_marche(market, dirs_cloturees, d4c, ctx_live) if d4c != 0 and d1c == d4c else 0
     else:
         confirme = d4h if d4h != 0 and d1h == d4h else 0
     # Contexte Daily / Weekly : où est le prix dans sa zone (0 = tout en bas, 1 = tout en haut)
