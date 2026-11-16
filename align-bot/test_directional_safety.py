@@ -35,6 +35,16 @@ class DirectionSafety(unittest.TestCase):
     def test_btc_retest_rule_is_unchanged(self):
         self.assertIn("ENTRÉE SUR RETEST : LONG", ab.entree_retest("BTC", retest_r(0), {}))
 
+    def test_sniper_requires_both_h1_and_h4_for_gold_nasdaq(self):
+        for market in ("GOLD", "NASDAQ"):
+            r = {"market": market, "dirPlan": 1, "dirs": [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]}
+            proposal, reason = ab._sniper(r)
+            self.assertIsNone(proposal)
+            self.assertIn("CONFLUENCE_H1_H4", reason)
+        btc = {"market": "BTC", "dirPlan": 1, "dirs": [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]}
+        _, reason_btc = ab._sniper(btc)
+        self.assertNotIn("CONFLUENCE_H1_H4", reason_btc)
+
     def test_gold_nasdaq_climax_is_watch_only_without_h1_h4_confluence(self):
         bars = [candle(i * 900) for i in range(80)]
         bars[-2] = candle(78 * 900, o=100, h=102, l=97, c=101, v=500)
