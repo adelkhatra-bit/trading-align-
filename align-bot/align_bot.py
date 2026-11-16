@@ -4647,8 +4647,8 @@ def menu_bot_gratuit(etat, cid):
     lignes = [f"🤖 MON BOT : {'▶️ ON' if on else '⏸ OFF'}", "━━━━━━━━━━━━", "🔔 Souhaites-tu encore des positions ?"]
     if dedans:
         lignes.append(f"🎯 En position : {', '.join(dedans)} (suivi jusqu'au TP / SL)")
-    lignes += (["✅ Je te propose la prochaine position", "🙋 Tu choisis : tu la prends ou non"] if on else
-               ["⏸ Aucune position proposée", "🔒 Tu sais juste qu'une position VIP sort"])
+    lignes += (["✅ Tu reçois les alertes des marchés validés", "🙋 Tu gardes le choix de chaque position"] if on else
+               ["🔕 Aucun message automatique", "📡 Choisis tes marchés puis valide le suivi"])
     lignes += ["━━━━━━━━━━━━", "🎁 Position du jour : " + ("déjà utilisée (nouvelle demain)" if utilise else "disponible"),
                "📡 Marchés : " + " + ".join(NOMS_MARCHES[m] for m in MARCHES if m in marches_choisis(etat, cid))]
     _envoi_sur(cid, text="\n".join(lignes) + "\n\n" + texte_suivi(etat, cid), reply_markup=json.dumps({"inline_keyboard": [
@@ -7451,14 +7451,13 @@ def diffuser_evenements(etat, chats, evts):
             _envoi_sur(cid, text="\n".join(regrouper_alertes(blocs)))
 
 def alertes_courtes(etat, chats, derniers, now=None):
-    """Appelé à chaque tour : sessions + évènements Pine du moment. Gratuit : préavis 15 min des grandes ouvertures seulement."""
+    """Diffusion publique vers les chaînes et privée uniquement vers les marchés explicitement suivis."""
     now = now or time.time()
-    evts, libres = [], []
-    modele3 = []
+    evts, libres, modele3 = [], [], []
     for ev in evenements_sessions(etat, now, derniers):
         if ev["evt"] == "ouvre" and ev["palier"] == 15:
             msgs = messages_ouverture(etat, ev, derniers, now, True)
-            if msgs:                                       # Modèle 3 (un message complet par marché) ; sinon repli sur l'ancienne alerte
+            if msgs:
                 modele3 += msgs
                 if (ev["code"], ev["evt"]) in SESSIONS_GRATUIT:
                     libres.append(ev)
@@ -7469,13 +7468,13 @@ def alertes_courtes(etat, chats, derniers, now=None):
     if modele3 and TOKEN:
         diffuser_messages(etat, chats, modele3)
     for m, r in derniers.items():
-        if m != "BTC" and not cme_ouvert(int(now)):          # marché fermé : aucune alerte de l'indicateur
+        if m != "BTC" and not cme_ouvert(int(now)):
             continue
         for ev in sorted(evenements_pine(etat, m, r, etat.get(m, {}), now), key=lambda x: _PINE_PRIO[x["kind"]]):
-            if ev["kind"] == "scalp_inv":              # carte complète à part (jamais coupée à 4 lignes par le regroupement)
+            if ev["kind"] == "scalp_inv":
                 if TOKEN:
                     diffuser_alerte(etat, chats, texte_scalp(m, ev["si"], ev["dp"]), texte_scalp(m, ev["si"], ev["dp"], True))
-                if scalp_vaut_le_coup(ev["si"]) and (etat.get("auto_marches") or {}).get(m):   # le bot prend le contre-tendance (60 $ max)
+                if scalp_vaut_le_coup(ev["si"]) and (etat.get("auto_marches") or {}).get(m):
                     si_ = ev["si"]
                     auto_entree(etat, m, {"d": si_["d"], "e": si_["e"], "sl": si_["sl"], "tp1": si_["tp"]}, contre=True)
                 continue
@@ -7484,15 +7483,22 @@ def alertes_courtes(etat, chats, derniers, now=None):
         diffuser_evenements(etat, chats, evts)
     if libres and TOKEN:
         for cid in destinataires_gratuits(etat):
+            abonnes = marches_notifications(etat, cid)
+            if not abonnes:
+                continue
             for ev in libres:
                 msgs = messages_ouverture(etat, ev, derniers, now, False) if ev["evt"] == "ouvre" and ev["palier"] == 15 else []
                 if msgs:
-                    mes = [texte for m, texte in msgs if marche_autorise(etat, cid, m)]
+                    mes = [texte for m, texte in msgs if m in abonnes and marche_autorise(etat, cid, m)]
                     if mes:
                         _envoi_sur(cid, text=fusion_ouvertures(mes))
                 else:
                     fr, en = texte_session(etat, ev), texte_session(etat, ev, True)
-                    _envoi_sur(cid, text="\n".join(regrouper_alertes([en if str(cid) in LANG_EN else fr])))
+                    fr = filtrer_texte_par_marches(fr, abonnes)
+                    en = filtrer_texte_par_marches(en, abonnes)
+                    choisi = en if str(cid) in LANG_EN else fr
+                    if choisi:
+                        _envoi_sur(cid, text="\\n".join(regrouper_alertes([choisi])))
 
 def alerte_gratuite_preparation(etat, texte, now=None):
     """Gratuit : version réduite d'une alerte de préparation VIP (« JE PRÉPARE UNE POSITION », « PRÉPARE-TOI », « POINT D'ENTRÉE À VENIR ») :
@@ -10817,17 +10823,17 @@ def menu_live(etat, cid):
     _envoi_sur(cid, text=texte, **({"reply_markup": kb} if kb else {}))
 
 def live_annoncer_debut(etat, chats):
-    """Le propriétaire lance le live : tout le monde (VIP + gratuits) reçoit le lien."""
+    """Le lien du live est envoyé uniquement aux personnes déjà abonnées à un coach/marché."""
     vus = set()
     for cid in list(chats) + list(etat.get("prospects", [])):
         cid = str(cid)
-        if cid in vus:
+        if cid in vus or not marches_notifications(etat, cid):
             continue
         vus.add(cid)
         anglais = cid in LANG_EN
         try:
-            _envoi_sur(cid, text=("🔴 ADEL IS LIVE\n📺 The ALIGN chart, live (YouTube • TikTok)\n🎮 You can take control of the chart"
-                                  if anglais else "🔴 ADEL EST EN LIVE\n📺 Le graphique ALIGN en direct (YouTube • TikTok)\n🎮 Tu peux prendre la main sur le graphique"),
+            _envoi_sur(cid, text=("🔴 ADEL IS LIVE\\n📺 The ALIGN chart, live (YouTube • TikTok)\\n🎮 You can take control of the chart"
+                                  if anglais else "🔴 ADEL EST EN LIVE\\n📺 Le graphique ALIGN en direct (YouTube • TikTok)\\n🎮 Tu peux prendre la main sur le graphique"),
                        reply_markup=clavier_live(etat, cid, anglais))
         except Exception as ex:
             print("live annonce", cid, ex)
