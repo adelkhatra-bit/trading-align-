@@ -202,7 +202,6 @@
   function parlerLive(item) {
     if (!voixActive || !item || !('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return;
     const anglais = !!item.en; // la langue appartient au message, pas à l'animation précédente
-    if (!!item.en !== anglais) return; // un seul passage vocal, dans la langue choisie
     const maintenant = Date.now();
     if (maintenant - voixDerniere < 12000) return; // pas de mitraillette vocale
     let phrase = String(item.texte || '').replace(/^🇫🇷\s*|^🇬🇧\s*/, '')
@@ -660,7 +659,8 @@
       setTimeout(() => montrer('🆓 TOI AUSSI TU VEUX ENCAISSER AVEC LA TEAM ? crée ton compte démo GRATUIT et active ton coach • lien en bio • ce n\'est pas un conseil en investissement', false, 1, 'membre', true), 22000); }
     if (/\bSL\b[^\n]{0,12}TOUCH|STOP TOUCH/i.test(txt)) setTimeout(() => coeurs(1, ['😢']), 3600);
     if (/PLONGE|DIVING/i.test(txt)) { coeurs(1, ['🌊']); setTimeout(() => coeurs(1, ['😄']), 5000); }   // v10.7 : quand ça coule aussi
-    if (/ENTRE EN POSITION/i.test(txt)) { feuArtifice('🚀 POSITION CONFIRMÉE !'); coeurs(12, ['🚀', '🔥', '💚']); }\n    else if (/ACCÉLÈRE|SPEEDING UP|DIRECTION TP/i.test(txt)) { coeurs(1, ['🚀']); setTimeout(() => coeurs(1, ['😄']), 5000); }   // v11.1 : spectacle renforcé uniquement sur une entrée réelle
+    if (/ENTRE EN POSITION/i.test(txt)) { feuArtifice('🚀 POSITION CONFIRMÉE !'); coeurs(12, ['🚀', '🔥', '💚']); }
+    else if (/ACCÉLÈRE|SPEEDING UP|DIRECTION TP/i.test(txt)) { coeurs(1, ['🚀']); setTimeout(() => coeurs(1, ['😄']), 5000); }   // v11.1 : spectacle renforcé uniquement sur une entrée réelle
     montrer(txt, bulle, 2);
     const em = (txt.slice(0, 4).match(/🔮|🧱|🛏/) || [])[0]; if (em) setTimeout(() => coeurs(1, [em]), 1500);   // v7.3 : animation « le graphique parle »
   }
