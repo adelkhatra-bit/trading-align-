@@ -4608,8 +4608,7 @@ def bot_on(etat, cid):
         return False
     return (cid in {str(x) for x in etat.get("notifications_on", [])}
             or any(cid in {str(x) for x in etat.get("auto", {}).get(m, [])} for m in MARCHES)
-            or any(cid in {str(x) for x in (etat.get("coach_live", {}).get(m) or {})} for m in MARCHES)
-            or bool(en_position(etat, cid)))
+            or any(cid in {str(x) for x in (etat.get("coach_live", {}).get(m) or {})} for m in MARCHES))
 
 def stats_bot(etat, cid):
     return etat.setdefault("stats_bot", {}).setdefault(cid, {"arrets": 0, "auto": 0})
@@ -5425,7 +5424,7 @@ def notifier_clotures(etat, m, r, cle):
     """Envoie les clôtures nouvelles une fois chacune, sur les UT suivies par l'utilisateur."""
     champs = TF_CHAMPS
     for cid, suivi in list(etat.get("veille_cloture", {}).get(m, {}).items()):
-        if not notifications_actives(etat, cid, m) or not marche_autorise(etat, cid, m):
+        if not notifications_abonne(etat, cid, m) or not marche_autorise(etat, cid, m):
             etat["veille_cloture"][m].pop(cid, None)
             continue
         if suivi.get("multi"):
@@ -8046,13 +8045,9 @@ def marche_du_message(texte):
     ens = marches_du_message(texte)
     return None if not ens else (next(iter(ens)) if len(ens) == 1 else "BOTH")
 
-def notifications_actives(etat, cid, marche):
-    """Consentement privé par marché : abonnement, coach live, bot activé ou position acceptée."""
+def notifications_abonne(etat, cid, marche):
+    """Consentement proactif : auto, coach live ou bot activé sur les marchés choisis."""
     cid = str(cid)
-    if marche in MARCHES:
-        pos = (((etat.get(marche) or {}).get("trade") or {}).get("qui") or {}).get(cid)
-        if isinstance(pos, dict) and not pos.get("fini"):
-            return True
     if cid in {str(x) for x in etat.get("bot_off", [])}:
         return False
     if marche in MARCHES:
@@ -8062,26 +8057,46 @@ def notifications_actives(etat, cid, marche):
                 or cid in {str(x) for x in (etat.get("coach_live", {}).get(marche) or {})}
                 or (cid in {str(x) for x in etat.get("notifications_on", [])}
                     and etat.get("marches_par_chat", {}).get(cid) is not None))
-    return any(notifications_actives(etat, cid, m) for m in MARCHES)
+    return any(notifications_abonne(etat, cid, m) for m in MARCHES)
+
+
+def notifications_actives(etat, cid, marche):
+    """Consentement aux alertes : abonnement, ou suivi d'une position explicitement prise."""
+    cid = str(cid)
+    if marche in MARCHES:
+        pos = (((etat.get(marche) or {}).get("trade") or {}).get("qui") or {}).get(cid)
+        if isinstance(pos, dict) and not pos.get("fini"):
+            return True
+    return notifications_abonne(etat, cid, marche)
 
 
 def marches_notifications(etat, cid):
-    return {m for m in MARCHES if notifications_actives(etat, cid, m)}
+    return {m for m in MARCHES if notifications_abonne(etat, cid, m)}
 
 
 def destinataires_message(etat, chats, texte):
-    """Les chaînes restent publiques ; les messages privés exigent un consentement explicite."""
+    """Les chaînes restent publiques ; les privés exigent un abonnement, sauf suivi d'une position acceptée."""
     ens = marches_message(texte)
+    execution = bool(re.search(r"TP[12]?|\bSL\b|STOP|\bBE\b|CLÔTURE|POSITION (?:EN COURS|FERMÉE|CLÔTURÉE)|J'ENTRE MAINTENANT", str(texte), re.I))
     canal = str(etat.get("canal") or "")
     prives = []
     for c in chats:
         cid = str(c)
         if cid == canal or vue_gratuite(etat, cid):
             continue
-        abonnes = marches_notifications(etat, cid)
-        if (ens and ens & abonnes) or (not ens and abonnes):
+        if ens:
+            ok = any(notifications_abonne(etat, cid, m) or
+                     (execution and notifications_actives(etat, cid, m)) for m in ens)
+        else:
+            ok = bool(marches_notifications(etat, cid)) or (execution and bool(en_position(etat, cid)))
+        if ok:
             prives.append(cid)
     return sorted(set(([canal] if canal else []) + prives))
+
+
+def destinataires(etat, chats):
+    """Téléphones qui reçoivent les signaux + la chaîne VIP."""
+    return list(chats) + ([etat["canal"]] if etat.get("canal") else [])
 
 def destinataires(etat, chats):
     """Téléphones qui reçoivent les signaux + la chaîne VIP."""
