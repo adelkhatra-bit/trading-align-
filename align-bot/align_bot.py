@@ -11348,11 +11348,21 @@ def live_phrases_ia(etat, maintenant, derniers=None):
     )
     brut = ia(etat, consigne, donnees)
     paires = phrases_bande_par_marche(brut)
-    if not paires:
-        secours = commentaires_live_de_secours(donnees)
-        paires = phrases_bande_par_marche(secours)
-        if paires:
-            print("LIVE_IA_FALLBACK=TECHNICAL_CONTEXT", flush=True)
+    # Une réponse IA partielle ne doit pas faire taire les autres marchés : compléter chaque marché
+    # présent dans les données avec une lecture factuelle locale, sans fabriquer de contexte absent.
+    marches_disponibles = set(donnees.get("marches", {}))
+    paires = {m: v for m, v in paires.items() if m in marches_disponibles}
+    secours = phrases_bande_par_marche(commentaires_live_de_secours(donnees))
+    for marche in marches_disponibles:
+        existantes = paires.setdefault(marche, [])
+        for phrase in secours.get(marche, []):
+            if len(existantes) >= 2:
+                break
+            if phrase not in existantes:
+                existantes.append(phrase)
+    paires = {m: v for m, v in paires.items() if v}
+    if paires and any(len(v) < 2 for v in paires.values()):
+        print("LIVE_IA_PARTIAL_MARKET_COVERAGE_COMPLETED", flush=True)
     nb = sum(len(v) for v in paires.values())
     print(f"LIVE_IA {nb} commentaires marché via {etat.get('ia_dernier_fournisseur')} {etat.get('ia_dernier_statut')} : {str(brut)[:160]!r}")
     if not paires:
