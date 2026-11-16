@@ -1922,6 +1922,16 @@ def prochaine(r, cle):
             return f"🔜 Prochaine entrée : ATTENTE — H1/H4 {SENS[d4]}, M15 {etat(d15)}, M5 {etat(d5)}. Pas de position avant l'accord des quatre clôtures."
         if direction_confirmee_marche(r.get("market"), D, d4, r) != d4:
             return "🔜 Prochaine entrée : ATTENTE — le cours en direct a déjà retracé contre la dernière clôture M5 ou le flux est périmé. J'attends une nouvelle clôture."
+    if r.get("market") == "BTC":
+        D = r.get("dirs_cloturees") or r.get("dirs") or []
+        d4 = D[9] if len(D) > 9 else 0
+        d1 = D[7] if len(D) > 7 else 0
+        if not d4:
+            return "🔜 Prochaine entrée : attente d'une direction claire en H4 clôturée"
+        if d1 != d4:
+            return f"🔜 Prochaine entrée : attente H1 clôturée — H4 {SENS[d4]}, H1 pas encore alignée"
+        if r.get("dirPlan") != d4:
+            return f"🔜 Prochaine entrée : H1/H4 {SENS[d4]} alignées, mais pas de setup confirmé dans ce sens"
     d = r["confirme"]; R = dict(zip(UT, r["rsis"]))
     if d and etire(r, d):
         # Grosses UT en excès : le retournement est possible
@@ -1955,7 +1965,7 @@ def verdict(r, cle):
             attente = prochaine(r, cle).replace("🔜 Prochaine entrée", "⏳ En attente")
             return ("🔴🔴 N'ENTRE PAS", attente + "\n🔔 Je te préviens dès que les clôtures et le cours valident l'entrée")
         # BTC conserve son explication historique H4 / H1.
-        if not (r.get("dirs") or [0] * 11)[9]:
+        if not (r.get("dirs_cloturees") or r.get("dirs") or [0] * 11)[9]:
             return ("🔴🔴 N'ENTRE PAS", "⏳ La 4 h est neutre : pas de direction LONG ni SHORT\n🔔 Je te préviens dès que c'est validé")
         return ("🔴🔴 N'ENTRE PAS", "⏳ Le 1h ne confirme pas la tendance 4h\n🔔 Je te préviens dès que c'est validé")
     if etire(r, al):
