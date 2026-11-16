@@ -11140,7 +11140,7 @@ def live_annonces(etat, m, textes):
     for t in textes or []:
         t = t if isinstance(t, str) else str(t)
         if "J'ENTRE MAINTENANT" in t or est_entree(t):   # v8.9 : le nouveau modèle « 🟢 GOLD - LONG » n'était pas vu → l'écran ne savait pas qu'ALIGN était dedans
-            live_bande(etat, f"🚀 ALIGN ENTRE EN POSITION sur {ic} {m} ! 👉 Le coach en direct : lien en bio 🎁", f"entre{m}", 600, toujours=True)
+            live_bande(etat, f"🚀 POSITION ALIGN CONFIRMÉE sur {ic} {m} ! 🎬 Pour suivre le plan complet : lien en bio • ne cours pas après un mouvement déjà parti.", f"entre{m}", 600, toujours=True)
         elif "OBJECTIF FINAL ATTEINT" in t or re.search(r"TP[2-9] TOUCHÉ", t):
             live_bande(etat, f"🏆 TP TOUCHÉ sur {ic} {m} ! Bravo à ceux qui ont suivi 🔥" + FIN_BANDE, f"tp2{m}", 600, toujours=True)
             sondage_tp(etat, m)
@@ -11165,7 +11165,7 @@ def live_annonces(etat, m, textes):
         elif "POINT D'ENTRÉE À VENIR" in t:
             # Règle live : aucune info (ni sens, ni niveau, ni marché) ; jamais le mot « Telegram » à l'écran (TikTok réduit la portée des lives qui renvoient ailleurs) → « lien en bio »
             live_bande(etat, f"BULLE:🎯 Le prix arrive dans une zone clé 👀 • ⏱ verdict dans {min_avant_cloture15()} min (clôture 15 min) • "
-                             "les infos en temps réel : lien en bio 🎁 gratuit", f"zone{m}", 900, toujours=True)
+                             "Tu veux savoir si le feu vert est confirmé ? Ouvre le lien en bio pour voir le plan complet.", f"zone{m}", 900, toujours=True)
         elif "RETOUR VERS L'ENTRÉE" in t:
             live_bande(etat, f"BULLE:🔁 {ic} {m} revient vers l'entrée : on respire 😎 • le bot est protégé 🛡 • "
                              f"⏱ clôture dans {min_avant_cloture15()} min" + FIN_BANDE, f"retour{m}", 900, toujours=True)
