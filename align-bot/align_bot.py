@@ -5375,12 +5375,12 @@ def canal_resultats(etat, m, textes):
 
 
 def notifier_coach_live(etat, m, r, cle):
-    """Envoie la carte « coach en direct » à chaque nouvelle clôture 15 min, aux abonnés qui l'ont activé pour ce marché."""
+    """Surveille sans échéance, signale immédiatement une nouvelle position puis commente les clôtures M15."""
     abonnes = etat.get("coach_live", {}).get(m) or {}
-    bars = (r.get("b15") or [])[:-1]                 # la dernière bougie est en formation
-    if not abonnes or not bars:
+    if not abonnes:
         return
-    b = bars[-1]
+    bars = (r.get("b15") or [])[:-1]                 # la dernière bougie est en formation
+    b = bars[-1] if bars else None
     for cid, info in list(abonnes.items()):
         if not bot_on(etat, cid):
             continue
@@ -5388,6 +5388,25 @@ def notifier_coach_live(etat, m, r, cle):
             abonnes.pop(cid, None)
             _envoi_sur(cid, text=f"🎙 Ton commentateur {ICONE.get(m, '')} {m}\n👉 Il est dans ta chaîne\n🔕 Ici, plus de doublon",
                        reply_markup=json.dumps({"inline_keyboard": [[{"text": f"🎙 Ouvrir {m}", "url": LIENS_CHAINES.get(m, BOT_LIEN)}]]}))
+            continue
+
+        # Une position nouvellement détectée ne doit pas attendre la prochaine clôture M15.
+        trade = cle.get("trade")
+        if trade:
+            position_key = "|".join(str(trade.get(k, "")) for k in ("d", "e", "sl", "tp1", "tp2"))
+            if position_key != info.get("position_key"):
+                message = (f"🎯 POSITION ALIGN DÉTECTÉE — {ICONE.get(m, '')} {m}\n"
+                           + resume_ordre(trade)
+                           + "\n📍 Suivi actif : SL / passage à BE / TP.\n"
+                           "ℹ️ ALIGN ne transmet aucun ordre à ton broker.")
+                resultat = _envoi_sur(cid, text=message,
+                                      reply_markup=markup_analyse(etat, m, r, cid))
+                if isinstance(resultat, dict) and resultat.get("ok") is True:
+                    info["position_key"] = position_key
+        else:
+            info.pop("position_key", None)
+
+        if b is None:
             continue
         if int(info.get("dernier_t", 0)) >= int(b["t"]):
             flash = flash_commentateur(m, r, cle)
