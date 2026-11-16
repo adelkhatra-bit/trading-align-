@@ -576,16 +576,16 @@ class ParitePine(unittest.TestCase):
         self.assertIn("insuffisantes", ab.mouvement_recent_m1({"m1": [{"c": 100.0}]}))
 
 class AffichageTPGraphique(unittest.TestCase):
-    def test_tp1_et_tp2_sont_traces_des_qu_un_plan_est_affiche(self):
+    def test_v24_reference_script_is_not_modified_by_visual_proposal(self):
         chemin = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pine", "ALIGN_MTF_PRO_v24.pine")
         with open(chemin, encoding="utf-8") as f:
             pine = f.read()
         bloc = pine[pine.index("// ═════════ LIGNES DU PLAN (TP1, TP2, STOP)"):pine.index("// ═════════ BARRE (en bas")]
         self.assertIn("if voirPlan and dirPlan != 0", bloc)
         self.assertIn("lTP1 := line.new(x1, tp1", bloc)
-        self.assertIn("lTP2 := line.new(x1, tp2", bloc)
         self.assertIn('eTP1 := label.new(x1, tp1, "TP1 "', bloc)
-        self.assertIn('eTP2 := label.new(x1, tp2, "TP2 "', bloc)
+        self.assertNotIn("lTP2 := line.new(x1, tp2", bloc)
+        self.assertNotIn('eTP2 := label.new(x1, tp2, "TP2 "', bloc)
 
     def test_option_apres_tp1_ne_recree_pas_de_lignes_superposees(self):
         chemin = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pine", "ALIGN_MTF_PRO_v24.pine")
