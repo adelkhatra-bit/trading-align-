@@ -4662,16 +4662,15 @@ def menu_bot_gratuit(etat, cid):
 
 def menu_bot(etat, cid):
     if str(cid) in {str(x) for x in proprio(etat)}:
-        # 16/11 : Adel ne trouvait pas les boutons (son compte est en « vue gratuite ») → le panneau ADMIN arrive TOUJOURS sous « 🤖 Mon bot »
+        # Le panneau ADMIN reste accessible sous « Mon bot ».
         commande_auto(etat, cid, "/auto")
     if vue_gratuite(etat, cid):
         return menu_bot_gratuit(etat, cid)
     on = bot_on(etat, cid)
-    # Lecture sans écriture : ce menu peut être affiché pendant une analyse en cours.
     st = etat.get("stats_bot", {}).get(str(cid), {"arrets": 0, "auto": 0})
     _envoi_sur(cid, text=(f"🤖 MON BOT   {'▶️ ON' if on else '⏸ OFF'}\n━━━━━━━━━━━━\n"
-                          + ("✅ Il entre tout seul dans chaque position\n👀 Vue 15 min • SL un peu sous / au-dessus de la mèche\n🎯 Le coach te suit jusqu'au TP\n"
-                             if on else "⏸ Il n'entre plus pour toi\n🔔 Tu reçois quand même les positions\n")
+                          + ("✅ Il suit uniquement les marchés que tu as validés\n👀 Tu choisis chaque position\n🎯 Le coach suit tes positions jusqu'au TP\n"
+                             if on else "⏸ Aucun message automatique\n📡 Choisis tes marchés puis valide le suivi\n")
                           + f"━━━━━━━━━━━━\n🤖 Positions prises par ton bot   {st['auto']}\n⏸ Arrêts manuels   {st['arrets']}"
                           + "\n\n" + texte_suivi(etat, cid)),
                reply_markup=json.dumps({"inline_keyboard": [[{"text": "⏸ Arrêter mon bot", "callback_data": "botoff:x"} if on
@@ -4860,7 +4859,7 @@ def timeframe_attendu(r, cle):
 
 def armer_cloture(etat, cid, m, r, cle):
     """Mémorise une clôture uniquement après consentement au suivi."""
-    if not notifications_actives(etat, cid, m):
+    if not notifications_abonne(etat, cid, m):
         return
     tf = timeframe_attendu(r, cle)
     champs = {"5m": "b5", "15m": "b15", "1h": "b1h", "4h": "b4h", "D": "bd", "W": "bw"}
@@ -7519,7 +7518,7 @@ def alerte_gratuite_preparation(etat, texte, now=None):
     vus[m] = now
     ic = ICONE.get(m, "")
     for cid in destinataires_gratuits(etat):
-        if not notifications_actives(etat, cid, m) or not marche_autorise(etat, cid, m):
+        if not notifications_abonne(etat, cid, m) or not marche_autorise(etat, cid, m):
             continue
         v = _tournante(etat, f"g:{cid}", 3)
         fr = (("🔔 {ic} {m} : une position se prépare", "🔒 Niveaux : VIP"), ("👀 {ic} {m} : quelque chose se met en place", "🔒 Détails réservés aux VIP"),
@@ -8093,10 +8092,6 @@ def destinataires_message(etat, chats, texte):
             prives.append(cid)
     return sorted(set(([canal] if canal else []) + prives))
 
-
-def destinataires(etat, chats):
-    """Téléphones qui reçoivent les signaux + la chaîne VIP."""
-    return list(chats) + ([etat["canal"]] if etat.get("canal") else [])
 
 def destinataires(etat, chats):
     """Téléphones qui reçoivent les signaux + la chaîne VIP."""
