@@ -7476,7 +7476,12 @@ def diffuser_evenements(etat, chats, evts):
     evts = [tuple(e) + (None,) * (4 - len(e)) for e in evts]
     dest_evt = []
     for marches, fr, en, _mk in evts:
-        t = Msg("\n".join(fr)); t.marches = frozenset(marches)
+        # Une session est globale dans le calendrier, mais son alerte privée reste
+        # limitée aux marchés explicitement concernés par cette session.
+        libelle = _mk[0] if isinstance(_mk, (tuple, list)) and _mk else (_mk or "")
+        mk_names = set(re.findall(r"BTC|GOLD|NASDAQ", str(libelle).upper()))
+        cibles = (set(marches) - {"*"}) or mk_names
+        t = Msg("\n".join(fr)); t.marches = frozenset(cibles)
         dest_evt.append(set(destinataires_message(etat, chats, t)))
     canal = str(etat.get("canal") or "")
     for cid in sorted(set().union(*dest_evt) if dest_evt else set()):
