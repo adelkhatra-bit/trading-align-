@@ -555,6 +555,14 @@ def direction_plan_autorisee(m, d, dirs, contexte=None):
     return d
 
 
+def direction_btc_confirmee(dir_plan, dirs_cloturees):
+    """BTC : le biais peut rester historique, mais aucun signal n'est confirmé sans H1/H4 clôturées dans le même sens."""
+    D = list(dirs_cloturees or [])
+    if dir_plan not in (-1, 1) or len(D) <= 9:
+        return 0
+    return dir_plan if D[7] == D[9] == dir_plan else 0
+
+
 def pivots(b, g=5):
     hs, ls = [], []
     for i in range(g, len(b) - g):
@@ -919,7 +927,7 @@ def calculer_analyse(S, stable=None, comp_prev=None, market=None):
     if market in ("GOLD", "NASDAQ"):
         confirme = dirPlan if dirPlan and d1c == dirPlan and d4c == dirPlan else 0
     else:
-        confirme = dirPlan if dirPlan and d1c == dirPlan and d4c == dirPlan else 0
+        confirme = direction_btc_confirmee(dirPlan, dirs_cloturees)
     # Contexte Daily / Weekly : où est le prix dans sa zone (0 = tout en bas, 1 = tout en haut)
     def position(bars, n):
         z = bars[-n:]; haut = max(x["h"] for x in z); bas = min(x["l"] for x in z)
