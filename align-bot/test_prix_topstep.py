@@ -50,6 +50,18 @@ class TestEnvoi(unittest.TestCase):
         self.assertEqual(ab.bouton_plateforme(etat, 111)["callback_data"], "plateforme:menu")
         self.assertEqual(ab.plateforme({}, 5), "tv")
 
+    def test_suivi_ponctuel_recoit_topstep_uniquement_pour_sa_position(self):
+        etat = {"plateforme": {"111": "topstep"}, "coach_optin": {},
+                "bot_off": [], "marches_par_chat": {"111": ["NASDAQ"]}}
+        trade = dict(TR, qui={"111": {"e": TR["e"], "sl": TR["sl"], "tp1": TR["tp1"], "d": TR["d"], "t": 1}})
+        envoyes = []
+        with unittest.mock.patch.object(ab, "_envoi_sur", lambda cid, **k: envoyes.append(cid)), \\
+             unittest.mock.patch.object(ab, "marche_autorise", lambda e, c, m: True), \\
+             unittest.mock.patch.object(ts, "prix_futures", lambda m: 20120.0):
+            self.assertEqual(ab.prix_topstep_inscrits(etat, "NASDAQ", trade, 20000.0), 1)
+        self.assertEqual(envoyes, ["111"])
+        self.assertFalse(ab.coach_abonne(etat, "111", "NASDAQ"))  # aucun abonnement permanent créé
+
     def test_les_deux_recoivent_aussi_topstep(self):
         etat = {"plateforme": {"111": "deux", "222": "tv", "333": "topstep"}, "coach_optin": {"NASDAQ": ["111", "333"]}}
         envoyes = []
