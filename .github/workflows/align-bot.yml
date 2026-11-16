@@ -49,7 +49,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # Un événement workflow_run ne doit jamais exécuter le HEAD main non validé :
+          # il doit exécuter exactement le commit dont la validation vient de réussir.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           sparse-checkout: align-bot
+
+      - name: Vérifier le commit validé réellement exécuté
+        env:
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+            echo "::error::Worker checkout mismatch: expected $EXPECTED_SHA, got $ACTUAL_SHA"
+            exit 1
+          fi
+          echo "WORKER_CHECKOUT_SHA=$ACTUAL_SHA"
 
       - name: Attendre la fin de l'ancien worker (sa sauvegarde de mémoire)
         # Sans cette attente, le nouveau worker restaurait une mémoire PÉRIMÉE (celle de la dernière fin de bloc) pendant que l'ancien
