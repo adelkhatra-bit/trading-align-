@@ -27,6 +27,12 @@ class MemoireDuBot(unittest.TestCase):
         self.assertIn("< 240", bloc)                                                    # jamais plus de 4 minutes
         self.assertIn('x["id"] < me', bloc)                                           # n'attend que les workers plus anciens
 
+    def test_worker_checkout_exactement_le_commit_valide(self):
+        checkout = self.t[self.t.index("uses: actions/checkout@v4"):self.t.index("name: Attendre la fin de l'ancien worker")]
+        self.assertIn("ref: ${{ github.event.workflow_run.head_sha || github.sha }}", checkout)
+        self.assertIn("WORKER_CHECKOUT_SHA=$ACTUAL_SHA", checkout)
+        self.assertIn("EXPECTED_SHA", checkout)
+
     def test_worker_actif_jamais_annule_avant_sauvegarde(self):
         bloc = self.t[self.t.index("concurrency:"):self.t.index("jobs:")]
         self.assertIn("group: align-bot", bloc)
