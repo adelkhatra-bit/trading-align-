@@ -17,7 +17,7 @@ def retest_r(h4):
     bars[20]["h"] = 102.0
     for i in range(34, 38):
         bars[i] = candle(i * 900, o=102.5, h=104.0, l=102.2, c=103.0)
-    bars[38] = candle(38 * 900, o=102.2, h=103.0, l=101.9, c=102.5)
+    bars[39] = candle(39 * 900, o=102.2, h=103.0, l=101.9, c=102.5)
     dirs = [0] * 11
     dirs[2], dirs[4], dirs[7], dirs[9] = 1, 1, 1, h4
     return dict(b15=bars, dirs=dirs, atr=1.0, t=40000)
