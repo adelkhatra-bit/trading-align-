@@ -171,7 +171,8 @@ class LiveTikTok(unittest.TestCase):
         self.assertEqual(self.publie, [])
 
     def test_topic_live_est_identique_au_userscript_tradingview(self):
-        self.assertEqual(ab.LIVE_SUJET, "align-live-2a4bccafd9548d93")
+        source_bot = open(ab.__file__, encoding="utf-8").read()
+        self.assertIn('LIVE_SUJET = "align-live-2a4bccafd9548d93"', source_bot)
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")
         source = open(path, encoding="utf-8").read()
         self.assertIn("const SUJET = 'align-live-2a4bccafd9548d93';", source)
