@@ -45,6 +45,38 @@ class MarketDataFreshness(unittest.TestCase):
     def test_btc_legacy_data_policy_is_unchanged(self):
         self.assertTrue(ab.donnees_mtf_fraiches("BTC", {}, now_ts=100000.0))
 
+    def test_sniper_refuses_stale_nasdaq_candles(self):
+        now = 100000.0
+        r = snapshot(now, "CME NQ=F Yahoo proxy", age5=600)
+        r.update({"market": "NASDAQ", "dirPlan": 1})
+        self.assertEqual(ab._sniper(r), (None, "DONNEES_MTF_PERIMEES"))
+
+    def test_agent_ne_cree_aucune_position_sur_bougies_yahoo_retardees(self):
+        now = 100000.0
+        r = snapshot(now, "CME NQ=F Yahoo proxy", age5=600)
+        r.update({
+            "r5": [50.0, 50.0], "posD": 0.5, "posW": 0.5,
+            "confirme": 1, "dirs": [1, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1],
+            "fermeture": False,
+        })
+        with (
+            mock.patch.object(ab, "manipulation"),
+            mock.patch.object(ab, "meche_suspecte"),
+            mock.patch.object(ab, "niveaux_cles"),
+            mock.patch.object(ab, "resistance_fvg"),
+            mock.patch.object(ab, "suivre_apres_sl"),
+            mock.patch.object(ab, "reprise_entree", return_value=None),
+            mock.patch.object(ab, "entree_retest", return_value=None),
+            mock.patch.object(ab, "radar_climax", return_value=None),
+            mock.patch.object(ab, "retournement_marche", return_value=None),
+            mock.patch.object(ab, "plan_cassure") as cassure,
+            mock.patch.object(ab, "point_entree") as fvg,
+        ):
+            out = ab.agent("NASDAQ", r, {}, "")
+        cassure.assert_not_called()
+        fvg.assert_not_called()
+        self.assertTrue(any("trop anciennes ou retardées" in x for x in out))
+
     def test_nasdaq_does_not_reuse_a_quote_cached_for_over_thirty_seconds(self):
         now = 100000.0
         with (
