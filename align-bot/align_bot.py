@@ -7697,7 +7697,7 @@ def envoyer_prospects(etat, texte, signal, clavier=None):
     vus = etat.setdefault("masque_vu", {})
     ref = f"{m}:{(tr or {}).get('cree') or int(time.time() // 1800)}"
     for cid in destinataires_gratuits(etat):
-        if not notifications_actives(etat, cid, m) or not marche_autorise(etat, cid, m):
+        if not notifications_abonne(etat, cid, m) or not marche_autorise(etat, cid, m):
             continue
         if TOUT_GRATUIT:                   # v7.4 (décision d'Adel) : tout gratuit pour le moment → chaque position en temps réel, une fois
             if not bot_on(etat, cid) or vus.get(cid) == ref:
