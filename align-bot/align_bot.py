@@ -3058,8 +3058,8 @@ def vue_gratuite(etat, cid):
         (PROPRIO_VUE_GRATUITE or etat.get("proprio_gratuit")) and cid in {str(x) for x in proprio(etat)})
 
 def destinataires_gratuits(etat):
-    return list(dict.fromkeys([str(c) for c in etat.get("prospects", [])]
-                              + ([str(x) for x in sorted(proprio(etat))] if (PROPRIO_VUE_GRATUITE or etat.get("proprio_gratuit")) else [])))
+    """Aucun push gratuit/prospect : les messages privés exigent une activation explicite du coach."""
+    return []
 
 def partage_du(etat, maintenant=None):
     """Le rappel de partage part au plus une fois par jour prévu, à heure fixe : jamais deux fois de suite."""
@@ -5396,10 +5396,10 @@ def activer_coach_live(etat, cid, m, actif=True):
 
 
 def notifier_clotures(etat, m, r, cle):
-    """Envoie les clôtures nouvelles une fois chacune, sur les UT suivies par l'utilisateur."""
+    """Envoie les clôtures nouvelles uniquement aux personnes ayant activé le coach de ce marché."""
     champs = TF_CHAMPS
     for cid, suivi in list(etat.get("veille_cloture", {}).get(m, {}).items()):
-        if not marche_autorise(etat, cid, m):
+        if not coach_abonne(etat, cid, m) or not marche_autorise(etat, cid, m):
             etat["veille_cloture"][m].pop(cid, None)
             continue
         if suivi.get("multi"):
@@ -7135,16 +7135,16 @@ def _radar_fond(txt):
     return re.sub(r"[\d.,]+", "#", "\n".join(x for x in lignes if not x.startswith("📏")))
 
 def destinataires_radar(etat, chats):
-    """Personnes qui suivent au moins un marché (« Valider et suivre ») + VIP qui ont coché au moins 2 marchés. Jamais la chaîne."""
+    """Radar privé réservé aux utilisateurs ayant activé le coach sur au moins un marché."""
     canal = str(etat.get("canal") or "")
     out = set()
     for m, suivis in (etat.get("veille_cloture") or {}).items():
         for cid, s in (suivis or {}).items():
-            if isinstance(s, dict) and s.get("multi"):
+            if isinstance(s, dict) and s.get("multi") and coach_abonne(etat, cid, m):
                 out.add(str(cid))
     for cid in {str(c) for c in chats}:
         try:
-            if autorise(etat, cid, cid) and len(marches_choisis(etat, cid)) >= 2:
+            if coach_abonne(etat, cid) and autorise(etat, cid, cid) and len(marches_choisis(etat, cid)) >= 2:
                 out.add(cid)
         except Exception:
             pass
@@ -7628,8 +7628,10 @@ DODO_TXT = ["😴 Tu dors ? Le marché aussi…\n🔔 Je te réveille dès qu'un
             "😴 Le marché fait la sieste\n🔔 Garde les notifications : une position peut tomber"]
 
 def envoyer_differes(etat, now=None, dodo=True):
-    """v7.4 (modèle d'Adel, 15/11) : les gratuits dont l'essai est validé (1er TP) reçoivent les positions en DIFFÉRÉ ;
-    et une fois par jour, s'il ne se passe rien, un petit « tu dors ? » pour garder le contact."""
+    """Supprime les anciens envois différés gratuits : aucun push sans activation explicite du coach."""
+    # Ne jamais rejouer un ancien signal après la mise en place du consentement.
+    etat["differe"] = []
+    return
     now = now or time.time()
     file_ = etat.setdefault("differe", [])
     prets = [x for x in file_ if x.get("t", 0) <= now]
@@ -7657,8 +7659,8 @@ def envoyer_differes(etat, now=None, dodo=True):
                     print("dodo", cid, ex)
 
 def envoyer_prospects(etat, texte, signal, clavier=None):
-    """GRATUIT (visiteurs + propriétaire en vue gratuite) : 1 position proposée par jour si le bot est ON,
-    sinon un simple avis masqué quand une position sort. Jamais de news ni d'analyse : c'est le VIP."""
+    """Désactivé : un prospect ne reçoit aucune alerte privée sans activation explicite du coach."""
+    return
     entree = signal and est_entree(texte)
     jour = datetime.datetime.now(PARIS).strftime("%Y-%m-%d")
     if etat.get("offerte_jour") != jour:           # 1 position GRATUITE par jour : on remet les compteurs à zéro
@@ -8022,17 +8024,31 @@ def marche_du_message(texte):
     ens = marches_du_message(texte)
     return None if not ens else (next(iter(ens)) if len(ens) == 1 else "BOTH")
 
+def coach_abonne(etat, cid, marche=None):
+    """Le choix d'un marché ne vaut PAS consentement : seul le bouton « Coach : préviens-moi » inscrit dans auto."""
+    cid = str(cid)
+    suivis = etat.get("auto") or {}
+    if marche in MARCHES:
+        valeurs = suivis.get(marche) or []
+        if isinstance(valeurs, (str, int)):
+            valeurs = [valeurs]
+        return cid in {str(x) for x in valeurs}
+    return any(coach_abonne(etat, cid, mk) for mk in MARCHES)
+
+
 def destinataires_message(etat, chats, texte):
-    # Le flux complet (news, analyses, toutes les positions) part dans la chaîne VIP (commune : tous les marchés).
-    # Chaque personne ne reçoit EN PRIVÉ que les marchés qu'elle a cochés (filtrage ligne par ligne au moment de l'envoi, voir filtrer_texte_par_marches).
+    """Chaîne publique conservée ; en privé, seul le coach explicitement activé pour le marché autorise les alertes."""
     ens = marches_message(texte)
-    if etat.get("canal"):
-        prives = [str(c) for c in chats if not vue_gratuite(etat, c) and str(c) != str(etat["canal"])
-                  and etat.get("marches_par_chat", {}).get(str(c)) is not None and ens
-                  and ens & marches_choisis(etat, c)]
-        return sorted(set([str(etat["canal"])] + prives))
-    cibles = [str(c) for c in chats if not ens or bool(ens & marches_choisis(etat, c))]
-    return sorted(set(cibles))
+    canal = str(etat.get("canal") or "")
+    if ens:
+        prives = [str(c) for c in chats if str(c) != canal
+                  and bool(ens & marches_choisis(etat, c))
+                  and any(coach_abonne(etat, c, mk) for mk in ens)]
+    else:
+        prives = [str(c) for c in chats if str(c) != canal and coach_abonne(etat, c)]
+    if canal:
+        return sorted(set([canal] + prives))
+    return sorted(set(prives))
 
 def destinataires(etat, chats):
     """Téléphones qui reçoivent les signaux + la chaîne VIP."""
@@ -8087,7 +8103,7 @@ def jauge(m, r, cle, cid=None, canal=False):
 
 def maj_jauge(etat, m, r, cle, chats, canal=None):
     for cid in list(chats) + ([canal] if canal else []):
-        if cid != canal and not marche_autorise(etat, cid, m):
+        if cid != canal and (not coach_abonne(etat, cid, m) or not marche_autorise(etat, cid, m)):
             mid = cle.get("jauge", {}).pop(cid, None)
             cle.get("jauge_txt", {}).pop(cid, None)
             if mid:
