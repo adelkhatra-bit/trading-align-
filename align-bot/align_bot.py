@@ -3094,19 +3094,9 @@ def selectionner_coach_optin(etat, cid, marches):
 
 
 def coach_abonne(etat, cid, m):
-    """Opt-in persistant et explicite ; migre les anciennes validations auto / veille déjà consenties."""
+    """Opt-in persistant : seul le choix explicite du Coach pour ce marché autorise les alertes proactives."""
     cid = str(cid)
-    optins = {str(x) for x in (etat.get("coach_optin") or {}).get(m, [])}
-    if cid in optins:
-        return True
-    # Compatibilité des états déjà enregistrés : auto[m] et veille_cloture[m]
-    # n'étaient créés qu'après une action explicite de suivi du marché.
-    legacy_auto = cid in {str(x) for x in (etat.get("auto") or {}).get(m, [])}
-    legacy_veille = cid in {str(x) for x in (etat.get("veille_cloture") or {}).get(m, {})}
-    if legacy_auto or legacy_veille:
-        activer_coach_optin(etat, cid, m, True)
-        return True
-    return False
+    return bot_on(etat, cid) and cid in {str(x) for x in (etat.get("coach_optin") or {}).get(m, [])}
 
 
 def destinataires_gratuits(etat):
@@ -4758,8 +4748,8 @@ def entrer_inscrits(etat, m, tr, chats=()):
     auto = [str(c) for c in chats if coach_abonne(etat, c, m) and marche_autorise(etat, c, m)
             and not vue_gratuite(etat, c) and str(c) != str(etat.get("canal") or "")]
     ponctuels = [str(c) for c in etat.get("auto", {}).pop(m, [])]
-    for cid in ponctuels:
-        activer_coach_optin(etat, cid, m, True)  # le clic ponctuel devient un coach persistant pour ce marché
+    # Un clic ponctuel « je prends cette position » autorise uniquement cette position ;
+    # il ne transforme jamais l'utilisateur en abonné permanent au Coach.
     for cid in list(dict.fromkeys(ponctuels + auto)):
         if not bot_on(etat, cid) or not marche_autorise(etat, cid, m):
             continue
