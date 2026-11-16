@@ -11240,7 +11240,7 @@ def contexte_technique_live(derniers):
         }
         if marche in ("GOLD", "NASDAQ"):
             contexte["fibonacci"] = progression_fibonacci_live(r, marche)
-        barres = (r.get("b15_long") or r.get("b15") or [])[:-1]
+        # Les fournisseurs Kraken/Yahoo et regrouper() retirent déjà les bougies en formation : la dernière M15 est clôturée.\n        barres = (r.get("b15_long") or r.get("b15") or [])
         reversal = detecter_chasse_liquidite(barres, r.get("atr"))
         if reversal:
             contexte["surveillance_retournement"] = reversal
