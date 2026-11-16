@@ -127,7 +127,8 @@ class TelegramOptIn(unittest.TestCase):
         self.assertIn("on laisse courir", text)
 
     def test_no_telegram_fibonacci_push_function_remains(self):
-        self.assertFalse(hasattr(ab, "fibo_zones"))\n        self.assertTrue(hasattr(ab, "progression_fibonacci_live"))
+        self.assertFalse(hasattr(ab, "fibo_zones"))
+        self.assertTrue(hasattr(ab, "progression_fibonacci_live"))
 
 
 if __name__ == "__main__":
