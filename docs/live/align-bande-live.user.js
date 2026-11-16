@@ -356,19 +356,31 @@
     montrer((k3 === 2 ? P[convN++ % P.length] : P[Math.floor(coachN / 3) % P.length]).replace('{m}', nomMarche()), false, 1);
     coachN++; derniereTend = Date.now();
   }, 15000);
-  let iaPool = [], iaN = 0;
+  let iaPool = [], iaPools = {}, iaN = 0;
   EN.push(['⚡ UNE POSITION SE PRÉPARE • dépêche-toi, les retardataires ont toujours tort 😉 • lien en bio', '⚡ A TRADE IS GETTING READY • hurry up, latecomers are always wrong 😉 • link in bio']);
   function recuIA(json) {
     try {
-      const paires = JSON.parse(json).filter(p => Array.isArray(p) && p.length === 2 && !/\d|telegram/i.test(p[0] + p[1]));
-      if (!paires.length) return;
-      iaPool = paires.map(([fr, en]) => { const f = sansPrix(fr); if (!EN.some(e => e[0] === f)) EN.push([f, en]); return f; });
+      const donnees = JSON.parse(json);
+      const propres = paires => (Array.isArray(paires) ? paires : [])
+        .filter(p => Array.isArray(p) && p.length === 2 && typeof p[0] === 'string' && typeof p[1] === 'string' && !/\d|telegram/i.test(p[0] + p[1]))
+        .map(([fr, en]) => { const f = sansPrix(fr); if (!EN.some(e => e[0] === f)) EN.push([f, en]); return f; });
+      if (Array.isArray(donnees)) {
+        iaPools = {};
+        iaPool = propres(donnees);
+      } else if (donnees && typeof donnees === 'object') {
+        iaPools = {};
+        ['BTC', 'GOLD', 'NASDAQ'].forEach(m => { iaPools[m] = propres(donnees[m]); });
+        iaPool = iaPools[codeMarche()] || [];
+      } else return;
       iaN = 0;
     } catch (e) {}
   }
   const iaT = setInterval(() => {
-    if (occupe || file.length || !iaPool.length) return;   // jamais par-dessus une vraie info
-    montrer(iaPool[iaN++ % iaPool.length], false, 1);
+    if (occupe || file.length) return;   // jamais par-dessus une vraie info
+    const m = codeMarche();
+    const pool = Object.keys(iaPools).length ? (iaPools[m] || []) : iaPool;  // commentaires du marché affiché uniquement
+    if (!pool.length) return;
+    montrer(pool[iaN++ % pool.length], false, 1);
   }, 4 * 60 * 1000);
   let astuceN = 0;
   const astuceT = setInterval(() => {
