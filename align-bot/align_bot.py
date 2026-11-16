@@ -5923,13 +5923,14 @@ def installer_menu(etat):
           ("resultats", "📈 My results"), ("gain", "📸 Share my profit"), ("vip", "💎 Become VIP"),
           ("live", "🔴 The live"), ("gagnantes", "🏆 Winning trades"), ("perdantes", "❌ Losing trades"), ("boutons", "⌨️ Bring back the buttons"), ("francais", "🌐 Français")]
     try:
+        # Tenter les trois réglages même si l'un échoue : chaque langue peut être mise à jour indépendamment.
         res_fr = telegram("setMyCommands", commands=json.dumps([{"command": c, "description": d} for c, d in fr]))
+        res_en = telegram("setMyCommands", commands=json.dumps([{"command": c, "description": d} for c, d in en]), language_code="en")
+        res_menu = telegram("setChatMenuButton", menu_button=json.dumps({"type": "commands"}))
         if not isinstance(res_fr, dict) or res_fr.get("ok") is not True:
             raise RuntimeError("setMyCommands FR non confirmé par Telegram")
-        res_en = telegram("setMyCommands", commands=json.dumps([{"command": c, "description": d} for c, d in en]), language_code="en")
         if not isinstance(res_en, dict) or res_en.get("ok") is not True:
             raise RuntimeError("setMyCommands EN non confirmé par Telegram")
-        res_menu = telegram("setChatMenuButton", menu_button=json.dumps({"type": "commands"}))
         if not isinstance(res_menu, dict) or res_menu.get("ok") is not True:
             raise RuntimeError("setChatMenuButton non confirmé par Telegram")
         print("TELEGRAM_MENU_COMMANDS_OK fr=/live en=/live")
