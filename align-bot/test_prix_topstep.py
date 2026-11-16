@@ -27,7 +27,7 @@ class TestNiveaux(unittest.TestCase):
 
 class TestEnvoi(unittest.TestCase):
     def test_seuls_ceux_qui_ont_choisi_topstep(self):
-        etat = {"plateforme": {"111": "topstep", "222": "tv"}}
+        etat = {"plateforme": {"111": "topstep", "222": "tv"}, "auto": {"NASDAQ": ["111"]}}
         envoyes = []
         with unittest.mock.patch.object(ab, "_envoi_sur", lambda cid, **k: envoyes.append((cid, k["text"]))), \
              unittest.mock.patch.object(ab, "marche_autorise", lambda e, c, m: True), \
@@ -51,7 +51,7 @@ class TestEnvoi(unittest.TestCase):
         self.assertEqual(ab.plateforme({}, 5), "tv")
 
     def test_les_deux_recoivent_aussi_topstep(self):
-        etat = {"plateforme": {"111": "deux", "222": "tv", "333": "topstep"}}
+        etat = {"plateforme": {"111": "deux", "222": "tv", "333": "topstep"}, "auto": {"NASDAQ": ["111", "333"]}}
         envoyes = []
         with unittest.mock.patch.object(ab, "_envoi_sur", lambda cid, **k: envoyes.append(cid)), \
              unittest.mock.patch.object(ab, "marche_autorise", lambda e, c, m: True), \
