@@ -2347,8 +2347,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
         state = {"prospects": ["7", "8"], "bot_off": ["7"], "coach_optin": {"GOLD": ["7"], "BTC": ["8"]}, "marches_par_chat": {"8": "BTC"}, "GOLD": {"trade": {"cree": 5}}}
         with patch.object(align_bot, "telegram") as tg, patch.object(align_bot, "PROPRIO_VUE_GRATUITE", False):
             align_bot.envoyer_prospects(state, "🥇 GOLD — J'ENTRE MAINTENANT\nEntrée 3990.50", True)
-        self.assertEqual([c.kwargs["chat_id"] for c in tg.call_args_list], ["7"])
-        self.assertIn("OFF", tg.call_args_list[0].kwargs["text"])
+        self.assertEqual(tg.call_count, 0)  # Bot OFF : aucune notification privée, même masquée
 
     def test_share_reminder_once_per_planned_day(self):
         import datetime
@@ -2557,6 +2556,7 @@ class TestFollowPositionMarketChoice(unittest.TestCase):
         from unittest.mock import patch
         state = {
             "auto": {"BTC": ["101", "202"], "GOLD": []},
+            "coach_optin": {"BTC": ["202"]},
             "veille_cloture": {"BTC": {"101": {"multi": True}, "202": {"multi": True}}},
             "marches_par_chat": {"101": "BOTH"}
         }
