@@ -5914,7 +5914,7 @@ COMMANDES = {"/faire_analyse": "📊 Faire une analyse", "/analyse_btc": "🟠 A
 
 def installer_menu(etat):
     """Bouton « Menu » à gauche du champ + description du bot (une seule fois par version)."""
-    if etat.get("menu") == 11:
+    if etat.get("menu") == 12:
         return
     fr = [("faire_analyse", "📊 Faire une analyse"), ("mon_bot", "🤖 Mon bot ON / OFF"),
           ("resultats", "📈 Mes résultats"), ("gain", "📸 Partager mon gain"), ("vip", "💎 Devenir VIP"),
@@ -5947,7 +5947,7 @@ def installer_menu(etat):
                                                   "🤖 Les abonnés au suivi sont enregistrés automatiquement à l'ouverture du signal.\n"
                                                   "📍 Suivi personnel : SL, BE, TP et sortie manuelle depuis Telegram.\n\n"
                                                   "ℹ️ Mes positions perso, pas un conseil. Le trading comporte un risque de perte."))
-        etat["menu"] = 11
+        etat["menu"] = 12
     except Exception as ex:
         # Ne pas marquer la version comme installée si Telegram a refusé les commandes.
         # Le prochain démarrage réessaiera automatiquement.
