@@ -5188,17 +5188,27 @@ def timeframe_attendu(r, cle):
     d1h = dirs[7] if len(dirs) > 7 else 0
     d4h = dirs[9] if len(dirs) > 9 else 0
 
-    # La tendance 4h est le filtre directeur : si elle est neutre, seule sa clôture
-    # peut changer ce constat. Une zone d'entrée existante ne doit pas masquer ce blocage.
+    # H4 pilote la direction ; H1 confirme le fond avant les unités d'entrée.
     if not d4h:
         return "4h"
-
-    # Tant que la 1h n'est pas dans le même sens que la 4h, la prochaine décision
-    # appartient à la clôture 1h, même si un ancien ordre/plan est encore mémorisé.
-    if d1h != d4h or not r.get("confirme"):
+    if d1h != d4h:
         return "1h"
 
-    # Une fois le biais 4h + 1h confirmé, les états d'exécution attendent le déclencheur M5.
+    marche = r.get("market")
+    if marche in ("GOLD", "NASDAQ"):
+        d5 = dirs[2] if len(dirs) > 2 else 0
+        d15 = dirs[4] if len(dirs) > 4 else 0
+        if d5 != d4h:
+            return "5m"
+        if d15 != d4h:
+            return "15m"
+        if not r.get("confirme"):
+            return "5m"  # clôtures alignées, mais le prix live / le flux doit être revalidé
+    elif marche == "BTC":
+        if r.get("dirPlan") != d4h or not r.get("confirme"):
+            return "15m"  # H1/H4 alignées : attendre le prochain setup 15 min, pas une H1 inutile
+
+    # Une fois le biais directeur confirmé, les états d'exécution attendent le déclencheur M5.
     if cle.get("trade") or cle.get("ordre") or cle.get("prep") or cle.get("attente_rsi") or cle.get("attente_rejet"):
         return "5m"
     return "15m"
