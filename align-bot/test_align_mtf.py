@@ -2463,7 +2463,7 @@ class TestTradingViewReportRegression(unittest.TestCase):
     def test_installer_menu_refreshes_existing_version_four_users(self):
         from unittest.mock import patch
         state = {"menu": 4}
-        with patch.object(align_bot, "telegram") as api:
+        with patch.object(align_bot, "telegram", return_value={"ok": True}) as api:
             align_bot.installer_menu(state)
         self.assertEqual(state["menu"], 12)
         self.assertTrue(any(call.args[0] == "setMyCommands" for call in api.call_args_list))
@@ -2605,7 +2605,7 @@ class TestTelegramSimpleAnalysisLayout(unittest.TestCase):
     def test_telegram_command_menu_has_one_analysis_entry_not_separate_btc_gold_entries(self):
         from unittest.mock import patch
         import json
-        with patch.object(align_bot, "telegram") as tg:
+        with patch.object(align_bot, "telegram", return_value={"ok": True}) as tg:
             align_bot.installer_menu({})
         calls = [c for c in tg.call_args_list if c.args and c.args[0] == "setMyCommands"]
         self.assertEqual(len(calls), 2)
