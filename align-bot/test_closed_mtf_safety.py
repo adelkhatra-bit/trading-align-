@@ -118,6 +118,7 @@ class ClosedMtfSafety(unittest.TestCase):
         self.assertEqual(result["dirPlan"], 0)
         self.assertEqual(result["confirme"], 0)
         self.assertEqual(result["strat"], "")
+        self.assertTrue(result["tv_bridge_conflict"])
         self.assertIsNone(result["zone_pine"])
         self.assertFalse(result["sigHaut"])
         self.assertFalse(result["sigBas"])
