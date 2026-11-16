@@ -213,8 +213,8 @@ f_plan(d, sMin, sMax, cMin, cMax) =>
     t2 = na(c2) ? e + d * risque * (gainMin + 2) : c2
     n2 = na(c2) ? "projection " + str.tostring(gainMin + 2) + " x le risque" : (d == 1 ? "résistance " : "support ") + nc2
     [e, t1, t2, s, n1, n2]
-// Plan automatique : les grosses UT (2h, 4h, Daily) sont prioritaires ; les zones ne tranchent que si elles ne décident pas.
-dirBrut = longT >= 2 ? 1 : longT <= -2 ? -1 : zoneHaut ? 1 : zoneBas ? -1 : retHaut ? 1 : retBas ? -1 : sens
+// Plan automatique : les grosses UT (2h, 4h, Daily) décident, sauf zone de retournement
+dirBrut = zoneHaut ? 1 : zoneBas ? -1 : longT >= 2 ? 1 : longT <= -2 ? -1 : retHaut ? 1 : retBas ? -1 : sens
 // Anti-parasites (vue 1 / 3 / 5 min) : le sens ne change qu'à la CLÔTURE d'une bougie,
 // et seulement si le 15 min ou l'1h confirme le nouveau sens. Pas de LONG / SHORT qui clignote en cours de bougie.
 var int dirStable = 0
