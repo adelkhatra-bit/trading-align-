@@ -3063,10 +3063,29 @@ def vue_gratuite(etat, cid):
     return cid in [str(c) for c in etat.get("prospects", [])] or (
         (PROPRIO_VUE_GRATUITE or etat.get("proprio_gratuit")) and cid in {str(x) for x in proprio(etat)})
 
-def coach_abonne(etat, cid, m):
-    """Opt-in explicite : le bouton Coach / Suivre ce marché a été validé par cet utilisateur."""
+def activer_coach_optin(etat, cid, marche, actif=True):
+    """Préférence persistante, distincte de la file auto à usage unique qui sert à entrer dans la prochaine position."""
+    if marche not in MARCHES:
+        return
     cid = str(cid)
-    return bot_on(etat, cid) and cid in {str(x) for x in (etat.get("auto") or {}).get(m, [])}
+    liste = etat.setdefault("coach_optin", {}).setdefault(marche, [])
+    if actif:
+        if cid not in {str(x) for x in liste}:
+            liste.append(cid)
+    else:
+        etat["coach_optin"][marche] = [str(x) for x in liste if str(x) != cid]
+
+
+def selectionner_coach_optin(etat, cid, marches):
+    """Enregistre exactement les marchés validés dans le menu de suivi."""
+    for marche in MARCHES:
+        activer_coach_optin(etat, cid, marche, marche in set(marches))
+
+
+def coach_abonne(etat, cid, m):
+    """Opt-in persistant et explicite : le coach a été activé pour ce marché précis."""
+    cid = str(cid)
+    return bot_on(etat, cid) and cid in {str(x) for x in (etat.get("coach_optin") or {}).get(m, [])}
 
 
 def destinataires_gratuits(etat):
@@ -6140,6 +6159,7 @@ def traiter(etat, chats, updates):
                 # qu'un ancien abonnement BTC survive à un nouveau choix GOLD (et inversement).
                 selectionner_marches_suivi(etat, qui, mk)
                 marches = ("BTC", "GOLD") if mk == "BOTH" else (mk,)
+                selectionner_coach_optin(etat, qui, marches)
                 for marche in marches:
                     inscrire_auto(etat, qui, marche, notifier=False)
                 try:
@@ -6376,9 +6396,10 @@ def traiter(etat, chats, updates):
                         selectionner_marches_suivi(etat, qui, [mk])          # pas encore de choix : uniquement ce marché
                     elif mk not in marches_choisis(etat, qui):
                         basculer_marche(etat, qui, mk)
+                    activer_coach_optin(etat, qui, mk, True)
                     inscrire_auto(etat, qui, mk, notifier=False)
                     try:
-                        telegram("answerCallbackQuery", callback_query_id=cb["id"], text="🔔 Suivi activé pour " + mk)
+                        telegram("answerCallbackQuery", callback_query_id=cb["id"], text="🧑‍🏫 Coach activé pour " + mk)
                     except Exception:
                         pass
                     _deja = (etat.get(mk) or {}).get("trade")
@@ -6458,6 +6479,7 @@ def traiter(etat, chats, updates):
             if charge.startswith("auto_") and charge[5:].upper() in MARCHES:
                 if cid not in chats and cid not in etat.get("prospects", []) and not autorise(etat, cid, msg.get("from", {}).get("id")):
                     etat.setdefault("prospects", []).append(cid); refuser(etat, cid)
+                activer_coach_optin(etat, cid, charge[5:].upper(), True)
                 inscrire_auto(etat, cid, charge[5:].upper())
                 continue
             if charge.startswith("ecran_") and charge[6:].upper() in MARCHES:
@@ -7843,6 +7865,7 @@ def valider_et_suivre_marches(etat, cid, user_id, message_id=None):
         return False
     choisis = [m for m in MARCHES if m in marches_choisis(etat, cid)]
     selectionner_marches_suivi(etat, cid, choisis)
+    selectionner_coach_optin(etat, cid, choisis)
     for m in choisis:
         inscrire_auto(etat, cid, m, notifier=False)
     noms = " + ".join(m for m in choisis)
@@ -7854,7 +7877,7 @@ def valider_et_suivre_marches(etat, cid, user_id, message_id=None):
                 telegram("editMessageReplyMarkup", chat_id=cid, message_id=message_id, reply_markup=json.dumps({"inline_keyboard": []}))
             except Exception as ex:
                 print("fermeture menu marchés", ex)
-    _envoi_sur(cid, text=(f"✅ Tracking on: {noms}" if anglais else f"✅ Suivi activé : {noms}") + "\n\n" + texte_suivi(etat, cid))
+    _envoi_sur(cid, text=(f"🧑‍🏫 Coach activated: {noms}" if anglais else f"🧑‍🏫 Coach privé activé pour : {noms}") + "\n\n" + texte_suivi(etat, cid))
     return True
 
 def basculer_marche(etat, cid, marche):
