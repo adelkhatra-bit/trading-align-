@@ -552,6 +552,9 @@ def direction_plan_autorisee(m, d, dirs, contexte=None):
     """Le plan affiché suit le même garde-fou que les entrées : clôtures M5/M15/H1/H4 + flux frais pour Gold/Nasdaq."""
     if m in ("GOLD", "NASDAQ"):
         return d if direction_confirmee_marche(m, dirs, d, contexte) == d else 0
+    if m == "BTC":
+        D = list(dirs or [])
+        return d if len(D) > 9 and D[7] == D[9] == d else 0
     return d
 
 
@@ -906,7 +909,8 @@ def calculer_analyse(S, stable=None, comp_prev=None, market=None):
         ctx_live = {"m1": m1, "b5": m5, "b15": m15[-30:], "b1h": h1[-30:], "b4h": h4[-30:],
                     "atr5": atr(m5[:-1], 14)[-1] if len(m5) >= 16 else 0}
         # Même règle que Pine v25 : aucun plan directionnel exploitable avant les quatre clôtures et un flux frais.
-        dirPlan = direction_plan_autorisee(market, dirPlan, dirs_cloturees, ctx_live)
+    # BTC garde son filtre H1/H4 historique, mais sur les dernières bougies terminées et dans le sens du plan.
+    dirPlan = direction_plan_autorisee(market, dirPlan, dirs_cloturees, ctx_live)
     dirs_strategie = dirs_cloturees if market in ("GOLD", "NASDAQ") else dirs
     strat_plan = strategie_alignement(dirs_strategie, dirPlan, dW_signal, market)[0]
     nom = ("★ ACHAT FORT" if fortHaut else "EXPLOSION ▲" if explHaut else "ZONE DE REBOND ▲") if sigHaut else \
@@ -914,11 +918,11 @@ def calculer_analyse(S, stable=None, comp_prev=None, market=None):
     # ═══ STRATÉGIE : 4h = tendance principale, 1h = confirmation ═══
     d1h, d4h = dirs[7], dirs[9]
     # BTC conserve sa règle historique. GOLD/NASDAQ : seules les clôtures M5/M15/H1/H4 concordantes arment une direction.
+    d1c, d4c = dirs_cloturees[7], dirs_cloturees[9]
     if market in ("GOLD", "NASDAQ"):
-        d1c, d4c = dirs_cloturees[7], dirs_cloturees[9]
         confirme = dirPlan if dirPlan and d1c == dirPlan and d4c == dirPlan else 0
     else:
-        confirme = d4h if d4h != 0 and d1h == d4h else 0
+        confirme = dirPlan if dirPlan and d1c == dirPlan and d4c == dirPlan else 0
     # Contexte Daily / Weekly : où est le prix dans sa zone (0 = tout en bas, 1 = tout en haut)
     def position(bars, n):
         z = bars[-n:]; haut = max(x["h"] for x in z); bas = min(x["l"] for x in z)
@@ -3826,7 +3830,7 @@ def resume_volume(bars, provenance, timeframe_sec=0, now_ts=None):
 def donnees_ia(m, r, cle):
     titre, raison = verdict(r, cle)
     o = (cle or {}).get("ordre") or {}
-    dirs = ((r.get("dirs_cloturees") or r.get("dirs")) if m in ("GOLD", "NASDAQ") else r.get("dirs")) or [0] * 11
+    dirs = (r.get("dirs_cloturees") or r.get("dirs")) or [0] * 11
     rsis = r.get("rsis") or [50] * 11
     data = {"marché": m, "prix": round(r["m1"][-1]["c"], 2),
             "sens 1m/5m/15m/1h/4h/Daily": [dirs[i] if len(dirs) > i else 0 for i in (0, 2, 4, 7, 9, 10)],
@@ -4697,7 +4701,7 @@ def raison_attente(r, cle):
         return "Une position est déjà ouverte : le coach surveille le stop et les objectifs."
     if r.get("annonce"):
         return "Une annonce économique approche : aucune nouvelle entrée pendant cette période de risque."
-    dirs = (r.get("dirs_cloturees") or r.get("dirs") or [0] * 11) if r.get("market") in ("GOLD", "NASDAQ") else r.get("dirs", [0] * 11)
+    dirs = (r.get("dirs_cloturees") or r.get("dirs") or [0] * 11)
     d4h, d1h = dirs[9], dirs[7]
     if not d4h:
         return "La bougie 4 h ne donne pas de direction nette : le marché est neutre. Aucun LONG ni SHORT n'est proposé."
@@ -5161,7 +5165,7 @@ def signature_analyse(m, r, cle):
 
 def timeframe_attendu(r, cle):
     """Retourne l'unité qui bloque réellement la décision, avant les déclencheurs d'entrée."""
-    dirs = ((r.get("dirs_cloturees") or r.get("dirs")) if r.get("market") in ("GOLD", "NASDAQ") else r.get("dirs")) or []
+    dirs = (r.get("dirs_cloturees") or r.get("dirs")) or []
     d1h = dirs[7] if len(dirs) > 7 else 0
     d4h = dirs[9] if len(dirs) > 9 else 0
 
@@ -5342,7 +5346,7 @@ def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
         lecture = "👁 Le marché hésite 🤏"
     d = r.get("confirme") or 0
     tr = cle.get("trade")
-    dirs = ((r.get("dirs_cloturees") or r.get("dirs")) if m in ("GOLD", "NASDAQ") else r.get("dirs")) or [0] * 11
+    dirs = (r.get("dirs_cloturees") or r.get("dirs")) or [0] * 11
     idx = [i for i in (0, 1, 2, 4, 7, 9, 10) if i < len(dirs)]
     bas, haut = sum(1 for i in idx if dirs[i] == -1), sum(1 for i in idx if dirs[i] == 1)
     if bas > haut:
@@ -11136,7 +11140,7 @@ def contexte_technique_live(derniers):
         r = (derniers or {}).get(marche)
         if not isinstance(r, dict):
             continue
-        dirs = ((r.get("dirs_cloturees") or r.get("dirs")) if marche in ("GOLD", "NASDAQ") else r.get("dirs")) or []
+        dirs = (r.get("dirs_cloturees") or r.get("dirs")) or []
         sens = int(r.get("dirPlan") or r.get("sens") or 0)
         biais = {1: "haussier", -1: "baissier", 0: "neutre"}[1 if sens > 0 else -1 if sens < 0 else 0]
         confirmation_complete = (
