@@ -6020,11 +6020,85 @@ def capturer_snapshot_audit(etat, m, r, cle, messages=None):
         print("audit MTF snapshot", m, ex, flush=True)
 
 
+def _features_snapshot_apprentissage(snap):
+    """Projection compacte et horodatée des variables disponibles au moment de la décision."""
+    if not isinstance(snap, dict):
+        return None
+    tv = snap.get("tradingview") or {}
+    return {
+        "t": snap.get("t"), "bar_t": snap.get("bar_t"), "bar_close_t": snap.get("bar_close_t"),
+        "price": snap.get("price"), "confirm": snap.get("confirm"), "sens": snap.get("sens"),
+        "score": snap.get("score"), "strategy": snap.get("strategy"),
+        "dirPlan": snap.get("dirPlan"), "dirW": snap.get("dirW"),
+        "mtf": snap.get("mtf") or {}, "filters": snap.get("filters") or {},
+        "decision": snap.get("decision") or {},
+        "tradingview": {
+            "available": tv.get("available"), "activeTimeframe": tv.get("activeTimeframe"),
+            "activeTimeframeAgeMs": tv.get("activeTimeframeAgeMs"),
+            "snapshots": tv.get("snapshots") or {}
+        }
+    }
+
+
+def enregistrer_cas_apprentissage(etat, m, tr, sortie, motif, gain):
+    """Lie un résultat TP/SL aux snapshots pré-entrée et d'entrée, sans modifier les règles de décision."""
+    try:
+        audit_key = cle_audit_trade(m, tr)
+        hist = (etat.get("audit_mtf") or {}).get(m) or []
+        actifs = [x for x in hist if (x.get("trade") or {}).get("audit_key") == audit_key]
+        actifs.sort(key=lambda x: int(x.get("t") or 0))
+        entree = actifs[0] if actifs else None
+        t_entree = int(tr.get("cree") or (entree or {}).get("t") or 0)
+        prix_entree = float(tr.get("e") or 0)
+        direction = int(tr.get("d") or 0)
+        # Rattachement pré-entrée strict : même sens et même prix d'ordre, avant l'entrée réelle.
+        pre = []
+        for snap in hist:
+            plan = snap.get("trade") or {}
+            if plan.get("plan_source") != "ordre_en_preparation":
+                continue
+            if int(plan.get("d") or 0) != direction or plan.get("e") is None:
+                continue
+            if abs(float(plan["e"]) - prix_entree) > max(abs(prix_entree) * 0.00005, 1e-8):
+                continue
+            ts = int(snap.get("t") or 0)
+            if t_entree and ts <= t_entree:
+                pre.append(snap)
+        pre.sort(key=lambda x: int(x.get("t") or 0))
+        stop_initial = float(tr.get("sl0", tr.get("sl")) or 0)
+        risque = abs(prix_entree - stop_initial) if stop_initial else 0.0
+        resultat_r = direction * (float(sortie) - prix_entree) / risque if risque > 0 else None
+        case = {
+            "audit_key": audit_key, "m": m, "d": direction,
+            "entry": round(prix_entree, 8), "exit": round(float(sortie), 8),
+            "initial_sl": round(stop_initial, 8) if stop_initial else None,
+            "result_pct": round(float(gain), 4), "result_r": round(resultat_r, 4) if resultat_r is not None else None,
+            "label": "WIN" if gain > 0 else "LOSS" if gain < 0 else "FLAT",
+            "reason": str(motif)[:100], "created_at": t_entree,
+            "closed_at": int(time.time()), "profile": tr.get("profil") or {},
+            "pre_entry_t": int(pre[-1].get("t") or 0) if pre else None,
+            "entry_snapshot_t": int(entree.get("t") or 0) if entree else None,
+            "entry_features": _features_snapshot_apprentissage(entree),
+            "snapshot_times": [int(x.get("t") or 0) for x in actifs[-30:]],
+            "evidence": "complete" if pre and entree else "partial" if pre or entree else "missing"
+        }
+        cases = etat.setdefault("cas_apprentissage", [])
+        # Une clôture rejouée après redémarrage ne crée pas deux cas.
+        if not any(x.get("audit_key") == audit_key for x in cases):
+            cases.append(case)
+        del cases[:-300]
+        return case
+    except Exception as ex:
+        print("cas apprentissage", m, type(ex).__name__, ex, flush=True)
+        return None
+
+
 def journal_trade(etat, m, tr, sortie, motif, gain):
     j = etat.setdefault("journal_trades", [])
+    case = enregistrer_cas_apprentissage(etat, m, tr, sortie, motif, gain)
     j.append({"m": m, "d": tr.get("d"), "e": round(float(tr["e"]), 2), "s": round(float(sortie), 2), "g": round(float(gain), 2),
               "pips": pips(m, sortie - tr["e"]), "t": int(time.time()), "motif": str(motif)[:40],
-              "audit_key": cle_audit_trade(m, tr)})
+              "audit_key": cle_audit_trade(m, tr), "learning_evidence": (case or {}).get("evidence", "missing")})
     del j[:-100]
 
 
