@@ -4444,9 +4444,9 @@ def retournement_marche(m, r, cle):
     GOLD/NASDAQ : M5/M15 contre H1/H4 = observation uniquement, jamais une position avant confirmation des quatre clôtures.
     BTC conserve sa règle historique : M5 + M15 + H1 contre H4, avec les cibles et le SL existants.
     Une alerte par nouveau sens, jamais deux fois de suite."""
-    dirs = (r.get("dirs_cloturees") or r.get("dirs") or []) if m in ("GOLD", "NASDAQ") else (r.get("dirs") or [])
+    dirs = r.get("dirs_cloturees") or r.get("dirs") or []
     b5, b15 = (r.get("b5") or [])[:-1], (r.get("b15_long") or r.get("b15") or [])[:-1]   # dernières bougies en formation exclues
-    b1, b4 = ((r.get("b1h") or [])[:-1], (r.get("b4h") or [])[:-1]) if m in ("GOLD", "NASDAQ") else (r.get("b1h") or [], r.get("b4h") or [])
+    b1, b4 = (r.get("b1h") or [])[:-1], (r.get("b4h") or [])[:-1]
     if len(dirs) < 10 or len(b5) < 6 or len(b15) < 41 or len(b1) < 6 or len(b4) < 6:
         return None
     d5, d15, d60, d240 = dirs[2], dirs[4], dirs[7], dirs[9]
