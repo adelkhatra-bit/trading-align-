@@ -25,6 +25,7 @@ SHUTDOWN_REQUESTED = threading.Event()
 CALLBACKS_ACKNOWLEDGED = set()
 # Mode Telegram « pull » : seuls les messages déclenchés par l'utilisateur ou une entrée demandée sont autorisés.
 TELEGRAM_PULL_CONTEXT = threading.local()
+TELEGRAM_PULL_MODE = False  # activé par main(); les tests unitaires du wrapper restent isolés par défaut
 MARCHES = {"BTC": "XBTUSD", "GOLD": "XAUUSD", "NASDAQ": "NAS100"}  # BTC → FTMO (CFD 24/7) • GOLD → Topstep (MGC) / FTMO • NASDAQ → FX:NAS100 (TradingView)
 MIN_ALIGN, MIN_SQZ, MARGE_ATR, GAIN_MIN = 8, 4, 0.5, 1.5   # = réglages par défaut de l'indicateur ALIGN MTF PRO v24
 LIEN_RESULTATS = "https://t.me/+RajFd_hMgl1kNmQ0"     # groupe ALIGN Résultats (lien privé)
@@ -2925,6 +2926,8 @@ def traiter_file_telegram(etat, maintenant=None, limite=20):
 
 def _telegram_sortant_autorise(methode, params):
     """Aucun push spontané : réponse privée à une action explicite, ou entrée attendue après demande."""
+    if not TELEGRAM_PULL_MODE:
+        return True
     if methode == "answerCallbackQuery":
         return True
     if not methode.startswith(("send", "copy", "forward", "edit")):
@@ -12037,6 +12040,8 @@ def sauver_etat(etat, chats=None):
 
 
 def main():
+    global TELEGRAM_PULL_MODE
+    TELEGRAM_PULL_MODE = True
     etat = charger_etat()
     LANG_EN.clear(); LANG_EN.update(etat.get("en", []))
     MEMOIRE[:] = etat.get("memoire", []); LECONS[:] = etat.get("lecons_ia", [])
