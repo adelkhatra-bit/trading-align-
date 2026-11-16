@@ -11616,11 +11616,30 @@ def recevoir_updates_telegram(etat, chats, demandes):
         except queue.Empty:
             break
     if updates:
-        try:
-            demandes.extend(traiter(etat, chats, updates))
-        finally:
-            TELEGRAM_PULL_CONTEXT.chat_id = None
-            TELEGRAM_PULL_CONTEXT.private = False
+        for update in updates:
+            callback = update.get("callback_query")
+            if callback:
+                chat = (callback.get("message") or {}).get("chat") or {}
+                user_id = str((callback.get("from") or {}).get("id", ""))
+                chat_id = str(chat.get("id") or "")
+                private = chat.get("type") == "private" and bool(user_id) and chat_id == user_id
+            elif update.get("pre_checkout_query"):
+                user_id = str((update.get("pre_checkout_query") or {}).get("from", {}).get("id", ""))
+                chat_id = user_id
+                private = bool(user_id)
+            else:
+                message = update.get("message") or update.get("edited_message") or {}
+                chat = message.get("chat") or {}
+                user_id = str((message.get("from") or {}).get("id", ""))
+                chat_id = str(chat.get("id") or "")
+                private = chat.get("type") == "private" and bool(user_id) and chat_id == user_id
+            TELEGRAM_PULL_CONTEXT.chat_id = chat_id if private else None
+            TELEGRAM_PULL_CONTEXT.private = private
+            try:
+                demandes.extend(traiter(etat, chats, [update]))
+            finally:
+                TELEGRAM_PULL_CONTEXT.chat_id = None
+                TELEGRAM_PULL_CONTEXT.private = False
     return len(updates)
 
 

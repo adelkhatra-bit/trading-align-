@@ -544,6 +544,51 @@ class LiveOutbox(unittest.TestCase):
                 ab.TELEGRAM_PULL_CONTEXT.chat_id = None
                 ab.TELEGRAM_PULL_CONTEXT.private = False
 
+    def test_recevoir_updates_propage_le_contexte_prive_des_callbacks(self):
+        update = {"callback_query": {
+            "id": "cb-1",
+            "from": {"id": 42},
+            "message": {"chat": {"id": 42, "type": "private"}},
+            "data": "botmenu"
+        }}
+        observed = []
+        def fake_traiter(etat, chats, updates):
+            observed.append(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "42", "text": "Réponse au bouton"}))
+            observed.append(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "43", "text": "Message non sollicité"}))
+            return []
+        queue = ab.queue.Queue()
+        queue.put(update)
+        with mock.patch.object(ab, "TOKEN", "test-token"), \
+             mock.patch.object(ab, "TELEGRAM_PULL_MODE", True), \
+             mock.patch.object(ab, "TELEGRAM_UPDATES", queue), \
+             mock.patch.object(ab, "traiter", side_effect=fake_traiter):
+            ab.recevoir_updates_telegram({}, set(), [])
+        self.assertEqual(observed, [True, False])
+        self.assertIsNone(ab.TELEGRAM_PULL_CONTEXT.chat_id)
+        self.assertFalse(ab.TELEGRAM_PULL_CONTEXT.private)
+
+    def test_recevoir_updates_propage_le_contexte_prive_des_messages(self):
+        update = {"message": {
+            "chat": {"id": 42, "type": "private"},
+            "from": {"id": 42},
+            "text": "/live"
+        }}
+        observed = []
+        def fake_traiter(etat, chats, updates):
+            observed.append(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "42", "text": "Réponse à /live"}))
+            observed.append(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "43", "text": "Message non sollicité"}))
+            return []
+        queue = ab.queue.Queue()
+        queue.put(update)
+        with mock.patch.object(ab, "TOKEN", "test-token"), \
+             mock.patch.object(ab, "TELEGRAM_PULL_MODE", True), \
+             mock.patch.object(ab, "TELEGRAM_UPDATES", queue), \
+             mock.patch.object(ab, "traiter", side_effect=fake_traiter):
+            ab.recevoir_updates_telegram({}, set(), [])
+        self.assertEqual(observed, [True, False])
+        self.assertIsNone(ab.TELEGRAM_PULL_CONTEXT.chat_id)
+        self.assertFalse(ab.TELEGRAM_PULL_CONTEXT.private)
+
     def test_telegram_pull_block_is_not_reported_as_successful_delivery(self):
         with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True), \
              mock.patch.object(ab, "_telegram_sortant_autorise", return_value=False), \
