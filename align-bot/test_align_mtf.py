@@ -135,17 +135,21 @@ class AlignMtfRulesTest(unittest.TestCase):
         }}}
         self.assertFalse(align_bot.plan_indicateur(r)["available"])
 
-    def test_tradingview_mtf_readings_merge_into_existing_align_context(self):
-        r = {"dirs": [0] * 11, "rsis": [50.0] * 11, "tv_indicator_mtf": {
-            "activeTimeframe": "M15", "snapshots": {"M15": {"fresh": True, "robotV12": {
-                "lecture_1m": "LONG", "lecture_5m": "SHORT", "lecture_15m": "LONG",
-                "lecture_60m": "LONG", "rsi_5m": 31.5, "rsi_15m": 62
-            }}}
-        }}
+    def test_tradingview_mtf_snapshot_does_not_mutate_align_context(self):
+        dirs, rsis = [0] * 11, [50.0] * 11
+        r = {"dirs": list(dirs), "rsis": list(rsis), "confirme": 0, "dirPlan": 0,
+             "tv_indicator_mtf": {"activeTimeframe": "M15", "snapshots": {"M15": {"fresh": True, "robotV12": {
+                 "lecture_1m": "LONG", "lecture_5m": "SHORT", "lecture_15m": "LONG",
+                 "lecture_60m": "LONG", "rsi_5m": 31.5, "rsi_15m": 62
+             }}}}}
         align_bot.fusionne_lectures_tradingview(r)
-        self.assertEqual([r["dirs"][i] for i in (0, 2, 4, 7)], [1, -1, 1, 1])
-        self.assertEqual(r["rsis"][2], 31.5)
-        self.assertEqual(r["rsis"][4], 62)
+        self.assertEqual(r["dirs"], dirs)
+        self.assertEqual(r["rsis"], rsis)
+        self.assertEqual(r["confirme"], 0)
+        self.assertEqual(r["dirPlan"], 0)
+        self.assertEqual(r["tv_robot_v12"]["lecture_5m"], "SHORT")
+        self.assertEqual(r["tv_robot_v12_timeframe"], "M15")
+        self.assertTrue(r["tv_robot_v12_fresh"])
 
     def test_tradingview_links_select_market_and_requested_timeframe(self):
         btc = align_bot.url_tradingview("BTC", 5)
