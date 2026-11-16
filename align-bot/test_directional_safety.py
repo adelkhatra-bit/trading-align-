@@ -173,6 +173,7 @@ class DirectionSafety(unittest.TestCase):
             mock.patch.object(ab, "entree_retest", return_value=None),
             mock.patch.object(ab, "radar_climax", return_value=None),
             mock.patch.object(ab, "retournement_marche", return_value=None),
+            mock.patch.object(ab, "bloque_dw", return_value=False),
             mock.patch.object(ab, "plan_cassure") as cassure,
             mock.patch.object(ab, "point_entree") as fvg,
         ):
