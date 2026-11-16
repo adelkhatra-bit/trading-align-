@@ -850,7 +850,8 @@
     let candleSeries = null;
     let entryPriceLine = null;
     let slPriceLine = null;
-    let tpPriceLine = null;
+    let tpPriceLine = null;   // TP1
+    let tp2PriceLine = null;
 
     function buildRealtimePath() {
       return '/coach/realtime?symbol=' + encodeURIComponent(state.symbol) +
@@ -1042,13 +1043,15 @@
         if (entryPriceLine) { candleSeries.removePriceLine(entryPriceLine); entryPriceLine = null; }
         if (slPriceLine) { candleSeries.removePriceLine(slPriceLine); slPriceLine = null; }
         if (tpPriceLine) { candleSeries.removePriceLine(tpPriceLine); tpPriceLine = null; }
+        if (tp2PriceLine) { candleSeries.removePriceLine(tp2PriceLine); tp2PriceLine = null; }
       } catch (_e) {}
 
       if (!positionLike) return;
 
       const entry = Number(positionLike.entry);
       const sl = Number(positionLike.sl);
-      const tp = Number(positionLike.tp);
+      const tp1 = Number(positionLike.tp1 ?? positionLike.tp ?? positionLike.takeProfit);
+      const tp2 = Number(positionLike.tp2);
 
       if (Number.isFinite(entry) && entry > 0) {
         entryPriceLine = candleSeries.createPriceLine({
@@ -1070,14 +1073,24 @@
           title: 'SL'
         });
       }
-      if (Number.isFinite(tp) && tp > 0) {
+      if (Number.isFinite(tp1) && tp1 > 0) {
         tpPriceLine = candleSeries.createPriceLine({
-          price: tp,
+          price: tp1,
           color: '#22c55e',
-          lineWidth: 1,
+          lineWidth: 2,
           lineStyle: 2,
           axisLabelVisible: true,
-          title: 'TP'
+          title: 'TP1'
+        });
+      }
+      if (Number.isFinite(tp2) && tp2 > 0) {
+        tp2PriceLine = candleSeries.createPriceLine({
+          price: tp2,
+          color: '#34d399',
+          lineWidth: 1,
+          lineStyle: 3,
+          axisLabelVisible: true,
+          title: 'TP2'
         });
       }
     }
@@ -1113,7 +1126,13 @@
         state.prices = candles.map((c) => c.close);
         const vp = state.realtime?.virtualPosition || null;
         const tr = state.realtime?.instantTrade || null;
-        renderTradeLevelsOnChart(vp || tr || null);
+        const chartPosition = (vp || tr) ? {
+          ...(tr || {}),
+          ...(vp || {}),
+          tp1: vp?.tp1 ?? tr?.tp1 ?? tr?.tp ?? null,
+          tp2: vp?.tp2 ?? tr?.tp2 ?? null
+        } : null;
+        renderTradeLevelsOnChart(chartPosition);
       } catch (_e) {
         const note = document.getElementById('chartNote');
         if (note) note.textContent = 'NO DATA — TradingView live indisponible.';
@@ -1472,7 +1491,8 @@
             '<div class="meta">' +
               'Entry: ' + formatPrice(livePosition.entry) + '<br>' +
               'SL: ' + formatPrice(livePosition.sl) + '<br>' +
-              'TP: ' + formatPrice(livePosition.tp) + '<br>' +
+              'TP1: ' + formatPrice(livePosition.tp1 ?? livePosition.tp) + '<br>' +
+              'TP2: ' + formatPrice(livePosition.tp2) + '<br>' +
               'RR: ' + (livePosition.rrRatio || '--') + '<br>' +
               'Prix live: ' + formatPrice(currentPrice) + '<br>' +
               'PnL points: ' + (pnlPoints != null ? String(pnlPoints) : '--') + '<br>' +
