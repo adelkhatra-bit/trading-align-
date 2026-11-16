@@ -163,17 +163,19 @@ class DirectionSafety(unittest.TestCase):
             "confirme": 1, "dirs": [1, 1, 1, 0, -1, 0, 0, 1, 0, 1, 1],
             "t": 5000, "fermeture": False,
         }
-        with mock.patch.object(ab, "manipulation"), \\
-             mock.patch.object(ab, "meche_suspecte"), \\
-             mock.patch.object(ab, "niveaux_cles"), \\
-             mock.patch.object(ab, "resistance_fvg"), \\
-             mock.patch.object(ab, "suivre_apres_sl"), \\
-             mock.patch.object(ab, "reprise_entree", return_value=None), \\
-             mock.patch.object(ab, "entree_retest", return_value=None), \\
-             mock.patch.object(ab, "radar_climax", return_value=None), \\
-             mock.patch.object(ab, "retournement_marche", return_value=None), \\
-             mock.patch.object(ab, "plan_cassure") as cassure, \\
-             mock.patch.object(ab, "point_entree") as fvg:
+        with (
+            mock.patch.object(ab, "manipulation"),
+            mock.patch.object(ab, "meche_suspecte"),
+            mock.patch.object(ab, "niveaux_cles"),
+            mock.patch.object(ab, "resistance_fvg"),
+            mock.patch.object(ab, "suivre_apres_sl"),
+            mock.patch.object(ab, "reprise_entree", return_value=None),
+            mock.patch.object(ab, "entree_retest", return_value=None),
+            mock.patch.object(ab, "radar_climax", return_value=None),
+            mock.patch.object(ab, "retournement_marche", return_value=None),
+            mock.patch.object(ab, "plan_cassure") as cassure,
+            mock.patch.object(ab, "point_entree") as fvg,
+        ):
             out = ab.agent("GOLD", r, {}, "")
         cassure.assert_not_called()
         fvg.assert_not_called()
