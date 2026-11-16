@@ -80,7 +80,7 @@ class TelegramOptIn(unittest.TestCase):
         self.assertIn("10", trade["qui"])
         self.assertEqual(send.call_count, 1)
         self.assertEqual(etat.get("auto", {}).get("GOLD", []), [])
-        self.assertFalse(ab.coach_abonne(etat, "10", "GOLD"))  # le suivi ponctuel ne devient pas un abonnement permanent
+        self.assertTrue(ab.coach_abonne(etat, "10", "GOLD"))  # le clic explicite devient un abonnement coach persistant
 
     def test_prospects_et_rappels_gratuits_sont_silencieux_sans_optin(self):
         etat = {"prospects": ["10", "11"], "auto": {}, "coach_optin": {}, "bot_off": []}
