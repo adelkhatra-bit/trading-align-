@@ -6884,8 +6884,8 @@ def traiter(etat, chats, updates):
             # Un seul accueil par utilisateur ; toutes les autres actions passent par ses boutons.
             deja = etat.setdefault("bienvenue_pull_v1", [])
             if cid not in {str(x) for x in deja}:
-                prenom = etat.get("prenoms", {}).get(cid) or "toi"
-                texte = f"Bonjour {prenom}, tu vas trader aujourd'hui ?"
+                prenom = etat.get("prenoms", {}).get(cid)
+                texte = f"Bonjour {prenom}, tu vas trader aujourd'hui ?" if prenom else "Bonjour, tu vas trader aujourd'hui ?"
                 clavier = json.dumps({"inline_keyboard": [
                     [{"text": "🎯 Oui, chercher une position", "callback_data": "searchpos:BOTH"}],
                     [{"text": "📊 Demander une analyse", "callback_data": "analysechoice:BOTH"}],
