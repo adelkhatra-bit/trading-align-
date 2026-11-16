@@ -671,6 +671,7 @@ class LiveOutbox(unittest.TestCase):
         self.assertIn("function commentaireMarcheEnDirect(B, moyR, moyV, m)", bande)
         self.assertIn("Date.now() - derniereTend > 75000", bande)
         self.assertIn("derniereCoach", bande)
+        self.assertIn("Date.now() - derniereTend < 40000", bande)
         self.assertIn("coachN++; derniereCoach = Date.now();", bande)
         self.assertIn("🔊 ACTIVER LE COMMENTATEUR", bande)
         self.assertIn("Le coach ALIGN est en direct", bande)
