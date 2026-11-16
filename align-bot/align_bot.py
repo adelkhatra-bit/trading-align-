@@ -3058,8 +3058,9 @@ def vue_gratuite(etat, cid):
         (PROPRIO_VUE_GRATUITE or etat.get("proprio_gratuit")) and cid in {str(x) for x in proprio(etat)})
 
 def destinataires_gratuits(etat):
-    return list(dict.fromkeys([str(c) for c in etat.get("prospects", [])]
-                              + ([str(x) for x in sorted(proprio(etat))] if (PROPRIO_VUE_GRATUITE or etat.get("proprio_gratuit")) else [])))
+    candidats = list(dict.fromkeys([str(c) for c in etat.get("prospects", [])]
+                                   + ([str(x) for x in sorted(proprio(etat))] if (PROPRIO_VUE_GRATUITE or etat.get("proprio_gratuit")) else [])))
+    return [cid for cid in candidats if bot_on(etat, cid) and bool(marches_choisis(etat, cid))]
 
 def partage_du(etat, maintenant=None):
     """Le rappel de partage part au plus une fois par jour prévu, à heure fixe : jamais deux fois de suite."""
@@ -4277,12 +4278,38 @@ def texte_apercu(m, r, cle, vip=True):
         if r.get("ferme_txt") else "⚠️ Le biais n'est pas une autorisation d'entrée." if not tr else "📍 Position ouverte : suis les alertes du coach.",
         "",
     ] + voyants_unites(r) + [""]
-    # Position ouverte : les niveaux du trade font foi (pas de cible différente du TP).
-    obj = ([f"🟨 Entrée : {px(tr['e'])} (étiquette ENTRÉE)",
-            (f"🔒 SL protégé : {px(tr['sl'])} (plus de perte possible)" if tr.get("d") and tr["d"] * (tr["e"] - tr["sl"]) <= 0
-             else f"🛑 SL : {px(tr['sl'])} (ligne rouge)"),
-            f"🎯 TP1 : {px(tr['tp1'])} (ligne bleue)"]
-           + ([f"🏁 TP2 : {px(tr['tp2'])}"] if tr.get("tp2") else [])) if tr else objectifs_marche(r, sens)
+    # Position ouverte : les niveaux du trade font foi. Pour GOLD/NASDAQ, le plan réel est visible avant l'entrée
+    # uniquement lorsque H1 et H4 confirment le même sens. Sinon, aucun TP directionnel trompeur n'est publié.
+    if tr:
+        obj = ([f"🟨 Entrée : {px(tr['e'])} (étiquette ENTRÉE)",
+                (f"🔒 SL protégé : {px(tr['sl'])} (plus de perte possible)" if tr.get("d") and tr["d"] * (tr["e"] - tr["sl"]) <= 0
+                 else f"🛑 SL : {px(tr['sl'])} (ligne rouge)"),
+                f"🎯 TP1 : {px(tr['tp1'])} (ligne bleue)"]
+               + ([f"🏁 TP2 : {px(tr['tp2'])}"] if tr.get("tp2") else []))
+    else:
+        obj = objectifs_marche(r, sens)
+        if m in ("GOLD", "NASDAQ"):
+            pl = r.get("plan_fige") or r.get("plan") or {}
+            dpl = pl.get("d") or r.get("dirPlan") or 0
+            dirs = r.get("dirs") or []
+            if dpl in (1, -1) and dpl == sens and len(dirs) >= 10 and dirs[7] == dpl and dirs[9] == dpl:
+                try:
+                    e_pl, sl_pl, tp1_pl = float(pl["e"]), float(pl["sl"]), float(pl["tp1"])
+                    tp2_pl = float(pl["tp2"]) if pl.get("tp2") is not None else None
+                    if dpl * (e_pl - sl_pl) <= 0 or dpl * (tp1_pl - e_pl) <= 0:
+                        raise ValueError("géométrie entrée/SL/TP1 incohérente")
+                    obj = ["🧾 PLAN INDICATIF — H1 + H4 CONFIRMÉS",
+                           f"📍 Entrée calculée : {px(e_pl)}",
+                           f"🛑 SL calculé : {px(sl_pl)}",
+                           f"🎯 TP1 : {px(tp1_pl)}" + (f" ({pl.get('n1')})" if pl.get("n1") else "")]
+                    if tp2_pl is not None and tp2_affichable(dpl, tp1_pl, tp2_pl):
+                        obj.append(f"🏁 TP2 : {px(tp2_pl)}" + (f" ({pl.get('n2')})" if pl.get("n2") else ""))
+                    obj.append("⚠️ Plan de référence uniquement : attends « ENTRÉE AUTORISÉE » avant toute prise de position.")
+                except (KeyError, TypeError, ValueError):
+                    obj = ["⏸ TP non publiés : le plan calculé ne possède pas une géométrie entrée / SL / TP cohérente."]
+            elif len(dirs) >= 10 and (dirs[7] != dirs[9] or dirs[7] != dpl or dirs[9] != dpl):
+                obj = ["⏸ TP directionnels non validés : H1 et H4 doivent confirmer le même sens."]
+
     if obj:
         lignes += obj + [""]
     if not tr:
@@ -4603,7 +4630,15 @@ def inscrire_auto(etat, cid, m, notifier=True):
     lancer_chrono(etat, cid, m, r)
 
 def bot_on(etat, cid):
-    return cid not in etat.get("bot_off", [])
+    """Mode automatique : activation explicite requise, aucun compte historique n'est actif par défaut."""
+    ident = str(cid)
+    actifs = {str(x) for x in etat.get("bot_on_chats", [])}
+    arretes = {str(x) for x in etat.get("bot_off", [])}
+    return ident in actifs and ident not in arretes
+
+def notifications_on(etat, cid):
+    """Consentement distinct pour les alertes privées et le coach des marchés sélectionnés."""
+    return str(cid) in {str(x) for x in etat.get("telegram_optin_chats", [])}
 
 def stats_bot(etat, cid):
     return etat.setdefault("stats_bot", {}).setdefault(cid, {"arrets": 0, "auto": 0})
@@ -4678,22 +4713,37 @@ def menu_bot(etat, cid):
                                            [{"text": "👁 Tester la version gratuite", "callback_data": "vuegratuit:on"}]] if str(cid) in {str(x) for x in proprio(etat)} else [])}))
 
 def regler_bot(etat, cid, on):
+    ident = str(cid)
     off = etat.setdefault("bot_off", [])
-    if on and cid in off:
-        off.remove(cid)
-    elif not on and cid not in off:
-        off.append(cid); stats_bot(etat, cid)["arrets"] += 1
+    actifs = etat.setdefault("bot_on_chats", [])
+    if on and not marches_choisis(etat, ident):
+        _envoi_sur(cid, text="📡 Choisis d'abord au moins un marché. Aucun marché n'est activé par défaut.",
+                   reply_markup=json.dumps({"inline_keyboard": [[{"text": "📡 Choisir mes marchés", "callback_data": "marketsmenu:x"}]]}))
+        return False
+    if on:
+        if ident not in {str(x) for x in actifs}:
+            actifs.append(ident)
+        off[:] = [x for x in off if str(x) != ident]
+        optins = etat.setdefault("telegram_optin_chats", [])
+        if ident not in {str(x) for x in optins}:
+            optins.append(ident)
+    else:
+        actifs[:] = [x for x in actifs if str(x) != ident]
+        if ident not in {str(x) for x in off}:
+            off.append(ident)
+            stats_bot(etat, ident)["arrets"] += 1
     if vue_gratuite(etat, cid):
         dedans = en_position(etat, cid)
         txt = (("✅ C'est noté : je te propose la prochaine position" if str(cid) not in etat.get("bienvenue", {})
                 else "✅ C'est noté\n🎁 Ta position du jour est déjà utilisée : la prochaine demain") if on else
-               "⏸ C'est noté : plus de position proposée\n▶️ Réactive quand tu veux : 🤖 Mon bot")
+               "⏸ C'est noté : aucune nouvelle position automatique\n🎯 Les positions déjà suivies restent suivies jusqu'au TP / SL")
         if dedans:
             txt += f"\n🎯 Ta position {', '.join(dedans)} reste suivie jusqu'au TP / SL"
         _envoi_sur(cid, reply_markup=CLAVIER_VISITEUR, text=txt)
-        return
-    _envoi_sur(cid, reply_markup=CLAVIER, text=("▶️ Ton bot est relancé\n🤖 Il entre tout seul dans la prochaine position" if on
-                                                else "⏸ Ton bot est arrêté\n🔔 Tu reçois toujours les positions\n▶️ Relance-le avec 🤖 Mon bot"))
+        return True
+    _envoi_sur(cid, reply_markup=CLAVIER, text=("▶️ Bot automatique activé pour : " + " + ".join(sorted(marches_choisis(etat, ident))) if on
+                                                else "⏸ Bot automatique arrêté\n🎙 Les coachs que tu as activés restent actifs jusqu'à leur arrêt"))
+    return True
 
 def entrer_inscrits(etat, m, tr, chats=()):
     """Le bot vient d'entrer : il fait entrer automatiquement tous les membres dont le bot est ON,
@@ -5490,15 +5540,14 @@ def envoyer_analyse_a(etat, cid, m, r, cle):
     vu = etat.setdefault("vu_analyse", {}).setdefault(m, {})
     sig = signature_analyse(m, r, cle); der = vu.get(str(cid))
     if der and der["sig"] == sig and time.time() - der["t"] < 1200:
-        armer_cloture(etat, cid, m, r, cle)
         lignes = chrono_txt(m, r, cle, time.time()).split("\n")
         utile = [l for l in lignes if l.startswith(("1️⃣", "2️⃣", "3️⃣", "4️⃣", "⏸", "⏳", "↩️", "⚡", "🕯 Prochaine"))]
         _envoi_sur(cid, reply_markup=bouton_rappel(m), text="\n".join(
             [f"😎 RIEN N'A BOUGÉ — {ICONE.get(m, '')} {m}   {px(r['m1'][-1]['c'])}",
-             f"🕒 Analyse de référence : {heure(der['t'])}"] + voyants_unites(r) + utile + [(statut_position(cle["trade"], r["m1"][-1]["c"]) if cle.get("trade") else statut_txt(0, cle.get("ordre")).strip()), "🔔 Je te préviens dès que ça change"]))
+             f"🕒 Analyse de référence : {heure(der['t'])}"] + voyants_unites(r) + utile + [(statut_position(cle["trade"], r["m1"][-1]["c"]) if cle.get("trade") else statut_txt(0, cle.get("ordre")).strip()), "🔔 Active le coach si tu veux recevoir un suivi"]))
         # Un seul message (voyants inclus) ; l'avis IA complet reste derrière « 🧠 En savoir plus ».
         return
-    armer_cloture(etat, cid, m, r, cle)
+    # Une analyse demandée reste ponctuelle. Le suivi est armé uniquement après un opt-in explicite via les boutons Coach / Suivre.
     # Toutes les analyses passent par le même garde-fou 429 que les autres messages.
     # Une analyse refusée par Telegram n'est pas marquée comme livrée et pourra être retentée.
     res = _envoi_sur(cid, text=texte_apercu(m, r, cle, vip=bool(autorise(etat, str(cid), str(cid)))),
@@ -6122,6 +6171,9 @@ def traiter(etat, chats, updates):
                 # La sélection explicite est aussi la préférence de distribution privée.
                 # Supprimer les anciennes réservations en attente sur l'autre marché évite
                 # qu'un ancien abonnement BTC survive à un nouveau choix GOLD (et inversement).
+                optins = etat.setdefault("telegram_optin_chats", [])
+                if str(qui) not in {str(x) for x in optins}:
+                    optins.append(str(qui))
                 selectionner_marches_suivi(etat, qui, mk)
                 marches = ("BTC", "GOLD") if mk == "BOTH" else (mk,)
                 for marche in marches:
@@ -6334,6 +6386,14 @@ def traiter(etat, chats, updates):
                 _envoi_sur(qui, text=f"🎙 COMMENTATEUR {ICONE.get(mk, '')} {mk}\n✅ Tu es déjà dans la chaîne\n👀 Il commente là-bas\n🙅 Pas de doublon ici")
                 continue
             if choix in ("coachlive", "coachstop") and mk in MARCHES:
+                if choix == "coachlive":
+                    if etat.get("marches_par_chat", {}).get(str(qui)) is None:
+                        selectionner_marches_suivi(etat, qui, [mk])
+                    elif mk not in marches_choisis(etat, qui):
+                        basculer_marche(etat, qui, mk)
+                    optins = etat.setdefault("telegram_optin_chats", [])
+                    if str(qui) not in {str(x) for x in optins}:
+                        optins.append(str(qui))
                 activer_coach_live(etat, qui, mk, choix == "coachlive")
                 r_now = DERNIERS.get(mk)
                 if choix == "coachlive" and r_now and len(r_now.get("b15") or []) > 1:
@@ -6353,6 +6413,9 @@ def traiter(etat, chats, updates):
             if choix == "auto" and mk in MARCHES:
                 # Le marché est déjà connu depuis le bouton de l'analyse : activation en un seul appui.
                 if autorise(etat, qui, cb["from"]["id"]) or qui not in etat.get("bienvenue", {}):
+                    optins = etat.setdefault("telegram_optin_chats", [])
+                    if str(qui) not in {str(x) for x in optins}:
+                        optins.append(str(qui))
                     # Un abonné BTC + GOLD garde les deux marchés : suivre BTC ne doit pas couper GOLD.
                     if etat.get("marches_par_chat", {}).get(str(qui)) is None:
                         selectionner_marches_suivi(etat, qui, [mk])          # pas encore de choix : uniquement ce marché
@@ -7843,9 +7906,9 @@ def basculer_marche(etat, cid, marche):
     selectionner_marches_suivi(etat, cid, sorted(actuels))
 
 def marches_choisis(etat, cid):
-    """Marchés cochés par la personne ; sans choix : tous les marchés."""
+    """Marchés cochés explicitement par la personne ; sans choix : aucun marché."""
     brut = etat.setdefault("marches_par_chat", {}).get(str(cid))
-    return _vers_ensemble(brut) or set(MARCHES)
+    return _vers_ensemble(brut) or set()
 
 def marche_selection(etat, cid):
     """Compatibilité : « BTC », « GOLD », « BOTH » (BTC + GOLD) ou la liste des marchés cochés."""
@@ -7858,7 +7921,7 @@ def marche_selection(etat, cid):
 def marche_autorise(etat, cid, marche):
     brut = etat.get("marches_par_chat", {}).get(str(cid))
     if brut is None:
-        return True                     # pas encore de choix : tous les marchés
+        return False                    # aucun marché suivi avant validation explicite
     return marche in _vers_ensemble(brut)
 
 NOMS_MARCHES = {"BTC": "🟠 BTC", "GOLD": "🥇 GOLD", "NASDAQ": "💠 NASDAQ"}
@@ -8023,15 +8086,15 @@ def marche_du_message(texte):
     return None if not ens else (next(iter(ens)) if len(ens) == 1 else "BOTH")
 
 def destinataires_message(etat, chats, texte):
-    # Le flux complet (news, analyses, toutes les positions) part dans la chaîne VIP (commune : tous les marchés).
-    # Chaque personne ne reçoit EN PRIVÉ que les marchés qu'elle a cochés (filtrage ligne par ligne au moment de l'envoi, voir filtrer_texte_par_marches).
+    # La chaîne reste un abonnement public distinct. En privé : consentement explicite + marché sélectionné.
     ens = marches_message(texte)
     if etat.get("canal"):
         prives = [str(c) for c in chats if not vue_gratuite(etat, c) and str(c) != str(etat["canal"])
-                  and etat.get("marches_par_chat", {}).get(str(c)) is not None and ens
-                  and ens & marches_choisis(etat, c)]
+                  and notifications_on(etat, c) and etat.get("marches_par_chat", {}).get(str(c)) is not None
+                  and bool(marches_choisis(etat, c)) and (not ens or bool(ens & marches_choisis(etat, c)))]
         return sorted(set([str(etat["canal"])] + prives))
-    cibles = [str(c) for c in chats if not ens or bool(ens & marches_choisis(etat, c))]
+    cibles = [str(c) for c in chats if notifications_on(etat, c) and bool(marches_choisis(etat, c))
+              and (not ens or bool(ens & marches_choisis(etat, c)))]
     return sorted(set(cibles))
 
 def destinataires(etat, chats):
