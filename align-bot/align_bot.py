@@ -829,7 +829,7 @@ def calculer_analyse(S, stable=None, comp_prev=None):
         pass
     atr5 = atr(m5, 14)[-1] if len(m5) >= 15 else a
     return dict(fvg=fvg, niv_cles=niv_cles, asie=asie, distrib=distrib, accum=accum, div4h=div4h,
-                b5=m5[-30:], b15=m15[-30:], b15_long=m15[-90:], b1h=h1[-30:], b4h=h4[-30:], bd=d1[-30:], bw=w1[-30:],
+                b5=m5[-30:], b15=m15[-30:], b15_long=m15[-90:], b1h=h1[-30:], b1h_long=h1[-60:], b4h=h4[-30:], b4h_long=h4[-40:], bd=d1[-30:], bw=w1[-30:],
                 atr5=atr5, ema5=ema([x["c"] for x in m5], 20)[-1], m1=m1, confirme=confirme, atr=a, r5=r5[-3:], r15=rC, posD=posD, posW=posW, hautD=hautD, basD=basD, hautW=hautW, basW=basW,
                 grosses=grosses, ema15=ema(c, 20)[-1], niveaux=[(v, n) for v, n in zip(niv, noms) if v is not None], t=b[-1]["t"], prix=cl, dirs=dirs, sqzs=sqzs, rsis=rsis, bull=bull, bear=bear, comp=comp, rsiOB=rsiOB, rsiOS=rsiOS,
                 pctH=pctH, sens=sens, retHaut=retHaut, retBas=retBas, sigHaut=sigHaut, sigBas=sigBas, nom=nom,
@@ -10092,6 +10092,97 @@ SESSIONS_LIVE = (("🇯🇵 TOKYO", 1, 0), ("🇬🇧 LONDRES", 9, 0), ("🇺�
 MOTS_DISCOURS = ("Speaks", "Speech", "Powell", "Testifies", "Press Conference", "FOMC")
 
 
+def progression_fibonacci_live(r):
+    """Lecture Fibonacci interne du commentateur : bougies déjà chargées, aucune requête réseau ni affichage graphique."""
+    prix = (r.get("m1") or [{}])[-1].get("c") or r.get("prix")
+    if prix is None:
+        return {}
+    specifications = (
+        ("M15", r.get("b15_long") or r.get("b15") or [], 48),
+        ("H1", r.get("b1h_long") or r.get("b1h") or [], 48),
+        ("H4", r.get("b4h_long") or r.get("b4h") or [], 30),
+    )
+    resultat = {}
+    for unite, serie, fenetre in specifications:
+        bougies = list(serie[:-1])[-fenetre:] if len(serie) > 1 else []
+        if len(bougies) < 10:
+            continue
+        i_haut = max(range(len(bougies)), key=lambda i: bougies[i]["h"])
+        i_bas = min(range(len(bougies)), key=lambda i: bougies[i]["l"])
+        haut, bas = bougies[i_haut]["h"], bougies[i_bas]["l"]
+        amplitude = haut - bas
+        if amplitude <= 0:
+            continue
+        hausse = i_bas < i_haut
+        pct = (haut - prix) / amplitude * 100 if hausse else (prix - bas) / amplitude * 100
+        if pct < 0:
+            lecture = "extension au-delà du dernier sommet" if hausse else "extension au-delà du dernier creux"
+        elif pct > 100:
+            lecture = "mouvement entièrement retracé et dépassé"
+        elif 61.8 <= pct <= 78.6:
+            lecture = "zone clé de retracement profond"
+        elif pct < 38.2:
+            lecture = "retracement léger"
+        elif pct < 50:
+            lecture = "retracement modéré"
+        elif pct < 61.8:
+            lecture = "retracement intermédiaire"
+        else:
+            lecture = "retracement très profond"
+        resultat[unite] = {
+            "mouvement": "hausse" if hausse else "baisse",
+            "retracement_pct": round(pct, 1),
+            "zone_cle_61_8_78_6": bool(0 <= pct <= 100 and 61.8 <= pct <= 78.6),
+            "lecture": lecture,
+            "fenetre_bougies_cloturees": len(bougies),
+        }
+    return resultat
+
+
+def contexte_technique_live(derniers):
+    """Contexte factuel du commentateur IA, construit exclusivement depuis les analyses et bougies déjà chargées."""
+    marches = {}
+    for marche in MARCHES:
+        r = (derniers or {}).get(marche)
+        if not isinstance(r, dict):
+            continue
+        dirs = r.get("dirs") or []
+        sens = int(r.get("dirPlan") or r.get("sens") or 0)
+        biais = {1: "haussier", -1: "baissier", 0: "neutre"}[1 if sens > 0 else -1 if sens < 0 else 0]
+        contexte = {
+            "biais_plan": biais,
+            "confirmation_4h_1h": "alignées à la hausse" if len(dirs) > 9 and dirs[7] == dirs[9] == 1 else
+                                  "alignées à la baisse" if len(dirs) > 9 and dirs[7] == dirs[9] == -1 else "non alignées",
+            "unites_haussieres_sur_11": sum(1 for d in dirs[:11] if d == 1),
+            "unites_baissieres_sur_11": sum(1 for d in dirs[:11] if d == -1),
+            "strategie": r.get("strat") or "aucune stratégie confirmée",
+            "rsi_15m": round(float(r.get("rC")), 1) if isinstance(r.get("rC"), (int, float)) else None,
+            "compression_unites": r.get("comp"),
+            "fibonacci": progression_fibonacci_live(r),
+        }
+        barres = (r.get("b15_long") or r.get("b15") or [])[:-1]
+        volumes = [x.get("v") for x in barres[-41:] if isinstance(x.get("v"), (int, float)) and x.get("v") is not None]
+        if len(volumes) >= 21:
+            moyenne = sum(volumes[:-1]) / max(1, len(volumes) - 1)
+            if moyenne > 0:
+                contexte["volume_15m_vs_moyenne"] = round(volumes[-1] / moyenne, 2)
+                contexte["source_volume"] = barres[-1].get("volume_source") or "source des bougies M15"
+        prix = (r.get("m1") or [{}])[-1].get("c") or r.get("prix")
+        atr15 = r.get("atr")
+        niveaux = [(v, nom) for v, nom in (r.get("niveaux") or []) if isinstance(v, (int, float)) and prix is not None]
+        if niveaux and isinstance(atr15, (int, float)) and atr15 > 0:
+            au_dessus = sorted((v - prix, nom) for v, nom in niveaux if v > prix)
+            au_dessous = sorted((prix - v, nom) for v, nom in niveaux if v < prix)
+            if au_dessus:
+                contexte["resistance_proche"] = {"unite": au_dessus[0][1], "distance_atr_15m": round(au_dessus[0][0] / atr15, 1)}
+            if au_dessous:
+                contexte["support_proche"] = {"unite": au_dessous[0][1], "distance_atr_15m": round(au_dessous[0][0] / atr15, 1)}
+        if r.get("news"):
+            contexte["news_recentes"] = str(r["news"])[:240]
+        marches[marche] = contexte
+    return {"marches": marches}
+
+
 def phrases_bande_propres(brut):
     """Lignes « FR | EN » de l'IA → paires propres : jamais de chiffre, prix, ENTRÉE / SL / TP, ni le mot Telegram."""
     paires = []
@@ -10108,34 +10199,66 @@ def phrases_bande_propres(brut):
     return paires[:8]
 
 
-def live_phrases_ia(etat, maintenant):
-    """Toutes les 30 min, l'IA GRATUITE (Gemini gratuit / Groq / IA sans clé) invente un lot de phrases FR + EN pour la bande."""
+def phrases_bande_par_marche(brut):
+    """Paires FR/EN rattachées à un marché précis ; rejette chiffres, prix et consignes de trade sur la bande."""
+    resultat = {m: [] for m in MARCHES}
+    for ligne in str(brut or "").splitlines():
+        ligne = re.sub(r"^\s*(?:\d+\s*[.)\-:]|[-•*#>]+)\s*", "", ligne).replace("**", "")
+        morceaux = [x.strip(" -•*\"'\t") for x in ligne.split("|", 2)]
+        if len(morceaux) != 3:
+            continue
+        marche, fr, en = morceaux
+        marche = marche.upper()
+        if marche not in resultat or not (8 <= len(fr) <= 140 and 8 <= len(en) <= 140):
+            continue
+        if _INTERDIT_BANDE.search(fr) or _INTERDIT_BANDE.search(en):
+            continue
+        paire = [fr, en]
+        if paire not in resultat[marche] and len(resultat[marche]) < 2:
+            resultat[marche].append(paire)
+    return {m: p for m, p in resultat.items() if p}
+
+
+def live_phrases_ia(etat, maintenant, derniers=None):
+    """Génère des commentaires IA par marché depuis les analyses en mémoire, sans nouvel appel de données."""
     if not live_actif(etat) or maintenant - etat.get("live_ia_t", 0) < LIVE_IA_INTERVALLE:
         return False
     etat["live_ia_t"] = maintenant
+    donnees = contexte_technique_live(derniers or {})
+    if not donnees["marches"]:
+        etat["live_ia_t"] = maintenant - LIVE_IA_INTERVALLE + 300
+        print("LIVE_IA_SKIPPED reason=NO_MARKET_DATA", flush=True)
+        return False
     h = datetime.datetime.fromtimestamp(maintenant, PARIS).hour
     moment = "nuit" if h < 7 else "matin" if h < 12 else "après-midi" if h < 18 else "soirée"
-    consigne = ("Écris 6 phrases pour la bande qui défile d'un live TikTok / YouTube de trading (BTC, Gold, NASDAQ). "
-                "Format EXACT, une par ligne : phrase en français | la même phrase en anglais. "
-                "Tu es un trader SENIOR et commentateur live expert des marchés financiers (bougies, liquidité, sessions, news, discours des banques centrales) : "
-                "tu lis le marché, tu réagis à ce qui se passe et tu ANTICIPES, comme les meilleurs streamers trading. "
-                "tu t'adresses directement aux spectateurs (tu, la team), tu poses des questions (ça va rebondir ? cassure ou rejet ?), "
-                "tu mets une pression gentille (si personne ne tape je garde l'info, cinquante taps et je lâche un indice ; JAMAIS de chiffre). "
-                "Ton jeune, drôle, poli, sûr de lui, émojis bienvenus, 80 caractères max par phrase. "
-                "Varie à chaque fois : faire commenter (ça monte ou ça descend ? dis-le en commentaire), faire tapoter l'écran, petites blagues de trader "
-                "(« c'est pas parce que je dis prépare-toi que je t'ai dit d'y aller 😝 », attendre le feu vert, rester discipliné), vocabulaire des bougies avec un clin d'œil jeune, "
-                "s'abonner, partager, « tu veux mon avis ? lien en bio », suspense sur le prochain mouvement. "
-                "INTERDIT : aucun chiffre, aucun prix, pas les mots entrée, SL, TP, stop, Telegram ; aucune promesse de gain. "
-                "Réponds uniquement avec les 6 lignes.")
-    donnees = {"moment": moment, "deja_dites": [p[0] for p in etat.get("live_ia_paires", [])][:6]}
+    consigne = (
+        "Tu es le commentateur technique en direct d'un live de trading BTC, GOLD et NASDAQ. "
+        "Tu dois animer la bande du live en expliquant ce que les données montrent réellement, pas en inventant un scénario. "
+        "Pour CHAQUE marché fourni, écris exactement 2 phrases courtes en français et leur traduction anglaise. "
+        "Format exact : MARCHÉ | phrase française | phrase anglaise. "
+        "Utilise les tendances multi-unités, la confirmation H4/H1, le RSI, le volume, les supports/résistances et surtout "
+        "la lecture du retracement Fibonacci M15/H1/H4 quand elle est disponible. "
+        "Si le prix est dans la zone Fibonacci 61,8–78,6 %, explique naturellement qu'il teste une zone de retracement profonde "
+        "ou une zone technique importante ; ne récite jamais les chiffres. Si le retracement est léger, intermédiaire, dépassé "
+        "ou absent, adapte exactement le commentaire. Relie le Fibonacci à la tendance et aux autres confirmations, ne le présente "
+        "jamais seul comme un signal d'achat ou de vente. "
+        "Ton direct, vivant, précis, pédagogique et naturel, comme un streamer expérimenté qui commente le graphique en direct. "
+        "Pose parfois une question à la team ou explique pourquoi on attend une clôture. "
+        "INTERDIT : aucun chiffre, pourcentage, prix, niveau chiffré, entrée, LONG, SHORT, SL, TP, stop, promesse de gain, "
+        "conseil d'investissement ou mention de Telegram. Ne parle que des marchés présents dans les données. "
+        "Si une donnée est absente, ne l'invente pas. Moment du live : " + moment + ". "
+        "Réponds uniquement avec les lignes demandées, sans titre ni introduction."
+    )
     brut = ia(etat, consigne, donnees)
-    paires = phrases_bande_propres(brut)
-    print(f"LIVE_IA {len(paires)} phrases via {etat.get('ia_dernier_fournisseur')} {etat.get('ia_dernier_statut')} : {str(brut)[:160]!r}")
+    paires = phrases_bande_par_marche(brut)
+    nb = sum(len(v) for v in paires.values())
+    print(f"LIVE_IA {nb} commentaires marché via {etat.get('ia_dernier_fournisseur')} {etat.get('ia_dernier_statut')} : {str(brut)[:160]!r}")
     if not paires:
-        etat["live_ia_t"] = maintenant - LIVE_IA_INTERVALLE + 300     # v8.8 : échec → on réessaie dans 5 min (pas 30)
+        etat["live_ia_t"] = maintenant - LIVE_IA_INTERVALLE + 300
         return False
     etat["live_ia_paires"] = paires
     return live_publier("IA:" + json.dumps(paires, ensure_ascii=False))
+
 
 
 def live_agenda(etat, maintenant):
@@ -11104,7 +11227,7 @@ def un_tour(etat, chats):
         print("alerte dxy", ex)
     try:
         live_agenda(etat, int(time.time()))          # v8.5 : discours / annonces / ouvertures sur la bande
-        live_phrases_ia(etat, int(time.time()))      # v8.5 : phrases IA gratuites toujours nouvelles
+        live_phrases_ia(etat, int(time.time()), derniers)      # v8.5 : phrases IA gratuites toujours nouvelles
         news_urgentes(etat)                          # 🚨 news de dernière minute (RSS gratuit + vraie IA), priorité sur la bande
     except Exception as ex:
         print("live spectacle", ex)
