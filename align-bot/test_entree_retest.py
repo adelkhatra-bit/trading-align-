@@ -32,7 +32,7 @@ class Retest(unittest.TestCase):
         self.assertIsNone(ab.entree_retest("GOLD", serie(retest=False), {}))
 
     def test_unites_pas_d_accord_rien(self):
-        r = serie(); r["dirs"] = [1, 1, 1, 0, 1, 0, 0, -1, 0, 1, 1]
+        r = serie(); r["dirs"] = [1, 1, 1, 0, 1, 0, 0, -1, 0, 1, 1]; r["dirs_cloturees"] = list(r["dirs"])
         self.assertIsNone(ab.entree_retest("GOLD", r, {}))
 
 
