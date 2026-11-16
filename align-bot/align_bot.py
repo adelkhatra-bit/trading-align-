@@ -4603,7 +4603,14 @@ def inscrire_auto(etat, cid, m, notifier=True):
     lancer_chrono(etat, cid, m, r)
 
 def bot_on(etat, cid):
-    return cid not in etat.get("bot_off", [])
+    """ON uniquement après un choix explicite de suivi ou d'activation."""
+    cid = str(cid)
+    if cid in {str(x) for x in etat.get("bot_off", [])}:
+        return False
+    return (cid in {str(x) for x in etat.get("notifications_on", [])}
+            or any(cid in {str(x) for x in etat.get("auto", {}).get(m, [])} for m in MARCHES)
+            or any(cid in {str(x) for x in (etat.get("coach_live", {}).get(m) or {})} for m in MARCHES)
+            or bool(en_position(etat, cid)))
 
 def stats_bot(etat, cid):
     return etat.setdefault("stats_bot", {}).setdefault(cid, {"arrets": 0, "auto": 0})
@@ -4678,22 +4685,38 @@ def menu_bot(etat, cid):
                                            [{"text": "👁 Tester la version gratuite", "callback_data": "vuegratuit:on"}]] if str(cid) in {str(x) for x in proprio(etat)} else [])}))
 
 def regler_bot(etat, cid, on):
+    """L'activation exige des marchés déjà validés ; OFF retire les abonnements futurs."""
+    cid = str(cid)
     off = etat.setdefault("bot_off", [])
-    if on and cid in off:
-        off.remove(cid)
-    elif not on and cid not in off:
-        off.append(cid); stats_bot(etat, cid)["arrets"] += 1
+    actifs = etat.setdefault("notifications_on", [])
+    if on:
+        if etat.get("marches_par_chat", {}).get(cid) is None:
+            _envoi_sur(cid, text="Avant d'activer les messages, choisis les marchés que tu veux suivre puis appuie sur « Valider et suivre ».")
+            menu_marches(etat, cid)
+            return
+        if cid in off:
+            off.remove(cid)
+        if cid not in actifs:
+            actifs.append(cid)
+    else:
+        if cid not in off:
+            off.append(cid)
+            stats_bot(etat, cid)["arrets"] += 1
+        if cid in actifs:
+            actifs.remove(cid)
+        for m in MARCHES:
+            etat.setdefault("auto", {}).setdefault(m, [])[:] = [x for x in etat.get("auto", {}).get(m, []) if str(x) != cid]
+            etat.setdefault("coach_live", {}).setdefault(m, {}).pop(cid, None)
+            etat.setdefault("veille_cloture", {}).setdefault(m, {}).pop(cid, None)
     if vue_gratuite(etat, cid):
         dedans = en_position(etat, cid)
-        txt = (("✅ C'est noté : je te propose la prochaine position" if str(cid) not in etat.get("bienvenue", {})
-                else "✅ C'est noté\n🎁 Ta position du jour est déjà utilisée : la prochaine demain") if on else
-               "⏸ C'est noté : plus de position proposée\n▶️ Réactive quand tu veux : 🤖 Mon bot")
+        txt = "✅ C'est noté : les alertes suivent les marchés que tu as validés" if on else "⏸ C'est noté : aucun nouveau message automatique"
         if dedans:
             txt += f"\n🎯 Ta position {', '.join(dedans)} reste suivie jusqu'au TP / SL"
         _envoi_sur(cid, reply_markup=CLAVIER_VISITEUR, text=txt)
         return
-    _envoi_sur(cid, reply_markup=CLAVIER, text=("▶️ Ton bot est relancé\n🤖 Il entre tout seul dans la prochaine position" if on
-                                                else "⏸ Ton bot est arrêté\n🔔 Tu reçois toujours les positions\n▶️ Relance-le avec 🤖 Mon bot"))
+    _envoi_sur(cid, reply_markup=CLAVIER, text=("▶️ Ton bot est relancé\n🤖 Il suit uniquement les marchés que tu as validés" if on
+                                                else "⏸ Ton bot est arrêté\n🔕 Aucun nouveau message automatique\n📍 Le suivi d'une position déjà prise continue jusqu'à sa clôture"))
 
 def entrer_inscrits(etat, m, tr, chats=()):
     """Le bot vient d'entrer : il fait entrer automatiquement tous les membres dont le bot est ON,
@@ -4838,7 +4861,9 @@ def timeframe_attendu(r, cle):
 
 
 def armer_cloture(etat, cid, m, r, cle):
-    """Mémorise la prochaine clôture attendue après une demande explicite d'analyse."""
+    """Mémorise une clôture uniquement après consentement au suivi."""
+    if not notifications_actives(etat, cid, m):
+        return
     tf = timeframe_attendu(r, cle)
     champs = {"5m": "b5", "15m": "b15", "1h": "b1h", "4h": "b4h", "D": "bd", "W": "bw"}
     bars = r.get(champs[tf], [])
@@ -5399,7 +5424,7 @@ def notifier_clotures(etat, m, r, cle):
     """Envoie les clôtures nouvelles une fois chacune, sur les UT suivies par l'utilisateur."""
     champs = TF_CHAMPS
     for cid, suivi in list(etat.get("veille_cloture", {}).get(m, {}).items()):
-        if not marche_autorise(etat, cid, m):
+        if not notifications_actives(etat, cid, m) or not marche_autorise(etat, cid, m):
             etat["veille_cloture"][m].pop(cid, None)
             continue
         if suivi.get("multi"):
@@ -7412,7 +7437,7 @@ def diffuser_evenements(etat, chats, evts):
     canal = str(etat.get("canal") or "")
     for cid in sorted(set().union(*dest_evt) if dest_evt else set()):
         choix = etat.get("marches_par_chat", {}).get(str(cid))
-        choisis = marches_choisis(etat, cid) if (choix is not None and cid != canal) else None
+        choisis = marches_notifications(etat, cid) if cid != canal else None
         anglais = str(cid) in LANG_EN
         blocs = []
         for (marches, fr, en, mk), dests in zip(evts, dest_evt):
@@ -7487,7 +7512,7 @@ def alerte_gratuite_preparation(etat, texte, now=None):
     vus[m] = now
     ic = ICONE.get(m, "")
     for cid in destinataires_gratuits(etat):
-        if not marche_autorise(etat, cid, m) or not bot_on(etat, cid):
+        if not notifications_actives(etat, cid, m) or not marche_autorise(etat, cid, m):
             continue
         v = _tournante(etat, f"g:{cid}", 3)
         fr = (("🔔 {ic} {m} : une position se prépare", "🔒 Niveaux : VIP"), ("👀 {ic} {m} : quelque chose se met en place", "🔒 Détails réservés aux VIP"),
@@ -7636,6 +7661,9 @@ def envoyer_differes(etat, now=None, dodo=True):
     etat["differe"] = [x for x in file_ if x.get("t", 0) > now][-200:]
     rang = [[{"text": "💎 Devenir VIP", "url": etat["lien"]}]] if etat.get("lien") else []
     for x in prets[:20]:
+        marche_differee = next(iter(marches_du_message(x.get("txt", ""))), None)
+        if not marche_differee or not notifications_actives(etat, x.get("c", ""), marche_differee):
+            continue
         try:
             telegram("sendMessage", chat_id=x["c"], text=(
                 f"⏱ EN DIFFÉRÉ ({DIFFERE_MIN} min) — info passée\n🙅 N'entre pas maintenant : le prix a bougé\n━━━━━━━━━━━━\n"
@@ -7643,19 +7671,7 @@ def envoyer_differes(etat, now=None, dodo=True):
                 reply_markup=json.dumps({"inline_keyboard": rang}))
         except Exception as ex:
             print("différé", x.get("c"), ex)
-    if not dodo:
-        return
-    maint = datetime.datetime.now(PARIS); jour = maint.strftime("%Y-%m-%d")
-    if 14 <= maint.hour < 22 and etat.get("dodo_jour") != jour and not any((etat.get(m_) or {}).get("trade") for m_ in MARCHES):
-        etat["dodo_jour"] = jour
-        txt = DODO_TXT[maint.toordinal() % len(DODO_TXT)]      # jamais le même texte deux jours de suite
-        for cid in destinataires_gratuits(etat):
-            if bot_on(etat, cid):
-                try:
-                    telegram("sendMessage", chat_id=cid, text=txt)
-                except Exception as ex:
-                    print("dodo", cid, ex)
-
+    # Aucun message de relance quotidien : pas de notification sans consentement explicite.\n
 def envoyer_prospects(etat, texte, signal, clavier=None):
     """GRATUIT (visiteurs + propriétaire en vue gratuite) : 1 position proposée par jour si le bot est ON,
     sinon un simple avis masqué quand une position sort. Jamais de news ni d'analyse : c'est le VIP."""
@@ -8022,17 +8038,42 @@ def marche_du_message(texte):
     ens = marches_du_message(texte)
     return None if not ens else (next(iter(ens)) if len(ens) == 1 else "BOTH")
 
+def notifications_actives(etat, cid, marche):
+    """Consentement privé par marché : abonnement, coach live, bot activé ou position acceptée."""
+    cid = str(cid)
+    if marche in MARCHES:
+        pos = (((etat.get(marche) or {}).get("trade") or {}).get("qui") or {}).get(cid)
+        if isinstance(pos, dict) and not pos.get("fini"):
+            return True
+    if cid in {str(x) for x in etat.get("bot_off", [])}:
+        return False
+    if marche in MARCHES:
+        if not marche_autorise(etat, cid, marche):
+            return False
+        return (cid in {str(x) for x in etat.get("auto", {}).get(marche, [])}
+                or cid in {str(x) for x in (etat.get("coach_live", {}).get(marche) or {})}
+                or (cid in {str(x) for x in etat.get("notifications_on", [])}
+                    and etat.get("marches_par_chat", {}).get(cid) is not None))
+    return any(notifications_actives(etat, cid, m) for m in MARCHES)
+
+
+def marches_notifications(etat, cid):
+    return {m for m in MARCHES if notifications_actives(etat, cid, m)}
+
+
 def destinataires_message(etat, chats, texte):
-    # Le flux complet (news, analyses, toutes les positions) part dans la chaîne VIP (commune : tous les marchés).
-    # Chaque personne ne reçoit EN PRIVÉ que les marchés qu'elle a cochés (filtrage ligne par ligne au moment de l'envoi, voir filtrer_texte_par_marches).
+    """Les chaînes restent publiques ; les messages privés exigent un consentement explicite."""
     ens = marches_message(texte)
-    if etat.get("canal"):
-        prives = [str(c) for c in chats if not vue_gratuite(etat, c) and str(c) != str(etat["canal"])
-                  and etat.get("marches_par_chat", {}).get(str(c)) is not None and ens
-                  and ens & marches_choisis(etat, c)]
-        return sorted(set([str(etat["canal"])] + prives))
-    cibles = [str(c) for c in chats if not ens or bool(ens & marches_choisis(etat, c))]
-    return sorted(set(cibles))
+    canal = str(etat.get("canal") or "")
+    prives = []
+    for c in chats:
+        cid = str(c)
+        if cid == canal or vue_gratuite(etat, cid):
+            continue
+        abonnes = marches_notifications(etat, cid)
+        if (ens and ens & abonnes) or (not ens and abonnes):
+            prives.append(cid)
+    return sorted(set(([canal] if canal else []) + prives))
 
 def destinataires(etat, chats):
     """Téléphones qui reçoivent les signaux + la chaîne VIP."""
