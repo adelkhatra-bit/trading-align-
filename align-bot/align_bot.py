@@ -1500,7 +1500,7 @@ def retournement_confirme(cle, d, r):
 
 def strategie_trade(r, d):
     """Fige sur la position le type (SWING / DAY / SCALPING) lu au moment de l'entrée."""
-    dirs_strat = r.get("dirs_cloturees") if r.get("market") in ("GOLD", "NASDAQ") else r.get("dirs")
+    dirs_strat = r.get("dirs_cloturees") or r.get("dirs")
     strat, etat_, motif = strategie_alignement(dirs_strat, d, r.get("dirW") or 0, r.get("market"))
     return {"strat": strat, "strat_etat": etat_, "strat_motif": motif} if strat else {}
 
@@ -3372,7 +3372,10 @@ def tendance_armee(r, cle):
         cle["arme"] = d
         return r
     a = cle.get("arme")
-    if a and r["dirs"][9] == a and r["dirs"][7] != -a:
+    D = r.get("dirs_cloturees") or r.get("dirs") or []
+    d4 = D[9] if len(D) > 9 else 0
+    d1 = D[7] if len(D) > 7 else 0
+    if a and d4 == a and d1 == a and r.get("dirPlan") == a:
         r["confirme"] = a; r["repli"] = True
     elif a:
         cle["arme"] = 0
