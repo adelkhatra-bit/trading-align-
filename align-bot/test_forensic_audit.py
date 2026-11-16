@@ -40,5 +40,25 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
         self.assertEqual(etat["audit_mtf"]["GOLD"][-1]["t"], 1000)
 
 
+    def test_gold_and_nasdaq_reversal_watch_remains_available(self):
+        # M5/M15 turn bullish while H1/H4 remain bearish: observation only.
+        dirs = [0] * 11
+        dirs[2], dirs[4], dirs[7], dirs[9] = 1, 1, -1, -1
+        b15 = [{"t": i * 900, "o": 99.0, "h": 101.0, "l": 98.0, "c": 100.0, "v": 10.0}
+               for i in range(42)]
+        b15[-2]["v"] = 20.0
+        b1 = [{"h": 105.0, "l": 95.0} for _ in range(6)]
+        b4 = [{"h": 110.0, "l": 90.0} for _ in range(6)]
+        r = {"dirs": dirs, "b5": [{"h": 101.0, "l": 98.0} for _ in range(7)],
+             "b15": b15, "b1h": b1, "b4h": b4, "m1": [{"c": 100.0}], "t": 999999}
+        for market in ("GOLD", "NASDAQ"):
+            cle = {}
+            alert = align_bot.retournement_marche(market, r, cle)
+            self.assertIsNotNone(alert, market)
+            self.assertIn("RETOURNEMENT EN OBSERVATION", alert)
+            self.assertIn("PAS DE POSITION", alert)
+
+
+
 if __name__ == "__main__":
     unittest.main()
