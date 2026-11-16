@@ -176,13 +176,14 @@
   bande.innerHTML = '<div class="piste"></div><div class="flash"></div>';
   document.body.appendChild(bande);
   const piste = bande.querySelector('.piste'), flash = bande.querySelector('.flash');
-  // Voix optionnelle : activation explicite par clic pour respecter le blocage audio automatique des navigateurs.
+  // L'audio automatique est bloqué par les navigateurs : afficher un bouton explicite pour démarrer la voix.
   const voixBtn = document.createElement('button');
   voixBtn.id = 'align-live-voice';
   voixBtn.type = 'button';
-  voixBtn.textContent = '🔇 Voix OFF';
-  voixBtn.title = 'Activer le commentateur vocal du live';
-  voixBtn.style.cssText = 'position:fixed;right:18px;top:104px;z-index:10001;padding:8px 12px;border:1px solid rgba(255,255,255,.55);border-radius:18px;background:rgba(18,18,28,.82);color:#fff;font:700 13px system-ui;cursor:pointer;pointer-events:auto';
+  voixBtn.textContent = '🔊 ACTIVER LE COMMENTATEUR';
+  voixBtn.title = 'Démarrer la narration vocale du marché';
+  voixBtn.setAttribute('aria-pressed', 'false');
+  voixBtn.style.cssText = 'position:fixed;right:18px;top:104px;z-index:10001;padding:11px 15px;border:2px solid #35d07f;border-radius:22px;background:linear-gradient(135deg,#123b2b,#10251f);color:#fff;font:800 13px system-ui;cursor:pointer;pointer-events:auto;box-shadow:0 0 18px rgba(53,208,127,.35)';
   document.body.appendChild(voixBtn);
   const voixLangueBtn = document.createElement('button');
   voixLangueBtn.type = 'button';
@@ -207,10 +208,14 @@
     if (voixActive) {
       window.speechSynthesis.cancel();
       window.speechSynthesis.resume();
-      voixBtn.textContent = '🔊 Voix ON';
+      voixBtn.textContent = '🔊 COMMENTATEUR ACTIF';
+      voixBtn.setAttribute('aria-pressed', 'true');
+      voixBtn.style.borderColor = '#35d07f';
     } else {
       window.speechSynthesis.cancel();
-      voixBtn.textContent = '🔇 Voix OFF';
+      voixBtn.textContent = '🔊 ACTIVER LE COMMENTATEUR';
+      voixBtn.setAttribute('aria-pressed', 'false');
+      voixBtn.style.borderColor = 'rgba(255,255,255,.55)';
     }
   });
   function parlerLive(item) {
@@ -475,7 +480,7 @@
     const pool = Object.keys(iaPools).length ? (iaPools[m] || []) : iaPool;  // commentaires du marché affiché uniquement
     if (!pool.length) return;
     montrer(pool[iaN++ % pool.length], false, 1);
-  }, 4 * 60 * 1000);
+  }, 55 * 1000);
   let astuceN = 0;
   const astuceT = setInterval(() => {
     if (occupe || file.length) return;            // jamais par-dessus une vraie info (TP, SL, news…)
