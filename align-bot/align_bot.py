@@ -11505,7 +11505,11 @@ def recevoir_updates_telegram(etat, chats, demandes):
         except queue.Empty:
             break
     if updates:
-        demandes.extend(traiter(etat, chats, updates))
+        try:
+            demandes.extend(traiter(etat, chats, updates))
+        finally:
+            TELEGRAM_PULL_CONTEXT.chat_id = None
+            TELEGRAM_PULL_CONTEXT.private = False
     return len(updates)
 
 
