@@ -240,6 +240,20 @@ class ClosedMtfSafety(unittest.TestCase):
         self.assertEqual(context["unites_baissieres_sur_11"], 11)
 
 
+    def test_gold_nasdaq_scheduler_names_m5_or_m15_when_that_is_the_blocker(self):
+        dirs = [1] * 11
+        r = {"market": "GOLD", "dirs_cloturees": dirs.copy(), "confirme": 0}
+        r["dirs_cloturees"][2] = -1
+        self.assertEqual(ab.timeframe_attendu(r, {}), "5m")
+        r["dirs_cloturees"][2] = 1
+        r["dirs_cloturees"][4] = -1
+        self.assertEqual(ab.timeframe_attendu(r, {}), "15m")
+
+    def test_btc_scheduler_waits_for_new_setup_not_an_unneeded_h1_close(self):
+        dirs = [1] * 11
+        r = {"market": "BTC", "dirs_cloturees": dirs, "confirme": 0, "dirPlan": -1}
+        self.assertEqual(ab.timeframe_attendu(r, {}), "15m")
+
     def test_gold_nasdaq_next_closure_uses_closed_h1_h4_not_forming_candles(self):
         r = {
             "market": "GOLD",
