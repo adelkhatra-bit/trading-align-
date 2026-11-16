@@ -1672,10 +1672,18 @@ def alerte_repli(out, m, r, cle, d, p):
                    + f"🕯 La moitié du dernier grand mouvement (vue 15 min){', ' + src if 'Fibonacci' not in src else ''}\n"
                    + "👀 Sois patient\n🔔 Je te préviens dès qu'on y est")
 
+def derniere_bougie_m5_declencheur(r, m):
+    """Dernière M5 clôturée pour GOLD/NASDAQ ; historique inchangé sur BTC."""
+    bars = r.get("b5") or []
+    if m in ("GOLD", "NASDAQ"):
+        bars = bars[:-1]
+    return bars[-1] if bars else None
+
+
 def rejet(r, d, e, a):
-    """Mèche de rejet + clôture : la dernière bougie 5 min (ou 15 min) terminée a piqué dans la zone
-    puis CLÔTURÉ en repartant dans le sens (grande mèche du côté de la zone, clôture du bon côté)."""
-    for b in r["b5"][-1:]:
+    """Mèche de rejet + clôture, calculée sur une M5 terminée pour GOLD/NASDAQ."""
+    b = derniere_bougie_m5_declencheur(r, r.get("market"))
+    for b in ([b] if b else []):
         rng = max(b["h"] - b["l"], 1e-9)
         if d == 1:
             meche = min(b["o"], b["c"]) - b["l"]
@@ -1707,16 +1715,25 @@ def niveau_cassure(r, d):
     return max(x["h"] for x in b) if d == 1 else min(x["l"] for x in b)
 
 def plan_cassure(r, d):
-    """Entrée sur cassure après clôture d'une bougie 5m au-delà des 20 précédentes."""
-    b = r["b5"]; a = r.get("atr5", r["atr"])
+    """GOLD/NASDAQ : cassure sur M5 clôturée ; BTC conserve le comportement historique."""
+    m = r.get("market")
+    b = r["b5"][:-1] if m in ("GOLD", "NASDAQ") else r["b5"]
+    a = r.get("atr5", r["atr"])
     if len(b) < 22:
         return None
-    L = niveau_cassure(r, d)
+    if m in ("GOLD", "NASDAQ"):
+        precedentes = b[-21:-1]
+        if len(precedentes) < 20 or len(r.get("r5") or []) < 2:
+            return None
+        L = max(x["h"] for x in precedentes) if d == 1 else min(x["l"] for x in precedentes)
+        rsi5 = r["r5"][-2]
+    else:
+        L = niveau_cassure(r, d)
+        rsi5 = r["r5"][-1]
     if L is None:
         return None
     c1, c0 = b[-1]["c"], b[-2]["c"]
     casse = (c1 > L + 0.05 * a and c0 <= L) if d == 1 else (c1 < L - 0.05 * a and c0 >= L)
-    rsi5 = r["r5"][-1]
     trop = (rsi5 >= 78) if d == 1 else (rsi5 <= 22)
     if not casse or trop:
         return None
@@ -1785,7 +1802,7 @@ def zone_repli(r, d):
 def etire(r, d):
     """Évite de poursuivre un mouvement déjà étiré selon le timing 5m, jamais selon le 15m."""
     p = r["m1"][-1]["c"]; a = r.get("atr5", r["atr"]); e = r.get("ema5", r["ema15"])
-    r5 = r["r5"][-1]
+    r5 = r["r5"][-2] if r.get("market") in ("GOLD", "NASDAQ") and len(r.get("r5") or []) >= 2 else r["r5"][-1]
     return (r5 >= 80 or p - e > 2 * a) if d == 1 else (r5 <= 20 or e - p > 2 * a)
 
 def prochaine(r, cle):
@@ -9558,7 +9575,10 @@ def agent(m, r, cle, ferme):
     p = r["m1"][-1]["c"]
     hi = max(x["h"] for x in bougies); lo = min(x["l"] for x in bougies)
     d = r["confirme"]
-    r5, r5p = r["r5"][-1], r["r5"][-2]
+    if m in ("GOLD", "NASDAQ"):
+        r5, r5p = (r["r5"][-2], r["r5"][-3]) if len(r.get("r5") or []) >= 3 else (50, 50)
+    else:
+        r5, r5p = r["r5"][-1], r["r5"][-2]
     ctx = f"Contexte : {zone_txt(r['posD'])} Daily, {zone_txt(r['posW'])} Weekly."
     try:
         manipulation(out, m, r, cle)
@@ -9773,7 +9793,10 @@ def agent(m, r, cle, ferme):
             # 1) mèche de rejet + clôture  2) manipulation confirmée dans notre sens  3) bougie 15 min qui clôture dans le bon sens
             a_ = r.get("atr5", r["atr"]); bj = rejet(r, d, o["e"], a_); raison = "Mèche de rejet + clôture 5 min"
             # Une manipulation repérée en 15m reste informative ; elle ne déclenche jamais une entrée.
-            x5 = r["b5"][-1]; rg = max(x5["h"] - x5["l"], 1e-9)
+            x5 = derniere_bougie_m5_declencheur(r, m)
+            if x5 is None:
+                return out
+            rg = max(x5["h"] - x5["l"], 1e-9)
             if not bj and x5["t"] != cle.get("conf_t") and (
                     (d == 1 and x5["l"] <= o["zb"] + 0.1 * a_ and x5["c"] > x5["o"] and x5["c"] >= x5["l"] + 0.55 * rg and x5["c"] > o["za"] and r5 > r5p) or
                     (d == -1 and x5["h"] >= o["za"] - 0.1 * a_ and x5["c"] < x5["o"] and x5["c"] <= x5["h"] - 0.55 * rg and x5["c"] < o["zb"] and r5 < r5p)):
