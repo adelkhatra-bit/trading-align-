@@ -416,7 +416,7 @@ class AlignMtfRulesTest(unittest.TestCase):
 
     def test_multi_timeframe_watcher_only_notifies_the_blocking_timeframe(self):
         from unittest.mock import patch
-        state = {"veille_cloture": {"GOLD": {"123": {
+        state = {"auto": {"GOLD": ["123"]}, "veille_cloture": {"GOLD": {"123": {
             "multi": True, "derniers_t": {"5m": 300, "15m": 900, "1h": 3600, "4h": 14400},
             "expire": 999999
         }}}}
@@ -442,7 +442,7 @@ class AlignMtfRulesTest(unittest.TestCase):
 
     def test_multi_timeframe_watcher_retries_when_telegram_send_fails(self):
         from unittest.mock import patch
-        state = {"veille_cloture": {"GOLD": {"123": {
+        state = {"auto": {"GOLD": ["123"]}, "veille_cloture": {"GOLD": {"123": {
             "multi": True, "derniers_t": {"5m": 300, "15m": 900, "1h": 3600, "4h": 14400},
             "expire": 999999
         }}}}
@@ -701,7 +701,7 @@ class AlignMtfRulesTest(unittest.TestCase):
 
     def test_closed_candle_notifier_sends_once_per_new_candle(self):
         from unittest.mock import patch
-        state = {"veille_cloture": {"BTC": {"123": {"tf": "5m", "dernier_t": 300, "restants": 1}}}}
+        state = {"auto": {"BTC": ["123"]}, "veille_cloture": {"BTC": {"123": {"tf": "5m", "dernier_t": 300, "restants": 1}}}}
         r = {"b5": [candle(300), candle(600, o=100, h=103, l=99, c=102)],
              "confirme": 0, "dirs": [0] * 11, "rsis": [50] * 11}
         with patch.object(align_bot, "verdict", return_value=("ATTENDRE", "pas de confirmation")), \
@@ -2546,7 +2546,7 @@ class TestFollowPositionMarketChoice(unittest.TestCase):
     def test_followmarket_gold_sets_exclusive_preference_and_clears_stale_btc_watch(self):
         from unittest.mock import patch
         state = {
-            "auto": {"BTC": ["101", "202"], "GOLD": []},
+            "auto": {"BTC": ["101", "202"], "GOLD": ["101", "202"]},
             "veille_cloture": {"BTC": {"101": {"multi": True}, "202": {"multi": True}}},
             "marches_par_chat": {"101": "BOTH"}
         }
@@ -3027,12 +3027,13 @@ class TestTelegramFloodProtection(unittest.TestCase):
     def test_gauge_is_edited_at_most_once_per_minute(self):
         from unittest.mock import patch
         cle = {"jauge": {"1": 5}, "jauge_txt": {"1": "old"}, "jauge_t": {"1": 1000.0}}
+        state = {"auto": {"GOLD": ["1"]}}
         with patch.object(align_bot, "jauge", side_effect=["p1", "p2", "p3"]), \
              patch.object(align_bot, "marche_autorise", return_value=True), \
              patch.object(align_bot.time, "time", side_effect=[1010.0, 1059.0, 1061.0, 1061.0]), \
              patch.object(align_bot, "telegram") as tg:
             for _ in range(3):
-                align_bot.maj_jauge({}, "GOLD", {}, cle, {"1"})
+                align_bot.maj_jauge(state, "GOLD", {}, cle, {"1"})
         edits = [c for c in tg.call_args_list if c.args[0] == "editMessageText"]
         self.assertEqual(len(edits), 1)
         self.assertEqual(edits[0].kwargs["text"], "p3")
