@@ -163,6 +163,7 @@ class LiveTikTok(unittest.TestCase):
         kb = json.loads(ab.clavier_live(self.etat, "2"))["inline_keyboard"]
         actions = {b.get("callback_data"): b["text"] for row in kb for b in row if b.get("callback_data")}
         self.assertIn("analysechoice:BOTH", actions)
+        self.assertIn("searchpos:BOTH", actions)
         self.assertIn("marketsmenu:x", actions)
         for market in ("BTC", "GOLD", "NASDAQ"):
             self.assertIn(f"coachlive:{market}", actions)
@@ -369,6 +370,20 @@ class LiveOutbox(unittest.TestCase):
         self.assertIn(cid, state["coach_live"][market])
         self.assertTrue(any("COACH BTC" in str(item) for item in sent))
         self.assertFalse(any("COACH EN DIRECT TERMINÉ" in str(item) for item in sent))
+
+
+
+    def test_search_position_starts_persistent_coach_for_selected_markets(self):
+        state = {"marches_par_chat": {"user-42": ["BTC", "GOLD"]}, "bot_off": ["user-42"]}
+        with mock.patch.object(ab, "DERNIERS", {
+            "BTC": {"b15": [{"t": 100}, {"t": 200}]},
+            "GOLD": {"b15": [{"t": 300}, {"t": 400}]}
+        }):
+            selected = ab.demarrer_recherche_positions(state, "user-42")
+        self.assertEqual(selected, ("BTC", "GOLD"))
+        self.assertEqual(state["coach_live"]["BTC"]["user-42"], {"dernier_t": 100})
+        self.assertEqual(state["coach_live"]["GOLD"]["user-42"], {"dernier_t": 300})
+        self.assertNotIn("user-42", state["bot_off"])
 
 
 
