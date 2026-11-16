@@ -79,6 +79,34 @@ class DirectionSafety(unittest.TestCase):
         self.assertEqual(strat, "SCALPING")
         self.assertEqual(status, "CONFIRMÉ")
 
+    def test_gold_nasdaq_h1_neutre_ne_rearme_pas_une_tendance(self):
+        for market in ("GOLD", "NASDAQ"):
+            r = {"market": market, "confirme": 0, "dirs": [0] * 11}
+            r["dirs"][9] = 1  # H4 haussier
+            r["dirs"][7] = 0  # H1 neutre : pas une confirmation
+            cle = {"arme": 1}
+            ab.tendance_armee(r, cle)
+            self.assertEqual(r["confirme"], 0, market)
+            self.assertEqual(cle["arme"], 0, market)
+
+    def test_gold_nasdaq_h1_h4_alignes_peuvent_conserver_le_repli(self):
+        for market in ("GOLD", "NASDAQ"):
+            r = {"market": market, "confirme": 0, "dirs": [0] * 11}
+            r["dirs"][9] = 1
+            r["dirs"][7] = 1
+            cle = {"arme": 1}
+            ab.tendance_armee(r, cle)
+            self.assertEqual(r["confirme"], 1, market)
+            self.assertTrue(r.get("repli"))
+
+    def test_btc_garde_la_tolerance_h1_neutre_historique(self):
+        r = {"market": "BTC", "confirme": 0, "dirs": [0] * 11}
+        r["dirs"][9] = 1
+        r["dirs"][7] = 0
+        cle = {"arme": 1}
+        ab.tendance_armee(r, cle)
+        self.assertEqual(r["confirme"], 1)
+
     def test_gold_nasdaq_climax_is_watch_only_without_h1_h4_confluence(self):
         bars = [candle(i * 900) for i in range(80)]
         bars[-2] = candle(78 * 900, o=100, h=102, l=97, c=101, v=500)
