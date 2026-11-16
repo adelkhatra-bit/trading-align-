@@ -3470,5 +3470,5 @@ class TelegramExplicitCoachOptInTest(unittest.TestCase):
                                         side_effect=lambda cid, **kw: sent.append(kw) or {"ok": True}):
             align_bot.noter(state, "11", "BTC", state["BTC"]["trade"]["qui"]["11"], 104.0, "TP1 touché")
         self.assertNotIn("11", state["bot_off"])
-        self.assertIn("Suivi maintenu sur : GOLD", sent[0]["text"])
+        self.assertIn("Suivi maintenu uniquement sur : GOLD", sent[0]["text"])
         self.assertNotIn("next:yes", sent[0]["reply_markup"])
