@@ -51,7 +51,7 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
         dirs[2], dirs[4], dirs[7], dirs[9] = 1, 1, -1, -1
         b15 = [{"t": now - 900 * (42 - i), "o": 99.0, "h": 101.0, "l": 98.0, "c": 100.0, "v": 10.0}
                for i in range(42)]
-        b15[-2]["v"] = 20.0
+        b15[-1]["v"] = 20.0
         b1 = [{"t": now - 3600 * (7 - i), "h": 105.0, "l": 95.0} for i in range(7)]
         b4 = [{"t": now - 14400 * (7 - i), "h": 110.0, "l": 90.0} for i in range(7)]
         b5 = [{"t": now - 300 * (7 - i), "h": 101.0, "l": 98.0} for i in range(7)]
