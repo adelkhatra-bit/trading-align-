@@ -57,7 +57,7 @@ class MarketEntryStabilisationTests(unittest.TestCase):
         now = event + 25 * 60
         state = {"cal": {"ev": [{"t": event, "titre": "CPI"}]}}
         r = self.stable_market(event)
-        r["b5"][-3:] = self.bars(event + 12 * 300, [3.0, 3.2, 3.5])
+        r["b5"][-3:] = self.bars(event + 2 * 300, [3.0, 3.2, 3.5])
         reason = align_bot.pause_entree_marche("BTC", r, state, now)
         self.assertIn("réaction M5 encore instable", reason)
 
