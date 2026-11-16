@@ -25,9 +25,9 @@ def retest_r(h4):
     dirs = [0] * 11
     dirs[2], dirs[4], dirs[7], dirs[9] = 1, 1, 1, h4
     return dict(
-        b15=bars, b5=[candle(now - 600, c=101.2), candle(now - 300, c=101.2)],
-        b1h=[candle(now - 7200), candle(now - 3600)],
-        b4h=[candle(now - 28800), candle(now - 14400)],
+        b15=bars, b5=[candle(now - 600, c=101.2), candle(now - 300, c=101.2), candle(now, c=101.2)],
+        b1h=[candle(now - 7200), candle(now - 3600), candle(now)],
+        b4h=[candle(now - 28800), candle(now - 14400), candle(now)],
         m1=[candle(now - 30, c=101.2)], r5=[50, 50, 50],
         grosses=[(110.0, "4h"), (120.0, "Daily")], atr=2.0, atr5=1.0, t=now
     )
