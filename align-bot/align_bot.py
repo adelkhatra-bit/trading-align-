@@ -1004,6 +1004,8 @@ def _sniper(r):
         return None, f"CONFLUENCE_H1_H4 refusée : {r.get('market')} exige H1 et H4 dans le même sens que le plan (H1={dirs[7]}, H4={dirs[9]}, plan={d})"
     if r.get("market") in ("GOLD", "NASDAQ") and len(dirs) >= 5 and (dirs[2] != d or dirs[4] != d):
         return None, f"CONFLUENCE_M5_M15 refusée : {r.get('market')} exige M5 et M15 clôturés dans le même sens que le plan (M5={dirs[2]}, M15={dirs[4]}, plan={d})"
+    if r.get("market") in ("GOLD", "NASDAQ") and direction_confirmee_marche(r.get("market"), dirs, d, r) != d:
+        return None, "CONFLUENCE_PRIX_LIVE refusée : le cours direct est trop éloigné de la dernière clôture M5 ou son flux est périmé"
     if d not in (1, -1) or len(dirs) < 11 or not a3 or not a15 or not zp or len(m1) < 40 or len(b3) < 12 or len(b5) < 8 or len(b15) < 5:
         return None, f"DONNEES/PLAN absents (dirPlan={d}, zone={'oui' if zp else 'non'}, b3={len(b3)}, b5={len(b5)}, b15={len(b15)})"
     if (r["bull"] if d == 1 else r["bear"]) < MIN_ALIGN or r.get("sens") != d or dirs[9] == -d or dirs[7] == -d:
@@ -1834,6 +1836,8 @@ def prochaine(r, cle):
         if d15 != d4 or d5 != d4:
             etat = lambda x: "haussière" if x == 1 else "baissière" if x == -1 else "neutre"
             return f"🔜 Prochaine entrée : ATTENTE — H1/H4 {SENS[d4]}, M15 {etat(d15)}, M5 {etat(d5)}. Pas de position avant l'accord des quatre clôtures."
+        if direction_confirmee_marche(r.get("market"), D, d4, r) != d4:
+            return "🔜 Prochaine entrée : ATTENTE — le cours en direct a déjà retracé contre la dernière clôture M5 ou le flux est périmé. J'attends une nouvelle clôture."
     d = r["confirme"]; R = dict(zip(UT, r["rsis"]))
     if d and etire(r, d):
         # Grosses UT en excès : le retournement est possible
@@ -3203,14 +3207,14 @@ def tendance_armee(r, cle):
     """La tendance reste armée pendant un repli, mais GOLD/NASDAQ ne réarment qu'après clôture M5/M15/H1/H4 concordante."""
     m = r.get("market")
     dirs = r.get("dirs_cloturees") or r.get("dirs") or []
-    d = direction_confirmee_marche(m, dirs, r.get("confirme"))
+    d = direction_confirmee_marche(m, dirs, r.get("confirme"), r)
     if m in ("GOLD", "NASDAQ"):
         r["confirme"] = d
         if d:
             cle["arme"] = d
             return r
         a = cle.get("arme")
-        if a and direction_confirmee_marche(m, dirs, a) == a:
+        if a and direction_confirmee_marche(m, dirs, a, r) == a:
             r["confirme"] = a
             r["repli"] = True
         elif a:
@@ -4098,7 +4102,7 @@ def reprise_entree(m, r, cle):
     if p_actuel is not None and (p_actuel - rp["sl"]) * rp["d"] <= 0:
         cle.pop("reprise", None)                       # le plan est cassé : même si les UT ne sont pas alignées
         return None
-    if m in ("GOLD", "NASDAQ") and direction_confirmee_marche(m, r.get("dirs_cloturees") or r.get("dirs"), rp.get("d")) != rp.get("d"):
+    if m in ("GOLD", "NASDAQ") and direction_confirmee_marche(m, r.get("dirs_cloturees") or r.get("dirs"), rp.get("d"), r) != rp.get("d"):
         return None
     b5 = (r.get("b5") or [])[:-1]
     atr = r.get("atr") or 0
@@ -4217,7 +4221,7 @@ def radar_climax(m, r, cle):
                 return None
             cle["radar_t"][str(sens)] = t
             cle["radar_dernier"] = t
-            if m in ("GOLD", "NASDAQ") and (len(dirs) < 10 or any(dirs[i] != sens for i in (2, 4, 7, 9))):
+            if m in ("GOLD", "NASDAQ") and (len(dirs) < 10 or any(dirs[i] != sens for i in (2, 4, 7, 9)) or direction_confirmee_marche(m, dirs, sens, r) != sens):
                 lib = lambda i: "haussier" if len(dirs) > i and dirs[i] == 1 else "baissier" if len(dirs) > i and dirs[i] == -1 else "neutre"
                 return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\n"
                         f"Clôtures M5={lib(2)}, M15={lib(4)}, H1={lib(7)}, H4={lib(9)} : elles ne confirment pas toutes le même sens.\n"
@@ -4538,6 +4542,8 @@ def raison_attente(r, cle):
         etat_m5 = "haussière" if dirs[2] == 1 else "baissière" if dirs[2] == -1 else "neutre"
         etat_m15 = "haussière" if dirs[4] == 1 else "baissière" if dirs[4] == -1 else "neutre"
         return f"Le fond H4/H1 est {sens}, mais M15 est {etat_m15} et M5 {etat_m5}. J'attends que les quatre unités clôturent dans le même sens. Aucune position pour l'instant."
+    if r.get("market") in ("GOLD", "NASDAQ") and direction_confirmee_marche(r.get("market"), dirs, d4h, r) != d4h:
+        return "Le fond H4/H1 et les clôtures M5/M15 sont alignés, mais le cours direct a déjà retracé contre la dernière clôture M5 ou le flux est périmé. J'attends une nouvelle clôture. Aucune position pour l'instant."
     d = r.get("confirme") or d4h
     if etire(r, d):
         return f"La tendance {sens} est confirmée, mais le mouvement est déjà trop étendu. Je n'achète/vends pas au prix actuel : j'attends un repli."
@@ -7061,6 +7067,7 @@ def evenements_pine(etat, m, r, cle, now):
     alignement_ok = strategie_alignement(dirs_confirmation, d, r.get("dirW") or 0, r.get("market"))[1] == "CONFIRMÉ"
     if m in ("GOLD", "NASDAQ"):
         alignement_ok = alignement_ok and len(dirs_confirmation) > 9 and all(dirs_confirmation[i] == d for i in (2, 4, 7, 9))
+        alignement_ok = alignement_ok and direction_confirmee_marche(m, dirs_confirmation, d, r) == d
     if d and zp and strat and not cle.get("trade") and alignement_ok:
         barres = (r.get("m1") if strat == "SCALPING" else r.get("b5")) or []           # même bougie que le trait de l'indicateur (vue du plan)
         if len(barres) >= 3:
