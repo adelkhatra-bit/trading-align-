@@ -3775,7 +3775,7 @@ def url_tradingview(m, timeframe):
     return "https://www.tradingview.com/chart/?symbol=" + urllib.parse.quote(symbole, safe="") + "&interval=" + str(timeframe)
 
 def bouton_auto(m):
-    return json.dumps({"inline_keyboard": [[{"text": "🧑‍🏫 Coach : préviens-moi", "callback_data": f"auto:{m}"}]]})
+    return json.dumps({"inline_keyboard": [[{"text": "🧑‍🏫 Activer le coach", "callback_data": f"auto:{m}"}]]})
 
 def menu_suivi(etat, cid):
     """Demande quels marchés l'utilisateur veut suivre avant l'inscription."""
@@ -3793,7 +3793,7 @@ def bouton_rappel(m):
     """Rappelle la bonne analyse de marché, même si un autre marché a envoyé des messages depuis."""
     return json.dumps({"inline_keyboard": [
         [{"text": f"📌 Revoir l'analyse {m}", "callback_data": f"previous:{m}"}],
-        [{"text": "🧑‍🏫 Coach : préviens-moi", "callback_data": f"auto:{m}"}],
+        [{"text": "🧑‍🏫 Activer le coach", "callback_data": f"auto:{m}"}],
         [{"text": "🎙 Coach commentateur (en direct)", "callback_data": f"coachlive:{m}"}]
     ]})
 
@@ -3824,7 +3824,10 @@ def markup_analyse(etat, m, r, cid=None):
         {"text": "🗂 Historique des messages", "callback_data": f"history:{m}"},
     ]
     if not tr:
-        actions.append({"text": "🧑‍🏫 Coach : préviens-moi ", "callback_data": f"auto:{m}"})
+        if cid is not None and coach_abonne(etat, cid, m):
+            actions.append({"text": "🔕 Désactiver le coach", "callback_data": f"coachoff:{m}"})
+        else:
+            actions.append({"text": "🧑‍🏫 Activer le coach", "callback_data": f"auto:{m}"})
     lignes.append(actions)
     live_ = cid is not None and str(cid) in (etat.get("coach_live", {}).get(m) or {})
     lignes.append([{"text": ("⏹ Arrêter le commentateur" if live_ else "🎙 Coach commentateur (en direct)"),
@@ -6426,6 +6429,15 @@ def traiter(etat, chats, updates):
                 except Exception:
                     pass
                 _envoi_sur(qui, text=f"🎙 COMMENTATEUR {ICONE.get(mk, '')} {mk}\n✅ Tu es déjà dans la chaîne\n👀 Il commente là-bas\n🙅 Pas de doublon ici")
+                continue
+            if choix == "coachoff" and mk in MARCHES:
+                activer_coach_optin(etat, qui, mk, False)
+                activer_coach_live(etat, qui, mk, False)
+                try:
+                    telegram("answerCallbackQuery", callback_query_id=cb["id"], text="🔕 Coach désactivé pour " + mk)
+                except Exception:
+                    pass
+                _envoi_sur(qui, text=f"🔕 COACH DÉSACTIVÉ — {ICONE.get(mk, '')} {mk}\nAucune nouvelle alerte privée sur ce marché. Réactive-le uniquement si tu le souhaites.")
                 continue
             if choix in ("coachlive", "coachstop") and mk in MARCHES:
                 activer_coach_live(etat, qui, mk, choix == "coachlive")
