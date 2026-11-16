@@ -484,6 +484,17 @@ def direction_confirmee_marche(m, dirs, d, contexte=None):
             ecart_live = m1[-1]["c"] - b5[-2]["c"]
             if d * ecart_live < -0.75 * atr5:
                 return 0
+            # Si le bridge TradingView est disponible, ses lectures ROBOT V12 M5/M15/H1 doivent aussi confirmer.
+            bridge = contexte.get("tv_indicator_mtf") or {}
+            if bridge.get("available") is True:
+                active = bridge.get("activeTimeframe")
+                snap = (bridge.get("snapshots") or {}).get(active) or {}
+                robot = snap.get("robotV12") or {}
+                if snap.get("fresh") is not True or not robot:
+                    return 0
+                for key in ("lecture_5m", "lecture_15m", "lecture_60m"):
+                    if _direction_tv(robot.get(key)) != d:
+                        return 0
     return d
 
 def pivots(b, g=5):
