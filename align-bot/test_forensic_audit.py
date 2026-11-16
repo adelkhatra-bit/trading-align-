@@ -318,8 +318,9 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
         sent = []
         with unittest.mock.patch.object(align_bot, "_envoi_sur", side_effect=lambda cid, **kw: sent.append(kw)):
             align_bot.menu_marches(etat, "new-user")
-        self.assertIn("Valider mes marchés", sent[-1]["text"])
-        self.assertNotIn("Valider et suivre", sent[-1]["text"])
+        markup = sent[-1]["reply_markup"]
+        self.assertIn("Valider mes marchés", markup)
+        self.assertNotIn("Valider et suivre", markup)
 
 
 
