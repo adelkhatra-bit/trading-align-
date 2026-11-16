@@ -4796,7 +4796,8 @@ def texte_prix_topstep(m, tr, prix_graphique, prix_fut):
 def prix_topstep_inscrits(etat, m, tr, prix_graphique):
     """Envoie les niveaux Topstep uniquement aux utilisateurs ayant activé le coach sur ce marché."""
     qui = [str(c) for c, v in (etat.get("plateforme") or {}).items()
-           if v in ("topstep", "deux") and marche_autorise(etat, c, m) and coach_actif(etat, c, m)]
+           if v in ("topstep", "deux") and marche_autorise(etat, c, m)
+           and (coach_actif(etat, c, m) or m in en_position(etat, c))]
     if not qui or not topstep_trade:
         return 0
     try:
