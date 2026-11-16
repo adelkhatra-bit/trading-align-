@@ -124,19 +124,28 @@ def plan_indicateur(r):
     snap = (bridge.get("snapshots") or {}).get(preferred) or {}
     robot = snap.get("robotV12") or {}
     try:
-        entry, sl, tp = float(robot.get("entry")), float(robot.get("sl")), float(robot.get("tp"))
-    except (TypeError, ValueError):
+        entry, sl = float(robot.get("entry")), float(robot.get("sl"))
+        # Le bridge peut exposer les deux objectifs ou un objectif unique historique.
+        # Dans ce dernier cas, on le traite comme TP1 et on n'invente jamais de TP2.
+        tp1 = float(robot.get("tp1", robot.get("tp")))
+        tp2 = float(robot["tp2"]) if robot.get("tp2") not in (None, "") else None
+    except (TypeError, ValueError, KeyError):
         return {"timeframe": preferred or None, "available": False,
                 "reason": "aucun plan ROBOT V12 complet pour l'unité TradingView active"}
     if not snap.get("fresh"):
         return {"timeframe": preferred, "available": False, "reason": "plan ROBOT V12 périmé"}
     signal = str(robot.get("signal") or robot.get("verdict") or "").upper()
     direction = _direction_tv(signal)
-    if direction not in (-1, 1) or min(entry, sl, tp) <= 0:
+    if direction not in (-1, 1) or min(entry, sl, tp1) <= 0 or (tp2 is not None and tp2 <= 0):
         return {"timeframe": preferred, "available": False, "reason": "direction ou niveaux ROBOT V12 invalides"}
-    if (direction == 1 and not sl < entry < tp) or (direction == -1 and not tp < entry < sl):
+    if direction == 1:
+        geometrie_ok = sl < entry < tp1 and (tp2 is None or tp2 > tp1)
+    else:
+        geometrie_ok = tp1 < entry < sl and (tp2 is None or tp2 < tp1)
+    if not geometrie_ok:
         return {"timeframe": preferred, "available": False, "reason": "géométrie entrée/SL/TP incohérente"}
-    return {"timeframe": preferred, "available": True, "direction": direction, "entry": entry, "sl": sl, "tp": tp,
+    return {"timeframe": preferred, "available": True, "direction": direction, "entry": entry, "sl": sl,
+            "tp": tp1, "tp1": tp1, "tp2": tp2,
             "confirmed": snap.get("confirmed") is True, "verdict": robot.get("verdict"),
             "macro_bull": robot.get("macro_bull"), "macro_bear": robot.get("macro_bear"),
             "long_score": robot.get("long_score"), "short_score": robot.get("short_score"),
@@ -1225,7 +1234,8 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
     if tv_plan["available"]:
         l += ["━━━━━━━━━━━━━━━━━━", "📡 PLAN DE L'INDICATEUR TRADINGVIEW",
               f"Unité sélectionnée : {tv_plan['timeframe']}",
-              f"Entrée indicateur : {px(tv_plan['entry'])} • SL : {px(tv_plan['sl'])} • TP : {px(tv_plan['tp'])}",
+              f"Entrée indicateur : {px(tv_plan['entry'])} • SL : {px(tv_plan['sl'])} • TP1 : {px(tv_plan['tp1'])}" +
+              (f" • TP2 : {px(tv_plan['tp2'])}" if tv_plan.get("tp2") is not None else " • TP2 : non fourni par le bridge"),
               "Clôture confirmée par l'indicateur : " + ("OUI" if tv_plan["confirmed"] else "NON / NON FOURNIE"),
               "⚠️ Plan indicateur séparé du verdict de sécurité ALIGN."]
     elif r.get("tv_indicator_mtf", {}).get("available"):
@@ -1272,7 +1282,8 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
         l.append(f"🎯 POSITION EN COURS : {sens} | Entrée {px(tr['e'])} | SL {px(tr['sl'])} | TP1 {px(tr['tp1'])} | TP2 {px(tr['tp2'])}")
     elif o:
         sens = "🟩 LONG" if o.get("d", r["confirme"]) == 1 else "🟥 SHORT"
-        l.append(f"🎯 POINT VISÉ : {sens} | Entrée ≈ {px(o['e'])} | TP1 {px(o['tp1'])} | SL {px(o['sl'])}")
+        l.append(f"🎯 POINT VISÉ : {sens} | Entrée ≈ {px(o['e'])} | TP1 {px(o['tp1'])}" +
+                 (f" | TP2 {px(o['tp2'])}" if o.get("tp2") is not None else "") + f" | SL {px(o['sl'])}")
     elif r["confirme"]:
         sens = "🟩 LONG" if r["confirme"] == 1 else "🟥 SHORT"
         l.append(f"🎯 DIRECTION À SURVEILLER : {sens} | Point d'entrée après validation du déclencheur")
