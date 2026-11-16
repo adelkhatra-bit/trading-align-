@@ -8139,9 +8139,11 @@ def valider_et_suivre_marches(etat, cid, user_id, message_id=None):
         _envoi_sur(cid, text=("Select at least one market to follow." if anglais else
                               "Coche au moins un marché pour activer les alertes."))
         return False
+    nouveau = cid in {str(x) for x in etat.get("coach_pending", [])}
     selectionner_marches_suivi(etat, cid, choisis)
-    for m in choisis:
-        inscrire_auto(etat, cid, m, notifier=False)
+    if not nouveau:
+        for m in choisis:
+            inscrire_auto(etat, cid, m, notifier=False)
     noms = " + ".join(m for m in choisis)
     if message_id:                      # ferme le menu : plus de cases ni de bouton à l'écran
         try:
@@ -8151,7 +8153,20 @@ def valider_et_suivre_marches(etat, cid, user_id, message_id=None):
                 telegram("editMessageReplyMarkup", chat_id=cid, message_id=message_id, reply_markup=json.dumps({"inline_keyboard": []}))
             except Exception as ex:
                 print("fermeture menu marchés", ex)
-    _envoi_sur(cid, text=(f"✅ Tracking on: {noms}" if anglais else f"✅ Suivi activé : {noms}") + "\n\n" + texte_suivi(etat, cid))
+    if nouveau:
+        actions = [[{"text": "🔎 Research markets" if anglais else "🔎 Faire une analyse",
+                     "callback_data": "analysechoice:BOTH"}]]
+        actions += [[{"text": (f"🎙 Live coach {m}" if anglais else f"🎙 Coach LIVE {m}"),
+                      "callback_data": f"coachlive:{m}"},
+                     {"text": (f"🔔 Entry alerts {m}" if anglais else f"🔔 Alertes {m}"),
+                      "callback_data": f"auto:{m}"}] for m in choisis]
+        _envoi_sur(cid, text=(f"✅ Markets selected: {noms}" if anglais else f"✅ Marchés sélectionnés : {noms}") +
+                   ("\n🔕 No automatic alerts are enabled. Use research on demand, or activate the live coach / entry alerts only for markets you choose."
+                    if anglais else
+                    "\n🔕 Aucune notification automatique n'est activée. Lance une analyse à la demande, ou active le coach LIVE / les alertes uniquement sur les marchés souhaités."),
+                   reply_markup=json.dumps({"inline_keyboard": actions}))
+    else:
+        _envoi_sur(cid, text=(f"✅ Tracking on: {noms}" if anglais else f"✅ Suivi activé : {noms}") + "\n\n" + texte_suivi(etat, cid))
     return True
 
 def basculer_marche(etat, cid, marche):
