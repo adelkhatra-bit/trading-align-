@@ -3385,6 +3385,7 @@ def analyse_marche(etat, pair):
             r["dirPlan"] = 0
             r["strat"] = ""
             r["zone_pine"] = None
+            r["tv_bridge_conflict"] = True
             r["sigHaut"] = r["sigBas"] = False
             r["nom"] = ""
         r["confirme"] = direction_confirmee_marche(
@@ -4584,7 +4585,11 @@ def texte_apercu(m, r, cle, vip=True):
     prof = profil_strategie(r) if r.get("dirs") and len(r.get("dirs")) >= 11 else {}
     # Même sens que la décision : pas de cible tant que la 4 h + 1 h ne donnent pas de direction.
     sens = (tr or {}).get("d") or maj or 0
+    if r.get("tv_bridge_conflict") and not tr:
+        sens = 0
     type_ = prof.get("mode") or ""
+    if r.get("tv_bridge_conflict"):
+        direction = "Non confirmée par TradingView"
     lignes = [
         f"{ICONE.get(m, '📊')} {m} — {px(prix)}",
         f"🚦 {decision}",
