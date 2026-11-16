@@ -6103,8 +6103,6 @@ def traiter(etat, chats, updates):
                     menu_marches(etat, qui)
                 else:
                     purger_messages_en_attente(etat, qui)
-                    _envoi_sur(qui, text=("Coach remains paused. You can still request an analysis at any time." if qui in LANG_EN else
-                                          "Le coach reste en pause. Tu peux toujours demander une analyse à tout moment."))
                 continue
             if choix == "coach":
                 telegram("answerCallbackQuery", callback_query_id=cb["id"], text="C'est noté")
@@ -6119,8 +6117,6 @@ def traiter(etat, chats, updates):
                         etat["bot_off"].append(qui)
                     purger_messages_en_attente(etat, qui)
                     etat["coach_pending"] = [x for x in etat.get("coach_pending", []) if str(x) != qui]
-                    _envoi_sur(qui, text=("Coach not activated. You can still request an analysis from the menu." if qui in LANG_EN else
-                                          "Coach non activé. Tu peux toujours demander une analyse depuis le menu."))
                 continue
             if live_callback(etat, chats, cb, choix, mk, qui):
                 continue
