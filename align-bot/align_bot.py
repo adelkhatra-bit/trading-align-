@@ -4110,6 +4110,7 @@ def reprise_entree(m, r, cle):
         return None
     d, e = rp["d"], rp["e"]
     if not confluence_entree_mtf(m, r, d):
+        cle.pop("reprise", None)                       # biais MTF changé : ancien plan invalidé
         return None
     if (p - rp["sl"]) * d <= 0:
         cle.pop("reprise", None)                       # le plan est cassé : on ne reprend pas
@@ -4117,10 +4118,13 @@ def reprise_entree(m, r, cle):
     if abs(p - e) > 0.25 * atr or (b5[-1]["c"] - b5[-1]["o"]) * d <= 0:
         return None
     cle.pop("reprise", None)
+    niveaux = f"📍 Entrée ≈ {px(e)} • 🛑 SL ≈ {px(rp['sl'])} • 🎯 TP1 ≈ {px(rp['tp1'])}"
+    if rp.get("tp2"):
+        niveaux += f" • 🎯 TP2 ≈ {px(rp['tp2'])}"
     return (f"🔁 REPRISE À L'ENTRÉE : {'LONG' if d == 1 else 'SHORT'} — {ICONE.get(m, '')} {m}\n"
             f"🧲 Le prix est revenu sur l'entrée {px(e)}, comme prévu 😎\n"
             "🕯 La bougie 5 min reclôture dans notre sens\n"
-            f"📍 Entrée ≈ {px(e)} • 🛑 SL ≈ {px(rp['sl'])} • 🎯 TP1 ≈ {px(rp['tp1'])}\n"
+            + niveaux + "\n"
             "💰 Deuxième passage sur le même mouvement : c'est comme ça qu'on fait le max\n"
             "⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
 
