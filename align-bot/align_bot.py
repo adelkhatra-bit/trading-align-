@@ -11474,6 +11474,22 @@ def live_paiement_recu(etat, cid, paiement):
     return True
 
 
+def _traiter_paiement_rapide(etat, update):
+    """Une confirmation de paiement est une réponse privée à une action volontaire de l'utilisateur."""
+    message = update.get("message") or {}
+    chat = message.get("chat") or {}
+    cid = str(chat.get("id") or "")
+    ancien_chat = getattr(TELEGRAM_PULL_CONTEXT, "chat_id", None)
+    ancien_prive = getattr(TELEGRAM_PULL_CONTEXT, "private", False)
+    TELEGRAM_PULL_CONTEXT.chat_id = cid if chat.get("type") == "private" else None
+    TELEGRAM_PULL_CONTEXT.private = chat.get("type") == "private"
+    try:
+        return live_paiement_recu(etat, cid, message.get("successful_payment") or {})
+    finally:
+        TELEGRAM_PULL_CONTEXT.chat_id = ancien_chat
+        TELEGRAM_PULL_CONTEXT.private = ancien_prive
+
+
 def boucle_polling_telegram(etat, chats):
     """Poll Telegram indépendamment des analyses longues; les actions d'écriture restent dans le thread principal."""
     offset = int(etat.get("offset", 0) or 0)
@@ -11491,7 +11507,7 @@ def boucle_polling_telegram(etat, chats):
                 live_pre_checkout(etat, update["pre_checkout_query"])
             paiement = (update.get("message") or {}).get("successful_payment")
             if paiement:
-                live_paiement_recu(etat, str((update.get("message") or {}).get("chat", {}).get("id", "")), paiement)
+                _traiter_paiement_rapide(etat, update)
                 update["_align_fast_handled"] = True
             cb = update.get("callback_query")
             if cb:

@@ -432,6 +432,26 @@ class LiveOutbox(unittest.TestCase):
         finally:
             ab.DERNIER_ETAT = previous
 
+    def test_confirmation_paiement_est_autorisee_seulement_dans_le_chat_prive(self):
+        observed = []
+
+        def faux_paiement(etat, cid, paiement):
+            observed.append(ab._telegram_sortant_autorise(
+                "sendMessage", {"chat_id": cid, "text": "Paiement confirmé"}))
+            return True
+
+        update = {"message": {
+            "chat": {"id": 42, "type": "private"},
+            "successful_payment": {"invoice_payload": "livemain:BTC"}
+        }}
+        with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True), \
+             mock.patch.object(ab, "live_paiement_recu", side_effect=faux_paiement):
+            self.assertTrue(ab._traiter_paiement_rapide({}, update))
+            self.assertFalse(ab._telegram_sortant_autorise(
+                "sendMessage", {"chat_id": "42", "text": "Message spontané"}))
+
+        self.assertEqual(observed, [True])
+
     def test_demande_analyse_autorise_une_reponse_apres_le_traitement_du_bouton(self):
         observations = []
 
