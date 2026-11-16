@@ -1399,7 +1399,31 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
     proches = sorted([f for f in r.get("fvg", []) if abs((f[0] + f[1]) / 2 - p_) <= 3 * r["atr"]],
                      key=lambda f: abs((f[0] + f[1]) / 2 - p_))
     for lo, hi, ut_fvg, dd in proches[:2]:
-        contexte.append(f"🧲 FVG {ut_fvg} : {'haussière' if dd == 1 else 'baissière'} | Basse {px(lo)} | Haute {px(hi)}")
+        bars_fvg = r.get("b15_long" if ut_fvg == "15m" else "b1h_long") or r.get("b15" if ut_fvg == "15m" else "b1h") or []
+        mange = zone_mangee_directionnelle(bars_fvg, lo, hi, dd)
+        statut = texte_mangee(mange)
+        contexte.append(f"🧲 FVG {ut_fvg} : {'haussière' if dd == 1 else 'baissière'} | Basse {px(lo)} | Haute {px(hi)}" + (f" | {statut}" if statut else ""))
+    # Même suivi pour les ORDER BLOCKS associés aux FVG : OB haussier consommé depuis le haut,
+    # OB baissier consommé depuis le bas. Une zone n'est affichée que si elle est proche du prix.
+    vus_ob = set()
+    for ut, champ in UT_FVG_BARS.items():
+        st = (r.get("struct_ut") or {}).get(ut)
+        bars_ob = r.get(champ) or []
+        if not st or len(st) < 12 or not bars_ob:
+            continue
+        for dd, haut_ob, bas_ob in ((-1, st[8], st[9]), (1, st[10], st[11])):
+            if haut_ob is None or bas_ob is None:
+                continue
+            lo_ob, hi_ob = min(haut_ob, bas_ob), max(haut_ob, bas_ob)
+            if abs((lo_ob + hi_ob) / 2 - p_) > 3 * r["atr"]:
+                continue
+            cle_ob = (round(lo_ob, 8), round(hi_ob, 8), ut, dd)
+            if cle_ob in vus_ob:
+                continue
+            vus_ob.add(cle_ob)
+            mange = zone_mangee_directionnelle(bars_ob, lo_ob, hi_ob, dd)
+            statut = texte_mangee(mange)
+            contexte.append(f"🏦 ORDER BLOCK {ut} {'baissier' if dd == -1 else 'haussier'} | Basse {px(lo_ob)} | Haute {px(hi_ob)}" + (f" | {statut}" if statut else ""))
     if r.get("distrib"):
         contexte.append("⚠️ Distribution possible : essoufflement en zone haute (divergence RSI)")
     if r.get("accum"):
@@ -10030,8 +10054,16 @@ def resistance_fvg(out, m, r, cle):
         if v is not None and n in ("1h", "4h", "Daily", "D"):
             zones.append((v, v, "Daily" if n == "D" else n, "niv"))
     for lo, hi, ut, dd in (r.get("fvg") or []):
-        zones.append((lo, hi, ut.replace("m", " min"), "fvg"))
-    for lo, hi, ut, sorte in zones:
+        zones.append((lo, hi, ut.replace("m", " min"), "fvg", dd))
+    # Les order blocks associés aux FVG sont des zones à part entière : surveiller leur test et leur mitigation.
+    for ut, champ in UT_FVG_BARS.items():
+        st = (r.get("struct_ut") or {}).get(ut)
+        if not st or len(st) < 12:
+            continue
+        for dd, haut_ob, bas_ob in ((-1, st[8], st[9]), (1, st[10], st[11])):
+            if haut_ob is not None and bas_ob is not None:
+                zones.append((min(haut_ob, bas_ob), max(haut_ob, bas_ob), ut.replace("m", " min"), "ob", dd))
+    for lo, hi, ut, sorte, sens_zone in zones:
         if not (x["h"] >= lo - 0.05 * a and x["l"] <= hi + 0.05 * a):
             # v7.3 (demande d'Adel, 15/11) : le prix S'APPROCHE (moins de 0,4 ATR) et vient vers la zone → le coach prévient AVANT
             if pc < lo and p < lo and lo - p <= 0.4 * a and p > pc:
@@ -10046,8 +10078,11 @@ def resistance_fvg(out, m, r, cle):
             vu[cle_] = 1
             cle["rsfvg_t"] = time.time()
             niveau = px(lo) if lo == hi else f"{px(lo)} – {px(hi)}"
-            quoi = f"la FVG {ut}" if sorte == "fvg" else f"la {'résistance' if plafond else 'zone de support'} {ut}"
+            quoi = f"la FVG {ut}" if sorte == "fvg" else f"l'ORDER BLOCK {ut}" if sorte == "ob" else f"la {'résistance' if plafond else 'zone de support'} {ut}"
+            mange = zone_mangee_directionnelle(r.get(UT_FVG_BARS.get(ut.replace(" min", ""), "b15")) or [], lo, hi, sens_zone) if sorte in ("fvg", "ob") else None
+            statut = texte_mangee(mange)
             out.append(f"🔮 ÇA VA TESTER — {ICONE.get(m, '')} {m}\n🎯 Le prix se rapproche de {quoi} ≈ {niveau}\n💰 Prix : {px(p)}\n"
+                       + (f"{statut}\n" if statut else "") +
                        f"{'⬇️ Ça peut rebondir dessous' if plafond else '⬆️ Ça peut rebondir dessus'}\n"
                        f"🧘 Ne prends pas ça pour argent comptant\n⏳ Patiente jusqu'au « ✅ VALIDÉ »\n🛡 Notre équipe contrôle tous les indicateurs")
             try:
@@ -10069,10 +10104,15 @@ def resistance_fvg(out, m, r, cle):
         niveau = px(lo) if lo == hi else f"{px(lo)} – {px(hi)}"
         if sorte == "fvg":
             titre = "🕳 FVG TOUCHÉE"; quoi = f"la FVG {ut}"
+        elif sorte == "ob":
+            titre = "🏦 ORDER BLOCK TOUCHÉ"; quoi = f"l'ORDER BLOCK {ut}"
         else:
             titre = "🧱 RÉSISTANCE TOUCHÉE" if plafond else "🛏 SUPPORT TOUCHÉ"; quoi = f"la {'résistance' if plafond else 'zone de support'} {ut}"
         rejet, casse = ("sous", "au-dessus") if plafond else ("au-dessus", "sous")
+        mange = zone_mangee_directionnelle(r.get(UT_FVG_BARS.get(ut.replace(" min", ""), "b15")) or [], lo, hi, sens_zone) if sorte in ("fvg", "ob") else None
+        statut = texte_mangee(mange)
         out.append(f"{titre} — {ICONE.get(m, '')} {m}\n📍 Le prix tape {quoi} ≈ {niveau}\n💰 Prix : {px(p)}\n"
+                   + (f"{statut}\n" if statut else "") +
                    f"{'⬇️' if plafond else '⬆️'} Rejet si la bougie 15 min clôture {rejet}\n{'⬆️' if plafond else '⬇️'} Cassure si elle clôture {casse}\n"
                    f"⏳ Verdict à la clôture 15 min\nℹ️ Info, pas une entrée")
         try:
@@ -10229,6 +10269,31 @@ def texte_mangee(pc):
     if pc < 100:
         return f"🍽 Zone mangée à {pc} % : elle s'use, prudence"
     return "🍽 Zone mangée à 100 % : traversée en entier, on attend la clôture"
+
+
+def zone_mangee_directionnelle(bars, a, b, sens_entree, n=25):
+    """Mesure la profondeur maximale réellement pénétrée depuis le bord d'arrivée.
+    sens_entree=1 : arrivée par le haut (FVG/OB haussier, support testé depuis le dessus).
+    sens_entree=-1 : arrivée par le bas (FVG/OB baissier, résistance testée depuis le dessous).
+    Une mèche qui entre compte ; les revisites ne s'additionnent pas et ne gonflent pas le %.
+    """
+    if not bars or a is None or b is None or sens_entree not in (-1, 1):
+        return None
+    try:
+        lo, hi = min(float(a), float(b)), max(float(a), float(b))
+        if not math.isfinite(lo) or not math.isfinite(hi) or hi <= lo:
+            return None
+        profondeur = 0.0
+        for x in bars[-n:]:
+            bas, haut = float(x["l"]), float(x["h"])
+            if not math.isfinite(bas) or not math.isfinite(haut) or haut < lo or bas > hi:
+                continue
+            # Depuis le haut, on mesure jusqu'au plus bas atteint ; depuis le bas, jusqu'au plus haut atteint.
+            p = hi - max(lo, bas) if sens_entree == 1 else min(hi, haut) - lo
+            profondeur = max(profondeur, min(hi - lo, max(0.0, p)))
+        return max(0, min(100, round(100 * profondeur / (hi - lo))))
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return None
 
 
 TF_NOM = {"1m": "1 min", "5m": "5 min", "15m": "15 min", "1h": "1 h", "4h": "4 h"}
