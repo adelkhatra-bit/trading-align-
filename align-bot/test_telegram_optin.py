@@ -1,0 +1,86 @@
+"""Telegram : aucune notification automatique privée sans activation explicite du coach par marché."""
+import os
+import sys
+import unittest
+from unittest import mock
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import align_bot as ab
+
+
+class TelegramOptIn(unittest.TestCase):
+    def test_aucun_message_prive_sans_activation_coach(self):
+        etat = {
+            "auto": {},
+            "marches_par_chat": {"10": ["GOLD"], "20": ["NASDAQ"]},
+            "bot_off": [],
+        }
+        self.assertEqual(ab.destinataires_message(etat, ["10", "20"], "🥇 GOLD\nTP1 : 3900"), [])
+        self.assertFalse(ab.coach_abonne(etat, "10", "GOLD"))
+
+    def test_un_seul_marche_choisi_et_active_recoit_ses_alertes(self):
+        etat = {
+            "auto": {"GOLD": ["10"], "NASDAQ": ["20"]},
+            "marches_par_chat": {"10": ["GOLD"], "20": ["NASDAQ"], "30": ["GOLD"]},
+            "bot_off": [],
+        }
+        self.assertEqual(ab.destinataires_message(etat, ["10", "20", "30"], "🥇 GOLD\nTP1 : 3900"), ["10"])
+        self.assertEqual(ab.destinataires_message(etat, ["10", "20", "30"], "💠 NASDAQ\nTP1 : 22000"), ["20"])
+
+    def test_chaine_publique_conserve_son_flux_et_prives_restent_optin(self):
+        etat = {
+            "canal": "-100",
+            "auto": {"GOLD": ["10"]},
+            "marches_par_chat": {"10": ["GOLD"], "20": ["GOLD"]},
+            "bot_off": [],
+        }
+        self.assertEqual(ab.destinataires_message(etat, ["10", "20", "-100"], "🥇 GOLD\nTP1 : 3900"),
+                         ["-100", "10"])
+
+    def test_arret_bot_coupe_immediatement_le_flux_prive(self):
+        etat = {"auto": {"GOLD": ["10"]}, "marches_par_chat": {"10": ["GOLD"]}, "bot_off": ["10"]}
+        self.assertEqual(ab.destinataires_message(etat, ["10"], "🥇 GOLD\nTP1 : 3900"), [])
+
+    def test_prospects_et_rappels_gratuits_sont_silencieux_sans_optin(self):
+        etat = {"prospects": ["10", "11"], "auto": {}, "bot_off": []}
+        self.assertEqual(ab.destinataires_gratuits(etat), [])
+        with mock.patch.object(ab, "TOKEN", "test"), mock.patch.object(ab, "telegram") as tg:
+            ab.envoyer_prospects(etat, "🥇 GOLD - LONG\nEntrée 3900\nTP1 3920", True)
+            ab.envoyer_differes({"differe": [{"t": 0, "c": "10", "txt": "🥇 GOLD - LONG"}]}, now=100, dodo=False)
+        tg.assert_not_called()
+
+    def test_veille_cloture_ancienne_est_retiree_si_plus_optin(self):
+        etat = {
+            "auto": {},
+            "marches_par_chat": {"10": ["GOLD"]},
+            "veille_cloture": {"GOLD": {"10": {"tf": "15 min", "dernier_t": 0}}},
+        }
+        with mock.patch.object(ab, "_envoi_sur") as send:
+            ab.notifier_clotures(etat, "GOLD", {}, {})
+        self.assertEqual(etat["veille_cloture"]["GOLD"], {})
+        send.assert_not_called()
+
+    def test_jauge_ne_cree_aucun_message_sans_optin(self):
+        etat = {"auto": {}, "marches_par_chat": {"10": ["GOLD"]}}
+        cle = {}
+        with mock.patch.object(ab, "telegram") as tg:
+            ab.maj_jauge(etat, "GOLD", {"m1": [{"c": 3900}], "confirme": 0}, cle, {"10"})
+        tg.assert_not_called()
+
+    def test_accueil_precise_que_le_coach_est_optionnel(self):
+        envoyes = []
+        etat = {"liens_marche": {}}
+        with mock.patch.object(ab, "_envoi_sur", side_effect=lambda cid, **kw: envoyes.append(kw)):
+            ab.accueil_liens(etat, "10", "GOLD")
+        self.assertIn("Aucune alerte privée avant activation du coach", envoyes[0]["text"])
+        self.assertIn("Activer le coach GOLD", envoyes[0]["reply_markup"])
+
+    def test_texte_telegram_de_preparation_ne_parle_pas_de_fibonacci(self):
+        tr = dict(d=-1, e=3900.0, sl=3910.0, tp1=3880.0, tp2=3860.0,
+                  rr=2.0, strat="SWING", src="Fibonacci 50 → 78,6 %", za=3898.0, zb=3902.0)
+        txt = ab.fmt_trade("GOLD", tr, 3901.0)
+        self.assertNotIn("Fibonacci", txt)
+
+
+if __name__ == "__main__":
+    unittest.main()
