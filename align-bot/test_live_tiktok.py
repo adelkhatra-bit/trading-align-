@@ -341,6 +341,37 @@ class LiveOutbox(unittest.TestCase):
                 ab._ETAT_COURANT["etat"] = previous
 
 
+    def test_coach_live_activation_reenables_bot_and_has_no_expiry(self):
+        market = "BTC"
+        cid = "user-42"
+        state = {"bot_off": [cid], "coach_live": {}}
+        bars = [{"t": 100}, {"t": 200}]
+        with mock.patch.object(ab, "DERNIERS", {market: {"b15": bars}}), \
+             mock.patch.object(ab.time, "time", return_value=500):
+            ab.activer_coach_live(state, cid, market, True)
+        self.assertNotIn(cid, state["bot_off"])
+        self.assertEqual(state["coach_live"][market][cid], {"dernier_t": 100})
+
+    def test_coach_live_ignores_legacy_expiry_and_keeps_monitoring(self):
+        market = "BTC"
+        cid = "user-42"
+        candle = {"t": 300, "o": 100, "h": 102, "l": 99, "c": 101}
+        state = {"coach_live": {market: {cid: {"expire": 1, "dernier_t": 0}}}}
+        sent = []
+        with mock.patch.object(ab, "bot_on", return_value=True), \
+             mock.patch.object(ab, "dans_chaine", return_value=False), \
+             mock.patch.object(ab, "_envoi_sur", side_effect=lambda *a, **kw: sent.append((a, kw)) or {"ok": True}), \
+             mock.patch.object(ab, "texte_coach_live", return_value="COACH BTC"), \
+             mock.patch.object(ab, "markup_analyse", return_value=None), \
+             mock.patch.object(ab, "positions_bot", return_value=[]), \
+             mock.patch.object(ab.time, "time", return_value=500):
+            ab.notifier_coach_live(state, market, {"b15": [candle, {"t": 600}]}, {})
+        self.assertIn(cid, state["coach_live"][market])
+        self.assertTrue(any("COACH BTC" in str(item) for item in sent))
+        self.assertFalse(any("COACH EN DIRECT TERMINÉ" in str(item) for item in sent))
+
+
+
 if __name__ == "__main__":
     unittest.main()
 
