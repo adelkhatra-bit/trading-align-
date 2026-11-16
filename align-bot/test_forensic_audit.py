@@ -87,11 +87,11 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
             trade = {"d": -1, "e": 100.0, "sl": 102.0, "tp1": 96.0, "tp2": 94.0,
                      "statut": "entree", "cree": 1000, "encore": 1, "be_dit": True}
             cle = {"trade": trade}
-            with unittest.mock.patch.object(align_bot, "manipulation"), \
-                 unittest.mock.patch.object(align_bot, "meche_suspecte"), \
-                 unittest.mock.patch.object(align_bot, "niveaux_cles"), \
-                 unittest.mock.patch.object(align_bot, "resistance_fvg"), \
-                 unittest.mock.patch.object(align_bot, "suivre_apres_sl"), \
+            with unittest.mock.patch.object(align_bot, "manipulation", return_value=None), \
+                 unittest.mock.patch.object(align_bot, "meche_suspecte", return_value=None), \
+                 unittest.mock.patch.object(align_bot, "niveaux_cles", return_value=None), \
+                 unittest.mock.patch.object(align_bot, "resistance_fvg", return_value=None), \
+                 unittest.mock.patch.object(align_bot, "suivre_apres_sl", return_value=None), \
                  unittest.mock.patch.object(align_bot, "radar_climax", return_value=None), \
                  unittest.mock.patch.object(align_bot, "retournement_marche", return_value=alert) as watch, \
                  unittest.mock.patch.object(align_bot, "alerte_retournement", return_value=None), \
