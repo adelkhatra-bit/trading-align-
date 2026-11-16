@@ -1617,7 +1617,7 @@ def alerte_repli(out, m, r, cle, d, p):
                     f"↩️ {ICONE.get(m, '')} {m} : ÇA RETRACE {'⬇️' if d == 1 else '⬆️'}\n"
                     f"📈 Rebond attendu : de ≈ {px(extreme)} vers ≈ {px(zv['za'])} – {px(zv['zb'])}\n")
                    + f"😎 Le repli qu'on attend commence\n🔜 Prochaine entrée   {SENS[d]} dans cette zone\n"
-                   + "👀 Sois patient\n🔔 Je te préviens dès qu'on y est")
+                   + "👀 Sois patient\n📡 Active le suivi si tu veux recevoir une alerte")
 
 def rejet(r, d, e, a):
     """Mèche de rejet + clôture : la dernière bougie 5 min (ou 15 min) terminée a piqué dans la zone
@@ -5518,7 +5518,8 @@ def envoyer_analyse_a(etat, cid, m, r, cle):
         utile = [l for l in lignes if l.startswith(("1️⃣", "2️⃣", "3️⃣", "4️⃣", "⏸", "⏳", "↩️", "⚡", "🕯 Prochaine"))]
         _envoi_sur(cid, reply_markup=bouton_rappel(m), text="\n".join(
             [f"😎 RIEN N'A BOUGÉ — {ICONE.get(m, '')} {m}   {px(r['m1'][-1]['c'])}",
-             f"🕒 Analyse de référence : {heure(der['t'])}"] + voyants_unites(r) + utile + [(statut_position(cle["trade"], r["m1"][-1]["c"]) if cle.get("trade") else statut_txt(0, cle.get("ordre")).strip()), "🔔 Je te préviens dès que ça change"]))
+             f"🕒 Analyse de référence : {heure(der['t'])}"] + voyants_unites(r) + utile + [(statut_position(cle["trade"], r["m1"][-1]["c"]) if cle.get("trade") else statut_txt(0, cle.get("ordre")).strip()),
+             "🔔 Je te préviens dès que ça change" if notifications_abonne(etat, cid, m) else "🔕 Aucun suivi automatique sans ton accord."]))
         # Un seul message (voyants inclus) ; l'avis IA complet reste derrière « 🧠 En savoir plus ».
         return
     armer_cloture(etat, cid, m, r, cle)
