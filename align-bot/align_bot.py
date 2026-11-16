@@ -3292,7 +3292,7 @@ IA_FOURNISSEURS = [
     ("Groq", "https://api.groq.com/openai/v1/chat/completions", os.environ.get("GROQ_MODEL") or "openai/gpt-oss-120b", os.environ.get("GROQ_API_KEY", ""), True),
     # 3) IA sans clé
     ("OVH Llama", "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions", "Meta-Llama-3_3-70B-Instruct", "", False),
-    ("OVH Mistral", "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions", "Mistral-Small-3.2-24B-Instruct", "", False),
+    ("OVH Mistral", "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions", "Mistral-Small-3.2-24B-Instruct-2506", "", False),
     ("Pollinations", "https://text.pollinations.ai/openai", "openai", "", False),
     ("LLM7", "https://api.llm7.io/v1/chat/completions", "default", "", False),
     # 4) Payants : seulement sans aucune IA gratuite disponible (OpenAI n'est actif que si une clé est fournie)
