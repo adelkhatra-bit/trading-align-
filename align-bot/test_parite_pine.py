@@ -566,5 +566,14 @@ class ParitePine(unittest.TestCase):
         expression = "dirBrut = longT >= 2 ? 1 : longT <= -2 ? -1 : zoneHaut ? 1 : zoneBas ? -1 : retHaut ? 1 : retBas ? -1 : sens"
         self.assertIn(expression, pine)
 
+    def test_mouvement_court_terme_m1_est_distinct_du_biais_de_fond(self):
+        hausse = {"m1": [{"c": float(x)} for x in (100, 101, 102, 103, 104, 105)]}
+        baisse = {"m1": [{"c": float(x)} for x in (105, 104, 103, 102, 101, 100)]}
+        stable = {"m1": [{"c": 100.0} for _ in range(6)]}
+        self.assertIn("HAUSSE", ab.mouvement_recent_m1(hausse))
+        self.assertIn("BAISSE", ab.mouvement_recent_m1(baisse))
+        self.assertIn("STABLE", ab.mouvement_recent_m1(stable))
+        self.assertIn("insuffisantes", ab.mouvement_recent_m1({"m1": [{"c": 100.0}]}))
+
 if __name__ == "__main__":
     unittest.main()
