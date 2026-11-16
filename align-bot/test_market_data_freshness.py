@@ -12,10 +12,10 @@ def snapshot(now, source, age5=120, age15=300, age1h=300, age4h=300):
     return {
         "t": now,
         "m1": [{"t": now, "c": 100.0}],
-        "b5": [{"t": now - 300 - age5, "volume_source": source}],
-        "b15": [{"t": now - 900 - age15, "volume_source": source}],
-        "b1h": [{"t": now - 3600 - age1h, "volume_source": source}],
-        "b4h": [{"t": now - 14400 - age4h, "volume_source": source}],
+        "b5": [{"t": now - 300 - age5, "o": 100.0, "h": 101.0, "l": 99.0, "c": 100.0, "v": 100.0, "volume_source": source}],
+        "b15": [{"t": now - 900 - age15, "o": 100.0, "h": 101.0, "l": 99.0, "c": 100.0, "v": 100.0, "volume_source": source}],
+        "b1h": [{"t": now - 3600 - age1h, "o": 100.0, "h": 101.0, "l": 99.0, "c": 100.0, "v": 100.0, "volume_source": source}],
+        "b4h": [{"t": now - 14400 - age4h, "o": 100.0, "h": 101.0, "l": 99.0, "c": 100.0, "v": 100.0, "volume_source": source}],
     }
 
 
