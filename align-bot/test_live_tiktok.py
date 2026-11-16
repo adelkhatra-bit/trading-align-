@@ -864,6 +864,11 @@ class LiquiditySweepReversalDetection(unittest.TestCase):
         self.assertIsNone(ab.detecter_chasse_liquidite([], 2.0))
         self.assertIsNone(ab.detecter_chasse_liquidite(self._bars("bull")[:10], 2.0))
 
+    def test_m5_early_sweep_uses_shorter_lookback(self):
+        result = ab.detecter_chasse_liquidite(self._bars("bull")[-13:], 2.0, lookback=12)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["direction"], 1)
+
 
 
 
