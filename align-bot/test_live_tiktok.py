@@ -831,6 +831,42 @@ class TestLiveBoostCallbackDispatch(unittest.TestCase):
 
 
 
+class LiquiditySweepReversalDetection(unittest.TestCase):
+    def _bars(self, side):
+        bars = []
+        for i in range(24):
+            bars.append({"t": i * 900, "o": 104.0, "h": 110.0, "l": 100.0, "c": 105.0, "v": 100.0})
+        if side == "bull":
+            bars.append({"t": 24 * 900, "o": 100.4, "h": 102.0, "l": 99.5, "c": 101.2, "v": 180.0})
+        else:
+            bars.append({"t": 24 * 900, "o": 109.6, "h": 110.5, "l": 108.0, "c": 108.8, "v": 180.0})
+        return bars
+
+    def test_bullish_false_break_reclaims_support(self):
+        result = ab.detecter_chasse_liquidite(self._bars("bull"), 2.0)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["direction"], 1)
+        self.assertEqual(result["type"], "reprise_haussiere_apres_chasse")
+        self.assertEqual(result["volume_ratio"], 1.8)
+
+    def test_bearish_false_break_rejects_resistance(self):
+        result = ab.detecter_chasse_liquidite(self._bars("bear"), 2.0)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["direction"], -1)
+        self.assertEqual(result["type"], "rejet_baissier_apres_chasse")
+
+    def test_no_reversal_when_close_stays_below_support(self):
+        bars = self._bars("bull")
+        bars[-1]["c"] = 99.8
+        self.assertIsNone(ab.detecter_chasse_liquidite(bars, 2.0))
+
+    def test_missing_or_insufficient_bars_never_invents_a_reversal(self):
+        self.assertIsNone(ab.detecter_chasse_liquidite([], 2.0))
+        self.assertIsNone(ab.detecter_chasse_liquidite(self._bars("bull")[:10], 2.0))
+
+
+
+
 class LiveMarketNarrationFallback(unittest.TestCase):
     """Regression tests for factual commentary when external AI providers fail."""
     def test_fallback_comments_all_markets_from_actual_context(self):
