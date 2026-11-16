@@ -47,9 +47,11 @@ class MarketDataFreshness(unittest.TestCase):
 
     def test_nasdaq_does_not_reuse_a_quote_cached_for_over_thirty_seconds(self):
         now = 100000.0
-        with mock.patch.dict(ab._CACHE, {"nq_live": (now - 60, 20123.0)}), \\
-             mock.patch.object(ab, "http_json", side_effect=RuntimeError("scanner down")), \\
-             mock.patch.object(ab.time, "time", return_value=now):
+        with (
+            mock.patch.dict(ab._CACHE, {"nq_live": (now - 60, 20123.0)}),
+            mock.patch.object(ab, "http_json", side_effect=RuntimeError("scanner down")),
+            mock.patch.object(ab.time, "time", return_value=now),
+        ):
             self.assertIsNone(ab.nasdaq_direct())
 
 
