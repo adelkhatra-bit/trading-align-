@@ -784,8 +784,8 @@ def calculer_analyse(S, stable=None, comp_prev=None):
     explBas = sqzC1 == 1 and sqzC == 0 and mom < 0 and bear > bull
     sigHaut = ((fortHaut or explHaut) and longT >= 1) or (zoneHaut and longT >= 0)
     sigBas = ((fortBas or explBas) and longT <= -1) or (zoneBas and longT <= 0)
-    # v24.1 (= indicateur) : la tendance des grosses UT passe AVANT une zone de retournement isolée
-    dirBrut = 1 if longT >= 2 else -1 if longT <= -2 else 1 if zoneHaut else -1 if zoneBas else 1 if retHaut else -1 if retBas else sens
+    # Parité Pine v24 : une zone de retournement valide est prioritaire ; sinon les grosses UT décident.
+    dirBrut = 1 if zoneHaut else -1 if zoneBas else 1 if longT >= 2 else -1 if longT <= -2 else 1 if retHaut else -1 if retBas else sens
     dirPlan = dirBrut if stable is None else stable
     strat_plan = strategie_alignement(dirs, dirPlan, etat_ut(w1)[0] if len(w1) >= 50 else 0)[0]
     nom = ("★ ACHAT FORT" if fortHaut else "EXPLOSION ▲" if explHaut else "ZONE DE REBOND ▲") if sigHaut else \
