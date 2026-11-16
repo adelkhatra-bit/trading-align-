@@ -4676,12 +4676,12 @@ def menu_bot(etat, cid):
     # Lecture sans écriture : ce menu peut être affiché pendant une analyse en cours.
     st = etat.get("stats_bot", {}).get(str(cid), {"arrets": 0, "auto": 0})
     _envoi_sur(cid, text=(f"🤖 MON BOT   {'▶️ ALERTES ON' if on else '🔕 ALERTES OFF'}\n━━━━━━━━━━━━\n"
-                          + ("🔔 Alertes activées sur les marchés cochés\n📩 Je te préviens aux étapes utiles du setup et de la position\n"
+                          + ("🔔 Alertes automatiques activées sur les marchés cochés\n📩 Tu peux les suspendre à tout moment et consulter sur demande\n"
                              if on else "🔕 Plus de nouvelles alertes automatiques\n📊 Tu peux demander une analyse à tout moment avec « Faire une analyse »\n")
                           + f"━━━━━━━━━━━━\n🤖 Positions suivies   {st['auto']}\n⏸ Arrêts manuels   {st['arrets']}"
                           + "\n\n" + texte_suivi(etat, cid)),
-               reply_markup=json.dumps({"inline_keyboard": [[{"text": "⏸ Arrêter mon bot", "callback_data": "botoff:x"} if on
-                                                            else {"text": "▶️ Relancer mon bot", "callback_data": "boton:x"}],
+               reply_markup=json.dumps({"inline_keyboard": [[{"text": "🔕 Suspendre les alertes", "callback_data": "botoff:x"} if on
+                                                            else {"text": "🔔 Réactiver les alertes", "callback_data": "boton:x"}],
                                                            [{"text": "📡 Choisir mes marchés", "callback_data": "marketsmenu:x"}],
                                                            [{"text": "🔔 Son pièce", "callback_data": "son:piece"}],
                                                            [bouton_plateforme(etat, cid)]]
