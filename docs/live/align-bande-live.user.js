@@ -180,7 +180,7 @@
   const voixBtn = document.createElement('button');
   voixBtn.id = 'align-live-voice';
   voixBtn.type = 'button';
-  voixBtn.textContent = '🔊 ACTIVER LA VOIX DU COACH';
+  voixBtn.textContent = '🔊 ACTIVER LE COMMENTATEUR';
   voixBtn.setAttribute('aria-pressed', 'false');
   voixBtn.title = 'Activer le commentateur vocal du live';
   voixBtn.style.cssText = 'position:fixed;right:18px;top:104px;z-index:10001;padding:11px 15px;border:2px solid #35d07f;border-radius:22px;background:linear-gradient(135deg,#123b2b,#10251f);color:#fff;font:800 13px system-ui;cursor:pointer;pointer-events:auto;box-shadow:0 0 18px rgba(53,208,127,.35)';
@@ -219,7 +219,7 @@
       voixDerniere = Date.now();
     } else {
       window.speechSynthesis.cancel();
-      voixBtn.textContent = '🔇 ACTIVER LA VOIX DU COACH';
+      voixBtn.textContent = '🔇 ACTIVER LE COMMENTATEUR';
       voixBtn.setAttribute('aria-pressed', 'false');
     }
   });
