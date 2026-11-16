@@ -3058,8 +3058,10 @@ def vue_gratuite(etat, cid):
         (PROPRIO_VUE_GRATUITE or etat.get("proprio_gratuit")) and cid in {str(x) for x in proprio(etat)})
 
 def destinataires_gratuits(etat):
-    return list(dict.fromkeys([str(c) for c in etat.get("prospects", [])]
-                              + ([str(x) for x in sorted(proprio(etat))] if (PROPRIO_VUE_GRATUITE or etat.get("proprio_gratuit")) else [])))
+    candidats = list(dict.fromkeys([str(c) for c in etat.get("prospects", [])]
+                                   + ([str(x) for x in sorted(proprio(etat))] if (PROPRIO_VUE_GRATUITE or etat.get("proprio_gratuit")) else [])))
+    # Aucun message privé automatique sans activation explicite du bot ET choix d'au moins un marché.
+    return [cid for cid in candidats if bot_on(etat, cid) and bool(marches_choisis(etat, cid))]
 
 def partage_du(etat, maintenant=None):
     """Le rappel de partage part au plus une fois par jour prévu, à heure fixe : jamais deux fois de suite."""
@@ -4687,8 +4689,8 @@ def menu_bot(etat, cid):
     # Lecture sans écriture : ce menu peut être affiché pendant une analyse en cours.
     st = etat.get("stats_bot", {}).get(str(cid), {"arrets": 0, "auto": 0})
     _envoi_sur(cid, text=(f"🤖 MON BOT   {'▶️ ON' if on else '⏸ OFF'}\n━━━━━━━━━━━━\n"
-                          + ("✅ Il entre tout seul dans chaque position\n👀 Vue 15 min • SL un peu sous / au-dessus de la mèche\n🎯 Le coach te suit jusqu'au TP\n"
-                             if on else "⏸ Il n'entre plus pour toi\n🔔 Tu reçois quand même les positions\n")
+                          + ("✅ Suivi privé activé uniquement pour tes marchés sélectionnés\n👀 Vue 15 min • SL sous / au-dessus de la mèche\n🎯 Le coach suit le TP si tu l'actives\n"
+                             if on else "⏸ Aucun message privé automatique tant que tu ne l'actives pas\n📡 Choisis d'abord tes marchés, puis active le suivi\n")
                           + f"━━━━━━━━━━━━\n🤖 Positions prises par ton bot   {st['auto']}\n⏸ Arrêts manuels   {st['arrets']}"
                           + "\n\n" + texte_suivi(etat, cid)),
                reply_markup=json.dumps({"inline_keyboard": [[{"text": "⏸ Arrêter mon bot", "callback_data": "botoff:x"} if on
@@ -4725,7 +4727,7 @@ def regler_bot(etat, cid, on):
         _envoi_sur(cid, reply_markup=CLAVIER_VISITEUR, text=txt)
         return
     _envoi_sur(cid, reply_markup=CLAVIER, text=("▶️ Ton bot est relancé\n🤖 Il entre tout seul dans la prochaine position" if on
-                                                else "⏸ Ton bot est arrêté\n🔔 Tu reçois toujours les positions\n▶️ Relance-le avec 🤖 Mon bot"))
+                                                else "⏸ Ton bot est arrêté\n🔕 Aucun message privé automatique\n▶️ Réactive-le avec 🤖 Mon bot"))
 
 def entrer_inscrits(etat, m, tr, chats=()):
     """Le bot vient d'entrer : il fait entrer automatiquement tous les membres dont le bot est ON,
@@ -7689,8 +7691,7 @@ def envoyer_differes(etat, now=None, dodo=True):
                     print("dodo", cid, ex)
 
 def envoyer_prospects(etat, texte, signal, clavier=None):
-    """GRATUIT (visiteurs + propriétaire en vue gratuite) : 1 position proposée par jour si le bot est ON,
-    sinon un simple avis masqué quand une position sort. Jamais de news ni d'analyse : c'est le VIP."""
+    """Message privé gratuit uniquement après opt-in explicite et choix du marché. Bot OFF = aucun message privé automatique."""
     entree = signal and est_entree(texte)
     jour = datetime.datetime.now(PARIS).strftime("%Y-%m-%d")
     if etat.get("offerte_jour") != jour:           # 1 position GRATUITE par jour : on remet les compteurs à zéro
@@ -8055,15 +8056,15 @@ def marche_du_message(texte):
     return None if not ens else (next(iter(ens)) if len(ens) == 1 else "BOTH")
 
 def destinataires_message(etat, chats, texte):
-    # Le flux complet (news, analyses, toutes les positions) part dans la chaîne VIP (commune : tous les marchés).
-    # Chaque personne ne reçoit EN PRIVÉ que les marchés qu'elle a cochés (filtrage ligne par ligne au moment de l'envoi, voir filtrer_texte_par_marches).
+    # Le flux commun reste dans la chaîne. En privé : opt-in explicite du bot + marché sélectionné obligatoires.
     ens = marches_message(texte)
     if etat.get("canal"):
         prives = [str(c) for c in chats if not vue_gratuite(etat, c) and str(c) != str(etat["canal"])
-                  and etat.get("marches_par_chat", {}).get(str(c)) is not None and ens
-                  and ens & marches_choisis(etat, c)]
+                  and bot_on(etat, c) and etat.get("marches_par_chat", {}).get(str(c)) is not None
+                  and bool(marches_choisis(etat, c)) and (not ens or bool(ens & marches_choisis(etat, c)))]
         return sorted(set([str(etat["canal"])] + prives))
-    cibles = [str(c) for c in chats if not ens or bool(ens & marches_choisis(etat, c))]
+    cibles = [str(c) for c in chats if bot_on(etat, c) and bool(marches_choisis(etat, c))
+              and (not ens or bool(ens & marches_choisis(etat, c)))]
     return sorted(set(cibles))
 
 def destinataires(etat, chats):
