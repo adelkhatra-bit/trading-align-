@@ -316,7 +316,16 @@
     // si une fenêtre / un menu TradingView est ouvert, la bande et les pastilles se cachent ; la pub « Go Pro » est fermée toute seule
     if (now - (anim.vu || 0) > 400) { anim.vu = now; try {
       const pub = document.querySelector('[data-dialog-name="gopro"] button[aria-label="Fermeture"]'); if (pub) pub.click();
-      document.documentElement.classList.toggle('align-cache', !!document.querySelector('[role="dialog"], [data-dialog-name], [data-name="menu-inner"]'));
+      // Ne masquer le spectacle que lorsqu'un vrai dialogue/menu est visible à l'écran.
+      // TradingView conserve des conteneurs [data-dialog-name] cachés dans le DOM : leur simple présence ne doit jamais couper le live.
+      const overlayVisible = el => {
+        if (!el || !el.isConnected || el.closest('[aria-hidden="true"]')) return false;
+        const st = getComputedStyle(el), r = el.getBoundingClientRect();
+        return st.display !== 'none' && st.visibility !== 'hidden' && Number(st.opacity || 1) > 0.01
+          && r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth;
+      };
+      const overlayOuvert = Array.from(document.querySelectorAll('[role="dialog"], [data-dialog-name], [data-name="menu-inner"]')).some(overlayVisible);
+      document.documentElement.classList.toggle('align-cache', overlayOuvert);
     } catch (e) {} }
     raf = requestAnimationFrame(anim);
   }
