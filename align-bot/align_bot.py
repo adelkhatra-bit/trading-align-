@@ -8025,8 +8025,10 @@ def marche_du_message(texte):
     return None if not ens else (next(iter(ens)) if len(ens) == 1 else "BOTH")
 
 def coach_abonne(etat, cid, marche=None):
-    """Le choix d'un marché ne vaut PAS consentement : seul le bouton « Coach : préviens-moi » inscrit dans auto."""
+    """Le choix d'un marché ne vaut PAS consentement : seul le bouton Coach inscrit dans auto, si le bot n'est pas arrêté."""
     cid = str(cid)
+    if cid in {str(x) for x in etat.get("bot_off", [])}:
+        return False
     suivis = etat.get("auto") or {}
     if marche in MARCHES:
         valeurs = suivis.get(marche) or []
