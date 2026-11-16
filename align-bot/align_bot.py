@@ -9684,7 +9684,7 @@ def agent(m, r, cle, ferme):
             return out
         # ── Entrée sur CASSURE confirmée (clôture 5 min au-delà du niveau) ──
         pc = plan_cassure(r, d)
-        if pc and pc["t15"] != cle.get("cassure_t") and not r.get("annonce"):
+        if pc and pc.get("rr", 0) >= GAIN_MIN and pc["t15"] != cle.get("cassure_t") and not r.get("annonce"):
             cle["cassure_t"] = pc["t15"]
             tr = dict(pc, statut="entree", cree=r["t"], encore=0, atr_e=r["atr"], sl0=pc.get("sl"))
             tr["profil"] = profil_trade(m, tr, r)
