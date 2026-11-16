@@ -11344,7 +11344,7 @@ def commentaires_live_de_secours(donnees):
         etiquette_volume = "le volume Kraken" if marche == "BTC" else "le volume proxy"
         etiquette_volume_en = "Kraken volume" if marche == "BTC" else "proxy volume"
         if not isinstance(volume, (int, float)):
-            flux, flux_en = "volume indisponible", "volume unavailable"
+            flux, flux_en = "volume indisponible", "volume is unavailable"
         elif volume >= 1.5:
             flux, flux_en = f"{etiquette_volume} accélère", f"{etiquette_volume_en} is picking up"
         elif volume <= 0.7:
