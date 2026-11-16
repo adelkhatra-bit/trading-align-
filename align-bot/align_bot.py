@@ -547,6 +547,14 @@ def direction_confirmee_marche(m, dirs, d, contexte=None, now_ts=None):
                 return 0
     return d
 
+
+def direction_plan_autorisee(m, d, dirs, contexte=None):
+    """Le plan affiché suit le même garde-fou que les entrées : clôtures M5/M15/H1/H4 + flux frais pour Gold/Nasdaq."""
+    if m in ("GOLD", "NASDAQ"):
+        return d if direction_confirmee_marche(m, dirs, d, contexte) == d else 0
+    return d
+
+
 def pivots(b, g=5):
     hs, ls = [], []
     for i in range(g, len(b) - g):
@@ -893,6 +901,12 @@ def calculer_analyse(S, stable=None, comp_prev=None, market=None):
     # Parité Pine v24 : une zone de retournement valide est prioritaire ; sinon les grosses UT décident.
     dirBrut = 1 if zoneHaut else -1 if zoneBas else 1 if longT >= 2 else -1 if longT <= -2 else 1 if retHaut else -1 if retBas else sens
     dirPlan = dirBrut if stable is None else stable
+    ctx_live = None
+    if market in ("GOLD", "NASDAQ"):
+        ctx_live = {"m1": m1, "b5": m5, "b15": m15[-30:], "b1h": h1[-30:], "b4h": h4[-30:],
+                    "atr5": atr(m5[:-1], 14)[-1] if len(m5) >= 16 else 0}
+        # Même règle que Pine v25 : aucun plan directionnel exploitable avant les quatre clôtures et un flux frais.
+        dirPlan = direction_plan_autorisee(market, dirPlan, dirs_cloturees, ctx_live)
     dirs_strategie = dirs_cloturees if market in ("GOLD", "NASDAQ") else dirs
     strat_plan = strategie_alignement(dirs_strategie, dirPlan, dW_signal, market)[0]
     nom = ("★ ACHAT FORT" if fortHaut else "EXPLOSION ▲" if explHaut else "ZONE DE REBOND ▲") if sigHaut else \
@@ -902,9 +916,7 @@ def calculer_analyse(S, stable=None, comp_prev=None, market=None):
     # BTC conserve sa règle historique. GOLD/NASDAQ : seules les clôtures M5/M15/H1/H4 concordantes arment une direction.
     if market in ("GOLD", "NASDAQ"):
         d1c, d4c = dirs_cloturees[7], dirs_cloturees[9]
-        ctx_live = {"m1": m1, "b5": m5, "b15": m15[-30:], "b1h": h1[-30:], "b4h": h4[-30:],
-                    "atr5": atr(m5[:-1], 14)[-1] if len(m5) >= 16 else 0}
-        confirme = direction_confirmee_marche(market, dirs_cloturees, d4c, ctx_live) if d4c != 0 and d1c == d4c else 0
+        confirme = dirPlan if dirPlan and d1c == dirPlan and d4c == dirPlan else 0
     else:
         confirme = d4h if d4h != 0 and d1h == d4h else 0
     # Contexte Daily / Weekly : où est le prix dans sa zone (0 = tout en bas, 1 = tout en haut)
