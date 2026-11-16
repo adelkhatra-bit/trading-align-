@@ -7668,7 +7668,7 @@ def envoyer_differes(etat, now=None, dodo=True):
     rang = [[{"text": "💎 Devenir VIP", "url": etat["lien"]}]] if etat.get("lien") else []
     for x in prets[:20]:
         marche_differee = next(iter(marches_du_message(x.get("txt", ""))), None)
-        if not marche_differee or not notifications_actives(etat, x.get("c", ""), marche_differee):
+        if not marche_differee or not notifications_abonne(etat, x.get("c", ""), marche_differee):
             continue
         try:
             telegram("sendMessage", chat_id=x["c"], text=(
