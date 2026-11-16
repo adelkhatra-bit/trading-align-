@@ -139,6 +139,8 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn("live-data/live.json", self.js)
         self.assertIn("synchroniserEtatBot()", self.js)
         self.assertIn("item.etat === 'entree'", self.js)
+        self.assertIn("POSITION ALIGN ACTIVE SUR", self.js)
+        self.assertIn("const botEtatConnu = {}", self.js)
         self.assertIn("clearInterval(botEtatSyncT)", self.js)
 
 
