@@ -4831,13 +4831,13 @@ def regler_bot(etat, cid, on):
         dedans = en_position(etat, cid)
         txt = (("✅ C'est noté : je te propose la prochaine position" if str(cid) not in etat.get("bienvenue", {})
                 else "✅ C'est noté\n🎁 Ta position du jour est déjà utilisée : la prochaine demain") if on else
-               "⏸ C'est noté : aucune notification privée ne sera envoyée\n▶️ Réactive quand tu veux : 🤖 Mon bot")
+               "⏸ C'est noté : aucune nouvelle alerte marché\n🎯 Le suivi d'une position déjà acceptée continue jusqu'à sa clôture\n▶️ Réactive quand tu veux : 🤖 Mon bot")
         if dedans:
             txt += f"\n🎯 Ta position {', '.join(dedans)} reste suivie jusqu'au TP / SL"
         _envoi_sur(cid, reply_markup=CLAVIER_VISITEUR, text=txt)
         return
     _envoi_sur(cid, reply_markup=CLAVIER, text=("▶️ Ton bot est relancé\n🤖 Il entre tout seul dans la prochaine position" if on
-                                                else "⏸ Ton bot est arrêté\n🔕 Aucune notification privée ne sera envoyée\n▶️ Relance-le avec 🤖 Mon bot"))
+                                                else "⏸ Ton bot est arrêté\n🔕 Aucune nouvelle alerte marché\n🎯 Les positions déjà acceptées restent suivies jusqu'à clôture\n▶️ Relance-le avec 🤖 Mon bot"))
 
 def entrer_inscrits(etat, m, tr, chats=()):
     """Le bot vient d'entrer : il fait entrer automatiquement tous les membres dont le bot est ON,
@@ -4946,7 +4946,7 @@ def texte_prix_topstep(m, tr, prix_graphique, prix_fut):
 def prix_topstep_inscrits(etat, m, tr, prix_graphique):
     """Envoie les niveaux Topstep à ceux qui ont choisi « Topstep » (le prix du contrat est lu en direct sur l'API)."""
     qui = [c for c, v in (etat.get("plateforme") or {}).items()
-           if v in ("topstep", "deux") and bot_on(etat, c) and marche_autorise(etat, c, m)
+           if v in ("topstep", "deux") and marche_autorise(etat, c, m)
            and (coach_abonne(etat, c, m)
                 or (isinstance((tr.get("qui") or {}).get(str(c)), dict)
                     and not (tr.get("qui") or {}).get(str(c), {}).get("fini")))]
