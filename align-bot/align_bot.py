@@ -4847,7 +4847,11 @@ def texte_prix_topstep(m, tr, prix_graphique, prix_fut):
 
 def prix_topstep_inscrits(etat, m, tr, prix_graphique):
     """Envoie les niveaux Topstep à ceux qui ont choisi « Topstep » (le prix du contrat est lu en direct sur l'API)."""
-    qui = [c for c, v in (etat.get("plateforme") or {}).items() if v in ("topstep", "deux") and coach_abonne(etat, c, m) and marche_autorise(etat, c, m)]
+    qui = [c for c, v in (etat.get("plateforme") or {}).items()
+           if v in ("topstep", "deux") and marche_autorise(etat, c, m)
+           and (coach_abonne(etat, c, m)
+                or (isinstance((tr.get("qui") or {}).get(str(c)), dict)
+                    and not (tr.get("qui") or {}).get(str(c), {}).get("fini")))]
     if not qui or not topstep_trade:
         return 0
     try:
