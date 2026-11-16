@@ -1964,10 +1964,9 @@ def verdict(r, cle):
         if r.get("market") in ("GOLD", "NASDAQ"):
             attente = prochaine(r, cle).replace("🔜 Prochaine entrée", "⏳ En attente")
             return ("🔴🔴 N'ENTRE PAS", attente + "\n🔔 Je te préviens dès que les clôtures et le cours valident l'entrée")
-        # BTC conserve son explication historique H4 / H1.
-        if not (r.get("dirs_cloturees") or r.get("dirs") or [0] * 11)[9]:
-            return ("🔴🔴 N'ENTRE PAS", "⏳ La 4 h est neutre : pas de direction LONG ni SHORT\n🔔 Je te préviens dès que c'est validé")
-        return ("🔴🔴 N'ENTRE PAS", "⏳ Le 1h ne confirme pas la tendance 4h\n🔔 Je te préviens dès que c'est validé")
+        # BTC conserve le filtre H1/H4, désormais lu sur des bougies clôturées et cohérent avec le setup.
+        attente = prochaine(r, cle)
+        return ("🔴🔴 N'ENTRE PAS", "⏳ " + attente.replace("🔜 Prochaine entrée : ", "") + "\n🔔 Je te préviens dès que le setup est confirmé")
     if etire(r, al):
         return ("⛔ TROP TARD — le marché est déjà parti", "😎 Patience, on trouve une autre entrée\n" + prochaine(r, cle))
     if bloque_dw(r, al, r["m1"][-1]["c"]) or (not cle.get("ordre") and bloque_dw(r, al, zone_repli(r, al)["e"])):
@@ -4730,6 +4729,8 @@ def raison_attente(r, cle):
         return f"La tendance {sens} est confirmée, mais le mouvement est déjà trop étendu. Je n'achète/vends pas au prix actuel : j'attends un repli."
     if bloque_dw(r, d, r.get("m1", [{}])[-1].get("c") if r.get("m1") else None):
         return f"La tendance {sens} existe, mais le prix est dans une zone Daily/Weekly extrême. J'attends un meilleur prix ou un retournement confirmé."
+    if r.get("market") == "BTC" and r.get("dirPlan") != d4h:
+        return f"Les clôtures H4/H1 indiquent {sens}, mais aucun setup BTC n'est confirmé dans ce sens. Je n'anticipe pas."
     if not o:
         return f"La direction {sens} est confirmée, mais aucun point d'entrée propre n'est encore validé. J'attends que le prix construise un repli exploitable."
     d = o.get("d", d)
@@ -11164,8 +11165,12 @@ def contexte_technique_live(derniers):
             "biais_plan": biais,
             "confirmation_4h_1h": "alignées à la hausse" if len(dirs) > 9 and dirs[7] == dirs[9] == 1 else
                                   "alignées à la baisse" if len(dirs) > 9 and dirs[7] == dirs[9] == -1 else "non alignées",
-            "confirmation_m5_m15_h1_h4": "quatre clôtures alignées à la hausse" if confirmation_complete else
-                                         "quatre clôtures alignées à la baisse" if confirmation_complete_short else "quatre clôtures non alignées",
+            "confirmation_m5_m15_h1_h4": (
+                "filtre non requis sur BTC : H1/H4 clôturées uniquement"
+                if marche == "BTC" else
+                "quatre clôtures alignées à la hausse" if confirmation_complete else
+                "quatre clôtures alignées à la baisse" if confirmation_complete_short else "quatre clôtures non alignées"
+            ),
             "lecture_mtf_cloturee": {
                 "M5": dirs[2] if len(dirs) > 2 else 0,
                 "M15": dirs[4] if len(dirs) > 4 else 0,
