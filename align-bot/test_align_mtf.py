@@ -416,7 +416,7 @@ class AlignMtfRulesTest(unittest.TestCase):
 
     def test_multi_timeframe_watcher_only_notifies_the_blocking_timeframe(self):
         from unittest.mock import patch
-        state = {"veille_cloture": {"GOLD": {"123": {
+        state = {"auto": {"GOLD": ["123"]}, "veille_cloture": {"GOLD": {"123": {
             "multi": True, "derniers_t": {"5m": 300, "15m": 900, "1h": 3600, "4h": 14400},
             "expire": 999999
         }}}}
@@ -442,7 +442,7 @@ class AlignMtfRulesTest(unittest.TestCase):
 
     def test_multi_timeframe_watcher_retries_when_telegram_send_fails(self):
         from unittest.mock import patch
-        state = {"veille_cloture": {"GOLD": {"123": {
+        state = {"auto": {"GOLD": ["123"]}, "veille_cloture": {"GOLD": {"123": {
             "multi": True, "derniers_t": {"5m": 300, "15m": 900, "1h": 3600, "4h": 14400},
             "expire": 999999
         }}}}
@@ -701,7 +701,7 @@ class AlignMtfRulesTest(unittest.TestCase):
 
     def test_closed_candle_notifier_sends_once_per_new_candle(self):
         from unittest.mock import patch
-        state = {"veille_cloture": {"BTC": {"123": {"tf": "5m", "dernier_t": 300, "restants": 1}}}}
+        state = {"auto": {"BTC": ["123"]}, "veille_cloture": {"BTC": {"123": {"tf": "5m", "dernier_t": 300, "restants": 1}}}}
         r = {"b5": [candle(300), candle(600, o=100, h=103, l=99, c=102)],
              "confirme": 0, "dirs": [0] * 11, "rsis": [50] * 11}
         with patch.object(align_bot, "verdict", return_value=("ATTENDRE", "pas de confirmation")), \
@@ -2245,7 +2245,8 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
         self.assertTrue(align_bot.marche_autorise(state, "202", "GOLD"))
 
     def test_market_message_routing_keeps_btc_and_gold_separate(self):
-        state = {"marches_par_chat": {"101": "BTC", "202": "GOLD", "303": "BOTH"}, "canal": "-1000"}
+        state = {"marches_par_chat": {"101": "BTC", "202": "GOLD", "303": "BOTH"},
+                 "auto": {"BTC": ["101", "303"], "GOLD": ["202", "303"]}, "canal": "-1000"}
         chats = {"101", "202", "303"}
         btc = align_bot.destinataires_message(state, chats, "🟠 BTC — SIGNAL EN ATTENTE\\nPrix 70000")
         gold = align_bot.destinataires_message(state, chats, "🥇 GOLD — SIGNAL CONFIRMÉ\\nPrix 4000")
@@ -2329,17 +2330,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
             align_bot.envoyer_prospects(state, "📰 NEWS USA DANS 1 H", False)
             self.assertEqual(tg.call_count, 0)          # plus de news côté gratuit
             align_bot.envoyer_prospects(state, entree, True)
-            textes = {c.kwargs["chat_id"]: c.kwargs["text"] for c in tg.call_args_list}
-            self.assertIn("POSITION GRATUITE DU JOUR", textes["7"])
-            self.assertIn("POSITION GRATUITE DU JOUR", textes["1"])   # le propriétaire voit le gratuit
-            tg.reset_mock()
-            state["GOLD"]["trade"]["cree"] = 6
-            align_bot.envoyer_prospects(state, entree, True)
-            self.assertIn("🔒", tg.call_args_list[0].kwargs["text"])
-            self.assertNotIn("3990", tg.call_args_list[0].kwargs["text"])
-            tg.reset_mock()
-            align_bot.envoyer_prospects(state, entree, True)
-            self.assertEqual(tg.call_count, 0)          # pas deux fois le même avis
+            self.assertEqual(tg.call_count, 0)          # aucune position gratuite poussée automatiquement
 
     @unittest.mock.patch.object(align_bot, "TOUT_GRATUIT", False)   # ancien modèle (1 position offerte puis masquée), gardé pour plus tard
     def test_free_bot_off_gets_only_masked_and_respects_market(self):
@@ -2347,8 +2338,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
         state = {"prospects": ["7", "8"], "bot_off": ["7"], "marches_par_chat": {"8": "BTC"}, "GOLD": {"trade": {"cree": 5}}}
         with patch.object(align_bot, "telegram") as tg, patch.object(align_bot, "PROPRIO_VUE_GRATUITE", False):
             align_bot.envoyer_prospects(state, "🥇 GOLD — J'ENTRE MAINTENANT\nEntrée 3990.50", True)
-        self.assertEqual([c.kwargs["chat_id"] for c in tg.call_args_list], ["7"])
-        self.assertIn("OFF", tg.call_args_list[0].kwargs["text"])
+        self.assertEqual(tg.call_count, 0)          # aucun teaser automatique, même bot OFF
 
     def test_share_reminder_once_per_planned_day(self):
         import datetime
@@ -2361,7 +2351,8 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
 
     def test_mixed_market_macro_alert_goes_to_each_concerned_account_with_only_its_markets(self):
         """Règle remplacée (demande d'Adel) : un message multi-marchés arrive à chaque compte concerné, mais réduit à SES marchés cochés."""
-        state = {"marches_par_chat": {"101": "BTC", "202": "GOLD", "303": "BOTH", "404": ["NASDAQ"]}}
+        state = {"marches_par_chat": {"101": "BTC", "202": "GOLD", "303": "BOTH", "404": ["NASDAQ"]},
+                 "auto": {"BTC": ["101", "303"], "GOLD": ["202", "303"]}}
         texte = "💵 DOLLAR EN FORTE HAUSSE\n🥇 GOLD : prudence\n🟠 BTC : prudence"
         recipients = align_bot.destinataires_message(state, {"101", "202", "303", "404"}, texte)
         self.assertEqual(set(recipients), {"101", "202", "303"})                  # 404 (NASDAQ seul) n'est pas concerné
@@ -2555,7 +2546,7 @@ class TestFollowPositionMarketChoice(unittest.TestCase):
     def test_followmarket_gold_sets_exclusive_preference_and_clears_stale_btc_watch(self):
         from unittest.mock import patch
         state = {
-            "auto": {"BTC": ["101", "202"], "GOLD": []},
+            "auto": {"BTC": ["101", "202"], "GOLD": ["101", "202"]},
             "veille_cloture": {"BTC": {"101": {"multi": True}, "202": {"multi": True}}},
             "marches_par_chat": {"101": "BOTH"}
         }
@@ -3036,12 +3027,13 @@ class TestTelegramFloodProtection(unittest.TestCase):
     def test_gauge_is_edited_at_most_once_per_minute(self):
         from unittest.mock import patch
         cle = {"jauge": {"1": 5}, "jauge_txt": {"1": "old"}, "jauge_t": {"1": 1000.0}}
+        state = {"auto": {"GOLD": ["1"]}}
         with patch.object(align_bot, "jauge", side_effect=["p1", "p2", "p3"]), \
              patch.object(align_bot, "marche_autorise", return_value=True), \
              patch.object(align_bot.time, "time", side_effect=[1010.0, 1059.0, 1061.0, 1061.0]), \
              patch.object(align_bot, "telegram") as tg:
             for _ in range(3):
-                align_bot.maj_jauge({}, "GOLD", {}, cle, {"1"})
+                align_bot.maj_jauge(state, "GOLD", {}, cle, {"1"})
         edits = [c for c in tg.call_args_list if c.args[0] == "editMessageText"]
         self.assertEqual(len(edits), 1)
         self.assertEqual(edits[0].kwargs["text"], "p3")
@@ -3387,3 +3379,106 @@ class TestMessagesPropres(unittest.TestCase):
         r["dirs"][:5] = [-1, -1, -1, -1, -1]
         self.assertIsNone(align_bot.alerte_retournement("BTC", r, tr))
         self.assertNotIn("ret_dit", tr)
+
+
+
+class TelegramExplicitCoachOptInTest(unittest.TestCase):
+    def test_private_broadcast_requires_explicit_coach_per_market(self):
+        state = {"marches_par_chat": {"11": "BTC", "22": "GOLD", "33": "BOTH"},
+                 "auto": {"BTC": ["11", "33"]}}
+        chats = {"11", "22", "33"}
+        self.assertEqual(set(align_bot.destinataires_message(state, chats, "🟠 BTC — SIGNAL LONG")), {"11", "33"})
+        self.assertEqual(align_bot.destinataires_message(state, chats, "🥇 GOLD — SIGNAL SHORT"), [])
+
+    def test_private_global_broadcast_is_never_sent(self):
+        state = {"auto": {"BTC": ["11"], "GOLD": ["11"], "NASDAQ": ["11"]}}
+        self.assertEqual(align_bot.destinataires_message(state, {"11"}, "📅 Calendrier du jour"), [])
+
+    def test_bot_off_revokes_private_broadcast_even_if_coach_is_active(self):
+        state = {"auto": {"BTC": ["11"]}, "bot_off": ["11"]}
+        self.assertEqual(align_bot.destinataires_message(state, {"11"}, "🟠 BTC — SIGNAL LONG"), [])
+
+    def test_daily_checkin_sends_once_per_paris_day(self):
+        now = datetime.datetime(2026, 11, 16, 9, 0, tzinfo=align_bot.PARIS).timestamp()
+        state = {}
+        sent = []
+        def fake_send(cid, **kwargs):
+            sent.append((str(cid), kwargs))
+            return {"ok": True, "result": {"message_id": len(sent)}}
+        with unittest.mock.patch.object(align_bot, "_envoi_sur", side_effect=fake_send):
+            align_bot.question_quotidienne(state, {"11", "22"}, now)
+            align_bot.question_quotidienne(state, {"11", "22"}, now + 300)
+            align_bot.question_quotidienne(state, {"11", "22"}, now + 86400)
+        self.assertEqual([x[0] for x in sent], ["11", "22", "11", "22"])
+        self.assertIn("trade:yes", sent[0][1]["reply_markup"])
+        self.assertIn("trade:no", sent[0][1]["reply_markup"])
+
+    def test_free_position_push_and_delayed_queue_are_disabled(self):
+        state = {"differe": [{"t": 0, "c": "11", "txt": "old signal"}]}
+        with unittest.mock.patch.object(align_bot, "telegram") as tg:
+            align_bot.envoyer_prospects(state, "🟠 BTC — LONG", True)
+            result = align_bot.envoyer_differes(state, now=9999999999)
+        self.assertEqual(result, 0)
+        self.assertEqual(state["differe"], [])
+        tg.assert_not_called()
+
+
+    def test_position_auto_enrollment_only_includes_explicit_coach_subscribers(self):
+        state = {"marches_par_chat": {"11": "BTC", "22": "BTC"}, "auto": {"BTC": ["22"]}}
+        trade = {"d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "qui": {}}
+        with unittest.mock.patch.object(align_bot, "_envoi_sur", return_value={"ok": True}):
+            align_bot.entrer_inscrits(state, "BTC", trade, {"11", "22"})
+        self.assertEqual(set(trade["qui"]), {"22"})
+
+    def test_pause_purges_pending_telegram_alerts_for_that_user_only(self):
+        state = {"telegram_outbox": [
+            {"chat_id": "11", "params": {"text": "old signal"}},
+            {"chat_id": 22, "params": {"text": "other user"}},
+            {"chat_id": 11, "params": {"text": "old coach update"}},
+        ]}
+        removed = align_bot.purger_messages_en_attente(state, "11")
+        self.assertEqual(removed, 2)
+        self.assertEqual([x["chat_id"] for x in state["telegram_outbox"]], [22])
+
+    def test_daily_checkin_skips_active_coach_and_open_positions(self):
+        now = datetime.datetime(2026, 11, 16, 9, 0, tzinfo=align_bot.PARIS).timestamp()
+        state = {
+            "auto": {"BTC": ["11"]},
+            "BTC": {"trade": {"qui": {"22": {"e": 100, "d": 1, "fini": False}}}}
+        }
+        sent = []
+        with unittest.mock.patch.object(align_bot, "_envoi_sur",
+                                        side_effect=lambda cid, **kw: sent.append(str(cid)) or {"ok": True}):
+            align_bot.question_quotidienne(state, {"11", "22", "33"}, now)
+        self.assertEqual(sent, ["33"])
+
+    def test_tp_closes_bot_and_asks_before_next_position(self):
+        state = {
+            "auto": {"BTC": ["11"], "GOLD": ["11"], "NASDAQ": []},
+            "BTC": {"trade": {"qui": {"11": {"e": 100.0, "d": 1, "fini": False}}}},
+            "bot_off": []
+        }
+        sent = []
+        with unittest.mock.patch.object(align_bot, "_envoi_sur",
+                                        side_effect=lambda cid, **kw: sent.append(kw) or {"ok": True}):
+            align_bot.noter(state, "11", "BTC", state["BTC"]["trade"]["qui"]["11"], 104.0, "TP1 touché")
+        self.assertIn("11", state["bot_off"])
+        self.assertTrue(all("11" not in state["auto"][m] for m in align_bot.MARCHES))
+        self.assertEqual(len(sent), 1)
+        self.assertIn("next:yes", sent[0]["reply_markup"])
+        self.assertIn("rechercher une autre position", sent[0]["text"])
+
+    def test_tp_keeps_monitoring_other_open_market_without_restart_prompt(self):
+        state = {
+            "auto": {"BTC": ["11"], "GOLD": ["11"]},
+            "BTC": {"trade": {"qui": {"11": {"e": 100.0, "d": 1, "fini": False}}}},
+            "GOLD": {"trade": {"qui": {"11": {"e": 200.0, "d": -1, "fini": False}}}},
+            "bot_off": []
+        }
+        sent = []
+        with unittest.mock.patch.object(align_bot, "_envoi_sur",
+                                        side_effect=lambda cid, **kw: sent.append(kw) or {"ok": True}):
+            align_bot.noter(state, "11", "BTC", state["BTC"]["trade"]["qui"]["11"], 104.0, "TP1 touché")
+        self.assertNotIn("11", state["bot_off"])
+        self.assertIn("Suivi maintenu uniquement sur : GOLD", sent[0]["text"])
+        self.assertNotIn("next:yes", sent[0]["reply_markup"])

@@ -78,7 +78,7 @@ class Sessions(unittest.TestCase):
             ab.alertes_courtes(etat, set(), {}, utc(2026, 11, 11, 14, 26))      # palier 5 : VIP seulement
             ab.alertes_courtes(etat, set(), {}, utc(2026, 11, 11, 23, 45))      # Tokyo : VIP seulement
         gratuit = [t for c, t in envois if c == "900"]
-        self.assertEqual(len(gratuit), 1); self.assertIn("Wall Street", gratuit[0])
+        self.assertEqual(gratuit, [])  # aucune alerte privée automatique
         self.assertGreaterEqual(len([1 for c, _ in envois if c == "canal"]), 3)
 
 
@@ -200,12 +200,7 @@ class EvenementsPine(unittest.TestCase):
         with patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append((str(c), k["text"]))), patch.object(ab, "bot_on", return_value=True):
             ab.alerte_gratuite_preparation(etat, "🔔 JE PRÉPARE UNE POSITION — 🥇 GOLD\n🟩 LONG ⬆️ monte\n📌 Entrée : 4012,5")
             ab.alerte_gratuite_preparation(etat, "⚡⚡ PRÉPARE-TOI — 🥇 GOLD\n4012,5")
-        self.assertEqual([c for c, _ in envois], ["900"])                                      # 901 n'a coché que BTC ; 2e appel < 30 min : rien
-        txt = envois[0][1]
-        for interdit in ("LONG", "SHORT", "4012", "Entrée", "SL", "TP"):
-            self.assertNotIn(interdit, txt)
-        self.assertIn("VIP", txt); self.assertLessEqual(len(txt.split("\n")), 4)
-        ab.alerte_gratuite_preparation({}, "🔔 Autre message")                                  # message non lié : aucun envoi
+        self.assertEqual(envois, [])  # les teasers privés gratuits sont désactivés
 
     def test_news_notice_is_15_minutes_vip_only_and_old_opening_block_removed(self):
         import inspect

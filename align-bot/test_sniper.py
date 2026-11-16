@@ -199,7 +199,7 @@ class SensDansLeGratuit(unittest.TestCase):
         etat = {"prospects": ["900"]}
         with patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append(k["text"])), patch.object(ab, "bot_on", return_value=True):
             ab.alerte_gratuite_preparation(etat, "🔔 JE PRÉPARE UNE POSITION — 🥇 GOLD\n🟥 SHORT ⬇️ descend\n📌 Entrée : 4012,5")
-        self.assertIn("Biais : baissier", envois[0]); self.assertNotIn("4012", envois[0]); self.assertNotIn("SHORT", envois[0])
+        self.assertEqual(envois, [])  # aucun teaser privé automatique
 
     def test_live_page_json_still_has_the_bias(self):
         etat = {}
