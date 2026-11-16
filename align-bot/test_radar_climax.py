@@ -48,3 +48,50 @@ class RadarBranche(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RetournementPrecocePetitesUnites(unittest.TestCase):
+    def test_micro_reversal_emits_long_then_short_watch_without_entries(self):
+        dirs = [0] * 11
+        dirs[2], dirs[4], dirs[7], dirs[9] = 1, -1, -1, -1
+        r = {"retHaut": True, "retBas": False, "dirs_cloturees": dirs,
+             "b15": [{"t": 12345}]}
+        cle = {}
+        long_msg = ab.alerte_retournement_micro("GOLD", r, cle)
+        self.assertIn("PRÉ-ALERTE RETOURNEMENT LONG", long_msg)
+        self.assertIn("aucune position", long_msg.lower())
+        self.assertIn("H4", long_msg)
+        self.assertIsNone(ab.alerte_retournement_micro("GOLD", r, cle))
+
+        r["retHaut"] = False
+        self.assertIsNone(ab.alerte_retournement_micro("GOLD", r, cle))
+        r["retBas"] = True
+        short_msg = ab.alerte_retournement_micro("GOLD", r, cle)
+        self.assertIn("PRÉ-ALERTE RETOURNEMENT SHORT", short_msg)
+        self.assertIn("aucune position", short_msg.lower())
+
+    def test_early_radar_watch_does_not_consume_confirmed_cooldown(self):
+        r = serie()
+        r["b15_long"] = r["b15"]
+        r["dirs"] = [0] * 11
+        r["dirs_cloturees"] = [0] * 11
+        r["grosses"] = [(63000.0, "4h")]
+        cle = {}
+        watch = ab.radar_climax("GOLD", r, cle)
+        self.assertIn("SURVEILLANCE", watch)
+        self.assertIn("SCÉNARIO LONG", watch)
+        self.assertNotIn("radar_t", cle)
+
+        r["dirs"] = [1] * 11
+        r["dirs_cloturees"] = [1] * 11
+        with unittest.mock.patch.object(ab, "direction_confirmee_marche", return_value=1), \\
+             unittest.mock.patch.object(
+                 ab, "objectifs",
+                 side_effect=lambda market, sens, entry, risk:
+                    ((entry + sens * 2 * risk, "TP1"), (entry + sens * 3 * risk, "TP2"))
+             ):
+            confirmed = ab.radar_climax("GOLD", r, cle)
+        self.assertIn("RETOURNEMENT CONFIRMÉ — LONG", confirmed)
+        self.assertEqual(cle["radar_t"]["1"], r["t"])
+
+
