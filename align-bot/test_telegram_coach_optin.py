@@ -27,6 +27,11 @@ class TelegramCoachOptIn(unittest.TestCase):
         state = {"auto": {"GOLD": ["10"], "NASDAQ": ["20"]}}
         self.assertEqual(ab.destinataires_message(state, {"10", "20", "30"}, "📅 Information générale"), ["10", "20"])
 
+    def test_bouton_arret_desactive_immediatement_les_alertes_du_coach(self):
+        state = {"auto": {"GOLD": ["10"]}, "marches_par_chat": {"10": ["GOLD"]}, "bot_off": ["10"]}
+        self.assertFalse(ab.coach_abonne(state, "10", "GOLD"))
+        self.assertEqual(ab.destinataires_message(state, {"10"}, "🥇 GOLD — LONG"), [])
+
     def test_chaine_publique_conserve_son_flux_mais_prives_requierent_le_coach(self):
         state = {"canal": "-100", "marches_par_chat": {"10": ["GOLD"], "20": ["GOLD"]},
                  "auto": {"GOLD": ["10"]}}
