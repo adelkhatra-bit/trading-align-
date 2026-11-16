@@ -202,6 +202,17 @@ class ClosedMtfSafety(unittest.TestCase):
         r["dirs_cloturees"][9] = 0
         self.assertEqual(ab.timeframe_attendu(r, {}), "4h")
 
+    def test_btc_armed_trend_cannot_override_closed_h1_h4_conflict(self):
+        closed = [1] * 11
+        closed[7] = -1
+        r = {"market": "BTC", "confirme": 0, "dirPlan": 1,
+             "dirs": [1] * 11, "dirs_cloturees": closed}
+        state = {"arme": 1}
+        ab.tendance_armee(r, state)
+        self.assertEqual(r["confirme"], 0)
+        self.assertEqual(state["arme"], 0)
+        self.assertFalse(r.get("repli"))
+
 
     def test_gold_nasdaq_live_coach_counts_closed_directions_not_forming_ones(self):
         forming = [1] * 11
