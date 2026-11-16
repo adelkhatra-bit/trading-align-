@@ -206,8 +206,9 @@
   function remplir() {
     const v = vueTxt();
     const iEN = BASE.indexOf('👉 FOLLOW • SHARE • TAP THE SCREEN');   // v7.8 : on repère les phrases anglaises de la bande d'accueil
-    const items = (v ? [[v, 0]] : []).concat(BASE.map((t, i) => [t, iEN >= 0 && i >= iEN]), extra.slice(-3).map(t => [t, 0]));
-    const html = items.map(([t, en]) => '<span' + (en ? ' class="en"' : '') + '>' + esc(plateforme(t)) + '</span>').join('');
+    const baseFR = iEN >= 0 ? BASE.slice(0, iEN) : BASE;
+    const items = (v ? [[v, 0]] : []).concat(baseFR.map(t => [t, false]), extra.slice(-3).map(t => [t, false]));
+    const html = items.map(([t]) => '<span>' + esc(plateforme(t)) + '</span>').join('');
     piste.innerHTML = html + html;
   }
   function esc(s) { return String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
@@ -264,11 +265,10 @@
     const g = couleur || genre(texte);
     texte = sansPrix(texte);
     const urgent = g && g !== 'proche' ? 1 : 0;
-    // v6.4 : chaque info passe en français PUIS en anglais (au moins 2 passages)
-    // v6.5 (règle d'Adel) : chaque info rappelle le risque, en français puis en anglais
-    if (!/risque|risk/i.test(texte)) texte += ' • ⚠️ Ceci n\'est pas un conseil en investissement, fais tes propres recherches (DYOR) • risque de perte';
-    // v7.3 (règle d'Adel, 15/11) : chaque info passe 2 fois en français PUIS 2 fois en anglais
-    const nPass = Math.max(4, 2 * (fois || 1)), items = []; for (let i = 0; i < nPass; i++) items.push({ texte: (i >= nPass / 2 ? '🇬🇧 ' : '🇫🇷 ') + plateforme(i >= nPass / 2 ? enAnglais(texte) : texte), bulle, g, en: i >= nPass / 2 });   // v7.4 : jamais FR et EN mélangés, drapeau + teinte
+    if (!/risque/i.test(texte)) texte += ' • ⚠️ Ceci n\'est pas un conseil en investissement, fais tes propres recherches (DYOR) • risque de perte';
+    // Langue unique du live : français. Les messages ne basculent plus en anglais en fin de défilement.
+    const nPass = Math.max(1, fois || 1), items = [];
+    for (let i = 0; i < nPass; i++) items.push({ texte: '🇫🇷 ' + plateforme(texte), bulle, g, en: false });
     if (devant) { file.splice(0, file.length, ...items, ...file.filter(m => m.g && m.g !== 'proche')); couper(); }   // v7.5 : clic sur une zone = la bande en parle TOUT DE SUITE
     else if (urgent) { let k = 0; while (k < file.length && file[k].g && file[k].g !== 'proche') k++; file.splice(k, 0, ...items); }
     else file.push(...items);
@@ -786,12 +786,7 @@
     const d = document.createElement('div'); d.className = 'align-ping'; d.style.left = P.x + 'px'; d.style.top = P.y + 'px'; document.body.appendChild(d); setTimeout(() => d.remove(), 3500);
   }
   // v7.8 : langue de la bande du haut en ce moment (l'info qui défile, sinon la phrase d'accueil au milieu de la bande)
-  function langueBande() {
-    try { if (bande.classList.contains('on')) return flash.classList.contains('en') ? 'en' : 'fr';
-      const b = bande.getBoundingClientRect(), cx = b.left + b.width * 0.35;
-      for (const sp of piste.children) { const q = sp.getBoundingClientRect(); if (q.left <= cx && q.right >= cx) return sp.classList.contains('en') ? 'en' : 'fr'; } } catch (e) {}
-    return 'fr';
-  }
+  function langueBande() { return 'fr'; }
   // v9.3 (demande d'Adel) : « LE GRAPH BALANCE » pas clair → titres drôles et liés au marché, qui changent à chaque bulle (jamais de sens ni de prix)
   const TITRES_PUNCH = [
     ['🕵️ LE GRAPHIQUE A REPÉRÉ UN TRUC', '🕵️ THE CHART SPOTTED SOMETHING'],
@@ -1116,7 +1111,7 @@
     if (((reste <= 45 || (enAttente && reste <= 60)) || pa) && !retour) {
       chrono.style.display = 'flex'; chrono.classList.toggle('urgent', reste <= (enAttente ? 30 : 10));
       // v6.6 : le texte clignote jusqu'à l'explosion et alterne français / anglais toutes les 3 s
-      const fr = Math.floor(reste / 3) % 2 === 0;
+      const fr = true;
       const lbl = enAttente
         ? (arme.d === -1 ? (fr ? '🔴 GROSSE DISTRIBUTION<br>' : '🔴 BIG SELL-OFF<br>') : (fr ? '🟢 GROSSE ACCUMULATION<br>' : '🟢 BIG ACCUMULATION<br>'))
           + (reste <= 20 ? (fr ? 'C\'EST MAINTENANT !' : 'IT\'S NOW!') : (fr ? 'abonne-toi • partage 🎁' : 'follow • share 🎁'))
