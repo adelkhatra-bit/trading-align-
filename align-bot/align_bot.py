@@ -3082,6 +3082,9 @@ def activer_coach_optin(etat, cid, marche, actif=True):
             liste.append(cid)
     else:
         etat["coach_optin"][marche] = [str(x) for x in liste if str(x) != cid]
+        etat.setdefault("auto", {})[marche] = [str(x) for x in etat.get("auto", {}).get(marche, []) if str(x) != cid]
+        etat.setdefault("veille_cloture", {}).setdefault(marche, {}).pop(cid, None)
+        etat.setdefault("coach_live", {}).setdefault(marche, {}).pop(cid, None)
 
 
 def selectionner_coach_optin(etat, cid, marches):
@@ -3093,8 +3096,6 @@ def selectionner_coach_optin(etat, cid, marches):
 def coach_abonne(etat, cid, m):
     """Opt-in persistant et explicite ; migre les anciennes validations auto / veille déjà consenties."""
     cid = str(cid)
-    if not bot_on(etat, cid):
-        return False
     optins = {str(x) for x in (etat.get("coach_optin") or {}).get(m, [])}
     if cid in optins:
         return True
