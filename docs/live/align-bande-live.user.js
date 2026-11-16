@@ -1390,7 +1390,9 @@
   }
   function poserMasque() {
     try {
-      const cel = celluleSens(); if (!cel) { masque.style.display = 'none'; return; }
+      // Ne jamais révéler le prix sur un raté ponctuel de lecture du canvas : conserver le dernier masque valide.
+      // Au premier chargement, le masque reste naturellement caché jusqu'à la première détection fiable.
+      const cel = celluleSens(); if (!cel) return;
       const A0 = ((cel.bgc >>> 24) & 255) / 255; let R0 = cel.bgc & 255, G0 = (cel.bgc >> 8) & 255, B0 = (cel.bgc >> 16) & 255;   // v8.4 : couleur parfois transparente
       const cv = document.querySelector('.chart-markup-table .chart-gui-wrapper canvas'); if (!cv) return;
       const R = cv.getBoundingClientRect(), k = cv.width / R.width, W = cv.width, y0 = Math.floor(cv.height * 0.55);
