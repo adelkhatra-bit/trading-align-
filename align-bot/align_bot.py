@@ -4561,7 +4561,9 @@ def boucle_chronos(etat):
 
 
 def inscrire_auto(etat, cid, m, notifier=True):
-    """Active le suivi de la prochaine position sans faire croire qu'un ordre broker est placé."""
+    """Active explicitement le coach pour le prochain setup, sans envoyer d'ordre broker."""
+    cid = str(cid)
+    etat["bot_off"] = [x for x in etat.get("bot_off", []) if str(x) != cid]
     liste = etat.setdefault("auto", {}).setdefault(m, [])
     if cid not in liste:
         liste.append(cid)
