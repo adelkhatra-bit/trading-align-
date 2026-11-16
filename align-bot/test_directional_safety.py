@@ -84,6 +84,21 @@ class DirectionSafety(unittest.TestCase):
         msg_btc = ab.retournement_marche("BTC", reversal_r(LONG_BTC), {})
         self.assertIn("Cible 1", msg_btc)
 
+    def test_gold_nasdaq_confirmation_alert_requires_h1_and_h4(self):
+        bars = [candle(0, c=98), candle(300, c=99), candle(600, c=101), candle(900, c=102)]
+        for market in ("GOLD", "NASDAQ"):
+            for h4, expected in ((0, False), (1, True)):
+                r = dict(comp=0, dirs=[0, 0, 1, 0, 1, 0, 0, 1, 0, h4, 1],
+                         sniper=None, dirPlan=1, strat="DAY", zone_pine={"zmil": 100},
+                         b5=bars, t=10000)
+                with mock.patch.object(ab, "etat_marche_hb", return_value=("ouvert", None)), \
+                     mock.patch.object(ab, "hb_etat_surveille", return_value={"d": 1, "n": 9}), \
+                     mock.patch.object(ab, "strategie_alignement", return_value=("DAY", "CONFIRMÉ")), \
+                     mock.patch.object(ab, "trait_indicateur", return_value=None):
+                    events = ab.evenements_pine({}, market, r, {}, 50000)
+                has_confirmation = "confirmation" in [e["kind"] for e in events]
+                self.assertEqual(has_confirmation, expected, (market, h4, events))
+
     def test_gold_nasdaq_do_not_emit_inverse_scalp_events_btc_keeps_legacy(self):
         r = dict(comp=0, dirs=[0,0,1,0,1,0,0,1,0,1,1],
                  sniper=None, dirPlan=1, strat="", zone_pine=None)
