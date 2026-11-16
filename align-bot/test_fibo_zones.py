@@ -30,6 +30,7 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn("voirFibo = input.bool(true, \"Zone d'entrée + Fibonacci\"", self.pine)
         self.assertNotIn("voirFiboProgression", self.pine)
         self.assertNotIn("FIBO —", self.pine)
+        self.assertFalse((ROOT / "pine" / "ALIGN_MTF_PRO_v24_5_FIBO_PROPOSITION.pine").exists())
         self.assertNotIn("request.security(", self.bot)
 
     def test_existing_pine_entry_zone_is_preserved(self):
@@ -97,6 +98,8 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn("montrer(pool[iaN++ % pool.length], false, 1)", self.js)
         self.assertNotIn("speechSynthesis", self.js)
         self.assertNotIn("voirFiboProgression", self.js)
+        self.assertIn("// @version      10.8", self.js)
+        self.assertIn("const VERSION = '10.8'", self.js)
 
 
 if __name__ == "__main__":
