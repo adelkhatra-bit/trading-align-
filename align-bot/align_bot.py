@@ -4623,11 +4623,16 @@ def inscrire_auto(etat, cid, m, notifier=True):
     lancer_chrono(etat, cid, m, r)
 
 def bot_on(etat, cid):
-    """Opt-in explicite obligatoire : les anciens comptes ne reçoivent plus d'alertes par défaut."""
+    """Autorisation séparée pour l'agent automatique qui peut suivre les positions."""
     ident = str(cid)
     actifs = {str(x) for x in etat.get("bot_on_chats", [])}
     arretes = {str(x) for x in etat.get("bot_off", [])}
     return ident in actifs and ident not in arretes
+
+def notifications_on(etat, cid):
+    """Opt-in séparé pour les notifications privées de marchés / coach."""
+    ident = str(cid)
+    return ident in {str(x) for x in etat.get("telegram_optin_chats", [])}
 
 def stats_bot(etat, cid):
     return etat.setdefault("stats_bot", {}).setdefault(cid, {"arrets": 0, "auto": 0})
@@ -4711,6 +4716,9 @@ def regler_bot(etat, cid, on):
     if on:
         if ident not in {str(x) for x in actifs}:
             actifs.append(ident)
+        optins = etat.setdefault("telegram_optin_chats", [])
+        if ident not in {str(x) for x in optins}:
+            optins.append(ident)
         off[:] = [x for x in off if str(x) != ident]
     else:
         actifs[:] = [x for x in actifs if str(x) != ident]
@@ -6152,7 +6160,10 @@ def traiter(etat, chats, updates):
                     _envoi_sur(qui, text="🔒 Réservé aux VIP\n🎁 Ta position gratuite du jour est déjà utilisée\n💎 VIP 49,90 € / mois 👇",
                                **({"reply_markup": bouton_payer(etat)} if etat.get("lien") else {}))
                     continue
-                # La sélection explicite est aussi la préférence de distribution privée.
+                # La sélection de suivi est un opt-in explicite aux messages privés du bot.
+                optins = etat.setdefault("telegram_optin_chats", [])
+                if str(qui) not in {str(x) for x in optins}:
+                    optins.append(str(qui))
                 # Supprimer les anciennes réservations en attente sur l'autre marché évite
                 # qu'un ancien abonnement BTC survive à un nouveau choix GOLD (et inversement).
                 selectionner_marches_suivi(etat, qui, mk)
@@ -6372,6 +6383,9 @@ def traiter(etat, chats, updates):
                         selectionner_marches_suivi(etat, qui, [mk])
                     elif mk not in marches_choisis(etat, qui):
                         basculer_marche(etat, qui, mk)
+                    optins = etat.setdefault("telegram_optin_chats", [])
+                    if str(qui) not in {str(x) for x in optins}:
+                        optins.append(str(qui))
                 activer_coach_live(etat, qui, mk, choix == "coachlive")
                 r_now = DERNIERS.get(mk)
                 if choix == "coachlive" and r_now and len(r_now.get("b15") or []) > 1:
@@ -6389,6 +6403,10 @@ def traiter(etat, chats, updates):
                            if choix == "coachlive" else f"⏹ COACH EN DIRECT ARRÊTÉ — {ICONE.get(mk, '')} {mk}\n😴 Je ne t'envoie plus les clôtures")
                 continue
             if choix == "auto" and mk in MARCHES:
+                # Le bouton est une demande explicite de suivi privé pour ce marché.
+                optins = etat.setdefault("telegram_optin_chats", [])
+                if str(qui) not in {str(x) for x in optins}:
+                    optins.append(str(qui))
                 # Le marché est déjà connu depuis le bouton de l'analyse : activation en un seul appui.
                 if autorise(etat, qui, cb["from"]["id"]) or qui not in etat.get("bienvenue", {}):
                     # Un abonné BTC + GOLD garde les deux marchés : suivre BTC ne doit pas couper GOLD.
@@ -8060,10 +8078,10 @@ def destinataires_message(etat, chats, texte):
     ens = marches_message(texte)
     if etat.get("canal"):
         prives = [str(c) for c in chats if not vue_gratuite(etat, c) and str(c) != str(etat["canal"])
-                  and bot_on(etat, c) and etat.get("marches_par_chat", {}).get(str(c)) is not None
+                  and notifications_on(etat, c) and etat.get("marches_par_chat", {}).get(str(c)) is not None
                   and bool(marches_choisis(etat, c)) and (not ens or bool(ens & marches_choisis(etat, c)))]
         return sorted(set([str(etat["canal"])] + prives))
-    cibles = [str(c) for c in chats if bot_on(etat, c) and bool(marches_choisis(etat, c))
+    cibles = [str(c) for c in chats if notifications_on(etat, c) and bool(marches_choisis(etat, c))
               and (not ens or bool(ens & marches_choisis(etat, c)))]
     return sorted(set(cibles))
 
