@@ -5437,6 +5437,14 @@ def notifier_coach_live(etat, m, r, cle):
         trade = cle.get("trade")
         if trade:
             position_key = "|".join(str(trade.get(k, "")) for k in ("d", "e", "sl", "tp1", "tp2"))
+            # Une recherche lancée APRÈS l'ouverture ne doit jamais pousser l'utilisateur à courir après le prix.
+            if "started_t" not in info:
+                info["started_t"] = time.time()  # ancien abonnement : on repart proprement à partir de maintenant
+            started_t = float(info.get("started_t") or 0)
+            opened_t = float(trade.get("ouvert_t") or 0)
+            if started_t > 0 and (opened_t <= 0 or opened_t < started_t):
+                info["position_key"] = position_key
+                continue
             if position_key != info.get("position_key"):
                 message = (f"🎯 POSITION ALIGN DÉTECTÉE — {ICONE.get(m, '')} {m}\n"
                            + resume_ordre(trade)
@@ -5477,7 +5485,7 @@ def activer_coach_live(etat, cid, m, actif=True):
             actifs.append(str(cid))
         dernier = int(((DERNIERS.get(m) or {}).get("b15") or [{"t": 0}, {"t": 0}])[-2]["t"]) if len((DERNIERS.get(m) or {}).get("b15") or []) > 1 else 0
         # Pas d'expiration automatique : surveillance jusqu'à arrêt manuel ou première entrée confirmée.
-        abonnes[str(cid)] = {"dernier_t": dernier}
+        abonnes[str(cid)] = {"dernier_t": dernier, "started_t": time.time()}
     else:
         abonnes.pop(str(cid), None)
         encore_actif = any(str(cid) in {str(x) for x in (a or {})} for a in (etat.get("coach_live") or {}).values())
@@ -6439,13 +6447,16 @@ def traiter(etat, chats, updates):
                     menu_marches(etat, qui)
                     continue
                 noms = " + ".join(marches_recherche)
+                deja_ouverts = [m for m in marches_recherche if (etat.get(m) or {}).get("trade")]
+                precision_retard = (f"\n⚠️ Position déjà en cours sur {', '.join(deja_ouverts)} : je ne te ferai pas entrer en retard. Je cherche la prochaine entrée."
+                                    if deja_ouverts else "")
                 boutons_stop = [[{"text": f"⏹ Arrêter {m}", "callback_data": f"coachstop:{m}"} for m in marches_recherche]]
                 _envoi_sur(qui, text=(f"🎯 RECHERCHE DE POSITION ACTIVE — {noms}\n"
                                       "🔎 ALIGN surveille les configurations confirmées en continu.\n"
                                       "🔕 Aucun commentaire intermédiaire : je t'écris uniquement lorsqu'une position est confirmée.\n"
                                       "📍 Dès qu'une position est détectée, tu reçois ses niveaux et son suivi.\n"
                                       "🔕 Pas d'alerte automatique sur les autres marchés.\n"
-                                      "⏹ La recherche reste active jusqu'à ton arrêt."), 
+                                      "⏹ La recherche reste active jusqu'à ton arrêt." + precision_retard), 
                            reply_markup=json.dumps({"inline_keyboard": boutons_stop}))
                 continue
             if choix == "analysechoice" and (mk in MARCHES or mk == "BOTH"):
@@ -10089,7 +10100,7 @@ def agent(m, r, cle, ferme):
         pc = plan_cassure(r, d)
         if pc and pc.get("rr", 0) >= GAIN_MIN and pc["t15"] != cle.get("cassure_t") and not r.get("annonce"):
             cle["cassure_t"] = pc["t15"]
-            tr = dict(pc, statut="entree", cree=r["t"], encore=0, atr_e=r["atr"], sl0=pc.get("sl"))
+            tr = dict(pc, statut="entree", cree=r["t"], ouvert_t=time.time(), encore=0, atr_e=r["atr"], sl0=pc.get("sl"))
             tr["profil"] = profil_trade(m, tr, r)
             tr.update(strategie_trade(r, d))
             tr["retour"] = retournement_confirme(cle, d, r)
@@ -10268,7 +10279,7 @@ def agent(m, r, cle, ferme):
                     return out
                 o = dict(o, e=p, sl=sl_m, za=p, zb=p, rr=abs(o["tp1"] - p) / max(abs(p - sl_m), 1e-9), rejet=True,
                          sl_h=bougie_protegee((r["b5"][:-1][-4:] if sl_ut_ == "5 min" else r["b15"][-3:]), d, sl_m), sl_ut=sl_ut_)
-                tr = dict(o, statut="entree", cree=r["t"], encore=0, atr_e=a_, sl0=o.get("sl"))
+                tr = dict(o, statut="entree", cree=r["t"], ouvert_t=time.time(), encore=0, atr_e=a_, sl0=o.get("sl"))
                 tr["profil"] = profil_trade(m, tr, r)
                 tr.update(strategie_trade(r, d))
                 tr["retour"] = retournement_confirme(cle, d, r)
