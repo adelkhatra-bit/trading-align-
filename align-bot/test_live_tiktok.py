@@ -353,6 +353,17 @@ class LiveOutbox(unittest.TestCase):
         self.assertNotIn(cid, state["bot_off"])
         self.assertEqual(state["coach_live"][market][cid], {"dernier_t": 100, "started_t": 500})
 
+    def test_legacy_coach_subscriptions_get_a_stable_start_time_once(self):
+        state = {"coach_live": {
+            "BTC": {"user-42": {"dernier_t": 100}},
+            "GOLD": {"user-43": {"dernier_t": 200, "started_t": 300}}
+        }}
+        ab.initialiser_debut_coach_live(state, maintenant=500)
+        self.assertEqual(state["coach_live"]["BTC"]["user-42"]["started_t"], 500)
+        self.assertEqual(state["coach_live"]["GOLD"]["user-43"]["started_t"], 300)
+        ab.initialiser_debut_coach_live(state, maintenant=600)
+        self.assertEqual(state["coach_live"]["BTC"]["user-42"]["started_t"], 500)
+
     def test_coach_live_ignores_legacy_expiry_and_keeps_monitoring(self):
         market = "BTC"
         cid = "user-42"
