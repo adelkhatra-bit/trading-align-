@@ -9750,14 +9750,16 @@ def agent(m, r, cle, ferme):
                         bouton_auto(m)))
         # Surcharge sur PLUSIEURS UT : 5m obligatoire + au moins 1 parmi 10m/15m/30m + confirmation 1h
         R = dict(zip(UT, r["rsis"]))
+        rsi5_contexte = r["r5"][:-1] if m in ("GOLD", "NASDAQ") else r["r5"]
+        dirs_contexte = r.get("dirs_cloturees") if m in ("GOLD", "NASDAQ") else r["dirs"]
         if d == 1:
-            r5ok = min(r["r5"]) <= 35
+            r5ok = min(rsi5_contexte) <= 35
             petites = [u for u in ("10", "15", "30") if R[u] <= 40]
-            conf1h = R["1h"] < 65 and r["dirs"][9] == d      # 1 h pas en excès, 4 h toujours dans le sens
+            conf1h = R["1h"] < 65 and dirs_contexte[9] == d
         else:
-            r5ok = max(r["r5"]) >= 65
+            r5ok = max(rsi5_contexte) >= 65
             petites = [u for u in ("10", "15", "30") if R[u] >= 60]
-            conf1h = R["1h"] > 35 and r["dirs"][9] == d
+            conf1h = R["1h"] > 35 and dirs_contexte[9] == d
         surcharge = r5ok and len(petites) >= 1 and conf1h
         detail = f"RSI 5m {r5:.0f} • " + " • ".join(f"{u}m {R[u]:.0f}" for u in ("10", "15", "30")) + f" • 1h {R['1h']:.0f}"
         if touche:
