@@ -197,7 +197,7 @@ class EpinglesSansDoublon(unittest.TestCase):
         def tg(meth, **k):
             appels.append(meth)
             return {"result": {"pinned_message": {"text": ab.REGLES, "message_id": 5}}} if meth == "getChat" else {"result": {"message_id": 9}}
-        etat = {}
+        etat = {"auto": {"GOLD": ["42"]}}
         with patch.object(ab, "telegram", side_effect=tg):
             ab.epingler(etat, "42")
         self.assertEqual(appels, ["getChat"])
@@ -210,7 +210,7 @@ class EpinglesSansDoublon(unittest.TestCase):
             appels.append(meth)
             return {"result": {}} if meth == "getChat" else {"result": {"message_id": 9}}
         with patch.object(ab, "telegram", side_effect=tg):
-            ab.epingler({}, "42")
+            ab.epingler({"auto": {"GOLD": ["42"]}}, "42")
         self.assertEqual(appels, ["getChat", "sendMessage", "pinChatMessage"])
 
 if __name__ == "__main__":
