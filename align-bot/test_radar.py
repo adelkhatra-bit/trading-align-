@@ -102,7 +102,7 @@ class RadarIaTest(unittest.TestCase):
              mock.patch.object(ab, "telegram", tg), mock.patch.object(ab, "_envoi_sur", lambda cid, **kw: tg("sendMessage", chat_id=cid, **kw)), \
              mock.patch.object(ab, "autorise", lambda *a: True), mock.patch.object(ab, "marches_choisis", lambda e, c: {"GOLD", "BTC", "NASDAQ"}), \
              mock.patch.object(ab, "classer_marches", lambda d, e, c, n=None: props):
-            etat = {}
+            etat = {"auto": {"GOLD": ["42"], "BTC": ["42"], "NASDAQ": ["42"]}}
             ab.radar_tick(etat, {"42"}, DERNIERS, now=1_000_000.0)            # GOLD prêt : alerte → 1 appel IA
             self.assertEqual(len(appels), 1)
             self.assertIn("GOLD se réveille", envois[0][1]["text"])
@@ -138,7 +138,7 @@ class RadarTickTest(unittest.TestCase):
             x.stop()
 
     def test_un_seul_message_puis_edition(self):
-        etat = {}
+        etat = {"auto": {"GOLD": ["42"], "BTC": ["42"], "NASDAQ": ["42"]}}
         self.props = props_test()
         self.props[0] = dict(self.props[0], rang=2, classe="en_approche", atr_n=2.5)
         t0 = 1_000_000.0
