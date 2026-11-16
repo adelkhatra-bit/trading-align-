@@ -265,7 +265,7 @@ def yahoo_or(interval):
         # Dernière minute = prix spot EN DIRECT (comme le graphique XAUUSD), pour ne pas avoir 10 min de retard
         t = int(time.time()) // 60 * 60
         if t > out[-1]["t"]:
-            out.append(dict(t=t, o=out[-1]["c"], h=max(out[-1]["c"], spot), l=min(out[-1]["c"], spot), c=spot))
+            out.append(dict(t=t, o=out[-1]["c"], h=max(out[-1]["c"], spot), l=min(out[-1]["c"], spot), c=spot, forming=True))
     return out
 
 def paxg_or(interval):
@@ -294,7 +294,7 @@ def paxg_or(interval):
     if interval == 1 and spot and out:
         t = int(time.time()) // 60 * 60
         if t > out[-1]["t"]:
-            out.append(dict(t=t, o=out[-1]["c"], h=max(out[-1]["c"], spot), l=min(out[-1]["c"], spot), c=spot))
+            out.append(dict(t=t, o=out[-1]["c"], h=max(out[-1]["c"], spot), l=min(out[-1]["c"], spot), c=spot, forming=True))
     return out
 
 def yahoo_nasdaq(interval):
@@ -344,7 +344,7 @@ def yahoo_nasdaq(interval):
         t = int(time.time()) // 60 * 60
         p_ = nq_live + e
         if t > out[-1]["t"]:
-            out.append(dict(t=t, o=out[-1]["c"], h=max(out[-1]["c"], p_), l=min(out[-1]["c"], p_), c=p_))
+            out.append(dict(t=t, o=out[-1]["c"], h=max(out[-1]["c"], p_), l=min(out[-1]["c"], p_), c=p_, forming=True))
     return out
 
 def nasdaq_direct():
@@ -482,11 +482,12 @@ def etat_ut(b):
 def directions_cloturees(series):
     """Sens EMA20/50 calculé sur la dernière bougie TERMINÉE de chaque UT.
     Les UT agrégées (3/10/45/2h) sont déjà complètes via regrouper()."""
-    en_formation = {"1", "5", "15", "30", "1h", "4h", "D"}
     out = []
     for k in UT:
         bars = list(series.get(k) or [])
-        if k in en_formation and bars:
+        # Les adaptateurs retirent déjà les bougies incomplètes de M5 à Weekly.
+        # Seules les minutes live ajoutées au flux portent explicitement forming=True.
+        if bars and bars[-1].get("forming") is True:
             bars = bars[:-1]
         out.append(etat_ut(bars)[0] if len(bars) >= 50 else 0)
     return out
@@ -580,7 +581,7 @@ def direct_btc(m1, pair):
         v = float(next(iter(j["result"].values()))["c"][0])
         t = int(time.time()) // 60 * 60
         if m1 and t > m1[-1]["t"]:
-            return m1 + [dict(t=t, o=m1[-1]["c"], h=max(m1[-1]["c"], v), l=min(m1[-1]["c"], v), c=v)]
+            return m1 + [dict(t=t, o=m1[-1]["c"], h=max(m1[-1]["c"], v), l=min(m1[-1]["c"], v), c=v, forming=True)]
     except Exception as ex:
         print("direct", ex)
     return m1
@@ -11163,6 +11164,44 @@ def progression_fibonacci_live(r, market=None):
     return resultat
 
 
+
+def detecter_chasse_liquidite(bars, atr_value, lookback=20):
+    """Détecte une fausse cassure clôturée d'un extrême récent, sans la transformer en signal d'entrée."""
+    b = [x for x in (bars or []) if isinstance(x, dict) and all(isinstance(x.get(k), (int, float)) for k in ("o", "h", "l", "c"))]
+    lookback = max(5, min(60, int(lookback)))
+    if len(b) < lookback + 1 or not isinstance(atr_value, (int, float)) or atr_value <= 0:
+        return None
+    precedente, x = b[-lookback-1:-1], b[-1]
+    support = min(y["l"] for y in precedente)
+    resistance = max(y["h"] for y in precedente)
+    corps = abs(x["c"] - x["o"])
+    meche_basse = min(x["o"], x["c"]) - x["l"]
+    meche_haute = x["h"] - max(x["o"], x["c"])
+    volume_ratio = None
+    volumes = [y.get("v") for y in precedente if isinstance(y.get("v"), (int, float)) and y.get("v") is not None]
+    if isinstance(x.get("v"), (int, float)) and x.get("v") is not None and len(volumes) >= 10:
+        moyenne = sum(volumes) / len(volumes)
+        if moyenne > 0:
+            volume_ratio = x["v"] / moyenne
+    div_baisse, div_hausse = divergence(b)
+    seuil = max(0.05 * atr_value, 1e-9)
+    balayage_bas = (
+        x["l"] < support - seuil and x["c"] > support and x["c"] > x["o"]
+        and meche_basse >= max(0.8 * corps, 0.08 * atr_value)
+    )
+    balayage_haut = (
+        x["h"] > resistance + seuil and x["c"] < resistance and x["c"] < x["o"]
+        and meche_haute >= max(0.8 * corps, 0.08 * atr_value)
+    )
+    if balayage_bas:
+        return {"direction": 1, "type": "reprise_haussiere_apres_chasse", "divergence_rsi": bool(div_hausse),
+                "volume_ratio": round(volume_ratio, 2) if volume_ratio is not None else None}
+    if balayage_haut:
+        return {"direction": -1, "type": "rejet_baissier_apres_chasse", "divergence_rsi": bool(div_baisse),
+                "volume_ratio": round(volume_ratio, 2) if volume_ratio is not None else None}
+    return None
+
+
 def contexte_technique_live(derniers):
     """Contexte factuel du commentateur IA, construit exclusivement depuis les analyses et bougies déjà chargées."""
     marches = {}
@@ -11203,7 +11242,17 @@ def contexte_technique_live(derniers):
         }
         if marche in ("GOLD", "NASDAQ"):
             contexte["fibonacci"] = progression_fibonacci_live(r, marche)
-        barres = (r.get("b15_long") or r.get("b15") or [])[:-1]
+        # Les fournisseurs Kraken/Yahoo et regrouper() retirent déjà les bougies en formation : la dernière M15 est clôturée.
+        barres = (r.get("b15_long") or r.get("b15") or [])
+        # Le M5 repère tôt les balayages ; le M15 apporte une confirmation plus robuste.
+        reversal15 = detecter_chasse_liquidite(barres, r.get("atr"), lookback=20)
+        reversal5 = detecter_chasse_liquidite(r.get("b5") or [], r.get("atr5") or r.get("atr"), lookback=12)
+        if reversal15 and reversal5 and reversal15["direction"] != reversal5["direction"]:
+            contexte["surveillance_retournement"] = {"direction": 0, "conflit": True, "timeframe": "M5/M15"}
+        elif reversal15:
+            contexte["surveillance_retournement"] = dict(reversal15, timeframe="M15")
+        elif reversal5:
+            contexte["surveillance_retournement"] = dict(reversal5, timeframe="M5", precoce=True)
         volumes = [x.get("v") for x in barres[-41:] if isinstance(x.get("v"), (int, float)) and x.get("v") is not None]
         if len(volumes) >= 21:
             moyenne = sum(volumes[:-1]) / max(1, len(volumes) - 1)
@@ -11292,12 +11341,16 @@ def commentaires_live_de_secours(donnees):
         else:
             momentum, momentum_en = "Le momentum demande encore confirmation", "Momentum still needs confirmation"
         volume = c.get("volume_15m_vs_moyenne")
-        if isinstance(volume, (int, float)) and volume >= 1.5:
-            flux, flux_en = "le volume accélère", "volume is picking up"
-        elif isinstance(volume, (int, float)) and volume <= 0.7:
-            flux, flux_en = "le volume reste discret", "volume remains quiet"
+        etiquette_volume = "le volume Kraken" if marche == "BTC" else "le volume proxy"
+        etiquette_volume_en = "Kraken volume" if marche == "BTC" else "proxy volume"
+        if not isinstance(volume, (int, float)):
+            flux, flux_en = "volume indisponible", "volume is unavailable"
+        elif volume >= 1.5:
+            flux, flux_en = f"{etiquette_volume} accélère", f"{etiquette_volume_en} is picking up"
+        elif volume <= 0.7:
+            flux, flux_en = f"{etiquette_volume} reste discret", f"{etiquette_volume_en} remains quiet"
         else:
-            flux, flux_en = "le volume accompagne le mouvement", "volume is accompanying the move"
+            flux, flux_en = f"{etiquette_volume} accompagne le mouvement", f"{etiquette_volume_en} is accompanying the move"
         fib = c.get("fibonacci") or {}
         unite = next((u for u in ("H1", "M15", "H4") if isinstance(fib.get(u), dict)), None)
         lecture = fib.get(unite, {}).get("lecture") if unite else None
@@ -11311,7 +11364,34 @@ def commentaires_live_de_secours(donnees):
             suite, suite_en = "Le prix approche une zone technique : observons sa réaction.", "Price is approaching a technical zone: let's watch its reaction."
         else:
             suite, suite_en = "Attendons une clôture claire avant de conclure.", "Let's wait for a clear close before drawing a conclusion."
-        fr2, en2 = f"{momentum} et {flux} ; {suite}", f"{momentum_en} and {flux_en}; {suite_en}"
+        reversal = c.get("surveillance_retournement") or {}
+        divergence_note = " avec divergence RSI" if reversal.get("divergence_rsi") else ""
+        volume_ratio = reversal.get("volume_ratio")
+        source_volume = str(c.get("source_volume") or "")
+        volume_label = "volume Kraken" if marche == "BTC" or "Kraken" in source_volume else "volume proxy"
+        volume_note = f" et {volume_label} fort" if isinstance(volume_ratio, (int, float)) and volume_ratio >= 1.5 else ""
+        divergence_note_en = " with RSI divergence" if reversal.get("divergence_rsi") else ""
+        volume_label_en = "Kraken volume" if marche == "BTC" or "Kraken" in source_volume else "proxy volume"
+        volume_note_en = f" and strong {volume_label_en}" if isinstance(volume_ratio, (int, float)) and volume_ratio >= 1.5 else ""
+        timeframe_prefix = "Unité courte" if reversal.get("timeframe") == "M5" else "Clôture de référence"
+        timeframe_prefix_en = "Short timeframe" if reversal.get("timeframe") == "M5" else "Reference close"
+        if reversal.get("conflit"):
+            fr2, en2 = (
+                "Les unités courtes et de référence divergent : marché hésitant, attendons une clôture cohérente.",
+                "Short and reference timeframes disagree: the market is undecided; wait for a consistent close."
+            )
+        elif reversal.get("direction") == 1:
+            fr2, en2 = (
+                f"{timeframe_prefix} : balayage du support{divergence_note}{volume_note}, reprise au-dessus ; retournement à confirmer.",
+                f"{timeframe_prefix_en} swept support{divergence_note_en}{volume_note_en}, then reclaimed it; reversal possible, not yet confirmed."
+            )
+        elif reversal.get("direction") == -1:
+            fr2, en2 = (
+                f"{timeframe_prefix} : balayage de la résistance{divergence_note}{volume_note}, rejet dessous ; retournement à confirmer.",
+                f"{timeframe_prefix_en} swept resistance{divergence_note_en}{volume_note_en}, then rejected below; reversal possible, not yet confirmed."
+            )
+        else:
+            fr2, en2 = f"{momentum} et {flux} ; {suite}", f"{momentum_en} and {flux_en}; {suite_en}"
         lignes.extend((f"{marche} | {fr1} | {en1}", f"{marche} | {fr2} | {en2}"))
     return "\n".join(lignes)
 
@@ -11334,7 +11414,10 @@ def live_phrases_ia(etat, maintenant, derniers=None):
         "Pour CHAQUE marché fourni, écris exactement 2 phrases courtes en français et leur traduction anglaise. "
         "Format exact : MARCHÉ | phrase française | phrase anglaise. "
         "Utilise les tendances multi-unités, la confirmation H4/H1, le RSI, le volume, les supports/résistances et surtout "
-        "la lecture du retracement Fibonacci M15/H1/H4 quand elle est disponible. "
+        "la lecture du retracement Fibonacci M15/H1/H4 quand elle est disponible, et les éventuelles chasses de liquidité "
+        "ou fausses cassures confirmées par une bougie clôturée. Le M5 sert d'alerte précoce, le M15 de confirmation plus robuste. "
+        "Distingue une baisse momentanée, un vrai breakdown et une reprise haussière après balayage des stops ; "
+        "ne confonds jamais une mèche avec une cassure confirmée et signale les désaccords M5/M15. "
         "Si le prix est dans la zone Fibonacci 61,8–78,6 %, explique naturellement qu'il teste une zone de retracement profonde "
         "ou une zone technique importante ; ne récite jamais les chiffres. Si le retracement est léger, intermédiaire, dépassé "
         "ou absent, adapte exactement le commentaire. Relie le Fibonacci à la tendance et aux autres confirmations, ne le présente "
@@ -11348,11 +11431,29 @@ def live_phrases_ia(etat, maintenant, derniers=None):
     )
     brut = ia(etat, consigne, donnees)
     paires = phrases_bande_par_marche(brut)
-    if not paires:
-        secours = commentaires_live_de_secours(donnees)
-        paires = phrases_bande_par_marche(secours)
-        if paires:
-            print("LIVE_IA_FALLBACK=TECHNICAL_CONTEXT", flush=True)
+    # Une réponse IA partielle ne doit pas faire taire les autres marchés : compléter chaque marché
+    # présent dans les données avec une lecture factuelle locale, sans fabriquer de contexte absent.
+    marches_disponibles = set(donnees.get("marches", {}))
+    paires = {m: v for m, v in paires.items() if m in marches_disponibles}
+    secours = phrases_bande_par_marche(commentaires_live_de_secours(donnees))
+    for marche in marches_disponibles:
+        existantes = paires.setdefault(marche, [])
+        # Une chasse de liquidité clôturée est un événement prioritaire : l'IA ne peut pas le masquer
+        # avec deux phrases génériques, on réserve la seconde intervention à cette lecture factuelle.
+        reversal = (donnees.get("marches", {}).get(marche, {}).get("surveillance_retournement") or {})
+        if (reversal.get("direction") in (-1, 1) or reversal.get("conflit")) and len(secours.get(marche, [])) >= 2:
+            if len(existantes) >= 2:
+                existantes[1] = secours[marche][1]
+            else:
+                existantes.append(secours[marche][1])
+        for phrase in secours.get(marche, []):
+            if len(existantes) >= 2:
+                break
+            if phrase not in existantes:
+                existantes.append(phrase)
+    paires = {m: v for m, v in paires.items() if v}
+    if paires and any(len(v) < 2 for v in paires.values()):
+        print("LIVE_IA_PARTIAL_MARKET_COVERAGE_COMPLETED", flush=True)
     nb = sum(len(v) for v in paires.values())
     print(f"LIVE_IA {nb} commentaires marché via {etat.get('ia_dernier_fournisseur')} {etat.get('ia_dernier_statut')} : {str(brut)[:160]!r}")
     if not paires:

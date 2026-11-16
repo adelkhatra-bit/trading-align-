@@ -1131,8 +1131,21 @@
     const pos = (B[B.length - 1][4] - ll) / Math.max(hh - ll, 1e-9);
     const volume = B[B.length - 1][5] || 0;
     const volumeFort = moyV > 0 && volume >= 1.8 * moyV;
+    const niveauBas = Math.min(...prev.map(x => x[3]));
+    const niveauHaut = Math.max(...prev.map(x => x[2]));
+    const corpsAbs = Math.abs(cur[4] - cur[1]);
+    const mecheBasse = Math.min(cur[1], cur[4]) - cur[3];
+    const mecheHaute = cur[2] - Math.max(cur[1], cur[4]);
+    const seuilSweep = Math.max(moyR * 0.05, 1e-9);
+    // Le graphique peut montrer une chasse en cours avant la clôture : on la décrit comme provisoire, jamais comme un signal.
+    const chasseSousSupport = cur[3] < niveauBas - seuilSweep && cur[4] > niveauBas && cur[4] > cur[1]
+      && mecheBasse >= Math.max(corpsAbs * 0.8, moyR * 0.08);
+    const chasseAuDessus = cur[2] > niveauHaut + seuilSweep && cur[4] < niveauHaut && cur[4] < cur[1]
+      && mecheHaute >= Math.max(corpsAbs * 0.8, moyR * 0.08);
     let lecture;
-    if (dFond > 0 && dRecent < 0) lecture = 'La tendance récente reste orientée à la hausse, mais les dernières bougies corrigent. Les acheteurs doivent défendre leur mouvement ; on attend une clôture avant de conclure.';
+    if (chasseSousSupport) lecture = 'Possible chasse de liquidité sous un support : le prix repasse au-dessus et les acheteurs réagissent. La bougie est encore en formation ; seule sa clôture dira si le piège est confirmé.';
+    else if (chasseAuDessus) lecture = 'Possible chasse de liquidité au-dessus d’une résistance : le prix repasse dessous et les vendeurs réagissent. La bougie est encore en formation ; seule sa clôture dira si le piège est confirmé.';
+    else if (dFond > 0 && dRecent < 0) lecture = 'La tendance récente reste orientée à la hausse, mais les dernières bougies corrigent. Les acheteurs doivent défendre leur mouvement ; on attend une clôture avant de conclure.';
     else if (dFond < 0 && dRecent > 0) lecture = 'Le mouvement de fond reste orienté à la baisse, mais le marché tente un rebond. Les vendeurs doivent encore montrer s’ils gardent la main ; aucune anticipation.';
     else if (dFond > 0 && dRecent >= 0) lecture = 'Les acheteurs gardent l’avantage sur les dernières bougies. Je surveille si l’impulsion se prolonge ou si le marché commence à souffler.';
     else if (dFond < 0 && dRecent <= 0) lecture = 'Les vendeurs gardent la pression sur les dernières bougies. Je surveille si la baisse continue ou si les acheteurs commencent à réagir.';

@@ -831,6 +831,47 @@ class TestLiveBoostCallbackDispatch(unittest.TestCase):
 
 
 
+class LiquiditySweepReversalDetection(unittest.TestCase):
+    def _bars(self, side):
+        bars = []
+        for i in range(24):
+            bars.append({"t": i * 900, "o": 104.0, "h": 110.0, "l": 100.0, "c": 105.0, "v": 100.0})
+        if side == "bull":
+            bars.append({"t": 24 * 900, "o": 100.4, "h": 102.0, "l": 99.5, "c": 101.2, "v": 180.0})
+        else:
+            bars.append({"t": 24 * 900, "o": 109.6, "h": 110.5, "l": 108.0, "c": 108.8, "v": 180.0})
+        return bars
+
+    def test_bullish_false_break_reclaims_support(self):
+        result = ab.detecter_chasse_liquidite(self._bars("bull"), 2.0)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["direction"], 1)
+        self.assertEqual(result["type"], "reprise_haussiere_apres_chasse")
+        self.assertEqual(result["volume_ratio"], 1.8)
+
+    def test_bearish_false_break_rejects_resistance(self):
+        result = ab.detecter_chasse_liquidite(self._bars("bear"), 2.0)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["direction"], -1)
+        self.assertEqual(result["type"], "rejet_baissier_apres_chasse")
+
+    def test_no_reversal_when_close_stays_below_support(self):
+        bars = self._bars("bull")
+        bars[-1]["c"] = 99.8
+        self.assertIsNone(ab.detecter_chasse_liquidite(bars, 2.0))
+
+    def test_missing_or_insufficient_bars_never_invents_a_reversal(self):
+        self.assertIsNone(ab.detecter_chasse_liquidite([], 2.0))
+        self.assertIsNone(ab.detecter_chasse_liquidite(self._bars("bull")[:10], 2.0))
+
+    def test_m5_early_sweep_uses_shorter_lookback(self):
+        result = ab.detecter_chasse_liquidite(self._bars("bull")[-13:], 2.0, lookback=12)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["direction"], 1)
+
+
+
+
 class LiveMarketNarrationFallback(unittest.TestCase):
     """Regression tests for factual commentary when external AI providers fail."""
     def test_fallback_comments_all_markets_from_actual_context(self):
@@ -847,10 +888,117 @@ class LiveMarketNarrationFallback(unittest.TestCase):
         parsed = ab.phrases_bande_par_marche(raw)
         self.assertEqual(set(parsed), {"BTC", "GOLD", "NASDAQ"})
         self.assertTrue(all(len(parsed[m]) == 2 for m in parsed))
+        self.assertTrue(all(8 <= len(fr) <= 140 and 8 <= len(en) <= 140 for pairs in parsed.values() for fr, en in pairs))
+        self.assertIn("volume Kraken accélère", parsed["BTC"][1][0])
         self.assertIn("confirment la hausse", parsed["BTC"][0][0])
         self.assertIn("zone profonde", parsed["BTC"][1][0])
-        self.assertIn("volume reste discret", parsed["GOLD"][1][0])
+        self.assertIn("volume proxy reste discret", parsed["GOLD"][1][0])
         self.assertIn("confirm the decline", parsed["NASDAQ"][0][1])
+        self.assertIn("volume is unavailable", parsed["NASDAQ"][1][1])
 
     def test_fallback_never_invents_market_without_data(self):
         self.assertEqual(ab.commentaires_live_de_secours({"marches": {}}), "")
+
+
+class LiveMarketPartialAiCoverage(unittest.TestCase):
+    def test_partial_ai_reply_is_completed_for_every_available_market(self):
+        data = {"marches": {
+            "BTC": {"biais_plan": "haussier", "confirmation_4h_1h": "alignées à la hausse",
+                    "rsi_15m": 54.0},
+            "GOLD": {"biais_plan": "baissier", "confirmation_4h_1h": "non alignées",
+                     "rsi_15m": 28.0, "volume_15m_vs_moyenne": 0.5},
+            "NASDAQ": {"biais_plan": "neutre", "confirmation_4h_1h": "alignées à la baisse",
+                       "rsi_15m": 72.0}
+        }}
+        published = []
+        state = {}
+        with (
+            mock.patch.object(ab, "LIVE_IA_INTERVALLE", 180),
+            mock.patch.object(ab, "live_actif", return_value=True),
+            mock.patch.object(ab, "contexte_technique_live", return_value=data),
+            mock.patch.object(ab, "ia", return_value="BTC | Les acheteurs gardent la main mais la reprise doit confirmer. | Buyers remain in control but the recovery must confirm."),
+            mock.patch.object(ab, "live_publier", side_effect=lambda message: published.append(message) or True)
+        ):
+            self.assertTrue(ab.live_phrases_ia(state, 1000, {}))
+        self.assertEqual(len(published), 1)
+        payload = json.loads(published[0][3:])
+        self.assertEqual(set(payload), {"BTC", "GOLD", "NASDAQ"})
+        self.assertTrue(all(len(payload[m]) == 2 for m in payload))
+        self.assertIn("biais reste baissier", payload["GOLD"][0][0].lower())
+
+
+class LiveNarrationPrioritizesLiquiditySweep(unittest.TestCase):
+    def test_closed_reversal_watch_overrides_generic_ai_line(self):
+        data = {"marches": {
+            "GOLD": {
+                "biais_plan": "neutre",
+                "confirmation_4h_1h": "non alignées",
+                "surveillance_retournement": {"direction": 1, "type": "reprise_haussiere_apres_chasse"}
+            }
+        }}
+        ai = (
+            "GOLD | Le marché consolide dans sa zone technique et attend une clôture plus claire. | "
+            "The market is consolidating in its technical area and awaits a clearer close.\n"
+            "GOLD | Le rythme ralentit avant la prochaine impulsion et la structure reste à surveiller. | "
+            "Momentum is slowing before the next impulse and structure remains in focus."
+        )
+        published = []
+        with (
+            mock.patch.object(ab, "LIVE_IA_INTERVALLE", 180),
+            mock.patch.object(ab, "live_actif", return_value=True),
+            mock.patch.object(ab, "contexte_technique_live", return_value=data),
+            mock.patch.object(ab, "ia", return_value=ai),
+            mock.patch.object(ab, "live_publier", side_effect=lambda message: published.append(message) or True)
+        ):
+            self.assertTrue(ab.live_phrases_ia({}, 1000, {}))
+        payload = json.loads(published[0][3:])
+        self.assertIn("balayage du support", payload["GOLD"][1][0])
+        self.assertIn("not yet confirmed", payload["GOLD"][1][1])
+        self.assertLessEqual(len(payload["GOLD"][1][0]), 140)
+        self.assertLessEqual(len(payload["GOLD"][1][1]), 140)
+
+
+
+
+class LiveClosedCandleContext(unittest.TestCase):
+    def test_context_uses_last_available_closed_m15_candle_for_sweep(self):
+        bars = []
+        for i in range(24):
+            bars.append({"t": i * 900, "o": 104.0, "h": 110.0, "l": 100.0, "c": 105.0, "v": 100.0})
+        bars.append({"t": 24 * 900, "o": 100.4, "h": 102.0, "l": 99.5, "c": 101.2, "v": 180.0})
+        latest = {
+            "b15_long": bars, "m1": [{"c": 101.2}], "atr": 2.0,
+            "dirs": [1] * 11, "dirPlan": 1, "niveaux": [], "rC": 54.0
+        }
+        context = ab.contexte_technique_live({"BTC": latest})
+        self.assertEqual(context["marches"]["BTC"]["surveillance_retournement"]["direction"], 1)
+        self.assertEqual(context["marches"]["BTC"]["surveillance_retournement"]["type"], "reprise_haussiere_apres_chasse")
+
+
+class LiveNarrationPrioritizesM5M15Conflict(unittest.TestCase):
+    def test_conflicting_closed_timeframe_sweeps_override_generic_ai(self):
+        data = {"marches": {
+            "NASDAQ": {
+                "biais_plan": "neutre",
+                "confirmation_4h_1h": "non alignées",
+                "surveillance_retournement": {"direction": 0, "conflit": True, "timeframe": "M5/M15"}
+            }
+        }}
+        ai = (
+            "NASDAQ | Le marché consolide dans sa zone technique et attend une clôture plus claire. | "
+            "The market is consolidating in its technical area and awaits a clearer close.\n"
+            "NASDAQ | Le rythme ralentit avant la prochaine impulsion et la structure reste à surveiller. | "
+            "Momentum is slowing before the next impulse and structure remains in focus."
+        )
+        published = []
+        with (
+            mock.patch.object(ab, "LIVE_IA_INTERVALLE", 180),
+            mock.patch.object(ab, "live_actif", return_value=True),
+            mock.patch.object(ab, "contexte_technique_live", return_value=data),
+            mock.patch.object(ab, "ia", return_value=ai),
+            mock.patch.object(ab, "live_publier", side_effect=lambda message: published.append(message) or True)
+        ):
+            self.assertTrue(ab.live_phrases_ia({}, 1000, {}))
+        payload = json.loads(published[0][3:])
+        self.assertIn("unités courtes et de référence divergent", payload["NASDAQ"][1][0])
+        self.assertIn("timeframes disagree", payload["NASDAQ"][1][1])
