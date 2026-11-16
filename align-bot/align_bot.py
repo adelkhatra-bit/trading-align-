@@ -4006,7 +4006,7 @@ def reprise_entree(m, r, cle):
 def entree_retest(m, r, cle):
     """ENTRÉE SUR RETEST (règle d'Adel 15/11) : une résistance cassée à la CLÔTURE devient support (et inversement) ;
     quand le prix revient dessus, que le marché bloque (mèche de rejet + clôture 15 min du bon côté) et que les unités
-    5 min / 15 min / 1h sont toutes d'accord (4h pas contre), on propose l'entrée à la clôture, SL un tout petit peu
+    5 min / 15 min / 1h / 4h sont d'accord pour GOLD/NASDAQ, on propose l'entrée à la clôture, SL un tout petit peu
     sous (sur) la mèche de la dernière bougie. Une alerte par niveau toutes les 2 h ; le bot ne la prend pas lui-même."""
     b = (r.get("b15") or [])[:-1]
     dirs = r.get("dirs") or []
@@ -4175,16 +4175,17 @@ def retournement_marche(m, r, cle):
     if m in ("GOLD", "NASDAQ"):
         sens = 1 if d5 == 1 and d15 == 1 else -1 if d5 == -1 and d15 == -1 else 0
         if not sens or (m == "NASDAQ" and not vol_fort):
+            cle["rv_watch_sens"] = 0
             return None
         if (sens == 1 and p >= h1) or (sens == -1 and p <= l1):
+            cle["rv_watch_sens"] = 0
             return None
         if d60 == sens and d240 == sens:
+            cle["rv_watch_sens"] = 0
             return None
-        t = r.get("t", 0)
-        vus = cle.setdefault("rv_watch_t", {})
-        if t - vus.get(str(sens), -10**9) < 3600:
+        if cle.get("rv_watch_sens") == sens:
             return None
-        vus[str(sens)] = t
+        cle["rv_watch_sens"] = sens
         sens_txt = "à la hausse" if sens == 1 else "à la baisse"
         h1_txt = "haussier" if d60 == 1 else "baissier" if d60 == -1 else "neutre"
         h4_txt = "haussier" if d240 == 1 else "baissier" if d240 == -1 else "neutre"
