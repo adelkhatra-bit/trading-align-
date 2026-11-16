@@ -1271,8 +1271,13 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
         sens = "🟩 LONG" if tr["d"] == 1 else "🟥 SHORT"
         l.append(f"🎯 POSITION EN COURS : {sens} | Entrée {px(tr['e'])} | SL {px(tr['sl'])} | TP1 {px(tr['tp1'])} | TP2 {px(tr['tp2'])}")
     elif o:
-        sens = "🟩 LONG" if o.get("d", r["confirme"]) == 1 else "🟥 SHORT"
-        l.append(f"🎯 POINT VISÉ : {sens} | Entrée ≈ {px(o['e'])} | TP1 {px(o['tp1'])} | SL {px(o['sl'])}")
+        d_ordre = o.get("d", r["confirme"])
+        sens = "🟩 LONG" if d_ordre == 1 else "🟥 SHORT"
+        tp2_ordre = o.get("tp2")
+        tp2_txt = (f" | TP2 {px(tp2_ordre)}"
+                   if tp2_affichable(d_ordre, o.get("tp1"), tp2_ordre)
+                   else " | TP2 non disponible (plan incomplet)")
+        l.append(f"🎯 POINT VISÉ : {sens} | Entrée ≈ {px(o['e'])} | SL {px(o['sl'])} | TP1 {px(o['tp1'])}{tp2_txt}")
     elif r["confirme"]:
         sens = "🟩 LONG" if r["confirme"] == 1 else "🟥 SHORT"
         l.append(f"🎯 DIRECTION À SURVEILLER : {sens} | Point d'entrée après validation du déclencheur")
