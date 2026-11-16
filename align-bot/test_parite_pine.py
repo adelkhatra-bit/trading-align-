@@ -525,5 +525,46 @@ class ParitePine(unittest.TestCase):
         self.assertGreaterEqual(fait, 40)
 
 
+    def test_bridge_tradingview_ne_melange_pas_les_directions_et_le_plan_align(self):
+        """Un snapshot TV frais reste consultable mais ne remplace pas partiellement les données ALIGN."""
+        r = {
+            "dirs": [1, 1, 1, 1, -1, -1, -1, -1, -1, -1, 0],
+            "rsis": [61.0, 58.0, 55.0, 52.0, 48.0, 46.0, 44.0, 42.0, 40.0, 38.0, 50.0],
+            "confirme": -1,
+            "dirPlan": -1,
+            "plan": {"e": 100.0, "sl": 105.0, "tp1": 90.0},
+            "tv_indicator_mtf": {
+                "activeTimeframe": "M15",
+                "snapshots": {
+                    "M15": {
+                        "fresh": True,
+                        "robotV12": {
+                            "lecture_1m": "LONG", "lecture_5m": "LONG",
+                            "lecture_15m": "LONG", "lecture_60m": "LONG",
+                            "rsi_1m": 65, "rsi_5m": 66, "rsi_15m": 67, "rsi_60m": 68
+                        }
+                    }
+                }
+            }
+        }
+        dirs, rsis = list(r["dirs"]), list(r["rsis"])
+        confirme, dir_plan, plan = r["confirme"], r["dirPlan"], dict(r["plan"])
+        ab.fusionne_lectures_tradingview(r)
+        self.assertEqual(r["dirs"], dirs)
+        self.assertEqual(r["rsis"], rsis)
+        self.assertEqual(r["confirme"], confirme)
+        self.assertEqual(r["dirPlan"], dir_plan)
+        self.assertEqual(r["plan"], plan)
+        self.assertEqual(r["tv_robot_v12_timeframe"], "M15")
+        self.assertTrue(r["tv_robot_v12_fresh"])
+
+    def test_priorite_direction_pine_identique_au_moteur_align(self):
+        """Le Pine doit appliquer la même priorité de direction que le moteur Python."""
+        chemin = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pine", "ALIGN_MTF_PRO_v24.pine")
+        with open(chemin, encoding="utf-8") as f:
+            pine = f.read()
+        expression = "dirBrut = longT >= 2 ? 1 : longT <= -2 ? -1 : zoneHaut ? 1 : zoneBas ? -1 : retHaut ? 1 : retBas ? -1 : sens"
+        self.assertIn(expression, pine)
+
 if __name__ == "__main__":
     unittest.main()
