@@ -449,6 +449,30 @@ class LiveOutbox(unittest.TestCase):
                 ab.TELEGRAM_PULL_CONTEXT.chat_id = None
                 ab.TELEGRAM_PULL_CONTEXT.private = False
 
+    def test_telegram_pull_block_is_not_reported_as_successful_delivery(self):
+        with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True), \
+             mock.patch.object(ab, "_telegram_sortant_autorise", return_value=False), \
+             mock.patch.object(ab, "http_json") as request:
+            result = ab.telegram("sendMessage", chat_id="other", text="ALERT")
+        self.assertFalse(result["ok"])
+        self.assertTrue(result["blocked_by_pull_mode"])
+        request.assert_not_called()
+
+    def test_blocked_position_notification_is_not_marked_as_sent(self):
+        market, cid = "BTC", "user-42"
+        trade = {"d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0, "ouvert_t": 100}
+        state = {
+            "coach_live": {market: {cid: {"dernier_t": 0, "started_t": 50}}},
+            "recherche_positions_active": [cid]
+        }
+        with mock.patch.object(ab, "bot_on", return_value=True), \
+             mock.patch.object(ab, "dans_chaine", return_value=False), \
+             mock.patch.object(ab, "_envoi_sur", return_value={"ok": False, "blocked_by_pull_mode": True}), \
+             mock.patch.object(ab, "markup_analyse", return_value=None):
+            ab.notifier_coach_live(state, market, {"m1": [{"c": 101.0}]}, {"trade": trade})
+        self.assertNotIn("position_key", state["coach_live"][market][cid])
+        self.assertEqual(state["recherche_positions_active"], [cid])
+
     def test_telegram_pull_mode_allows_entry_only_for_active_search(self):
         previous = ab.DERNIER_ETAT
         ab.DERNIER_ETAT = {"recherche_positions_active": ["42"]}
