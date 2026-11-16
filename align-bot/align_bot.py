@@ -11401,8 +11401,12 @@ def menu_live(etat, cid):
     anglais = str(cid) in LANG_EN
     kb = clavier_live(etat, cid, anglais)
     texte = texte_live(etat, anglais)
-    if str(cid) in {str(x) for x in proprio(etat)}:      # admin seulement : le code à mettre dans le script de l'écran
-        texte += f"\n━━━━━━━━━━━━━━━\n🔐 Code écran (admin) : {LIVE_SUJET or 'absent'}"
+    if str(cid) in {str(x) for x in proprio(etat)}:      # admin seulement : diagnostic écran + code privé
+        vu_ecran = float(etat.get("live_screen_seen_t", 0) or 0)
+        ecran_ok = time.time() - vu_ecran <= 90
+        statut_ecran = ("🟢 Écran TradingView connecté (signal reçu)" if ecran_ok else
+                        "🔴 Écran TradingView non connecté — actualise l'onglet du live")
+        texte += f"\n━━━━━━━━━━━━━━━\n{statut_ecran}\n🔐 Code écran (admin) : {LIVE_SUJET or 'absent'}"
     _envoi_sur(cid, text=texte, **({"reply_markup": kb} if kb else {}))
 
 def live_annoncer_debut(etat, chats):

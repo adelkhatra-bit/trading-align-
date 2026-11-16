@@ -161,11 +161,18 @@ class LiveTikTok(unittest.TestCase):
             self.assertFalse(ab.live_paiement_recu(self.etat, "2", {"invoice_payload": "livemain:5"}))
         self.assertIn("n'a pas répondu", self.envoye[-1][1]["text"])
 
-    def test_admin_voit_le_code_ecran(self):
+    def test_admin_voit_le_code_ecran_et_le_statut_deconnexion(self):
         ab.menu_live(self.etat, "1")
         self.assertIn("Code écran (admin) : test-sujet", self.envoye[-1][1]["text"])
+        self.assertIn("Écran TradingView non connecté", self.envoye[-1][1]["text"])
         ab.menu_live(self.etat, "2")
         self.assertNotIn("Code écran", self.envoye[-1][1]["text"])
+        self.assertNotIn("Écran TradingView", self.envoye[-1][1]["text"])
+
+    def test_admin_voit_ecran_tradingview_connecte_apres_heartbeat(self):
+        self.etat["live_screen_seen_t"] = __import__("time").time()
+        ab.menu_live(self.etat, "1")
+        self.assertIn("Écran TradingView connecté", self.envoye[-1][1]["text"])
 
     def test_paiement_recu_envoie_l_ordre_au_graphique(self):
         self.etat["live_on"] = True
@@ -671,3 +678,26 @@ class LeconsIA(unittest.TestCase):
             ab.auto_entree(etat, "BTC", {"d": 1, "e": 1, "sl": 0.5, "tp1": 3})   # en pause : aucun ordre
         env.assert_not_called()
         ab.LECONS[:] = []
+
+
+class TestLiveBoostCallbackDispatch(unittest.TestCase):
+    def test_private_boost_callback_saves_telegram_first_name_and_queues_it(self):
+        ab._LIVE_BOOSTS.clear()
+        state = {"live_on": True, "live_screen_seen_t": __import__("time").time(), "prenoms": {}}
+        published = []
+        sent = []
+        update = {"update_id": 99001, "callback_query": {
+            "id": "cb-liveboost",
+            "from": {"id": 44, "first_name": "Nora"},
+            "message": {"chat": {"id": 44, "type": "private"}},
+            "data": "liveboost:x"
+        }}
+        with mock.patch.object(ab, "LIVE_SUJET", "test-sujet"), \
+             mock.patch.object(ab, "live_publier", side_effect=lambda t: published.append(t) or True), \
+             mock.patch.object(ab, "_envoi_sur", side_effect=lambda cid, **kw: sent.append((cid, kw)) or {"ok": True}), \
+             mock.patch.object(ab, "telegram", return_value={"ok": True}):
+            ab.traiter(state, set(), [update])
+        self.assertEqual(state["prenoms"]["44"], "Nora")
+        self.assertEqual(published, ["🙏 MERCI NORA ! Nora BOOSTE LE LIVE 🚀 ABONNE-TOI • PARTAGE"])
+        self.assertTrue(any("Ton prénom doit apparaître" in kw.get("text", "") for _, kw in sent))
+
