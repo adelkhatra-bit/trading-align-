@@ -28,7 +28,8 @@ T = (debut // 180 + 1) * 180
 while T <= fin:
     St = {k: [x for x in v if x["t"] <= T] for k, v in S.items()}
     try:
-        r = ab.analyser_avec_memoire(St, mem)
+        r = ab.analyser_avec_memoire(St, mem, market=a.marche)
+        r["market"] = a.marche
     except Exception as ex:
         T += 180
         continue
