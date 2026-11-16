@@ -168,6 +168,49 @@ function speak(text) {
 var _ctPrio   = 0;          // priorité du message actuel
 var _ctExpiry = 0;          // timestamp d'expiration du message actuel
 var _ctLast   = '';         // dernier texte affiché (évite re-render inutile)
+var _coachShowTimer = null;
+var _coachShowLastAt = 0;
+var _coachShowLastKey = '';
+
+function showCoachShowcase(txt, color, prio) {
+  var raw = String(txt || '').trim();
+  if (!raw || (prio || 0) < 4) return;
+  var first = raw.split(/\r?\n/)[0] || raw;
+  var kind = null;
+  if (/TP[12]?\s+TOUCH|OBJECTIF FINAL ATTEINT/i.test(raw)) kind = {title:'OBJECTIF ATTEINT', tone:'#86efac'};
+  else if (/STOP TOUCHÉ|SORTIE AU STOP|DANGER/i.test(raw)) kind = {title:'PROTECTION DU RISQUE', tone:'#fca5a5'};
+  else if (/METS-TOI À BE|SL\s*(?:→|TO)\s*BE|BREAK.?EVEN/i.test(raw)) kind = {title:'STOP SÉCURISÉ • BREAK EVEN', tone:'#93c5fd'};
+  else if (/SIGNAL (?:LONG|SHORT)|J'ENTRE MAINTENANT|ENTRÉE CONFIRMÉE/i.test(raw)) kind = {title:'SIGNAL CONFIRMÉ', tone:color || '#fde68a'};
+  else if (/RETOURNEMENT|CONFLIT/i.test(raw)) kind = {title:'CHANGEMENT DE CONTEXTE', tone:'#fdba74'};
+  else if ((prio || 0) >= 8) kind = {title:'ALERTE ALIGN', tone:color || '#93c5fd'};
+  if (!kind) return;
+  var now = Date.now();
+  var key = kind.title + '|' + first;
+  if (key === _coachShowLastKey && now - _coachShowLastAt < 60000) return;
+  if (now - _coachShowLastAt < 10000 && (prio || 0) < 10) return;
+  var root = document.getElementById('coachShow');
+  if (!root) return;
+  var title = document.getElementById('coachShowTitle');
+  var body = document.getElementById('coachShowBody');
+  var market = document.getElementById('coachShowMarket');
+  if (title) { title.textContent = kind.title; title.style.color = kind.tone; }
+  if (body) body.textContent = first.length > 115 ? first.slice(0,112) + '…' : first;
+  var found = raw.match(/\b(BTC|GOLD|NASDAQ|XAUUSD|NAS100)\b/i);
+  if (market) market.textContent = found ? found[1].toUpperCase() : String(state.symbol || 'ALIGN').toUpperCase();
+  root.style.borderColor = kind.tone;
+  root.classList.remove('show');
+  root.style.display = 'flex';
+  void root.offsetWidth;
+  root.classList.add('show');
+  if (_coachShowTimer) clearTimeout(_coachShowTimer);
+  _coachShowTimer = setTimeout(function() {
+    root.classList.remove('show');
+    root.style.display = 'none';
+  }, 4600);
+  _coachShowLastAt = now;
+  _coachShowLastKey = key;
+}
+
 
 function setCoachText(txt, color, prio, ttlMs) {
   var _now = Date.now();
@@ -188,6 +231,7 @@ function setCoachText(txt, color, prio, ttlMs) {
   _ctPrio   = _p;
   _ctExpiry = _now + _ttl;
   _ctLast   = txt;
+  showCoachShowcase(txt, color, _p);
 }
 
 function toggleNewsExt() {
