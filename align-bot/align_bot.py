@@ -10530,6 +10530,7 @@ def agent(m, r, cle, ferme):
                     out.append(texte_zone_extreme(m, r, d))
             else:
                 cle["ordre"] = o
+                cle["ordre_t"] = r["t"]
                 out.append((f"{SENS_TETE[d]} · 🔔 JE PRÉPARE UNE POSITION — {ICONE.get(m, '')} {m}\n{SENS[d]}   {'monte' if d == 1 else 'descend'} sur 15m, 1h et 4h ✅✅✅\n{qualite(o)}"
                            f"⏳ Je n'entre pas encore : j'attends que le prix vienne dans la zone 🟨\n"
                            f"{ligne_vers_zone(d)}\n"
