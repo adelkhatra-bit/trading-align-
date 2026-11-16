@@ -666,6 +666,16 @@ class LiveOutbox(unittest.TestCase):
 
 
 
+    def test_market_narration_identifies_closed_candle_liquidity_sweeps_without_calling_entries(self):
+        bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
+        self.assertIn("const terminee = B[B.length - 2]", bande)
+        self.assertIn("balayageBas", bande)
+        self.assertIn("balayageHaut", bande)
+        self.assertIn("Possible chasse de liquidité vendeuse", bande)
+        self.assertIn("Possible chasse de liquidité acheteuse", bande)
+        self.assertIn("ce n’est pas encore un signal LONG", bande)
+        self.assertIn("ce n’est pas encore un signal SHORT", bande)
+
     def test_market_narration_is_factual_and_runs_independently_of_generic_coach(self):
         bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
         self.assertIn("function commentaireMarcheEnDirect(B, moyR, moyV, m)", bande)
