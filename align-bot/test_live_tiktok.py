@@ -433,6 +433,21 @@ class LiveOutbox(unittest.TestCase):
         self.assertEqual(state["coach_live"][market][cid]["position_key"], "-1|100.0|102.0|96.0|92.0")
         self.assertEqual(state["recherche_positions_active"], [cid])
 
+    def test_repeated_start_does_not_duplicate_welcome_but_returns_menu(self):
+        state = {"bienvenue_pull_v1": ["42"]}
+        sent = []
+        update = {"update_id": 1, "message": {
+            "chat": {"id": 42, "type": "private"},
+            "from": {"id": 42, "first_name": "Adel"},
+            "text": "/start"
+        }}
+        with mock.patch.object(ab, "_envoi_sur", side_effect=lambda *a, **kw: sent.append((a, kw)) or {"ok": True}):
+            ab.traiter(state, set(), [update])
+        self.assertEqual(len(sent), 1)
+        self.assertIn("/boutons", sent[0][1]["text"])
+        self.assertNotIn("Bonjour", sent[0][1]["text"])
+        self.assertEqual(state["bienvenue_pull_v1"], ["42"])
+
     def test_telegram_pull_mode_blocks_background_notifications(self):
         with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True):
             self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "other", "text": "ALERT"}))

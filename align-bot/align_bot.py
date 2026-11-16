@@ -6924,6 +6924,12 @@ def traiter(etat, chats, updates):
                 res_bienvenue = _envoi_sur(cid, text=texte, reply_markup=clavier)
                 if isinstance(res_bienvenue, dict) and res_bienvenue.get("ok") is True:
                     deja.append(cid)
+            else:
+                # /start répété est une action volontaire : ne pas renvoyer le message de bienvenue,
+                # mais répondre et redonner un accès au menu pour ne pas sembler muet.
+                clavier = CLAVIER if autorise(etat, cid, msg.get("from", {}).get("id")) else CLAVIER_VISITEUR
+                _envoi_sur(cid, text="Tu as déjà reçu le message d'accueil. Voici ton menu ; tu peux aussi utiliser /boutons.",
+                           reply_markup=clavier)
             continue
         if cmd == "/boutons":
             _envoi_sur(cid, text="Choisis une action :", reply_markup=CLAVIER if autorise(etat, cid, msg.get("from", {}).get("id")) else CLAVIER_VISITEUR)
