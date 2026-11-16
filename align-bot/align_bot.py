@@ -5552,6 +5552,7 @@ def notifier_coach_live(etat, m, r, cle):
 def activer_coach_live(etat, cid, m, actif=True):
     abonnes = etat.setdefault("coach_live", {}).setdefault(m, {})
     if actif:
+        etat["bot_off"] = [str(x) for x in etat.get("bot_off", []) if str(x) != str(cid)]
         dernier = int(((DERNIERS.get(m) or {}).get("b15") or [{"t": 0}, {"t": 0}])[-2]["t"]) if len((DERNIERS.get(m) or {}).get("b15") or []) > 1 else 0
         abonnes[str(cid)] = {"expire": time.time() + COACH_LIVE_DUREE, "dernier_t": dernier}
     else:
