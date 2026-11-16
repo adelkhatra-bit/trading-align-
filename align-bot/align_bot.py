@@ -4144,6 +4144,8 @@ def entree_retest(m, r, cle):
         h4_ok = dirs[9] == d if m in ("GOLD", "NASDAQ") else dirs[9] != -d
         if not (dirs[2] == d and dirs[4] == d and dirs[7] == d and h4_ok):
             continue
+        if m in ("GOLD", "NASDAQ") and direction_confirmee_marche(m, dirs, d, r) != d:
+            continue
         avant = b[-26:-6]
         niveau = max(y["h"] for y in avant) if d == 1 else min(y["l"] for y in avant)
         casse = any((y["c"] - niveau) * d > 0 for y in b[-6:-1])
@@ -4221,12 +4223,16 @@ def radar_climax(m, r, cle):
                 return None
             cle["radar_t"][str(sens)] = t
             cle["radar_dernier"] = t
-            if m in ("GOLD", "NASDAQ") and (len(dirs) < 10 or any(dirs[i] != sens for i in (2, 4, 7, 9)) or direction_confirmee_marche(m, dirs, sens, r) != sens):
+            if m in ("GOLD", "NASDAQ") and (len(dirs) < 10 or any(dirs[i] != sens for i in (2, 4, 7, 9))):
                 lib = lambda i: "haussier" if len(dirs) > i and dirs[i] == 1 else "baissier" if len(dirs) > i and dirs[i] == -1 else "neutre"
                 return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\n"
                         f"Clôtures M5={lib(2)}, M15={lib(4)}, H1={lib(7)}, H4={lib(9)} : elles ne confirment pas toutes le même sens.\n"
                         "⛔ Pas de position : aucune entrée, aucun SL/TP à prendre pour l'instant.\n"
                         "⏳ J'attends l'accord des quatre unités clôturées.")
+            if m in ("GOLD", "NASDAQ") and direction_confirmee_marche(m, dirs, sens, r) != sens:
+                return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\n"
+                        "Les clôtures sont alignées, mais le cours direct est trop éloigné de la dernière clôture M5 ou le flux est périmé.\n"
+                        "⛔ Pas de position : j'attends une nouvelle clôture M5.")
             e = cl[-1]
             mot = "plus bas" if sens == 1 else "plus haut"
             if m in ("GOLD", "NASDAQ"):
