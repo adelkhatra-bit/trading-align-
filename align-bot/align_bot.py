@@ -11959,7 +11959,7 @@ def un_tour(etat, chats):
     print(f"{len(envois)} signal(s) envoyé(s) à {len(chats)} téléphone(s)")
     sauver_etat(etat, chats)
 
-STATE_SCHEMA_VERSION = 2
+STATE_SCHEMA_VERSION = 3
 
 def charger_etat():
     """Charge l'état sans jamais repartir à zéro silencieusement si le fichier est abîmé."""
@@ -11979,12 +11979,15 @@ def charger_etat():
     # offset Telegram, suivis, résultats et journal) sans réinitialiser les instructions.
     etat.setdefault("journal_telegram", [])
     etat.setdefault("chats", [])
-    # Migration de sécurité : couper les anciens abonnements push et vider les messages en attente.
-    etat["coach_live"] = {}
-    etat["coach_pending"] = []
-    etat["recherche_positions_active"] = []
-    etat["telegram_outbox"] = []
-    etat["veille_cloture"] = {}
+    if version < 3:
+        # Migration unique : couper les anciens push et purger la file une seule fois.
+        # Ne surtout pas effacer les nouvelles recherches opt-in aux redémarrages suivants.
+        etat["coach_live"] = {}
+        etat["coach_pending"] = []
+        etat["recherche_positions_active"] = []
+        etat["telegram_outbox"] = []
+        etat["veille_cloture"] = {}
+        print("TELEGRAM_PULL_MIGRATION=enabled; legacy push subscriptions and queued messages cleared", flush=True)
     etat["schema_version"] = STATE_SCHEMA_VERSION
     if version < STATE_SCHEMA_VERSION:
         print(f"STATE_MIGRATION={version}->{STATE_SCHEMA_VERSION} (conservation des données)", flush=True)
