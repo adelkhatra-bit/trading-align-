@@ -3148,6 +3148,10 @@ def _telegram_sortant_autorise(methode, params):
     prive = bool(getattr(TELEGRAM_PULL_CONTEXT, "private", False))
     if cid and prive and cid == contexte:
         return True
+    # Exception strictement limitée au helper qui publie dans une chaîne marché enregistrée.
+    canal_spectacle = str(getattr(TELEGRAM_PULL_CONTEXT, "live_channel_id", "") or "")
+    if cid and methode == "sendMessage" and cid == canal_spectacle:
+        return True
     etat = DERNIER_ETAT or {}
     actifs = {str(x) for x in etat.get("recherche_positions_active", [])}
     texte = str(params.get("text") or params.get("caption") or "")
@@ -4364,15 +4368,10 @@ def entree_retest(m, r, cle):
     return None
 
 def radar_climax(m, r, cle):
-    """RADAR RETOURNEMENT (validé par Adel le 15/11, « oui radar ») — le LONG raté 62 → 65,5 k BTC :
-    1) volume climax : une des 4 dernières bougies 15 min CLÔTURÉES a un volume ≥ 3 × la moyenne des 40 d'avant (épuisement) ;
-    2) balayage : une de ces bougies est passée sous le plus bas (sur le plus haut) des 20 bougies d'avant, puis la clôture est revenue au-dessus ;
-    3) confirmation : la dernière clôture 15 min repasse au-dessus (au-dessous) de l'EMA9.
-    → BTC conserve l'alerte historique ; GOLD/NASDAQ restent en surveillance si H1 et H4 ne confirment pas le même sens.
-    Une alerte par sens toutes les 2 h ; mémorise l'heure (radar_t) pour ne pas envoyer « FEINTE » juste après."""
-    # 16/11 : le radar lisait « b15 » coupé à 30 bougies alors qu'il en faut 66 → il ne se déclenchait JAMAIS en réel (LONG raté).
+    """Radar retournement : volume climax, balayage, retour EMA9.
+    Une observation précoce ne consomme jamais le délai du signal confirmé."""
     dirs = (r.get("dirs_cloturees") or r.get("dirs") or []) if m in ("GOLD", "NASDAQ") else (r.get("dirs") or [])
-    b = (r.get("b15_long") or r.get("b15") or [])[:-1]  # la dernière est en formation
+    b = (r.get("b15_long") or r.get("b15") or [])[:-1]
     if len(b) < 66:
         return None
     vols = [x.get("v") or 0 for x in b]
@@ -4381,7 +4380,7 @@ def radar_climax(m, r, cle):
     if e9 is None:
         return None
     for sens in (1, -1):
-        for k in range(1, 5):                          # bougie climax / balayage parmi les 4 dernières clôturées
+        for k in range(1, 5):
             i = len(b) - k
             moy = sum(vols[i - 40:i]) / 40
             if moy <= 0 or vols[i] < 3 * moy:
@@ -4398,39 +4397,55 @@ def radar_climax(m, r, cle):
             if not ok:
                 continue
             t = r.get("t", 0)
-            if t - cle.setdefault("radar_t", {}).get(str(sens), -10 ** 9) < 7200:
-                return None
-            cle["radar_t"][str(sens)] = t
-            cle["radar_dernier"] = t
-            if m in ("GOLD", "NASDAQ") and (len(dirs) < 10 or any(dirs[i] != sens for i in (2, 4, 7, 9))):
-                lib = lambda i: "haussier" if len(dirs) > i and dirs[i] == 1 else "baissier" if len(dirs) > i and dirs[i] == -1 else "neutre"
-                return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\n"
-                        f"Clôtures M5={lib(2)}, M15={lib(4)}, H1={lib(7)}, H4={lib(9)} : elles ne confirment pas toutes le même sens.\n"
-                        "⛔ Pas de position : aucune entrée, aucun SL/TP à prendre pour l'instant.\n"
-                        "⏳ J'attends l'accord des quatre unités clôturées.")
+            watch_key = f"{sens}:{b[i].get('t', i)}"
+            if m in ("GOLD", "NASDAQ") and (len(dirs) < 10 or any(dirs[j] != sens for j in (2, 4, 7, 9))):
+                vus = cle.setdefault("radar_watch_evt", [])
+                if watch_key not in vus:
+                    vus.append(watch_key)
+                    del vus[:-40]
+                    cle["radar_dernier"] = t
+                    lib = lambda j: "haussier" if len(dirs) > j and dirs[j] == 1 else "baissier" if len(dirs) > j and dirs[j] == -1 else "neutre"
+                    return (f"👀 RADAR CLIMAX — SURVEILLANCE / SCÉNARIO {'LONG' if sens == 1 else 'SHORT'} EN PRÉPARATION — {ICONE.get(m, '')} {m}\n"
+                            f"📊 Volume ×{vols[i] / moy:.1f} et balayage du {'support' if sens == 1 else 'résistance'} détectés ; la clôture est revenue dans la zone.\n"
+                            f"🧭 Clôtures M5={lib(2)}, M15={lib(4)}, H1={lib(7)}, H4={lib(9)} : elles ne confirment pas toutes le même sens.\n"
+                            "⛔ Pas de position : aucun ordre, aucun SL/TP à prendre pour l'instant.\n"
+                            "⏳ Le radar garde ce scénario en mémoire et retestera la confirmation.")
+                continue
             if m in ("GOLD", "NASDAQ") and direction_confirmee_marche(m, dirs, sens, r) != sens:
-                return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\n"
-                        "Les clôtures sont alignées, mais le cours direct est trop éloigné de la dernière clôture M5 ou le flux est périmé.\n"
-                        "⛔ Pas de position : j'attends une nouvelle clôture M5.")
+                vus = cle.setdefault("radar_watch_evt", [])
+                flux_key = watch_key + ":flux"
+                if flux_key not in vus:
+                    vus.append(flux_key)
+                    del vus[:-40]
+                    cle["radar_dernier"] = t
+                    return (f"👀 RADAR CLIMAX — SURVEILLANCE / SCÉNARIO {'LONG' if sens == 1 else 'SHORT'} EN PRÉPARATION — {ICONE.get(m, '')} {m}\n"
+                            "Les clôtures sont alignées, mais le cours direct ou le flux M1/M5 est trop éloigné ou périmé.\n"
+                            "⛔ Pas de position : j'attends un nouveau M5 et un flux frais.")
+                continue
+            # Le cooldown de 2 h ne commence qu'après la validation complète des niveaux.
+            if t - cle.setdefault("radar_t", {}).get(str(sens), -10 ** 9) < 7200:
+                continue
             e = cl[-1]
             mot = "plus bas" if sens == 1 else "plus haut"
             if m in ("GOLD", "NASDAQ"):
                 risque = abs(e - sl)
                 if risque <= 0 or "grosses" not in r:
-                    return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\n"
-                            "Balayage détecté, mais niveaux TP/SL complets indisponibles.\n⛔ Aucune entrée publiée.")
+                    continue
                 (tp1, n1), (tp2, n2) = objectifs(r, sens, e, risque)
                 rr = abs(tp1 - e) / risque
                 if sens * (tp1 - e) <= 0 or sens * (tp2 - tp1) <= 0 or rr < GAIN_MIN:
-                    return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\n"
-                            "Le retournement est repéré, mais le gain/risque ne valide pas une position.\n⛔ Aucune entrée publiée.")
+                    continue
+                cle.setdefault("radar_t", {})[str(sens)] = t
+                cle["radar_dernier"] = t
                 return (f"🔄 RETOURNEMENT CONFIRMÉ — {'LONG' if sens == 1 else 'SHORT'} POSSIBLE — {ICONE.get(m, '')} {m}\n"
                         f"📊 Volume ×{vols[i] / moy:.1f} : épuisement détecté\n"
                         f"🧹 Balayage du {mot} des 20 dernières bougies 15 min, clôture revenue\n"
-                        f"✅ Clôtures M5 + M15 + H1 + H4 dans le même sens\n"
+                        "✅ Clôtures M5 + M15 + H1 + H4 dans le même sens\n"
                         f"📍 Entrée : {px(e)}\n🛑 SL : {px(sl)}\n🎯 TP1 : {px(tp1)} ({n1})\n🏁 TP2 : {px(tp2)} ({n2})\n"
                         f"⚖️ Gain/risque : 1:{rr:.1f}\n🤖 Signal à valider, aucun ordre automatique\n"
                         "⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
+            cle.setdefault("radar_t", {})[str(sens)] = t
+            cle["radar_dernier"] = t
             return (f"🔄 RETOURNEMENT : {'LONG' if sens == 1 else 'SHORT'} prenable — {ICONE.get(m, '')} {m}\n"
                     f"📊 Volume ×{vols[i] / moy:.1f} : le marché s'est épuisé\n"
                     f"🧹 Le {mot} des 20 dernières bougies 15 min a été balayé, puis la clôture est revenue\n"
@@ -4439,6 +4454,7 @@ def radar_climax(m, r, cle):
                     "⚠️ Contre-tendance = RISQUÉ : petite taille, BE dès que le gain = le risque\n"
                     "🤖 Le bot ne la prend pas lui-même\n⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
     return None
+
 
 def retournement_marche(m, r, cle):
     """v71 = Pine « RETOURNEMENT PAR MARCHÉ » (mesuré sur 60 jours de bougies 5 min) :
@@ -8537,6 +8553,21 @@ def _envoi_sur(cid, **kw):
         print("envoi", cid, ex)
         return None
 
+def _envoi_sur_canal_spectacle(etat, cid, **kw):
+    """Envoi spectacle autorisé uniquement vers une chaîne marché déjà enregistrée."""
+    canaux = {str(x) for x in (etat.get("canaux_marche") or {}).values() if x}
+    cid = str(cid)
+    if cid not in canaux:
+        print(f"LIVE_CHANNEL_SEND_REFUSED chat={cid}")
+        return {"ok": False, "description": "Chaîne de marché non enregistrée"}
+    ancien = getattr(TELEGRAM_PULL_CONTEXT, "live_channel_id", None)
+    TELEGRAM_PULL_CONTEXT.live_channel_id = cid
+    try:
+        return _envoi_sur(cid, **kw)
+    finally:
+        TELEGRAM_PULL_CONTEXT.live_channel_id = ancien
+
+
 def _envoi_sur_demande(cid, **kw):
     """Autorise uniquement la réponse privée déclenchée par une demande explicite d'analyse."""
     ancien_chat = getattr(TELEGRAM_PULL_CONTEXT, "chat_id", None)
@@ -10397,6 +10428,39 @@ def suivre_apres_sl(out, m, r, cle, hi, lo):
                f"📚 {len(ap['hist'])} cas appris sur {m}")
 
 
+def alerte_retournement_micro(m, r, cle):
+    """Pré-alerte non exécutable issue des flèches de retournement des petites unités de l'indicateur."""
+    haut = bool(r.get("retHaut"))
+    bas = bool(r.get("retBas"))
+    sens = 1 if haut and not bas else -1 if bas and not haut else 0
+    if not sens:
+        cle.pop("ret_micro_sens", None)
+        cle.pop("ret_micro_t", None)
+        return None
+    if cle.get("ret_micro_sens") == sens:
+        return None  # une annonce par bascule ; attendre la disparition du signal avant une nouvelle alerte
+    dirs = r.get("dirs_cloturees") or r.get("dirs") or []
+    lib = lambda i: "haussier" if len(dirs) > i and dirs[i] == 1 else "baissier" if len(dirs) > i and dirs[i] == -1 else "neutre"
+    scenario = "LONG" if sens == 1 else "SHORT"
+    grandes = (dirs[7], dirs[9]) if len(dirs) > 9 else (0, 0)
+    if m in ("GOLD", "NASDAQ"):
+        confirme = len(dirs) > 9 and all(dirs[i] == sens for i in (2, 4, 7, 9))
+    else:
+        confirme = len(dirs) > 9 and grandes[0] == grandes[1] == sens
+    cle["ret_micro_sens"] = sens
+    cle["ret_micro_t"] = (r.get("b15") or [{}])[-1].get("t", r.get("t", 0))
+    if confirme:
+        attente = "Les clôtures de référence sont alignées ; j'attends encore le déclencheur et le contrôle du risque."
+    elif m in ("GOLD", "NASDAQ"):
+        attente = f"M5 {lib(2)}, M15 {lib(4)}, H1 {lib(7)}, H4 {lib(9)} : il manque encore l'accord des quatre clôtures."
+    else:
+        attente = f"H1 {lib(7)} et H4 {lib(9)} : confirmation de fond encore nécessaire."
+    return (f"↩️ PRÉ-ALERTE RETOURNEMENT {scenario} — {ICONE.get(m, '')} {m}\n"
+            f"🔎 Les petites unités 1m / 3m / 5m / 10m / 15m signalent une bascule {'haussière' if sens == 1 else 'baissière'} avant les grandes unités.\n"
+            f"🧭 {attente}\n"
+            "⛔ ANTICIPATION UNIQUEMENT : aucune position ouverte, aucun SL/TP à prendre avant validation complète.")
+
+
 def agent(m, r, cle, ferme):
     """BTC conserve H4/H1 + déclencheur M5 ; GOLD/NASDAQ exigent M5/M15/H1/H4 clôturés concordants."""
     r.setdefault("market", m)
@@ -10447,6 +10511,12 @@ def agent(m, r, cle, ferme):
             out.append(rv_)
     except Exception as ex:
         print("retournement_marche", ex)
+    try:
+        micro_ = alerte_retournement_micro(m, r, cle)
+        if micro_:
+            out.append(micro_)
+    except Exception as ex:
+        print("retournement micro", ex)
 
     # ── Pas de trade : tendance 4h confirmée par 1h, puis timing d'entrée en 5m ──
     if not tr and r.get("fermeture"):
@@ -11248,6 +11318,16 @@ def contexte_technique_live(derniers):
             "rsi_15m": round(float(r.get("rC")), 1) if isinstance(r.get("rC"), (int, float)) else None,
             "compression_unites": r.get("comp"),
         }
+        sens_micro = 1 if r.get("retHaut") and not r.get("retBas") else -1 if r.get("retBas") and not r.get("retHaut") else 0
+        if sens_micro:
+            contexte["anticipation_micro"] = {
+                "direction": sens_micro,
+                "lecture": "petites unités en avance sur les grandes",
+                "M5": dirs[2] if len(dirs) > 2 else 0,
+                "M15": dirs[4] if len(dirs) > 4 else 0,
+                "H1": dirs[7] if len(dirs) > 7 else 0,
+                "H4": dirs[9] if len(dirs) > 9 else 0,
+            }
         if marche in ("GOLD", "NASDAQ"):
             contexte["fibonacci"] = progression_fibonacci_live(r, marche)
         # Les fournisseurs Kraken/Yahoo et regrouper() retirent déjà les bougies en formation : la dernière M15 est clôturée.
@@ -11373,6 +11453,7 @@ def commentaires_live_de_secours(donnees):
         else:
             suite, suite_en = "Attendons une clôture claire avant de conclure.", "Let's wait for a clear close before drawing a conclusion."
         reversal = c.get("surveillance_retournement") or {}
+        micro = c.get("anticipation_micro") or {}
         divergence_note = " avec divergence RSI" if reversal.get("divergence_rsi") else ""
         volume_ratio = reversal.get("volume_ratio")
         source_volume = str(c.get("source_volume") or "")
@@ -11397,6 +11478,16 @@ def commentaires_live_de_secours(donnees):
             fr2, en2 = (
                 f"{timeframe_prefix} : balayage de la résistance{divergence_note}{volume_note}, rejet dessous ; retournement à confirmer.",
                 f"{timeframe_prefix_en} swept resistance{divergence_note_en}{volume_note_en}, then rejected below; reversal possible, not yet confirmed."
+            )
+        elif micro.get("direction") == 1:
+            fr2, en2 = (
+                "Les petites unités amorcent une reprise haussière ; les grandes clôtures doivent encore confirmer.",
+                "Shorter timeframes are starting a bullish turn; higher-timeframe closes still need to confirm."
+            )
+        elif micro.get("direction") == -1:
+            fr2, en2 = (
+                "Les petites unités amorcent une bascule baissière ; les grandes clôtures doivent encore confirmer.",
+                "Shorter timeframes are starting a bearish turn; higher-timeframe closes still need to confirm."
             )
         else:
             fr2, en2 = f"{momentum} et {flux} ; {suite}", f"{momentum_en} and {flux_en}; {suite_en}"
@@ -11424,7 +11515,8 @@ def live_phrases_ia(etat, maintenant, derniers=None):
         "Utilise les tendances multi-unités, la confirmation H4/H1, le RSI, le volume, les supports/résistances et surtout "
         "la lecture du retracement Fibonacci M15/H1/H4 quand elle est disponible, et les éventuelles chasses de liquidité "
         "ou fausses cassures confirmées par une bougie clôturée. Le M5 sert d'alerte précoce, le M15 de confirmation plus robuste. "
-        "Distingue une baisse momentanée, un vrai breakdown et une reprise haussière après balayage des stops ; "
+        "Distingue une baisse momentanée, un vrai breakdown et une reprise haussière après balayage des stops. "
+        "Les flèches de retournement des petites unités sont des alertes précoces, jamais une confirmation d'entrée ; explique ce qui manque sur H1/H4 et les clôtures de référence. "
         "ne confonds jamais une mèche avec une cassure confirmée et signale les désaccords M5/M15. "
         "Si le prix est dans la zone Fibonacci 61,8–78,6 %, explique naturellement qu'il teste une zone de retracement profonde "
         "ou une zone technique importante ; ne récite jamais les chiffres. Si le retracement est léger, intermédiaire, dépassé "
@@ -11522,7 +11614,7 @@ ECRAN_TITRES = {
     "annonce": ("✅ ANNONCÉ : ça a coulé 🔴", "✅ ANNONCÉ : ça a décollé 🟢"),
     "rebond": ("↩️ REJET sur {l} : touchée puis le prix repart vers le bas 🔴", "↩️ REBOND sur {l} : touchée puis le prix repart vers le haut 🟢"),
     "ligne": ("📍 Le prix arrive sur {l} (par le haut) 🔴", "📍 Le prix arrive sur {l} (par le bas) 🟢"),
-    "zone": ("📍 Le prix est sur le BAS de sa zone (support) 🔴", "📍 Le prix est sur le HAUT de sa zone (résistance) 🟢"),
+    "zone": ("📍 Le prix teste une RÉSISTANCE en haut de sa zone 🔴", "📍 Le prix teste un SUPPORT en bas de sa zone 🟢"),
     "respire": ("😮‍💨 Pas de distribution finalement : le marché respire", "😮‍💨 Pas d'envolée finalement : le marché respire"),
     "feinte": ("🪤 FEINTE : le prix REMONTE contre la tendance baissière", "🪤 FEINTE : le prix RECULE contre la tendance haussière"),
 }
@@ -11552,7 +11644,7 @@ ECRAN_FEINTE = {
 }
 
 def ecran_lire():
-    """Événements envoyés par la bande du live (au plus toutes les 20 s, échec = ignoré)."""
+    """Lit les événements du graphique sans avancer le curseur avant leur traitement."""
     if not LIVE_SUJET or time.time() - _ECRAN_T[0] < 20:
         return []
     _ECRAN_T[0] = time.time()
@@ -11563,28 +11655,35 @@ def ecran_lire():
         with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "align-bot"}), timeout=8) as rep:
             lignes = rep.read().decode("utf-8", "ignore").splitlines()
     except Exception as ex:
-        print("écran lire", ex)
+        print("écran lire", type(ex).__name__, ex)
         return []
     out = []
-    for l in lignes:
+    for ligne_brute in lignes:
         try:
-            j = json.loads(l)
+            item = json.loads(ligne_brute)
         except Exception:
             continue
-        if j.get("event") == "message":
-            etat["ecran_id"] = j.get("id") or etat.get("ecran_id")
-            out.append(str(j.get("message") or ""))
+        if item.get("event") == "message":
+            out.append({"id": str(item.get("id") or ""), "message": str(item.get("message") or "")})
     return out
 
+
 def texte_ecran(m, typ, d, minutes, r, cle, ligne=""):
-    """Message DÉTAILLÉ pour la chaîne du marché, à partir d'un événement vu à l'écran du live."""
+    """Message détaillé de la chaîne marché : scénario, confirmations et prochaine étape."""
     titre = ECRAN_TITRES.get(typ)
     if not titre or (typ in ("rebond", "ligne") and ligne not in ECRAN_LIGNES):
         return None
     if typ == "feinte" and r.get("t", 0) - (cle or {}).get("radar_dernier", -10 ** 9) < 3600:
-        return None                                   # le radar vient d'annoncer un retournement : pas de « FEINTE » contradictoire
+        return None
     t0 = (titre[0] if d == -1 else titre[1]).replace("{l}", ECRAN_LIGNES.get(ligne, ""))
     lignes = [f"🎬 EN DIRECT DU LIVE — {ICONE.get(m, '')} {m}", t0]
+    if typ == "zone":
+        if d == 1:
+            lignes.append("🟢 SCÉNARIO HAUSSIER À SURVEILLER : le prix travaille un support. Ce n'est pas encore un ordre d'entrée.")
+        else:
+            lignes.append("🔴 SCÉNARIO BAISSIER À SURVEILLER : le prix travaille une résistance. Ce n'est pas encore un ordre d'entrée.")
+    elif typ in ("pression", "manip", "casse", "acc", "volume", "feinte", "annonce"):
+        lignes.append(f"{'🟢 SCÉNARIO HAUSSIER' if d == 1 else '🔴 SCÉNARIO BAISSIER'} EN OBSERVATION — le mouvement est surveillé, pas encore autorisé comme entrée.")
     if typ in ("rebond", "ligne"):
         lignes.append(ECRAN_CONSEIL[ligne])
     if typ == "feinte":
@@ -11599,35 +11698,59 @@ def texte_ecran(m, typ, d, minutes, r, cle, ligne=""):
         if b:
             lo, hi = min(x["l"] for x in b), max(x["h"] for x in b)
             if d == -1:
-                lignes += [f"🔴 Dernier plus bas 15 min : {px(lo)} → clôture dessous = ça peut couler encore",
-                           f"🟢 Au-dessus de {px(hi)} : le scénario baissier tombe"]
+                lignes += [f"🔴 Dernier support 15 min : {px(lo)} → clôture dessous = la baisse peut continuer",
+                           f"🟢 Au-dessus de {px(hi)} : le scénario baissier est invalidé"]
             else:
-                lignes += [f"🟢 Dernier plus haut 15 min : {px(hi)} → clôture au-dessus = ça peut monter encore",
-                           f"🔴 Sous {px(lo)} : le scénario haussier tombe"]
+                lignes += [f"🟢 Dernière résistance 15 min : {px(hi)} → clôture au-dessus = la hausse peut continuer",
+                           f"🔴 Sous {px(lo)} : le scénario haussier est invalidé"]
     except Exception:
         pass
-    # v7.2 (demande d'Adel, 15/11) : le marché explose CONTRE la tendance → vrai coach : tentable, mais déconseillé ; on attend le retrace dans le sens du marché
+    # Les directions affichées ici sont celles des clôtures réellement utilisées par le filtre d'entrée.
+    D = r.get("dirs_cloturees") or r.get("dirs") or []
+    if len(D) > 9 and m in ("GOLD", "NASDAQ"):
+        lib = lambda i: "HAUSSIER" if D[i] == 1 else "BAISSIER" if D[i] == -1 else "NEUTRE"
+        lignes.append(f"🧭 Clôtures M5 {lib(2)} • M15 {lib(4)} • H1 {lib(7)} • H4 {lib(9)}")
+        if all(D[i] == d for i in (2, 4, 7, 9)):
+            lignes.append("✅ Les quatre unités clôturées sont alignées ; le bot vérifie encore la fraîcheur du prix et le déclencheur avant toute entrée.")
+        else:
+            lignes.append("⏳ Préparation uniquement : les quatre clôtures ne sont pas encore d'accord. Aucune entrée avant confirmation.")
+    elif len(D) > 9 and m == "BTC":
+        lignes.append(f"🧭 Clôtures H1 {'HAUSSIER' if D[7] == 1 else 'BAISSIER' if D[7] == -1 else 'NEUTRE'} • H4 {'HAUSSIER' if D[9] == 1 else 'BAISSIER' if D[9] == -1 else 'NEUTRE'}")
+        if D[7] != d or D[9] != d:
+            lignes.append("⏳ Scénario en préparation : H1 et H4 ne confirment pas encore ce sens.")
     tend = (r or {}).get("confirme")
     if tend in (1, -1) and d in (1, -1) and d != tend and typ not in ("respire", "rebond", "feinte"):
-        lignes += [f"🧭 Contre-tendance : un {'🟢 LONG' if d == 1 else '🔴 SHORT'} est tentable, mais on le DÉCONSEILLE",
-                   f"⏳ Mieux vaut attendre le retrace et viser un {'🔴 SHORT' if tend == -1 else '🟢 LONG'} dans le sens du marché"]
+        lignes += [f"🧭 Contre-tendance : le scénario {'haussier' if d == 1 else 'baissier'} est tentable, mais déconseillé",
+                   f"⏳ Mieux vaut attendre un retracement dans le sens confirmé par les grandes unités"]
     tr = (cle or {}).get("trade")
     if tr and tr.get("d") in (1, -1):
-        lignes.append(f"📌 Position ALIGN en cours : {'🟢 LONG' if tr['d'] == 1 else '🔴 SHORT'}"
+        lignes.append(f"📌 Position ALIGN en cours : {'LONG' if tr['d'] == 1 else 'SHORT'}"
                       + (" ✅ dans le même sens" if tr["d"] == d else " ⚠️ mouvement contre la position : le SL protège"))
     else:
-        lignes.append("🙅 Ce n'est pas une entrée : on attend la confirmation du bot")
-    lignes.append("🔔 Entrée, SL et TP précis : dans le bot, au bon moment")
+        lignes.append("🙅 Ce n'est pas une entrée : attends le feu vert explicite du bot")
+    lignes.append("🔔 Entrée, SL et TP précis : dans le bot, au moment de la validation")
     return "\n".join(lignes)
 
+
 def ecran_vers_telegram(etat):
-    """Lit les événements de l'écran du live et les publie en détail dans la chaîne du marché (sans son)."""
-    for brut in ecran_lire():
-        p = brut.split("|")        # EVT|BTC|pression|-1|7 ou PING|LIVE_SCREEN|timestamp
+    """Publie les événements du spectacle dans la chaîne du marché, avec acquittement après livraison."""
+    for item in ecran_lire():
+        if isinstance(item, dict):
+            event_id, brut = str(item.get("id") or ""), str(item.get("message") or "")
+        else:  # compatibilité avec les anciens appels directs
+            event_id, brut = "", str(item or "")
+
+        def acquitter():
+            if event_id:
+                etat["ecran_id"] = event_id
+
+        p = brut.split("|")
         if len(p) >= 2 and p[0] == "PING" and p[1] == "LIVE_SCREEN":
             etat["live_screen_seen_t"] = time.time()
+            acquitter()
             continue
         if len(p) < 4 or p[0] != "EVT" or p[1] not in MARCHES:
+            acquitter()
             continue
         m, typ = p[1], p[2]
         ligne = p[5] if len(p) > 5 else ""
@@ -11635,29 +11758,38 @@ def ecran_vers_telegram(etat):
             d = -1 if int(p[3]) < 0 else 1
             minutes = int(p[4]) if len(p) > 4 and p[4] else 0
         except ValueError:
+            acquitter()
             continue
         r = DERNIERS.get(m)
         canal = (etat.get("canaux_marche") or {}).get(m)
         if not r or not canal:
-            continue
+            print(f"LIVE_EVENT_PENDING market={m} reason={'missing_analysis' if not r else 'missing_market_channel'}", flush=True)
+            break  # conserver le curseur : retenter au prochain passage
         cle_vu = f"ecran{m}{typ}{d}{ligne}"
+        maintenant = time.time()
         if typ in ("pression", "manip", "annonce", "respire", "feinte"):
-            # une annonce = UNE fois par quart d'heure (même si l'écran du live est rechargé) : jamais 3 « distribution en vue » de suite
-            cle_vu += str(int(time.time() // 900))
+            cle_vu += str(int(maintenant // 900))
             if cle_vu in _LIVE_DERNIER:
+                acquitter()
                 continue
-        elif time.time() - _LIVE_DERNIER.get(cle_vu, 0) < 300:      # au plus 1 fois / 5 min par type : pas de rafale
+        elif maintenant - _LIVE_DERNIER.get(cle_vu, 0) < 300:
+            acquitter()
             continue
-        _LIVE_DERNIER[cle_vu] = time.time()
         txt = texte_ecran(m, typ, d, minutes, r, etat.get(m) or {}, ligne)
         if not txt:
+            acquitter()
             continue
-        # Chaîne : l'info en 4 lignes + bouton « 🧠 En savoir plus » qui ouvre le détail complet (pourquoi, où regarder) dans le bot
         etat.setdefault("ecran_detail", {})[m] = txt
-        court = "\n".join(txt.split("\n")[:3] + ["🧠 Pourquoi, où regarder : bouton En savoir plus 👇"])
+        court = "\n".join(txt.split("\n")[:4] + ["🧠 Détails, indicateurs et clôtures : bouton En savoir plus 👇"])
         kb = json.loads(boutons_chaine_marche(etat) or '{"inline_keyboard": []}')
         kb.setdefault("inline_keyboard", []).insert(0, [{"text": "🧠 En savoir plus", "url": BOT_LIEN + "?start=ecran_" + m.lower()}])
-        _envoi_sur(canal, text=court, reply_markup=json.dumps(kb))     # AVEC son : l'écran intrigue, le téléphone donne la réponse
+        resultat = _envoi_sur_canal_spectacle(etat, canal, text=court, reply_markup=json.dumps(kb))
+        if not isinstance(resultat, dict) or resultat.get("ok") is not True:
+            print(f"LIVE_EVENT_SEND_PENDING market={m} channel={canal}", flush=True)
+            break  # ne pas acquitter un message que Telegram n'a pas confirmé
+        _LIVE_DERNIER[cle_vu] = maintenant
+        acquitter()
+
 
 def promo_apres_tp(etat, m, now=None):
     """Demande d'Adel (15/11) : quand on tape un TP, on remet en avant le parrainage (compte démo gratuit + codes prop firms)
@@ -11730,10 +11862,11 @@ def live_annonces(etat, m, textes):
         elif "RETOUR VERS L'ENTRÉE" in t:
             live_bande(etat, f"BULLE:🔁 {ic} {m} revient vers l'entrée : on respire 😎 • le bot est protégé 🛡 • "
                              f"⏱ clôture dans {min_avant_cloture15()} min" + FIN_BANDE, f"retour{m}", 900, toujours=True)
-        elif ("RETOURNEMENT EN OBSERVATION" in t or "RETOURNEMENT EN PRÉPARATION" in t
-              or "RETOURNEMENT LONG" in t or "RETOURNEMENT SHORT" in t):
-            live_bande(etat, f"BULLE:↩ {ic} {m} : les petites unités se retournent • on attend la confirmation des grandes unités" + FIN_BANDE,
+        elif ("PRÉ-ALERTE RETOURNEMENT" in t or "RETOURNEMENT EN OBSERVATION" in t
+              or "RETOURNEMENT EN PRÉPARATION" in t or "RETOURNEMENT LONG" in t or "RETOURNEMENT SHORT" in t):
+            live_bande(etat, f"BULLE:↩ {ic} {m} : les petites unités signalent un retournement possible • on attend la confirmation des grandes unités" + FIN_BANDE,
                        f"ret{m}", 900, toujours=True)
+            live_bande(etat, f"CMD:chrono:{max(30, 900 - int(time.time()) % 900)}:{m}", f"chronoret{m}", 900, toujours=True)
         elif "MANIPULATION" in t or "MÈCHE SUSPECTE" in t:
             live_bande(etat, f"BULLE:🎣 {ic} {m} : grosse mèche = chasse aux stops • on attend la clôture" + FIN_BANDE, f"meche{m}", 900, toujours=True)
 
