@@ -571,8 +571,11 @@ def plan_fvg(d, st, ent, sl, tp1, tp2, ut_nom="", tick=0.01):
         else:
             t1, n1 = (c1, f"FVG verte {ut_nom}") if c1 >= c2 else (c2, f"dernier plus bas {ut_nom}")
         if c1 is None or c2 is None:
-            t2 = min(t1, tp1) if tp1 is not None else t1
-            n2 = "objectif du plan" if t2 != t1 else n1
+            candidat = min(t1, tp1) if tp1 is not None else None
+            if candidat is not None and candidat < t1 - tick:
+                t2, n2 = candidat, "objectif du plan"
+            else:
+                t2, n2 = t1 - max(2 * (s - e), 2 * aS), "projection 2R au-delà du TP1"
         else:
             t2 = min(c1, c2); n2 = f"FVG verte {ut_nom}" if t2 == c1 else f"dernier plus bas {ut_nom}"
         src = f"{'FVG rouge' if obRL is None else 'Order block + FVG rouge'} {ut_nom}"
@@ -591,8 +594,11 @@ def plan_fvg(d, st, ent, sl, tp1, tp2, ut_nom="", tick=0.01):
         else:
             t1, n1 = (c1, f"FVG rouge {ut_nom}") if c1 <= c2 else (c2, f"dernier plus haut {ut_nom}")
         if c1 is None or c2 is None:
-            t2 = max(t1, tp1) if tp1 is not None else t1
-            n2 = "objectif du plan" if t2 != t1 else n1
+            candidat = max(t1, tp1) if tp1 is not None else None
+            if candidat is not None and candidat > t1 + tick:
+                t2, n2 = candidat, "objectif du plan"
+            else:
+                t2, n2 = t1 + max(2 * (e - s), 2 * aS), "projection 2R au-delà du TP1"
         else:
             t2 = max(c1, c2); n2 = f"FVG rouge {ut_nom}" if t2 == c1 else f"dernier plus haut {ut_nom}"
         src = f"{'FVG verte' if obGH is None else 'Order block + FVG verte'} {ut_nom}"
@@ -2125,7 +2131,7 @@ TRAD = {
 "🧩 Indicateur ALIGN MTF PRO — TradingView": "🧩 ALIGN MTF PRO indicator — TradingView", "🧩 Indicateur ALIGN MTF PRO": "🧩 ALIGN MTF PRO indicator",
 "✅ Ton accès est actif": "✅ Your access is active", "👤 Pseudo": "👤 Username", "📍 TradingView → Indicateurs → Sur invitation": "📍 TradingView → Indicators → Invite-only",
 "✅ Tu y as droit": "✅ You're entitled to it", "✍️ Écris ton pseudo TradingView": "✍️ Type your TradingView username", "(exemple : adel_khatra)": "(example: adel_khatra)",
-"📊 Alignement des 11 unités de temps": "📊 Alignment of 11 timeframes", "🟨 Zone d'entrée + Fibonacci": "🟨 Entry zone + Fibonacci",
+"📊 Alignement des 11 unités de temps": "📊 Alignment of 11 timeframes", "🟨 Zone d'entrée et retracement technique": "🟨 Entry zone and technical retracement",
 "🛑 Stop derrière la mèche": "🛑 SL behind the wick", "💰 TP sur les grosses unités de temps": "💰 TP on the big timeframes", "⚡ Surcharge RSI + explosions": "⚡ RSI overextension + breakouts",
 "🎁 Les positions restent gratuites ici": "🎁 Positions stay free here", "💎 Indicateur 49,90 € / mois": "💎 Indicator €49.90 / month",
 "👉 Après paiement, reviens appuyer sur 🧩": "👉 After paying, come back and tap 🧩", "👌 Pseudo reçu": "👌 Username received",
@@ -3057,9 +3063,16 @@ def vue_gratuite(etat, cid):
     return cid in [str(c) for c in etat.get("prospects", [])] or (
         (PROPRIO_VUE_GRATUITE or etat.get("proprio_gratuit")) and cid in {str(x) for x in proprio(etat)})
 
+def coach_abonne(etat, cid, m):
+    """Opt-in explicite : le bouton Coach / Suivre ce marché a été validé par cet utilisateur."""
+    cid = str(cid)
+    return bot_on(etat, cid) and cid in {str(x) for x in (etat.get("auto") or {}).get(m, [])}
+
+
 def destinataires_gratuits(etat):
-    return list(dict.fromkeys([str(c) for c in etat.get("prospects", [])]
-                              + ([str(x) for x in sorted(proprio(etat))] if (PROPRIO_VUE_GRATUITE or etat.get("proprio_gratuit")) else [])))
+    candidats = list(dict.fromkeys([str(c) for c in etat.get("prospects", [])]
+                                   + ([str(x) for x in sorted(proprio(etat))] if (PROPRIO_VUE_GRATUITE or etat.get("proprio_gratuit")) else [])))
+    return [cid for cid in candidats if any(coach_abonne(etat, cid, m) for m in MARCHES)]
 
 def partage_du(etat, maintenant=None):
     """Le rappel de partage part au plus une fois par jour prévu, à heure fixe : jamais deux fois de suite."""
@@ -5165,6 +5178,8 @@ def renvoyer_claviers(etat, chats):
         return
     vus = etat.setdefault("clavier_v", {})
     for cid in sorted(({str(c) for c in chats} | {str(c) for c in etat.get("prospects", [])}) - {str(etat.get("canal") or "")})[:30]:
+        if not any(coach_abonne(etat, cid, m) for m in MARCHES):
+            continue
         if vus.get(cid) == CLAVIER_VERSION:
             continue
         vus[cid] = CLAVIER_VERSION               # marqué avant l'envoi : jamais 2 fois, même si Telegram répond mal
@@ -5399,7 +5414,7 @@ def notifier_clotures(etat, m, r, cle):
     """Envoie les clôtures nouvelles une fois chacune, sur les UT suivies par l'utilisateur."""
     champs = TF_CHAMPS
     for cid, suivi in list(etat.get("veille_cloture", {}).get(m, {}).items()):
-        if not marche_autorise(etat, cid, m):
+        if not coach_abonne(etat, cid, m) or not marche_autorise(etat, cid, m):
             etat["veille_cloture"][m].pop(cid, None)
             continue
         if suivi.get("multi"):
@@ -6710,7 +6725,7 @@ def menu_indicateur(etat, cid, user):
     kw = {"reply_markup": bouton_indicateur(etat)} if etat.get("lien") else {}
     _envoi_sur(cid, text=(
         "🧩 Indicateur ALIGN MTF PRO — TradingView\n━━━━━━━━━━━━\n"
-        "📊 Alignement des 11 unités de temps\n🟨 Zone d'entrée + Fibonacci\n🛑 Stop derrière la mèche\n"
+        "📊 Alignement des 11 unités de temps\n🟨 Zone d'entrée et retracement technique\n🛑 Stop derrière la mèche\n"
         "💰 TP sur les grosses unités de temps\n⚡ Surcharge RSI + explosions\n━━━━━━━━━━━━\n"
         "🎁 Les positions restent gratuites ici\n💎 Indicateur 49,90 € / mois\n"
         "👉 Après paiement, reviens appuyer sur 🧩"), **kw)
@@ -7636,6 +7651,9 @@ def envoyer_differes(etat, now=None, dodo=True):
     etat["differe"] = [x for x in file_ if x.get("t", 0) > now][-200:]
     rang = [[{"text": "💎 Devenir VIP", "url": etat["lien"]}]] if etat.get("lien") else []
     for x in prets[:20]:
+        marche = next((m for m in MARCHES if m in str(x.get("txt", "")).splitlines()[0]), None)
+        if not marche or not coach_abonne(etat, x.get("c"), marche):
+            continue
         try:
             telegram("sendMessage", chat_id=x["c"], text=(
                 f"⏱ EN DIFFÉRÉ ({DIFFERE_MIN} min) — info passée\n🙅 N'entre pas maintenant : le prix a bougé\n━━━━━━━━━━━━\n"
@@ -7650,7 +7668,7 @@ def envoyer_differes(etat, now=None, dodo=True):
         etat["dodo_jour"] = jour
         txt = DODO_TXT[maint.toordinal() % len(DODO_TXT)]      # jamais le même texte deux jours de suite
         for cid in destinataires_gratuits(etat):
-            if bot_on(etat, cid):
+            if any(coach_abonne(etat, cid, mk) for mk in MARCHES):
                 try:
                     telegram("sendMessage", chat_id=cid, text=txt)
                 except Exception as ex:
@@ -7675,7 +7693,7 @@ def envoyer_prospects(etat, texte, signal, clavier=None):
     vus = etat.setdefault("masque_vu", {})
     ref = f"{m}:{(tr or {}).get('cree') or int(time.time() // 1800)}"
     for cid in destinataires_gratuits(etat):
-        if not marche_autorise(etat, cid, m):
+        if not coach_abonne(etat, cid, m) or not marche_autorise(etat, cid, m):
             continue
         if TOUT_GRATUIT:                   # v7.4 (décision d'Adel) : tout gratuit pour le moment → chaque position en temps réel, une fois
             if not bot_on(etat, cid) or vus.get(cid) == ref:
@@ -8023,15 +8041,18 @@ def marche_du_message(texte):
     return None if not ens else (next(iter(ens)) if len(ens) == 1 else "BOTH")
 
 def destinataires_message(etat, chats, texte):
-    # Le flux complet (news, analyses, toutes les positions) part dans la chaîne VIP (commune : tous les marchés).
-    # Chaque personne ne reçoit EN PRIVÉ que les marchés qu'elle a cochés (filtrage ligne par ligne au moment de l'envoi, voir filtrer_texte_par_marches).
+    # La chaîne de marché reste le flux public auquel ses membres ont choisi de s'abonner.
+    # En privé : aucune alerte automatique avant l'opt-in Coach explicite, marché par marché.
     ens = marches_message(texte)
     if etat.get("canal"):
-        prives = [str(c) for c in chats if not vue_gratuite(etat, c) and str(c) != str(etat["canal"])
-                  and etat.get("marches_par_chat", {}).get(str(c)) is not None and ens
-                  and ens & marches_choisis(etat, c)]
+        prives = [str(c) for c in chats if str(c) != str(etat["canal"]) and ens
+                  and not vue_gratuite(etat, c)
+                  and etat.get("marches_par_chat", {}).get(str(c)) is not None
+                  and ens & marches_choisis(etat, c)
+                  and any(coach_abonne(etat, c, m) for m in ens)]
         return sorted(set([str(etat["canal"])] + prives))
-    cibles = [str(c) for c in chats if not ens or bool(ens & marches_choisis(etat, c))]
+    cibles = [str(c) for c in chats if ens and bool(ens & marches_choisis(etat, c))
+              and any(coach_abonne(etat, c, m) for m in ens)]
     return sorted(set(cibles))
 
 def destinataires(etat, chats):
@@ -8087,7 +8108,7 @@ def jauge(m, r, cle, cid=None, canal=False):
 
 def maj_jauge(etat, m, r, cle, chats, canal=None):
     for cid in list(chats) + ([canal] if canal else []):
-        if cid != canal and not marche_autorise(etat, cid, m):
+        if cid != canal and (not coach_abonne(etat, cid, m) or not marche_autorise(etat, cid, m)):
             mid = cle.get("jauge", {}).pop(cid, None)
             cle.get("jauge_txt", {}).pop(cid, None)
             if mid:
@@ -9585,7 +9606,7 @@ def agent(m, r, cle, ferme):
                            f"👀 Mets-toi en vue {o.get('sl_ut', '5 min')} · 🚦 attends mon feu vert 🟢\n"
                            f"{ligne_cassure(r, d)}\n\n"
                            f"{fmt_trade(m, o, p)}\n\n"
-                           f"📐 Zone = {o['src']}{ferme}", bouton_auto(m)))
+                           f"{ferme}", bouton_auto(m)))
         if (bloque and not cle.get("ordre")) or o["rr"] < GAIN_MIN:
             return out
         # Petit repli en cours avant d'arriver dans la zone : on le dit tout de suite
@@ -9707,7 +9728,7 @@ def agent(m, r, cle, ferme):
                 niveau = "Fibonacci" not in o["src"] or "+" in o["src"]   # confluence avec un niveau 15m / 1h / 4h ou l'EMA
                 checks = [("4 h + 1 h alignées", bool(r["confirme"] == d)),
                           ("Daily / Weekly hors zone extrême", not bloque_dw(r, d, p)),
-                          ("Zone Fibonacci 50 – 78,6 %", "Fibonacci" in o["src"]),
+                          ("Zone de retracement validée", "Fibonacci" in o["src"]),
                           ("Niveau 15m / 1h / 4h ou EMA", niveau),
                           ("RSI de repli confirmé", surcharge), ("Contexte 1 h cohérent", conf1h),
                           (raison, bool(bj)),
