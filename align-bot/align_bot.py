@@ -103,6 +103,22 @@ def _direction_tv(value):
     return None
 
 
+def directions_tv_mtf(contexte):
+    """Lectures ROBOT V12 fraîches du bridge TradingView : M5, M15 et H1."""
+    bridge = (contexte or {}).get("tv_indicator_mtf") or {}
+    if bridge.get("available") is not True:
+        return None
+    active = bridge.get("activeTimeframe")
+    snap = (bridge.get("snapshots") or {}).get(active) or {}
+    robot = snap.get("robotV12") or {}
+    if snap.get("fresh") is not True or not robot:
+        return None
+    out = {tf: _direction_tv(robot.get(key)) for tf, key in (
+        ("M5", "lecture_5m"), ("M15", "lecture_15m"), ("H1", "lecture_60m")
+    )}
+    return out if all(v in (-1, 1) for v in out.values()) else None
+
+
 def fusionne_lectures_tradingview(r):
     """Conserve le snapshot ROBOT V12 séparé : il ne doit pas modifier une analyse ALIGN déjà calculée."""
     bridge = r.get("tv_indicator_mtf") or {}
@@ -340,7 +356,8 @@ def nasdaq_direct():
         v = float(http_json("https://scanner.tradingview.com/symbol?symbol=CME_MINI:NQ1%21&fields=close")["close"])
     except Exception as ex:
         print("nasdaq direct", ex)
-        return c[1] if c else None
+        # Ne jamais recycler indéfiniment un ancien cours : au-delà de 60 s, la source live est considérée indisponible.
+        return c[1] if c and time.time() - c[0] <= 60 else None
     _CACHE["nq_live"] = (time.time(), v)
     return v
 
@@ -460,6 +477,72 @@ def etat_ut(b):
     d = 1 if c[-1] > ef > es else -1 if c[-1] < ef < es else 0
     sqz = (basis + dev) < (kc + rng) and (basis - dev) > (kc - rng)
     return d, 1 if sqz else 0, rsi(c)[-1]
+
+
+def directions_cloturees(series):
+    """Sens EMA20/50 calculé sur la dernière bougie TERMINÉE de chaque UT.
+    Les UT agrégées (3/10/45/2h) sont déjà complètes via regrouper()."""
+    en_formation = {"1", "5", "15", "30", "1h", "4h", "D"}
+    out = []
+    for k in UT:
+        bars = list(series.get(k) or [])
+        if k in en_formation and bars:
+            bars = bars[:-1]
+        out.append(etat_ut(bars)[0] if len(bars) >= 50 else 0)
+    return out
+
+
+def donnees_mtf_fraiches(m, r, now_ts=None):
+    """Refuse une nouvelle entrée GOLD/NASDAQ si les bougies M5/M15/H1/H4 ou le flux M1 sont périmés."""
+    if m not in ("GOLD", "NASDAQ"):
+        return True
+    now = time.time() if now_ts is None else float(now_ts)
+    specs = (("b5", 300, 450), ("b15", 900, 1350), ("b1h", 3600, 5400), ("b4h", 14400, 21600))
+    for key, interval, max_age in specs:
+        bars = r.get(key) or []
+        if len(bars) < 2:
+            return False
+        age = now - (int(bars[-2].get("t", 0)) + interval)
+        if age < -60 or age > max_age:
+            return False
+    m1 = r.get("m1") or []
+    if not m1:
+        return False
+    age_m1 = now - int(m1[-1].get("t", 0))
+    return -30 <= age_m1 <= 120
+
+
+def direction_confirmee_marche(m, dirs, d, contexte=None):
+    """Filtre d'entrée : GOLD/NASDAQ exigent quatre clôtures concordantes, un prix live frais et pas de déplacement live marqué contre le sens."""
+    if d not in (1, -1):
+        return 0
+    if m in ("GOLD", "NASDAQ"):
+        D = list(dirs or [])
+        if len(D) < 10 or any(D[i] != d for i in (2, 4, 7, 9)):
+            return 0
+        if contexte is not None:
+            if not donnees_mtf_fraiches(m, contexte):
+                return 0
+            m1 = contexte.get("m1") or []
+            b5 = contexte.get("b5") or []
+            atr5 = contexte.get("atr5") or contexte.get("atr") or 0
+            if not m1 or len(b5) < 2 or atr5 <= 0:
+                return 0
+            # Le flux M1 doit être frais ; NASDAQ ne doit jamais trader sur un cours direct périmé.
+            if time.time() - m1[-1]["t"] > 120:
+                return 0
+            # Le cours live ne doit pas avoir déjà retracé de plus de 0,75 ATR M5 contre la dernière clôture.
+            ecart_live = m1[-1]["c"] - b5[-2]["c"]
+            if d * ecart_live < -0.75 * atr5:
+                return 0
+            # Si le bridge TradingView est disponible, ses lectures ROBOT V12 M5/M15/H1 doivent aussi confirmer.
+            bridge = contexte.get("tv_indicator_mtf") or {}
+            tv_dirs = directions_tv_mtf(contexte)
+            if contexte.get("require_tv_bridge") and tv_dirs is None:
+                return 0
+            if bridge.get("available") is True and (tv_dirs is None or any(v != d for v in tv_dirs.values())):
+                return 0
+    return d
 
 def pivots(b, g=5):
     hs, ls = [], []
@@ -740,6 +823,7 @@ def calculer_analyse(S, stable=None, comp_prev=None, market=None):
               "30": S["m30"], "45": regrouper(m15, 3, 900), "1h": h1, "2h": regrouper(h1, 2, 3600), "4h": h4, "D": d1}
     et = {k: etat_ut(v) for k, v in series.items()}
     dirs = [et[k][0] for k in UT]; sqzs = [et[k][1] for k in UT]; rsis = [et[k][2] or 50 for k in UT]
+    dirs_cloturees = directions_cloturees(series)
     bull, bear, comp = dirs.count(1), dirs.count(-1), sum(sqzs)
     rsiOB = sum(r >= 70 for r in rsis); rsiOS = sum(r <= 30 for r in rsis)
     sw = sum(POIDS); trendS = sum(w * d for w, d in zip(POIDS, dirs)) / sw
@@ -785,6 +869,8 @@ def calculer_analyse(S, stable=None, comp_prev=None, market=None):
     grosses = [(v, n) for v, n in zip(niv, noms) if v is not None and n != "15m"]
     tous_niv = [(v, n) for v, n in zip(niv, noms) if v is not None]
     dW_ = etat_ut(w1)[0] if len(w1) >= 50 else 0
+    dW_cloture = etat_ut(w1[:-1])[0] if len(w1) >= 51 else 0
+    dW_signal = dW_cloture if market in ("GOLD", "NASDAQ") else dW_
     a15 = atr(b, 14)[-2] if len(b) >= 16 else None
     bas10, haut10 = min(x["l"] for x in b[-10:]), max(x["h"] for x in b[-10:])
     def plan(d, strat_rng=None):
@@ -795,18 +881,29 @@ def calculer_analyse(S, stable=None, comp_prev=None, market=None):
     fortBas = rsiVente and rsiOS < 3 and bear > bull and bear >= MIN_ALIGN - 2 and (comp >= MIN_SQZ or bear >= MIN_ALIGN)
     explHaut = sqzC1 == 1 and sqzC == 0 and mom > 0 and bull > bear
     explBas = sqzC1 == 1 and sqzC == 0 and mom < 0 and bear > bull
-    sigHaut = ((fortHaut or explHaut) and longT >= 1) or (zoneHaut and longT >= 0)
-    sigBas = ((fortBas or explBas) and longT <= -1) or (zoneBas and longT <= 0)
+    sigHaut = (((fortHaut or explHaut) and longT >= 1) or (zoneHaut and longT >= 0))
+    sigBas = (((fortBas or explBas) and longT <= -1) or (zoneBas and longT <= 0))
+    if market in ("GOLD", "NASDAQ"):
+        # Pas d’étiquette « explosion » si les quatre clôtures ne valident pas ce sens.
+        sigHaut = sigHaut and direction_confirmee_marche(market, dirs_cloturees, 1) == 1
+        sigBas = sigBas and direction_confirmee_marche(market, dirs_cloturees, -1) == -1
     # Parité Pine v24 : une zone de retournement valide est prioritaire ; sinon les grosses UT décident.
     dirBrut = 1 if zoneHaut else -1 if zoneBas else 1 if longT >= 2 else -1 if longT <= -2 else 1 if retHaut else -1 if retBas else sens
     dirPlan = dirBrut if stable is None else stable
-    strat_plan = strategie_alignement(dirs, dirPlan, etat_ut(w1)[0] if len(w1) >= 50 else 0, market)[0]
+    dirs_strategie = dirs_cloturees if market in ("GOLD", "NASDAQ") else dirs
+    strat_plan = strategie_alignement(dirs_strategie, dirPlan, dW_signal, market)[0]
     nom = ("★ ACHAT FORT" if fortHaut else "EXPLOSION ▲" if explHaut else "ZONE DE REBOND ▲") if sigHaut else \
           ("★ VENTE FORTE" if fortBas else "EXPLOSION ▼" if explBas else "ZONE DE RETOURNEMENT ▼") if sigBas else ""
     # ═══ STRATÉGIE : 4h = tendance principale, 1h = confirmation ═══
     d1h, d4h = dirs[7], dirs[9]
-    # Le 15m reste informatif et ne bloque jamais un signal.
-    confirme = d4h if d4h != 0 and d1h == d4h else 0
+    # BTC conserve sa règle historique. GOLD/NASDAQ : seules les clôtures M5/M15/H1/H4 concordantes arment une direction.
+    if market in ("GOLD", "NASDAQ"):
+        d1c, d4c = dirs_cloturees[7], dirs_cloturees[9]
+        ctx_live = {"m1": m1, "b5": m5, "b15": m15[-30:], "b1h": h1[-30:], "b4h": h4[-30:],
+                    "atr5": atr(m5[:-1], 14)[-1] if len(m5) >= 16 else 0}
+        confirme = direction_confirmee_marche(market, dirs_cloturees, d4c, ctx_live) if d4c != 0 and d1c == d4c else 0
+    else:
+        confirme = d4h if d4h != 0 and d1h == d4h else 0
     # Contexte Daily / Weekly : où est le prix dans sa zone (0 = tout en bas, 1 = tout en haut)
     def position(bars, n):
         z = bars[-n:]; haut = max(x["h"] for x in z); bas = min(x["l"] for x in z)
@@ -848,7 +945,8 @@ def calculer_analyse(S, stable=None, comp_prev=None, market=None):
                 pctH=pctH, sens=sens, retHaut=retHaut, retBas=retBas, sigHaut=sigHaut, sigBas=sigBas, nom=nom,
                 dirPlan=dirPlan, dirBrut=dirBrut, strat=strat_plan,
                 plan=plan(dirPlan if dirPlan else 1, strat_plan), planH=plan(1), planB=plan(-1), rC=rC,
-                dirW=dW_, ohlc15=b[-30:], b3=series["3"][-80:], atr3=(atr(series["3"], 14)[-1] if len(series["3"]) >= 16 else None),
+                dirW=dW_signal, dirs_cloturees=dirs_cloturees, market=market,
+                ohlc15=b[-30:], b3=series["3"][-80:], atr3=(atr(series["3"], 14)[-1] if len(series["3"]) >= 16 else None),
                 struct_ut=_structures_ut(series))
 
 def analyser_avec_memoire(S, mem=None, market=None):
@@ -871,7 +969,11 @@ def analyser_avec_memoire(S, mem=None, market=None):
         rc = calculer_analyse(S2, stable=mem["stable"], comp_prev=mem.get("comp_prev"), market=market)
         sl_old, dir_fig = mem.get("sl"), mem.get("dir_fig") or 0
         franchi = sl_old is not None and ((dir_fig == -1 and rc["prix"] > sl_old) or (dir_fig == 1 and rc["prix"] < sl_old))
-        stable = dir_stable_pas(mem["stable"], rc["dirBrut"], rc["dirs"][4], rc["dirs"][7])
+        if market in ("GOLD", "NASDAQ"):
+            # S2 contient déjà la dernière M15 clôturée ; H1 doit aussi être lue sur sa clôture précédente.
+            stable = dir_stable_pas(mem["stable"], rc["dirBrut"], rc["dirs"][4], rc["dirs_cloturees"][7])
+        else:
+            stable = dir_stable_pas(mem["stable"], rc["dirBrut"], rc["dirs"][4], rc["dirs"][7])
         mem["comp_prev"] = rc["comp"]
         if franchi:
             mem["ret_dir"], mem["ret_age"] = -dir_fig, 0
@@ -953,11 +1055,16 @@ def entree_sniper(r):
 def _sniper(r):
     """(proposition ou None, raison du refus) : la raison sert au diagnostic du rejeu, jamais à Telegram."""
     d = r.get("dirPlan") or 0
-    dirs, a3, a15, a5, zp = r.get("dirs") or [], r.get("atr3"), r.get("atr"), r.get("atr5") or r.get("atr"), r.get("zone_pine")
+    dirs = (r.get("dirs_cloturees") or r.get("dirs") or []) if r.get("market") in ("GOLD", "NASDAQ") else (r.get("dirs") or [])
+    a3, a15, a5, zp = r.get("atr3"), r.get("atr"), r.get("atr5") or r.get("atr"), r.get("zone_pine")
     m1, b3 = r.get("m1") or [], r.get("b3") or []
     b5, b15 = (r.get("b5") or [])[:-1], (r.get("b15") or [])[:-1]          # la dernière bougie M5 / M15 est en formation
     if r.get("market") in ("GOLD", "NASDAQ") and len(dirs) >= 10 and (dirs[7] != d or dirs[9] != d):
         return None, f"CONFLUENCE_H1_H4 refusée : {r.get('market')} exige H1 et H4 dans le même sens que le plan (H1={dirs[7]}, H4={dirs[9]}, plan={d})"
+    if r.get("market") in ("GOLD", "NASDAQ") and len(dirs) >= 5 and (dirs[2] != d or dirs[4] != d):
+        return None, f"CONFLUENCE_M5_M15 refusée : {r.get('market')} exige M5 et M15 clôturés dans le même sens que le plan (M5={dirs[2]}, M15={dirs[4]}, plan={d})"
+    if r.get("market") in ("GOLD", "NASDAQ") and direction_confirmee_marche(r.get("market"), dirs, d, r) != d:
+        return None, "CONFLUENCE_PRIX_LIVE refusée : le cours direct est trop éloigné de la dernière clôture M5 ou son flux est périmé"
     if d not in (1, -1) or len(dirs) < 11 or not a3 or not a15 or not zp or len(m1) < 40 or len(b3) < 12 or len(b5) < 8 or len(b15) < 5:
         return None, f"DONNEES/PLAN absents (dirPlan={d}, zone={'oui' if zp else 'non'}, b3={len(b3)}, b5={len(b5)}, b15={len(b15)})"
     if (r["bull"] if d == 1 else r["bear"]) < MIN_ALIGN or r.get("sens") != d or dirs[9] == -d or dirs[7] == -d:
@@ -1328,6 +1435,8 @@ def strategie_alignement(dirs, d, dW=0, market=None):
     D = list(dirs or []) + [0] * 11
     if market in ("GOLD", "NASDAQ") and (D[7] != d or D[9] != d):
         return "", "EN ATTENTE", f"{market} : H4 et H1 doivent clôturer dans le même sens que le plan (H1={D[7]}, H4={D[9]}, plan={d})"
+    if market in ("GOLD", "NASDAQ") and (D[2] != d or D[4] != d):
+        return "", "EN ATTENTE", f"{market} : M5 et M15 doivent aussi clôturer dans le même sens (M5={D[2]}, M15={D[4]}, plan={d})"
     u = lambda i: D[i] == d
     o = lambda i: D[i] == -d
     uW, oW = dW == d, dW == -d
@@ -1372,7 +1481,8 @@ def retournement_confirme(cle, d, r):
 
 def strategie_trade(r, d):
     """Fige sur la position le type (SWING / DAY / SCALPING) lu au moment de l'entrée."""
-    strat, etat_, motif = strategie_alignement(r.get("dirs"), d, r.get("dirW") or 0, r.get("market"))
+    dirs_strat = r.get("dirs_cloturees") if r.get("market") in ("GOLD", "NASDAQ") else r.get("dirs")
+    strat, etat_, motif = strategie_alignement(dirs_strat, d, r.get("dirW") or 0, r.get("market"))
     return {"strat": strat, "strat_etat": etat_, "strat_motif": motif} if strat else {}
 
 
@@ -1441,10 +1551,11 @@ def ligne_retournement(r):
 def ligne_strategie(r):
     """Même lecture que la barre TradingView v24 : stratégie, état, score /100, motif."""
     d = r.get("dirPlan") or 0
-    strat, etat, motif = strategie_alignement(r.get("dirs"), d, r.get("dirW") or 0, r.get("market"))
+    dirs_strategie = (r.get("dirs_cloturees") or r.get("dirs") or []) if r.get("market") in ("GOLD", "NASDAQ") else (r.get("dirs") or [])
+    strat, etat, motif = strategie_alignement(dirs_strategie, d, r.get("dirW") or 0, r.get("market"))
     if not strat:
         return ligne_retournement(r) + [f"🏷 Stratégie : aucune — {motif}"]
-    total, p, dec = score_validation(strat, etat, r.get("dirs"), d, r.get("dirW") or 0, r.get("prix", 0),
+    total, p, dec = score_validation(strat, etat, dirs_strategie, d, r.get("dirW") or 0, r.get("prix", 0),
                                      r.get("plan"), r.get("atr", 0) or 0, r.get("rsis"), r.get("sens"),
                                      [x.get("v") for x in (r.get("b15") or [])])
     ic = "✅" if etat == "CONFIRMÉ" and total >= 75 else "⏳"
@@ -1475,7 +1586,8 @@ def lecture_unite_active(r):
 def strategie_mtf(r):
     """H4/H1 = fond, M15 = préparation, M5 = timing ; profil scalp/intraday/swing explicite."""
     fl = lambda x: "🟢⬆️" if x == 1 else "🔴⬇️" if x == -1 else "🟠➖"
-    D = r["dirs"]; d5, d15, d1h, d4h, dD = D[2], D[4], D[7], D[9], D[10]
+    D = r.get("dirs_cloturees") or r["dirs"] if r.get("market") in ("GOLD", "NASDAQ") else r["dirs"]
+    d5, d15, d1h, d4h, dD = D[2], D[4], D[7], D[9], D[10]
     profil = profil_strategie(r)
     l = ["🧭 STRATÉGIE MULTI-UT",
          f"🏔 Tendance principale 4 h : {fl(d4h)}",
@@ -1642,10 +1754,18 @@ def alerte_repli(out, m, r, cle, d, p):
                    + f"🕯 La moitié du dernier grand mouvement (vue 15 min){', ' + src if 'Fibonacci' not in src else ''}\n"
                    + "👀 Sois patient\n🔔 Je te préviens dès qu'on y est")
 
+def derniere_bougie_m5_declencheur(r, m):
+    """Dernière M5 clôturée pour GOLD/NASDAQ ; historique inchangé sur BTC."""
+    bars = r.get("b5") or []
+    if m in ("GOLD", "NASDAQ"):
+        bars = bars[:-1]
+    return bars[-1] if bars else None
+
+
 def rejet(r, d, e, a):
-    """Mèche de rejet + clôture : la dernière bougie 5 min (ou 15 min) terminée a piqué dans la zone
-    puis CLÔTURÉ en repartant dans le sens (grande mèche du côté de la zone, clôture du bon côté)."""
-    for b in r["b5"][-1:]:
+    """Mèche de rejet + clôture, calculée sur une M5 terminée pour GOLD/NASDAQ."""
+    b = derniere_bougie_m5_declencheur(r, r.get("market"))
+    for b in ([b] if b else []):
         rng = max(b["h"] - b["l"], 1e-9)
         if d == 1:
             meche = min(b["o"], b["c"]) - b["l"]
@@ -1677,16 +1797,25 @@ def niveau_cassure(r, d):
     return max(x["h"] for x in b) if d == 1 else min(x["l"] for x in b)
 
 def plan_cassure(r, d):
-    """Entrée sur cassure après clôture d'une bougie 5m au-delà des 20 précédentes."""
-    b = r["b5"]; a = r.get("atr5", r["atr"])
+    """GOLD/NASDAQ : cassure sur M5 clôturée ; BTC conserve le comportement historique."""
+    m = r.get("market")
+    b = r["b5"][:-1] if m in ("GOLD", "NASDAQ") else r["b5"]
+    a = r.get("atr5", r["atr"])
     if len(b) < 22:
         return None
-    L = niveau_cassure(r, d)
+    if m in ("GOLD", "NASDAQ"):
+        precedentes = b[-21:-1]
+        if len(precedentes) < 20 or len(r.get("r5") or []) < 2:
+            return None
+        L = max(x["h"] for x in precedentes) if d == 1 else min(x["l"] for x in precedentes)
+        rsi5 = r["r5"][-2]
+    else:
+        L = niveau_cassure(r, d)
+        rsi5 = r["r5"][-1]
     if L is None:
         return None
     c1, c0 = b[-1]["c"], b[-2]["c"]
     casse = (c1 > L + 0.05 * a and c0 <= L) if d == 1 else (c1 < L - 0.05 * a and c0 >= L)
-    rsi5 = r["r5"][-1]
     trop = (rsi5 >= 78) if d == 1 else (rsi5 <= 22)
     if not casse or trop:
         return None
@@ -1755,11 +1884,25 @@ def zone_repli(r, d):
 def etire(r, d):
     """Évite de poursuivre un mouvement déjà étiré selon le timing 5m, jamais selon le 15m."""
     p = r["m1"][-1]["c"]; a = r.get("atr5", r["atr"]); e = r.get("ema5", r["ema15"])
-    r5 = r["r5"][-1]
+    r5 = r["r5"][-2] if r.get("market") in ("GOLD", "NASDAQ") and len(r.get("r5") or []) >= 2 else r["r5"][-1]
     return (r5 >= 80 or p - e > 2 * a) if d == 1 else (r5 <= 20 or e - p > 2 * a)
 
 def prochaine(r, cle):
-    """Prochaine entrée attendue, avec la flèche et la couleur."""
+    """Prochaine entrée attendue ; GOLD/NASDAQ n'annoncent un sens qu'après quatre clôtures concordantes."""
+    if r.get("market") in ("GOLD", "NASDAQ"):
+        D = r.get("dirs_cloturees") or r.get("dirs") or []
+        if len(D) < 10:
+            return "🔜 Prochaine entrée : attente des clôtures M5 / M15 / H1 / H4"
+        d4, d1, d15, d5 = D[9], D[7], D[4], D[2]
+        if not d4:
+            return "🔜 Prochaine entrée : attente d'une direction claire en H4"
+        if d1 != d4:
+            return f"🔜 Prochaine entrée : attente H1 — H4 {SENS[d4]}, H1 pas encore alignée"
+        if d15 != d4 or d5 != d4:
+            etat = lambda x: "haussière" if x == 1 else "baissière" if x == -1 else "neutre"
+            return f"🔜 Prochaine entrée : ATTENTE — H1/H4 {SENS[d4]}, M15 {etat(d15)}, M5 {etat(d5)}. Pas de position avant l'accord des quatre clôtures."
+        if direction_confirmee_marche(r.get("market"), D, d4, r) != d4:
+            return "🔜 Prochaine entrée : ATTENTE — le cours en direct a déjà retracé contre la dernière clôture M5 ou le flux est périmé. J'attends une nouvelle clôture."
     d = r["confirme"]; R = dict(zip(UT, r["rsis"]))
     if d and etire(r, d):
         # Grosses UT en excès : le retournement est possible
@@ -3168,8 +3311,22 @@ def marche_demande(txt):
     return "GOLD"                   # demande générale = Gold uniquement
 
 def tendance_armee(r, cle):
-    """Une fois 4h + 1h alignées, la tendance reste armée pendant le repli 5m tant que les deux UT ne s'inversent pas."""
-    d = r["confirme"]
+    """La tendance reste armée pendant un repli, mais GOLD/NASDAQ ne réarment qu'après clôture M5/M15/H1/H4 concordante."""
+    m = r.get("market")
+    dirs = r.get("dirs_cloturees") or r.get("dirs") or []
+    d = direction_confirmee_marche(m, dirs, r.get("confirme"), r)
+    if m in ("GOLD", "NASDAQ"):
+        r["confirme"] = d
+        if d:
+            cle["arme"] = d
+            return r
+        a = cle.get("arme")
+        if a and direction_confirmee_marche(m, dirs, a, r) == a:
+            r["confirme"] = a
+            r["repli"] = True
+        elif a:
+            cle["arme"] = 0
+        return r
     if d:
         cle["arme"] = d
         return r
@@ -4048,6 +4205,12 @@ def reprise_entree(m, r, cle):
     if r.get("t", 0) - rp["t"] > 6 * 3600:
         cle.pop("reprise", None)
         return None
+    p_actuel = r["m1"][-1]["c"] if r.get("m1") else None
+    if p_actuel is not None and (p_actuel - rp["sl"]) * rp["d"] <= 0:
+        cle.pop("reprise", None)                       # le plan est cassé : même si les UT ne sont pas alignées
+        return None
+    if m in ("GOLD", "NASDAQ") and direction_confirmee_marche(m, r.get("dirs_cloturees") or r.get("dirs"), rp.get("d"), r) != rp.get("d"):
+        return None
     b5 = (r.get("b5") or [])[:-1]
     atr = r.get("atr") or 0
     p = r["m1"][-1]["c"] if r.get("m1") else None
@@ -4060,6 +4223,12 @@ def reprise_entree(m, r, cle):
     if abs(p - e) > 0.25 * atr or (b5[-1]["c"] - b5[-1]["o"]) * d <= 0:
         return None
     cle.pop("reprise", None)
+    if m in ("GOLD", "NASDAQ"):
+        tp2_txt = f" • 🏁 TP2 : {px(rp['tp2'])}" if rp.get("tp2") is not None and d * (rp["tp2"] - rp["tp1"]) > 0 else ""
+        return (f"🔁 REPRISE À L'ENTRÉE : {'LONG' if d == 1 else 'SHORT'} — {ICONE.get(m, '')} {m}\n"
+                f"🧲 Retour sur l'entrée {px(e)} avec clôture M5 dans le sens confirmé\n"
+                f"📍 Entrée : {px(e)} • 🛑 SL : {px(rp['sl'])} • 🎯 TP1 : {px(rp['tp1'])}{tp2_txt}\n"
+                "⚠️ Reprise uniquement après clôtures M5/M15/H1/H4 concordantes.")
     return (f"🔁 REPRISE À L'ENTRÉE : {'LONG' if d == 1 else 'SHORT'} — {ICONE.get(m, '')} {m}\n"
             f"🧲 Le prix est revenu sur l'entrée {px(e)}, comme prévu 😎\n"
             "🕯 La bougie 5 min reclôture dans notre sens\n"
@@ -4073,7 +4242,7 @@ def entree_retest(m, r, cle):
     5 min / 15 min / 1h sont d'accord ; GOLD/NASDAQ exigent aussi 4h dans le même sens (BTC conserve la règle historique), on propose l'entrée à la clôture, SL un tout petit peu
     sous (sur) la mèche de la dernière bougie. Une alerte par niveau toutes les 2 h ; le bot ne la prend pas lui-même."""
     b = (r.get("b15") or [])[:-1]
-    dirs = r.get("dirs") or []
+    dirs = (r.get("dirs_cloturees") or r.get("dirs") or []) if m in ("GOLD", "NASDAQ") else (r.get("dirs") or [])
     atr = r.get("atr") or 0
     if len(b) < 30 or len(dirs) < 10 or atr <= 0:
         return None
@@ -4081,6 +4250,8 @@ def entree_retest(m, r, cle):
     for d in (1, -1):
         h4_ok = dirs[9] == d if m in ("GOLD", "NASDAQ") else dirs[9] != -d
         if not (dirs[2] == d and dirs[4] == d and dirs[7] == d and h4_ok):
+            continue
+        if m in ("GOLD", "NASDAQ") and direction_confirmee_marche(m, dirs, d, r) != d:
             continue
         avant = b[-26:-6]
         niveau = max(y["h"] for y in avant) if d == 1 else min(y["l"] for y in avant)
@@ -4095,12 +4266,28 @@ def entree_retest(m, r, cle):
             return None
         vu[k] = r.get("t", 0)
         sl = (x["l"] - 0.1 * atr) if d == 1 else (x["h"] + 0.1 * atr)
+        entree = x["c"]
+        risque = abs(entree - sl)
+        if risque <= 0:
+            continue
+        (tp1, n1), (tp2, n2) = objectifs(r, d, entree, risque)
+        rr = abs(tp1 - entree) / risque
+        if d * (tp1 - entree) <= 0 or d * (tp2 - tp1) <= 0 or rr < GAIN_MIN:
+            continue
         ancien, nouveau = ("résistance", "support") if d == 1 else ("support", "résistance")
+        if m in ("GOLD", "NASDAQ"):
+            return (f"🎯 ENTRÉE POSSIBLE SUR RETEST : {'LONG' if d == 1 else 'SHORT'} — {ICONE.get(m, '')} {m}\n"
+                    f"🧱 L'ancienne {ancien} {px(niveau)} a été cassée à la clôture : elle devient {nouveau}\n"
+                    "🛑 Le prix est revenu dessus et le marché bloque (clôture 15 min du bon côté)\n"
+                    "✅ Clôtures M5 + M15 + H1 + H4 dans le même sens\n"
+                    f"📍 Entrée : {px(entree)}\n🛑 SL : {px(sl)}\n🎯 TP1 : {px(tp1)} ({n1})\n🏁 TP2 : {px(tp2)} ({n2})\n"
+                    f"⚖️ Gain/risque : 1:{rr:.1f}\n🛡 BE à +1R\n🤖 Signal à valider, le bot ne passe pas l'ordre\n"
+                    "⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
         return (f"🎯 ENTRÉE SUR RETEST : {'LONG' if d == 1 else 'SHORT'} — {ICONE.get(m, '')} {m}\n"
                 f"🧱 L'ancienne {ancien} {px(niveau)} a été cassée à la clôture : elle devient {nouveau}\n"
                 "🛑 Le prix est revenu dessus et le marché bloque (clôture 15 min du bon côté)\n"
-                f"✅ 5 min + 15 min + 1h d'accord" + (" + 4h confirmé" if m in ("GOLD", "NASDAQ") else "") + "\n"
-                f"📍 Entrée ≈ {px(x['c'])}\n🛑 SL {'juste sous' if d == 1 else 'juste au-dessus de'} la mèche : {px(sl)}\n"
+                "✅ 5 min + 15 min + 1h d'accord\n"
+                f"📍 Entrée ≈ {px(entree)}\n🛑 SL juste derrière la mèche : {px(sl)}\n"
                 "🛡 BE dès que le gain = le risque\n🤖 Le bot ne la prend pas lui-même\n⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
     return None
 
@@ -4112,7 +4299,7 @@ def radar_climax(m, r, cle):
     → BTC conserve l'alerte historique ; GOLD/NASDAQ restent en surveillance si H1 et H4 ne confirment pas le même sens.
     Une alerte par sens toutes les 2 h ; mémorise l'heure (radar_t) pour ne pas envoyer « FEINTE » juste après."""
     # 16/11 : le radar lisait « b15 » coupé à 30 bougies alors qu'il en faut 66 → il ne se déclenchait JAMAIS en réel (LONG raté).
-    dirs = r.get("dirs") or []
+    dirs = (r.get("dirs_cloturees") or r.get("dirs") or []) if m in ("GOLD", "NASDAQ") else (r.get("dirs") or [])
     b = (r.get("b15_long") or r.get("b15") or [])[:-1]  # la dernière est en formation
     if len(b) < 66:
         return None
@@ -4143,15 +4330,35 @@ def radar_climax(m, r, cle):
                 return None
             cle["radar_t"][str(sens)] = t
             cle["radar_dernier"] = t
-            if m in ("GOLD", "NASDAQ") and (len(dirs) < 10 or dirs[7] != sens or dirs[9] != sens):
-                h1_txt = "haussier" if len(dirs) > 7 and dirs[7] == 1 else "baissier" if len(dirs) > 7 and dirs[7] == -1 else "neutre"
-                h4_txt = "haussier" if len(dirs) > 9 and dirs[9] == 1 else "baissier" if len(dirs) > 9 and dirs[9] == -1 else "neutre"
+            if m in ("GOLD", "NASDAQ") and (len(dirs) < 10 or any(dirs[i] != sens for i in (2, 4, 7, 9))):
+                lib = lambda i: "haussier" if len(dirs) > i and dirs[i] == 1 else "baissier" if len(dirs) > i and dirs[i] == -1 else "neutre"
                 return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\n"
-                        f"Balayage et volume détectés, mais H1 est {h1_txt} et H4 {h4_txt}.\n"
-                        "⛔ Pas de position contre le biais H1/H4 : aucune entrée ni aucun SL/TP à prendre.\n"
-                        "⏳ J'attends que H1 et H4 confirment le même sens.")
+                        f"Clôtures M5={lib(2)}, M15={lib(4)}, H1={lib(7)}, H4={lib(9)} : elles ne confirment pas toutes le même sens.\n"
+                        "⛔ Pas de position : aucune entrée, aucun SL/TP à prendre pour l'instant.\n"
+                        "⏳ J'attends l'accord des quatre unités clôturées.")
+            if m in ("GOLD", "NASDAQ") and direction_confirmee_marche(m, dirs, sens, r) != sens:
+                return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\n"
+                        "Les clôtures sont alignées, mais le cours direct est trop éloigné de la dernière clôture M5 ou le flux est périmé.\n"
+                        "⛔ Pas de position : j'attends une nouvelle clôture M5.")
             e = cl[-1]
             mot = "plus bas" if sens == 1 else "plus haut"
+            if m in ("GOLD", "NASDAQ"):
+                risque = abs(e - sl)
+                if risque <= 0 or "grosses" not in r:
+                    return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\n"
+                            "Balayage détecté, mais niveaux TP/SL complets indisponibles.\n⛔ Aucune entrée publiée.")
+                (tp1, n1), (tp2, n2) = objectifs(r, sens, e, risque)
+                rr = abs(tp1 - e) / risque
+                if sens * (tp1 - e) <= 0 or sens * (tp2 - tp1) <= 0 or rr < GAIN_MIN:
+                    return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\n"
+                            "Le retournement est repéré, mais le gain/risque ne valide pas une position.\n⛔ Aucune entrée publiée.")
+                return (f"🔄 RETOURNEMENT CONFIRMÉ — {'LONG' if sens == 1 else 'SHORT'} POSSIBLE — {ICONE.get(m, '')} {m}\n"
+                        f"📊 Volume ×{vols[i] / moy:.1f} : épuisement détecté\n"
+                        f"🧹 Balayage du {mot} des 20 dernières bougies 15 min, clôture revenue\n"
+                        f"✅ Clôtures M5 + M15 + H1 + H4 dans le même sens\n"
+                        f"📍 Entrée : {px(e)}\n🛑 SL : {px(sl)}\n🎯 TP1 : {px(tp1)} ({n1})\n🏁 TP2 : {px(tp2)} ({n2})\n"
+                        f"⚖️ Gain/risque : 1:{rr:.1f}\n🤖 Signal à valider, aucun ordre automatique\n"
+                        "⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
             return (f"🔄 RETOURNEMENT : {'LONG' if sens == 1 else 'SHORT'} prenable — {ICONE.get(m, '')} {m}\n"
                     f"📊 Volume ×{vols[i] / moy:.1f} : le marché s'est épuisé\n"
                     f"🧹 Le {mot} des 20 dernières bougies 15 min a été balayé, puis la clôture est revenue\n"
@@ -4163,12 +4370,12 @@ def radar_climax(m, r, cle):
 
 def retournement_marche(m, r, cle):
     """v71 = Pine « RETOURNEMENT PAR MARCHÉ » (mesuré sur 60 jours de bougies 5 min) :
-    GOLD/NASDAQ : M5/M15 contre H1/H4 = observation uniquement, jamais une position avant confirmation H1+H4.
+    GOLD/NASDAQ : M5/M15 contre H1/H4 = observation uniquement, jamais une position avant confirmation des quatre clôtures.
     BTC conserve sa règle historique : M5 + M15 + H1 contre H4, avec les cibles et le SL existants.
     Une alerte par nouveau sens, jamais deux fois de suite."""
-    dirs = r.get("dirs") or []
-    b5, b15 = (r.get("b5") or [])[:-1], (r.get("b15_long") or r.get("b15") or [])[:-1]   # 16/11 : 41 bougies 15 min nécessaires (b15 = 30 → muet)
-    b1, b4 = r.get("b1h") or [], r.get("b4h") or []
+    dirs = (r.get("dirs_cloturees") or r.get("dirs") or []) if m in ("GOLD", "NASDAQ") else (r.get("dirs") or [])
+    b5, b15 = (r.get("b5") or [])[:-1], (r.get("b15_long") or r.get("b15") or [])[:-1]   # dernières bougies en formation exclues
+    b1, b4 = ((r.get("b1h") or [])[:-1], (r.get("b4h") or [])[:-1]) if m in ("GOLD", "NASDAQ") else (r.get("b1h") or [], r.get("b4h") or [])
     if len(dirs) < 10 or len(b5) < 6 or len(b15) < 41 or len(b1) < 6 or len(b4) < 6:
         return None
     d5, d15, d60, d240 = dirs[2], dirs[4], dirs[7], dirs[9]
@@ -4436,7 +4643,7 @@ def raison_attente(r, cle):
         return "Une position est déjà ouverte : le coach surveille le stop et les objectifs."
     if r.get("annonce"):
         return "Une annonce économique approche : aucune nouvelle entrée pendant cette période de risque."
-    dirs = r.get("dirs", [0] * 11)
+    dirs = (r.get("dirs_cloturees") or r.get("dirs") or [0] * 11) if r.get("market") in ("GOLD", "NASDAQ") else r.get("dirs", [0] * 11)
     d4h, d1h = dirs[9], dirs[7]
     if not d4h:
         return "La bougie 4 h ne donne pas de direction nette : le marché est neutre. Aucun LONG ni SHORT n'est proposé."
@@ -4444,6 +4651,12 @@ def raison_attente(r, cle):
     if d1h != d4h:
         etat_1h = "neutre" if not d1h else "dans le sens opposé"
         return f"La tendance 4 h est {sens}, mais la 1 h est {etat_1h}. J'attends une clôture 1 h qui confirme la 4 h."
+    if r.get("market") in ("GOLD", "NASDAQ") and (dirs[2] != d4h or dirs[4] != d4h):
+        etat_m5 = "haussière" if dirs[2] == 1 else "baissière" if dirs[2] == -1 else "neutre"
+        etat_m15 = "haussière" if dirs[4] == 1 else "baissière" if dirs[4] == -1 else "neutre"
+        return f"Le fond H4/H1 est {sens}, mais M15 est {etat_m15} et M5 {etat_m5}. J'attends que les quatre unités clôturent dans le même sens. Aucune position pour l'instant."
+    if r.get("market") in ("GOLD", "NASDAQ") and direction_confirmee_marche(r.get("market"), dirs, d4h, r) != d4h:
+        return "Le fond H4/H1 et les clôtures M5/M15 sont alignés, mais le cours direct a déjà retracé contre la dernière clôture M5 ou le flux est périmé. J'attends une nouvelle clôture. Aucune position pour l'instant."
     d = r.get("confirme") or d4h
     if etire(r, d):
         return f"La tendance {sens} est confirmée, mais le mouvement est déjà trop étendu. Je n'achète/vends pas au prix actuel : j'attends un repli."
@@ -7403,10 +7616,11 @@ def evenements_pine(etat, m, r, cle, now):
                 ev.append(dict(kind="scalp_inv", **base, si=si, dp=d))
     zp, strat = r.get("zone_pine"), r.get("strat") or ""
     zp = trait_indicateur(r, d) or zp                  # v24.3 : trait blanc « Clôture … ce trait » de l'indicateur sur la vue de validation
-    alignement_ok = strategie_alignement(r.get("dirs"), d, r.get("dirW") or 0, r.get("market"))[1] == "CONFIRMÉ"
+    dirs_confirmation = (r.get("dirs_cloturees") or r.get("dirs") or []) if m in ("GOLD", "NASDAQ") else (r.get("dirs") or [])
+    alignement_ok = strategie_alignement(dirs_confirmation, d, r.get("dirW") or 0, r.get("market"))[1] == "CONFIRMÉ"
     if m in ("GOLD", "NASDAQ"):
-        dirs_confirmation = r.get("dirs") or []
-        alignement_ok = alignement_ok and len(dirs_confirmation) > 9 and dirs_confirmation[7] == d and dirs_confirmation[9] == d
+        alignement_ok = alignement_ok and len(dirs_confirmation) > 9 and all(dirs_confirmation[i] == d for i in (2, 4, 7, 9))
+        alignement_ok = alignement_ok and direction_confirmee_marche(m, dirs_confirmation, d, r) == d
     if d and zp and strat and not cle.get("trade") and alignement_ok:
         barres = (r.get("m1") if strat == "SCALPING" else r.get("b5")) or []           # même bougie que le trait de l'indicateur (vue du plan)
         if len(barres) >= 3:
@@ -8984,10 +9198,14 @@ def fmt_trade(m, tr, p=None):
                 "⛔ Ne pas anticiper la clôture de confirmation. Le SL reste obligatoire.\n")
     if tr.get("retour"):
         tete = f"✅ RETOURNEMENT CONFIRMÉ : {'LONG' if d == 1 else 'SHORT'}\n" + tete
+    alignement_txt = ("🧭 Clôtures M5 + M15 + H1 + H4 concordantes" if m in ("GOLD", "NASDAQ")
+                      else "🧭 Fond H4 • confirmation H1 • préparation M15 • timing M5")
+    timing_txt = ("⏱ M15 confirme le sens • M5 déclenche après sa clôture" if m in ("GOLD", "NASDAQ")
+                  else "⏱ Vue d'entrée : 5 minutes (15M = préparation, M5 = timing après clôture confirmée)")
     return (f"{tete}\n"
             + resume +
-            f"🧭 Fond H4 • confirmation H1 • préparation M15 • timing M5\n"
-            f"⏱ Vue d'entrée : 5 minutes (15M = préparation, M5 = timing après clôture confirmée)\n\n"
+            f"{alignement_txt}\n"
+            f"{timing_txt}\n\n"
             f"🕯 EN BOUGIES (marche sur toutes les plateformes) :\n"
             f"1️⃣ 👀 Mets-toi en vue 5 minutes pour l'entrée\n"
             + (f"2️⃣ 🛑 SL : un tout petit peu {meche_sl(tr)} (structure 5 min)\n"
@@ -10059,7 +10277,12 @@ def suivre_apres_sl(out, m, r, cle, hi, lo):
 
 
 def agent(m, r, cle, ferme):
-    """Agent : tendance 4h + confirmation 1h → déclenchement sur bougie 5m clôturée."""
+    """BTC conserve H4/H1 + déclencheur M5 ; GOLD/NASDAQ exigent M5/M15/H1/H4 clôturés concordants."""
+    r.setdefault("market", m)
+    # Sans flux M1, l'agent ne peut ni calculer le prix ni valider une entrée ; il reste silencieux et ne plante pas.
+    if not (r.get("m1") or []) or len(r.get("r5") or []) < 2:
+        print(f"{m}: flux M1/RSI5 indisponible — aucune nouvelle position")
+        return []
     out = []
     tr = cle.get("trade")
     depuis = cle.get("t1m", 0)
@@ -10068,7 +10291,10 @@ def agent(m, r, cle, ferme):
     p = r["m1"][-1]["c"]
     hi = max(x["h"] for x in bougies); lo = min(x["l"] for x in bougies)
     d = r["confirme"]
-    r5, r5p = r["r5"][-1], r["r5"][-2]
+    if m in ("GOLD", "NASDAQ"):
+        r5, r5p = (r["r5"][-2], r["r5"][-3]) if len(r.get("r5") or []) >= 3 else (50, 50)
+    else:
+        r5, r5p = r["r5"][-1], r["r5"][-2]
     ctx = f"Contexte : {zone_txt(r['posD'])} Daily, {zone_txt(r['posW'])} Weekly."
     try:
         manipulation(out, m, r, cle)
@@ -10254,14 +10480,16 @@ def agent(m, r, cle, ferme):
                         bouton_auto(m)))
         # Surcharge sur PLUSIEURS UT : 5m obligatoire + au moins 1 parmi 10m/15m/30m + confirmation 1h
         R = dict(zip(UT, r["rsis"]))
+        rsi5_contexte = r["r5"][:-1] if m in ("GOLD", "NASDAQ") else r["r5"]
+        dirs_contexte = r.get("dirs_cloturees") if m in ("GOLD", "NASDAQ") else r["dirs"]
         if d == 1:
-            r5ok = min(r["r5"]) <= 35
+            r5ok = min(rsi5_contexte) <= 35
             petites = [u for u in ("10", "15", "30") if R[u] <= 40]
-            conf1h = R["1h"] < 65 and r["dirs"][9] == d      # 1 h pas en excès, 4 h toujours dans le sens
+            conf1h = R["1h"] < 65 and dirs_contexte[9] == d
         else:
-            r5ok = max(r["r5"]) >= 65
+            r5ok = max(rsi5_contexte) >= 65
             petites = [u for u in ("10", "15", "30") if R[u] >= 60]
-            conf1h = R["1h"] > 35 and r["dirs"][9] == d
+            conf1h = R["1h"] > 35 and dirs_contexte[9] == d
         surcharge = r5ok and len(petites) >= 1 and conf1h
         detail = f"RSI 5m {r5:.0f} • " + " • ".join(f"{u}m {R[u]:.0f}" for u in ("10", "15", "30")) + f" • 1h {R['1h']:.0f}"
         if touche:
@@ -10297,7 +10525,10 @@ def agent(m, r, cle, ferme):
             # 1) mèche de rejet + clôture  2) manipulation confirmée dans notre sens  3) bougie 15 min qui clôture dans le bon sens
             a_ = r.get("atr5", r["atr"]); bj = rejet(r, d, o["e"], a_); raison = "Mèche de rejet + clôture 5 min"
             # Une manipulation repérée en 15m reste informative ; elle ne déclenche jamais une entrée.
-            x5 = r["b5"][-1]; rg = max(x5["h"] - x5["l"], 1e-9)
+            x5 = derniere_bougie_m5_declencheur(r, m)
+            if x5 is None:
+                return out
+            rg = max(x5["h"] - x5["l"], 1e-9)
             if not bj and x5["t"] != cle.get("conf_t") and (
                     (d == 1 and x5["l"] <= o["zb"] + 0.1 * a_ and x5["c"] > x5["o"] and x5["c"] >= x5["l"] + 0.55 * rg and x5["c"] > o["za"] and r5 > r5p) or
                     (d == -1 and x5["h"] >= o["za"] - 0.1 * a_ and x5["c"] < x5["o"] and x5["c"] <= x5["h"] - 0.55 * rg and x5["c"] < o["zb"] and r5 < r5p)):
@@ -11800,10 +12031,15 @@ def un_tour(etat, chats):
             recevoir_updates_telegram(etat, chats, demandes)
             if SHUTDOWN_REQUESTED.is_set():
                 return
-            r["market"] = nom_marche  # applique les confirmations H1/H4 spécifiques à GOLD/NASDAQ avant le SNIPER
-            r["sniper"] = entree_sniper(r)  # recalcul après attribution du marché : calculer_analyse ne connaît pas encore GOLD/NASDAQ
+            r["market"] = nom_marche
             r["tv_indicator_mtf"] = fetch_tv_mtf(pair)
+            r["require_tv_bridge"] = nom_marche in ("GOLD", "NASDAQ")
             fusionne_lectures_tradingview(r)
+            # Revalider après lecture du bridge : Gold/Nasdaq ne peuvent pas ouvrir de position sans ROBOT V12 M5/M15/H1 frais.
+            r["confirme"] = direction_confirmee_marche(
+                nom_marche, r.get("dirs_cloturees") or r.get("dirs"), r.get("confirme"), r
+            )
+            r["sniper"] = entree_sniper(r)
         except Exception as ex:
             print(nom_marche, "erreur", ex)
             if TOKEN:
