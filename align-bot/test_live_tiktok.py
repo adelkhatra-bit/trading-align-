@@ -917,3 +917,34 @@ class LiveMarketPartialAiCoverage(unittest.TestCase):
         self.assertEqual(set(payload), {"BTC", "GOLD", "NASDAQ"})
         self.assertTrue(all(len(payload[m]) == 2 for m in payload))
         self.assertIn("biais reste baissier", payload["GOLD"][0][0].lower())
+
+
+class LiveNarrationPrioritizesLiquiditySweep(unittest.TestCase):
+    def test_closed_reversal_watch_overrides_generic_ai_line(self):
+        data = {"marches": {
+            "GOLD": {
+                "biais_plan": "neutre",
+                "confirmation_4h_1h": "non alignées",
+                "surveillance_retournement": {"direction": 1, "type": "reprise_haussiere_apres_chasse"}
+            }
+        }}
+        ai = (
+            "GOLD | Le marché consolide dans sa zone technique et attend une clôture plus claire. | "
+            "The market is consolidating in its technical area and awaits a clearer close.\n"
+            "GOLD | Le rythme ralentit avant la prochaine impulsion et la structure reste à surveiller. | "
+            "Momentum is slowing before the next impulse and structure remains in focus."
+        )
+        published = []
+        with (
+            mock.patch.object(ab, "LIVE_IA_INTERVALLE", 180),
+            mock.patch.object(ab, "live_actif", return_value=True),
+            mock.patch.object(ab, "contexte_technique_live", return_value=data),
+            mock.patch.object(ab, "ia", return_value=ai),
+            mock.patch.object(ab, "live_publier", side_effect=lambda message: published.append(message) or True)
+        ):
+            self.assertTrue(ab.live_phrases_ia({}, 1000, {}))
+        payload = json.loads(published[0][3:])
+        self.assertIn("balayé un support", payload["GOLD"][1][0])
+        self.assertIn("reversal still needs confirmation", payload["GOLD"][1][1])
+
+
