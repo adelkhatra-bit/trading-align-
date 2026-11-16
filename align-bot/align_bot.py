@@ -3083,6 +3083,8 @@ def activer_coach_optin(etat, cid, marche, actif=True):
     cid = str(cid)
     liste = etat.setdefault("coach_optin", {}).setdefault(marche, [])
     if actif:
+        # Une activation explicite du Coach réactive le bot pour ce chat.
+        etat["bot_off"] = [str(x) for x in etat.get("bot_off", []) if str(x) != cid]
         if cid not in {str(x) for x in liste}:
             liste.append(cid)
         # Le bouton d'activation ajoute ce marché à la sélection sans désabonner les autres.
@@ -4808,23 +4810,34 @@ def menu_bot(etat, cid):
                                        + ([[{"text": "🛠 ADMIN : trading auto (démarrer / arrêter)", "callback_data": "autoadm:menu"}],
                                            [{"text": "👁 Tester la version gratuite", "callback_data": "vuegratuit:on"}]] if str(cid) in {str(x) for x in proprio(etat)} else [])}))
 
+def purger_messages_en_attente(etat, cid):
+    """Supprime les notifications Telegram en attente quand l'utilisateur coupe le bot."""
+    cid = str(cid)
+    file_ = etat.setdefault("telegram_outbox", [])
+    avant = len(file_)
+    etat["telegram_outbox"] = [x for x in file_ if str(x.get("chat_id", "")) != cid]
+    return avant - len(etat["telegram_outbox"])
+
+
 def regler_bot(etat, cid, on):
     off = etat.setdefault("bot_off", [])
     if on and cid in off:
         off.remove(cid)
     elif not on and cid not in off:
         off.append(cid); stats_bot(etat, cid)["arrets"] += 1
+    if not on:
+        purger_messages_en_attente(etat, cid)
     if vue_gratuite(etat, cid):
         dedans = en_position(etat, cid)
         txt = (("✅ C'est noté : je te propose la prochaine position" if str(cid) not in etat.get("bienvenue", {})
                 else "✅ C'est noté\n🎁 Ta position du jour est déjà utilisée : la prochaine demain") if on else
-               "⏸ C'est noté : plus de position proposée\n▶️ Réactive quand tu veux : 🤖 Mon bot")
+               "⏸ C'est noté : aucune notification privée ne sera envoyée\n▶️ Réactive quand tu veux : 🤖 Mon bot")
         if dedans:
             txt += f"\n🎯 Ta position {', '.join(dedans)} reste suivie jusqu'au TP / SL"
         _envoi_sur(cid, reply_markup=CLAVIER_VISITEUR, text=txt)
         return
     _envoi_sur(cid, reply_markup=CLAVIER, text=("▶️ Ton bot est relancé\n🤖 Il entre tout seul dans la prochaine position" if on
-                                                else "⏸ Ton bot est arrêté\n🔔 Tu reçois toujours les positions\n▶️ Relance-le avec 🤖 Mon bot"))
+                                                else "⏸ Ton bot est arrêté\n🔕 Aucune notification privée ne sera envoyée\n▶️ Relance-le avec 🤖 Mon bot"))
 
 def entrer_inscrits(etat, m, tr, chats=()):
     """Le bot vient d'entrer : il fait entrer automatiquement tous les membres dont le bot est ON,
@@ -4834,9 +4847,7 @@ def entrer_inscrits(etat, m, tr, chats=()):
     auto = [str(c) for c in chats if coach_abonne(etat, c, m) and marche_autorise(etat, c, m)
             and not vue_gratuite(etat, c) and str(c) != str(etat.get("canal") or "")]
     ponctuels = [str(c) for c in etat.get("auto", {}).pop(m, [])]
-    # Le clic explicite « activer le coach » migre la file ponctuelle vers un consentement persistant.
-    for cid in ponctuels:
-        activer_coach_optin(etat, cid, m, True)
+    # La file ponctuelle ne devient jamais un abonnement Coach permanent.
     for cid in list(dict.fromkeys(ponctuels + auto)):
         if not bot_on(etat, cid) or not marche_autorise(etat, cid, m):
             continue
@@ -4935,7 +4946,7 @@ def texte_prix_topstep(m, tr, prix_graphique, prix_fut):
 def prix_topstep_inscrits(etat, m, tr, prix_graphique):
     """Envoie les niveaux Topstep à ceux qui ont choisi « Topstep » (le prix du contrat est lu en direct sur l'API)."""
     qui = [c for c, v in (etat.get("plateforme") or {}).items()
-           if v in ("topstep", "deux") and marche_autorise(etat, c, m)
+           if v in ("topstep", "deux") and bot_on(etat, c) and marche_autorise(etat, c, m)
            and (coach_abonne(etat, c, m)
                 or (isinstance((tr.get("qui") or {}).get(str(c)), dict)
                     and not (tr.get("qui") or {}).get(str(c), {}).get("fini")))]
@@ -5531,8 +5542,11 @@ def notifier_coach_live(etat, m, r, cle):
                 if _envoi_sur(cid, text=flash) is not None:
                     info["flash_t"] = time.time()
             continue
-        info["dernier_t"] = int(b["t"])          # marqué avant l'envoi : jamais de doublon
-        _envoi_sur(cid, text=texte_coach_live(m, b, r, cle, positions_bot(etat)), reply_markup=markup_analyse(etat, m, r, cid))
+        # N'avance le curseur qu'après un envoi confirmé : un échec Telegram sera retenté au prochain cycle.
+        envoye = _envoi_sur(cid, text=texte_coach_live(m, b, r, cle, positions_bot(etat)),
+                            reply_markup=markup_analyse(etat, m, r, cid))
+        if envoye is not None:
+            info["dernier_t"] = int(b["t"])
 
 
 def activer_coach_live(etat, cid, m, actif=True):
