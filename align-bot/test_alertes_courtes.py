@@ -86,17 +86,27 @@ class EvenementsPine(unittest.TestCase):
     NOW = utc(2026, 11, 11, 15, 0)
 
     def r(self, **kw):
-        barres = [{"t": self.NOW - 900 * (30 - i), "o": 100.0, "h": 101.0, "l": 99.0, "c": 100.5} for i in range(30)]
-        base = {"dirPlan": 1, "bull": 5, "bear": 2, "sens": 1, "pctH": 70, "strat": "", "dirs": [1] * 11, "dirW": 0, "atr": 2.0, "prix": 100.5, "comp": 0, "sqzs": [0] * 11,
-                "b15": barres, "b5": barres, "b1h": barres, "m1": [{"t": self.NOW - 30, "o": 100, "h": 101, "l": 99, "c": 100.5}] * 5,
+        def bars(interval):
+            return [{"t": self.NOW - interval * (30 - i), "o": 100.0, "h": 101.0, "l": 99.0, "c": 100.5, "v": 10.0}
+                    for i in range(30)]
+        base = {"dirPlan": 1, "bull": 5, "bear": 2, "sens": 1, "pctH": 70, "strat": "", "dirs": [1] * 11, "dirW": 0, "atr": 2.0, "atr5": 1.0, "prix": 100.5, "comp": 0, "sqzs": [0] * 11,
+                "b15": bars(900), "b5": bars(300), "b1h": bars(3600), "b4h": bars(14400),
+                "m1": [{"t": self.NOW - 30, "o": 100, "h": 101, "l": 99, "c": 100.5}] * 5,
                 "zone_pine": {"za": 98.0, "zb": 100.0, "zmil": 99.0}, "ret_dir": 0, "ret_conf": False}
         base.update(kw)
+        if "dirs_cloturees" not in kw:
+            base["dirs_cloturees"] = list(base.get("dirs") or [])
         return base
 
     def lance(self, etat, m, r, now=None):
         now = now or self.NOW
         if not r.get("_vieux"):
-            r = dict(r, m1=[{"t": now - 30, "o": 100, "h": 101, "l": 99, "c": 100.5}] * 5)      # cotation fraîche à chaque lecture
+            r = dict(r)
+            delta = now - self.NOW
+            if delta >= 300:  # ne déplacer les bougies que lorsqu'un nouveau cycle de marché est simulé
+                for key in ("b5", "b15", "b1h", "b4h"):
+                    r[key] = [dict(x, t=x["t"] + delta) for x in (r.get(key) or [])]
+            r["m1"] = [{"t": now - 30, "o": 100, "h": 101, "l": 99, "c": 100.5}] * 5
         with patch.object(ab, "cme_ouvert", return_value=True):
             return ab.evenements_pine(etat, m, r, etat.setdefault(m, {}), now)
 
@@ -156,10 +166,10 @@ class EvenementsPine(unittest.TestCase):
         r["b5"][-3] = dict(r["b5"][-3], c=98.5); r["b5"][-2] = dict(r["b5"][-2], c=99.6)
         self.assertEqual(self.kinds(self.lance(etat, "GOLD", r)), ["confirmation"])
         r2 = self.r(dirPlan=1, strat="DAY", dirs=r["dirs"])
-        r2["b5"] = [dict(x, t=x["t"] + 900) for x in r["b5"]]                                   # nouvelle bougie, même croisement
+        r2["b5"] = [dict(x) for x in r["b5"]]                                                   # nouvelle bougie, même croisement
         self.assertEqual(self.lance(etat, "GOLD", r2, self.NOW + 900), [])
         r3 = self.r(dirPlan=1, strat="DAY", dirs=r["dirs"])
-        r3["b5"] = [dict(x, t=x["t"] + 4000) for x in r["b5"]]
+        r3["b5"] = [dict(x) for x in r["b5"]]
         self.assertEqual(self.kinds(self.lance(etat, "GOLD", r3, self.NOW + 4000)), ["confirmation"])   # période écoulée : de nouveau possible
 
     def test_rising_alignment_below_threshold_is_silent(self):

@@ -44,6 +44,15 @@ class RetournementParMarche(unittest.TestCase):
         self.assertIn("le 1h a suivi", t)
         self.assertIn("Cible 1", t)
 
+    def test_btc_reversal_uses_closed_higher_timeframe_readings(self):
+        r = r_(LONG_BTC)
+        r["dirs"] = list(LONG_BTC)
+        r["dirs_cloturees"] = list(LONG_GOLD)  # H1/H4 clôturées restent baissières
+        self.assertIsNone(ab.retournement_marche("BTC", r, {}))
+        r["dirs_cloturees"] = list(LONG_BTC)  # H1 clôturée confirme le retournement, H4 reste contre
+        msg = ab.retournement_marche("BTC", r, {})
+        self.assertIn("le 1h a suivi", msg)
+
     def test_nasdaq_demande_du_volume_et_ne_donne_pas_de_position_inverse(self):
         self.assertIsNone(ab.retournement_marche("NASDAQ", r_(LONG_GOLD, vol_dernier=100), {}))
         t = ab.retournement_marche("NASDAQ", r_(LONG_GOLD, vol_dernier=500), {})

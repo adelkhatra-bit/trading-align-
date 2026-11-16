@@ -1,6 +1,7 @@
 import json
 import sys
 import unittest
+import time
 import unittest.mock
 from pathlib import Path
 
@@ -45,22 +46,23 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
 
     def test_gold_and_nasdaq_reversal_watch_remains_available(self):
         # M5/M15 turn bullish while H1/H4 remain bearish: observation only.
+        now = int(time.time())
         dirs = [0] * 11
         dirs[2], dirs[4], dirs[7], dirs[9] = 1, 1, -1, -1
-        b15 = [{"t": i * 900, "o": 99.0, "h": 101.0, "l": 98.0, "c": 100.0, "v": 10.0}
+        b15 = [{"t": now - 900 * (42 - i), "o": 99.0, "h": 101.0, "l": 98.0, "c": 100.0, "v": 10.0}
                for i in range(42)]
         b15[-2]["v"] = 20.0
-        b1 = [{"h": 105.0, "l": 95.0} for _ in range(6)]
-        b4 = [{"h": 110.0, "l": 90.0} for _ in range(6)]
-        r = {"dirs": dirs, "b5": [{"h": 101.0, "l": 98.0} for _ in range(7)],
-             "b15": b15, "b1h": b1, "b4h": b4, "m1": [{"c": 100.0}], "t": 999999}
+        b1 = [{"t": now - 3600 * (7 - i), "h": 105.0, "l": 95.0} for i in range(7)]
+        b4 = [{"t": now - 14400 * (7 - i), "h": 110.0, "l": 90.0} for i in range(7)]
+        b5 = [{"t": now - 300 * (7 - i), "h": 101.0, "l": 98.0} for i in range(7)]
+        r = {"dirs": dirs, "dirs_cloturees": dirs.copy(), "b5": b5, "b15": b15, "b15_long": b15,
+             "b1h": b1, "b4h": b4, "m1": [{"t": now - 30, "c": 100.0}], "t": now}
         for market in ("GOLD", "NASDAQ"):
             cle = {}
             alert = align_bot.retournement_marche(market, r, cle)
             self.assertIsNotNone(alert, market)
             self.assertIn("RETOURNEMENT EN OBSERVATION", alert)
             self.assertIn("PAS DE POSITION", alert)
-
 
 
     def test_pre_entry_order_is_recorded_without_fake_trade_identity(self):

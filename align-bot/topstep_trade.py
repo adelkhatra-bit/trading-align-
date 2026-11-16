@@ -74,7 +74,7 @@ def annonces(etat, maintenant=None):
 
 
 def ticks(distance, taille_tick, valeur_tick):
-    """Nombre de ticks du SL (élargi ×1,25), plafonné à 100 $ de perte pour 1 micro-contrat."""
+    """Nombre de ticks du SL (élargi ×1,25), plafonné à 75 $ de perte pour l’unique micro-contrat."""
     t = int(abs(distance) * SL_ELARGI / taille_tick)
     return max(1, min(t, int(PERTE_POSITION_MAX / valeur_tick)))
 
@@ -142,10 +142,8 @@ def executer(etat, signal, journal=print):
         return {"ok": False, "raison": "gain visé < 2 × le risque : on n'entre pas"}   # règle d'Adel : 100 $ seulement pour 1:3, 60 $ pour 1:2
     plafond = PERTE_POSITION_MAX if rr >= 3 and not signal.get("contre") else 60.0   # contre-tendance : 60 $ max (16/11)
     tk = min(ticks(signal["e"] - signal["sl"], ts, tv), int(plafond / tv))
-    n = nb_contrats(tk, tv) if 2 * tk * tv <= plafond else CONTRATS
-    # Demande d'Adel (15/11) : sur Topstep une seule position → pas de TP posé d'avance. Le bot GARDE la position :
-    # 2 contrats si le risque tient dans 75 $ → 50 % coupés au TP1 + SL à l'entrée (BE), le reste vise le TP2 ;
-    # sinon 1 contrat → au TP1 le SL passe à BE et on garde jusqu'au TP2.
+    n = CONTRATS
+    # Topstep : une seule position d’un micro-contrat. Au TP1, SL à BE, puis suivi jusqu’au TP2.
     ordre = {"accountId": int(COMPTE), "contractId": c["id"], "type": 2, "side": 0 if signal["sens"] == "LONG" else 1,
              "size": n, "stopLossBracket": {"ticks": tk, "type": 4}}
     try:
@@ -170,8 +168,8 @@ def executer(etat, signal, journal=print):
 
 
 def nb_contrats(tk, valeur_tick):
-    """2 micro-contrats seulement si le risque total (2 × SL) reste dans les 75 $ par position, sinon 1."""
-    return 2 if 2 * tk * valeur_tick <= PERTE_POSITION_MAX else CONTRATS
+    """Topstep : exactement un micro-contrat, quel que soit le risque calculé."""
+    return CONTRATS
 
 
 def dernier_prix(jeton, contrat_id):
