@@ -265,7 +265,7 @@ def yahoo_or(interval):
         # Dernière minute = prix spot EN DIRECT (comme le graphique XAUUSD), pour ne pas avoir 10 min de retard
         t = int(time.time()) // 60 * 60
         if t > out[-1]["t"]:
-            out.append(dict(t=t, o=out[-1]["c"], h=max(out[-1]["c"], spot), l=min(out[-1]["c"], spot), c=spot))
+            out.append(dict(t=t, o=out[-1]["c"], h=max(out[-1]["c"], spot), l=min(out[-1]["c"], spot), c=spot, forming=True))
     return out
 
 def paxg_or(interval):
@@ -294,7 +294,7 @@ def paxg_or(interval):
     if interval == 1 and spot and out:
         t = int(time.time()) // 60 * 60
         if t > out[-1]["t"]:
-            out.append(dict(t=t, o=out[-1]["c"], h=max(out[-1]["c"], spot), l=min(out[-1]["c"], spot), c=spot))
+            out.append(dict(t=t, o=out[-1]["c"], h=max(out[-1]["c"], spot), l=min(out[-1]["c"], spot), c=spot, forming=True))
     return out
 
 def yahoo_nasdaq(interval):
@@ -344,7 +344,7 @@ def yahoo_nasdaq(interval):
         t = int(time.time()) // 60 * 60
         p_ = nq_live + e
         if t > out[-1]["t"]:
-            out.append(dict(t=t, o=out[-1]["c"], h=max(out[-1]["c"], p_), l=min(out[-1]["c"], p_), c=p_))
+            out.append(dict(t=t, o=out[-1]["c"], h=max(out[-1]["c"], p_), l=min(out[-1]["c"], p_), c=p_, forming=True))
     return out
 
 def nasdaq_direct():
@@ -482,11 +482,12 @@ def etat_ut(b):
 def directions_cloturees(series):
     """Sens EMA20/50 calculé sur la dernière bougie TERMINÉE de chaque UT.
     Les UT agrégées (3/10/45/2h) sont déjà complètes via regrouper()."""
-    en_formation = {"1", "5", "15", "30", "1h", "4h", "D"}
     out = []
     for k in UT:
         bars = list(series.get(k) or [])
-        if k in en_formation and bars:
+        # Les adaptateurs retirent déjà les bougies incomplètes de M5 à Weekly.
+        # Seules les minutes live ajoutées au flux portent explicitement forming=True.
+        if bars and bars[-1].get("forming") is True:
             bars = bars[:-1]
         out.append(etat_ut(bars)[0] if len(bars) >= 50 else 0)
     return out
@@ -580,7 +581,7 @@ def direct_btc(m1, pair):
         v = float(next(iter(j["result"].values()))["c"][0])
         t = int(time.time()) // 60 * 60
         if m1 and t > m1[-1]["t"]:
-            return m1 + [dict(t=t, o=m1[-1]["c"], h=max(m1[-1]["c"], v), l=min(m1[-1]["c"], v), c=v)]
+            return m1 + [dict(t=t, o=m1[-1]["c"], h=max(m1[-1]["c"], v), l=min(m1[-1]["c"], v), c=v, forming=True)]
     except Exception as ex:
         print("direct", ex)
     return m1
