@@ -4993,7 +4993,7 @@ def signature_cloture(texte):
         garde.append(re.sub(r"[\d.,]+", "#", l.strip()))          # les niveaux qui bougent de quelques points ne changent pas la décision
     return "|".join(garde)
 
-COACH_LIVE_DUREE = 2 * 3600          # le coach en direct parle 2 h, puis demande si on continue
+# Le coach LIVE reste actif jusqu'à l'arrêt manuel de l'utilisateur.
 
 
 def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
@@ -5389,11 +5389,6 @@ def notifier_coach_live(etat, m, r, cle):
             _envoi_sur(cid, text=f"🎙 Ton commentateur {ICONE.get(m, '')} {m}\n👉 Il est dans ta chaîne\n🔕 Ici, plus de doublon",
                        reply_markup=json.dumps({"inline_keyboard": [[{"text": f"🎙 Ouvrir {m}", "url": LIENS_CHAINES.get(m, BOT_LIEN)}]]}))
             continue
-        if time.time() >= float(info.get("expire", 0)):
-            abonnes.pop(cid, None)
-            _envoi_sur(cid, text=f"⏹ COACH EN DIRECT TERMINÉ — {ICONE.get(m, '')} {m}\n🙌 2 h ensemble, merci !\n🔁 On continue ?",
-                       reply_markup=json.dumps({"inline_keyboard": [[{"text": "🔴 Oui, 2 h de plus", "callback_data": f"coachlive:{m}"}]]}))
-            continue
         if int(info.get("dernier_t", 0)) >= int(b["t"]):
             flash = flash_commentateur(m, r, cle)
             if flash and time.time() - float(info.get("flash_t", 0)) >= 300:
@@ -5409,8 +5404,11 @@ def notifier_coach_live(etat, m, r, cle):
 def activer_coach_live(etat, cid, m, actif=True):
     abonnes = etat.setdefault("coach_live", {}).setdefault(m, {})
     if actif:
+        # Cliquer explicitement sur le coach le réactive même si le bot avait été mis en pause.
+        etat["bot_off"] = [x for x in etat.get("bot_off", []) if str(x) != str(cid)]
         dernier = int(((DERNIERS.get(m) or {}).get("b15") or [{"t": 0}, {"t": 0}])[-2]["t"]) if len((DERNIERS.get(m) or {}).get("b15") or []) > 1 else 0
-        abonnes[str(cid)] = {"expire": time.time() + COACH_LIVE_DUREE, "dernier_t": dernier}
+        # Pas d'expiration automatique : surveillance jusqu'à l'arrêt manuel.
+        abonnes[str(cid)] = {"dernier_t": dernier}
     else:
         abonnes.pop(str(cid), None)
 
@@ -6659,8 +6657,9 @@ def traiter(etat, chats, updates):
                     pass
                 if choix == "coachlive":
                     intro = (f"🎙 COACH COMMENTATEUR ACTIVÉ — {ICONE.get(mk, '')} {mk}\n"
-                             "🕯 Je commente chaque clôture 15 min pendant 2 h\n"
-                             "📺 Garde le LIVE à côté : tu reçois l'explication avec les boutons d'analyse.\n"
+                             "🔎 Surveillance continue : je cherche une configuration d'entrée confirmée, sans inventer de signal.\n"
+                             "🕯 Je commente les clôtures M15 et les changements importants jusqu'à détection d'une position.\n"
+                             "📍 Dès qu'une position est ouverte par ALIGN, je poursuis son suivi.\n"
                              "⏹ Pour arrêter : le bouton sous mes messages.")
                     contenu = intro
                     clavier = None
