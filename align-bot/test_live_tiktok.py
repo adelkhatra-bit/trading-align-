@@ -38,7 +38,7 @@ class LiveTikTok(unittest.TestCase):
     def test_installer_menu_actualise_la_commande_live(self):
         etat = {"menu": 10}
         ab.installer_menu(etat)
-        self.assertEqual(etat.get("menu"), 11)
+        self.assertEqual(etat.get("menu"), 12)
         commandes = [kw for methode, kw in self.tg if methode == "setMyCommands"]
         self.assertEqual(len(commandes), 2)
         fr = json.loads(commandes[0]["commands"])
