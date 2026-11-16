@@ -631,7 +631,7 @@
     b.style.background = x >= 0 ? 'linear-gradient(135deg,#0f9d58,#0b7a43)' : 'linear-gradient(135deg,#c62828,#8e1b1b)';
     b.innerHTML = '<small>' + (en ? '💰 ALIGN LIVE • REAL ACCOUNTS • ' : '💰 ALIGN EN DIRECT • VRAIS COMPTES • ') + esc(m || '') + '</small>'
       + (x >= 0 ? '+' : '−') + Math.abs(x).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' $'
-      + '<small>' + (en ? 'too late to get in 😏 next one: link in bio' : 'trop tard pour rentrer 😏 la prochaine : lien en bio') + '</small>';
+      + '<small>' + (en ? 'Do not enter late • next setup: link in bio' : 'Ne rentre pas en retard • prochaine configuration : lien en bio') + '</small>';
   }
   function recu(txt) {
     txt = String(txt || '').trim(); if (!txt) return;
@@ -1264,14 +1264,14 @@
   // v8.9 (demande d'Adel) : pub légère pendant qu'on attend le TP, jamais de prix
   const POS_TXT = ['🔥 LA TEAM, Y\'A DU MONDE DANS LE TRAIN ? 🚂 si t\'es dedans tapote l\'écran et écris OUI 👇 • partage le live pour qu\'il reste tout en haut 🙏',
     '🚀 TU VEUX FAIRE PARTIE DE L\'AVENTURE ? viens tester GRATUITEMENT en compte démo, zéro risque 😉 • tout est dans le lien en bio 👉',
-    '😎 ALIGN EST DÉJÀ DEDANS DEPUIS UN MOMENT… ET LE MARCHÉ SUIT LE PLAN 🍿 • trop tard pour monter : on ne court jamais après un train qui roule 🚄 • t\'es dedans ? tapote 👆 et écris OUI 👇 • tu l\'as loupé ? la prochaine fois, le lien en bio te prévient AVANT 😉',
+    '😎 ALIGN SUIT SON PLAN… on ne court jamais après un mouvement déjà parti 🚄 • si tu veux suivre la prochaine configuration, consulte le lien en bio',
     '😏 JE SUIS DEDANS AVEC VOUS LA TEAM ! qui est rentré avec moi ? tapote l\'écran 👆 • qui pensait que le marché allait me contredire ? 😝',
     '🍿 ALIGN EST EN POSITION, LE MARCHÉ FAIT LE SPECTACLE… vous, vous tapotez et vous partagez le live 😎 • ceux qui doutaient, on se reparle au TP 😜',
     '😇 TOUT VA BIEN, JE GÈRE… ceux qui sont rentrés sans feu vert, respirez 😂 • tapote si t\'es dans le train avec moi 🚂'];
   EN.push(['😏 JE SUIS DEDANS AVEC VOUS LA TEAM ! qui est rentré avec moi ? tapote l\'écran 👆 • qui pensait que le marché allait me contredire ? 😝', '😏 I\'M IN WITH YOU TEAM! who got in with me? tap the screen 👆 • who thought the market would prove me wrong? 😝'], ['🍿 ALIGN EST EN POSITION, LE MARCHÉ FAIT LE SPECTACLE… vous, vous tapotez et vous partagez le live 😎 • ceux qui doutaient, on se reparle au TP 😜', '🍿 ALIGN IS IN, THE MARKET PUTS ON THE SHOW… you tap and share the live 😎 • doubters, see you at the TP 😜'], ['😇 TOUT VA BIEN, JE GÈRE… ceux qui sont rentrés sans feu vert, respirez 😂 • tapote si t\'es dans le train avec moi 🚂', '😇 ALL GOOD, I\'VE GOT IT… those who jumped in without the green light, breathe 😂 • tap if you\'re on the train with me 🚂']);   // v10.4
   EN.push([POS_TXT[0], '🔥 TEAM, WHO\'S ON THE TRAIN? 🚂 if you\'re in, tap the screen and write YES 👇 • share the live to keep it on top 🙏'],
     [POS_TXT[1], '🚀 WANT TO BE PART OF THE ADVENTURE? try it FOR FREE on a demo account, zero risk 😉 • everything is in the link in bio 👉'],
-    [POS_TXT[2], '😎 ALIGN HAS BEEN IN FOR A WHILE… AND THE MARKET IS FOLLOWING THE PLAN 🍿 • too late to jump on: we never chase a moving train 🚄 • you\'re in? tap 👆 and write YES 👇 • missed it? next time, the link in bio warns you BEFORE 😉']);
+    [POS_TXT[2], '😎 ALIGN FOLLOWS ITS PLAN… we never chase a move that has already happened 🚄 • to follow the next setup, see the link in bio'],
   const posT = setInterval(() => { try {
     if (retour) return; const LG = lignesAlign(), E = LG['ENTRÉE'], S = LG.SL; if (!E || !S) return;
     const B = barres(3); if (!B.length) return; const p = B[B.length - 1][4], sens = S.y > E.y ? -1 : 1;
