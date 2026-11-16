@@ -132,13 +132,14 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn("if (!voixActive", self.js)
         self.assertIn("speechSynthesis.speak(utterance)", self.js)
         self.assertNotIn("voirFiboProgression", self.js)
-        self.assertIn("// @version      11.0", self.js)
+        self.assertIn("// @version      11.1", self.js)
         self.assertIn("@updateURL    https://raw.githubusercontent.com/adelkhatra-bit/trading-auto/main/docs/live/align-bande-live.user.js", self.js)
         self.assertIn("@downloadURL  https://raw.githubusercontent.com/adelkhatra-bit/trading-auto/main/docs/live/align-bande-live.user.js", self.js)
-        self.assertIn("const VERSION = '11.0'", self.js)
+        self.assertIn("const VERSION = '11.1'", self.js)
         self.assertIn("live-data/live.json", self.js)
         self.assertIn("synchroniserEtatBot()", self.js)
         self.assertIn("item.etat === 'entree'", self.js)
+        self.assertIn("POSITION ALIGN ACTIVE SUR", self.js)
         self.assertIn("clearInterval(botEtatSyncT)", self.js)
 
 
