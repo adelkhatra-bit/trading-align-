@@ -545,7 +545,7 @@ def structure_fvg(bars):
 SL_FVG_MARGE = 0.3   # SL un peu plus large derrière la mèche (0,15 → 0,3 ATR) : moins de SL touchés de justesse — identique au Pine
 SL_FVG_MIN = 1.0     # distance mini entrée → SL (0,8 → 1 ATR)
 
-def plan_fvg(d, st, ent, sl, tp1, tp2, ut_nom="", tick=0.01):
+def plan_fvg(d, st, ent, sl, tp1, tp2, ut_nom="", tick=0.01, market=None):
     """Entrée / SL / TP1 / TP2 de l'indicateur v24.3 sur l'unité affichée (règle identique au Pine). None = le Pine garde son plan d'origine.
     SHORT : entrée = bas de la FVG rouge la plus proche ; SL = au-dessus de la mèche du dernier plus haut / du haut de la FVG (≥ 0,8 ATR) ;
     TP1 = FVG verte ou dernier plus bas (≥ 1,5 x le risque), TP2 = le niveau suivant. LONG : l'inverse."""
@@ -555,6 +555,7 @@ def plan_fvg(d, st, ent, sl, tp1, tp2, ut_nom="", tick=0.01):
     obRH, obRL, obGH, obGL = (tuple(st[8:12]) + (None,) * 4)[:4]
     if not aS:
         return None
+    corrige_tp2 = market in ("GOLD", "NASDAQ")
     m = max(SL_FVG_MARGE * aS, 3 * tick)
     if d == -1:
         if rBot is None or rBot < cl - 0.5 * aS:
@@ -566,10 +567,18 @@ def plan_fvg(d, st, ent, sl, tp1, tp2, ut_nom="", tick=0.01):
         c2 = swL if e - swL >= rq else None
         if c1 is None and c2 is None:
             t1, n1 = (tp1, "objectif du plan") if tp1 is not None and e - tp1 >= rq else (e - 2 * (s - e), "2 x le risque")
-            t2, n2 = (tp2, "TP2 du plan") if tp2 is not None and e - tp2 > e - t1 else (e - 3 * (s - e), "projection 3 x le risque")
+            if corrige_tp2:
+                t2, n2 = (tp2, "TP2 du plan") if tp2 is not None and e - tp2 > e - t1 else (e - 3 * (s - e), "projection 3 x le risque")
+            else:
+                t2 = min(t1, tp1) if tp1 is not None else t1
+                n2 = "objectif du plan" if t2 != t1 else n1
         elif c1 is None or c2 is None:
             t1, n1 = (c1, f"FVG verte {ut_nom}") if c1 is not None else (c2, f"dernier plus bas {ut_nom}")
-            t2, n2 = (tp2, "TP2 du plan") if tp2 is not None and tp2 < t1 else (tp1, "TP1 du plan") if tp1 is not None and tp1 < t1 else (e - 3 * (s - e), "projection 3 x le risque")
+            if corrige_tp2:
+                t2, n2 = (tp2, "TP2 du plan") if tp2 is not None and tp2 < t1 else (tp1, "TP1 du plan") if tp1 is not None and tp1 < t1 else (e - 3 * (s - e), "projection 3 x le risque")
+            else:
+                t2 = min(t1, tp1) if tp1 is not None else t1
+                n2 = "objectif du plan" if t2 != t1 else n1
         else:
             t1, n1 = (c1, f"FVG verte {ut_nom}") if c1 >= c2 else (c2, f"dernier plus bas {ut_nom}")
             t2 = min(c1, c2); n2 = f"FVG verte {ut_nom}" if t2 == c1 else f"dernier plus bas {ut_nom}"
@@ -584,17 +593,28 @@ def plan_fvg(d, st, ent, sl, tp1, tp2, ut_nom="", tick=0.01):
         c2 = swH if swH - e >= rq else None
         if c1 is None and c2 is None:
             t1, n1 = (tp1, "objectif du plan") if tp1 is not None and tp1 - e >= rq else (e + 2 * (e - s), "2 x le risque")
-            t2, n2 = (tp2, "TP2 du plan") if tp2 is not None and tp2 - e > t1 - e else (e + 3 * (e - s), "projection 3 x le risque")
+            if corrige_tp2:
+                t2, n2 = (tp2, "TP2 du plan") if tp2 is not None and tp2 - e > t1 - e else (e + 3 * (e - s), "projection 3 x le risque")
+            else:
+                t2 = max(t1, tp1) if tp1 is not None else t1
+                n2 = "objectif du plan" if t2 != t1 else n1
         elif c1 is None or c2 is None:
             t1, n1 = (c1, f"FVG rouge {ut_nom}") if c1 is not None else (c2, f"dernier plus haut {ut_nom}")
-            t2, n2 = (tp2, "TP2 du plan") if tp2 is not None and tp2 > t1 else (tp1, "TP1 du plan") if tp1 is not None and tp1 > t1 else (e + 3 * (e - s), "projection 3 x le risque")
+            if corrige_tp2:
+                t2, n2 = (tp2, "TP2 du plan") if tp2 is not None and tp2 > t1 else (tp1, "TP1 du plan") if tp1 is not None and tp1 > t1 else (e + 3 * (e - s), "projection 3 x le risque")
+            else:
+                t2 = max(t1, tp1) if tp1 is not None else t1
+                n2 = "objectif du plan" if t2 != t1 else n1
         else:
             t1, n1 = (c1, f"FVG rouge {ut_nom}") if c1 <= c2 else (c2, f"dernier plus haut {ut_nom}")
             t2 = max(c1, c2); n2 = f"FVG rouge {ut_nom}" if t2 == c1 else f"dernier plus haut {ut_nom}"
         src = f"{'FVG verte' if obGH is None else 'Order block + FVG verte'} {ut_nom}"
-    if d * (t2 - t1) <= 0:
-        t2 = t1 + d * max(2 * abs(t1 - e), 2 * aS, 3 * tick)
-        n2 = "projection 3 x le risque"
+    if corrige_tp2:
+        if d * (t2 - t1) <= 0:
+            t2 = t1 + d * max(2 * abs(t1 - e), 2 * aS, 3 * tick)
+            n2 = "projection 3 x le risque"
+    elif d * (t2 - t1) < 0:
+        t2, n2 = t1, n1
     if d * (e - s) <= 0 or d * (t1 - e) <= 0:
         return None                                         # sécurité du Pine : SL / TP du mauvais côté → plan d'origine
     za, zb = (e, s - 0.25 * (s - e)) if d == -1 else (s + 0.25 * (e - s), e)
@@ -8522,7 +8542,7 @@ def scalp_inverse(r, d):
     pl = (r.get("plan_fige") if r.get("plan_fige") and d == r.get("dirPlan") else (r.get("planH") if d == 1 else r.get("planB"))) or None
     if not st or not pl:
         return None
-    principal = plan_fvg(d, st, pl["e"], pl["sl"], pl["tp1"], pl["tp2"], "5 min") or pl
+    principal = plan_fvg(d, st, pl["e"], pl["sl"], pl["tp1"], pl["tp2"], "5 min", market=r.get("market")) or pl
     cible = principal["e"]
     rTop, rBot, gTop, gBot, swH, swL, aS, cl = st[:8]
     if not aS:
@@ -8650,7 +8670,7 @@ def pine_entree(r, d):
     # v24.3 : mêmes niveaux que l'indicateur sur l'unité de référence (FVG + mèche). Sinon : plan d'origine, comme le Pine.
     ut = UT_FVG.get(r.get("strat") or "", "5")
     vue = PLAN_VUE.get(r.get("strat") or "", "5 min")
-    fv = plan_fvg(d, (r.get("struct_ut") or {}).get(ut), pl["e"], pl["sl"], pl["tp1"], pl["tp2"], vue)
+    fv = plan_fvg(d, (r.get("struct_ut") or {}).get(ut), pl["e"], pl["sl"], pl["tp1"], pl["tp2"], vue, market=r.get("market"))
     if fv:
         bars_ut = [x for x in (r.get(UT_FVG_BARS[ut]) or [])][-3:]
         out.update(fv, src=fv["src"] + " (indicateur ALIGN)", rr=abs(fv["tp1"] - fv["e"]) / max(abs(fv["e"] - fv["sl"]), 1e-9),
