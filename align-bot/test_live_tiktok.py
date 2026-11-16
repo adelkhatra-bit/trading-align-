@@ -154,10 +154,27 @@ class LiveTikTok(unittest.TestCase):
 
     def test_heartbeat_ecran_est_enregistre_sans_annonce_publique(self):
         self.etat["live_screen_seen_t"] = 0
-        with mock.patch.object(ab, "ecran_lire", return_value=["PING|LIVE_SCREEN|123456"]):
-            ab.ecran_vers_telegram(self.etat)
-        self.assertGreater(self.etat["live_screen_seen_t"], 0)
+        maintenant = __import__("time").time()
+        with mock.patch.object(ab, "time") as horloge:
+            horloge.time.return_value = maintenant
+            with mock.patch.object(ab, "ecran_lire", return_value=[f"PING|LIVE_SCREEN|{int(maintenant * 1000)}"]):
+                ab.ecran_vers_telegram(self.etat)
+        self.assertAlmostEqual(self.etat["live_screen_seen_t"], maintenant, delta=0.01)
         self.assertEqual(self.publie, [])
+
+    def test_heartbeat_ancien_ne_reconnecte_pas_un_ecran_deconnecte(self):
+        self.etat["live_screen_seen_t"] = 0
+        ancien = int((__import__("time").time() - 600) * 1000)
+        with mock.patch.object(ab, "ecran_lire", return_value=[f"PING|LIVE_SCREEN|{ancien}"]):
+            ab.ecran_vers_telegram(self.etat)
+        self.assertEqual(self.etat["live_screen_seen_t"], 0)
+        self.assertEqual(self.publie, [])
+
+    def test_topic_live_est_identique_au_userscript_tradingview(self):
+        self.assertEqual(ab.LIVE_SUJET, "align-live-2a4bccafd9548d93")
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")
+        source = open(path, encoding="utf-8").read()
+        self.assertIn("const SUJET = 'align-live-2a4bccafd9548d93';", source)
 
     def test_facture_en_stars(self):
         self.etat["live_on"] = True
