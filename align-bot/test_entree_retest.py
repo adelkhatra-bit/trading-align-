@@ -36,5 +36,31 @@ class Retest(unittest.TestCase):
         self.assertIsNone(ab.entree_retest("GOLD", r, {}))
 
 
+    def test_ordre_en_attente_ne_remonte_pas_avec_un_nouveau_candidat(self):
+        ancien = {"d": 1, "e": 100.0, "sl": 90.0, "sl_h": "12:00"}
+        cle = {"ordre": ancien, "ordre_t": 1000}
+        candidat = {"d": 1, "e": 108.0, "sl": 98.0, "sl_h": "12:15"}
+        retenu, remplace = ab.conserver_ordre_entree(cle, candidat, 1, 120.0, 10.0, 1100)
+        self.assertFalse(remplace)
+        self.assertIs(retenu, ancien)
+        self.assertEqual(cle["ordre"]["e"], 100.0)
+
+    def test_ordre_est_remplace_si_sens_change(self):
+        ancien = {"d": 1, "e": 100.0, "sl": 90.0, "sl_h": "12:00"}
+        cle = {"ordre": ancien, "ordre_t": 1000}
+        candidat = {"d": -1, "e": 125.0, "sl": 135.0, "sl_h": "12:15"}
+        retenu, remplace = ab.conserver_ordre_entree(cle, candidat, -1, 120.0, 10.0, 1100)
+        self.assertTrue(remplace)
+        self.assertIs(retenu, candidat)
+
+    def test_ordre_expire_est_remplace(self):
+        ancien = {"d": 1, "e": 100.0, "sl": 90.0, "sl_h": "12:00"}
+        cle = {"ordre": ancien, "ordre_t": 1000}
+        candidat = {"d": 1, "e": 105.0, "sl": 95.0, "sl_h": "16:15"}
+        retenu, remplace = ab.conserver_ordre_entree(cle, candidat, 1, 120.0, 10.0, 1000 + 4 * 3600 + 1)
+        self.assertTrue(remplace)
+        self.assertIs(retenu, candidat)
+
+
 if __name__ == "__main__":
     unittest.main()
