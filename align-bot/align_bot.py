@@ -11675,13 +11675,22 @@ def texte_ecran(m, typ, d, minutes, r, cle, ligne=""):
         return None
     if typ == "feinte" and r.get("t", 0) - (cle or {}).get("radar_dernier", -10 ** 9) < 3600:
         return None
-    t0 = (titre[0] if d == -1 else titre[1]).replace("{l}", ECRAN_LIGNES.get(ligne, ""))
+    if typ == "zone" and d == 0:
+        t0 = f"🧲 {ligne or 'ZONE'} touchée : niveau technique à surveiller"
+    else:
+        t0 = (titre[0] if d == -1 else titre[1]).replace("{l}", ECRAN_LIGNES.get(ligne, ""))
     lignes = [f"🎬 EN DIRECT DU LIVE — {ICONE.get(m, '')} {m}", t0]
     if typ == "zone":
+        if ligne == "FVG":
+            lignes.append("🧲 Fair Value Gap : le prix revient dans une zone d'inefficience ; on surveille la réaction et la clôture.")
+        elif ligne == "OB":
+            lignes.append("🏦 Order Block : le prix reteste une zone d'ordre ; on observe si elle est défendue ou traversée.")
         if d == 1:
-            lignes.append("🟢 SCÉNARIO HAUSSIER À SURVEILLER : le prix travaille un support. Ce n'est pas encore un ordre d'entrée.")
+            lignes.append("🟢 BIAIS HAUSSIER À SURVEILLER : zone sous le prix / support. Ce n'est pas encore un ordre d'entrée.")
+        elif d == -1:
+            lignes.append("🔴 BIAIS BAISSIER À SURVEILLER : zone au-dessus du prix / résistance. Ce n'est pas encore un ordre d'entrée.")
         else:
-            lignes.append("🔴 SCÉNARIO BAISSIER À SURVEILLER : le prix travaille une résistance. Ce n'est pas encore un ordre d'entrée.")
+            lignes.append("⚪ BIAIS NON DÉFINI : le prix est dans la zone et les données ne donnent pas encore de rejet directionnel fiable.")
     elif typ in ("pression", "manip", "casse", "acc", "volume", "feinte", "annonce"):
         lignes.append(f"{'🟢 SCÉNARIO HAUSSIER' if d == 1 else '🔴 SCÉNARIO BAISSIER'} EN OBSERVATION — le mouvement est surveillé, pas encore autorisé comme entrée.")
     if typ in ("rebond", "ligne"):
@@ -11695,14 +11704,14 @@ def texte_ecran(m, typ, d, minutes, r, cle, ligne=""):
         p = r["m1"][-1]["c"]
         b = (r.get("b15") or [])[-9:-1]
         lignes.append(f"📍 Prix : {px(p)}")
-        if b:
+        if b and d == -1:
             lo, hi = min(x["l"] for x in b), max(x["h"] for x in b)
-            if d == -1:
-                lignes += [f"🔴 Dernier support 15 min : {px(lo)} → clôture dessous = la baisse peut continuer",
-                           f"🟢 Au-dessus de {px(hi)} : le scénario baissier est invalidé"]
-            else:
-                lignes += [f"🟢 Dernière résistance 15 min : {px(hi)} → clôture au-dessus = la hausse peut continuer",
-                           f"🔴 Sous {px(lo)} : le scénario haussier est invalidé"]
+            lignes += [f"🔴 Dernier support 15 min : {px(lo)} → clôture dessous = la baisse peut continuer",
+                       f"🟢 Au-dessus de {px(hi)} : le scénario baissier est invalidé"]
+        elif b and d == 1:
+            lo, hi = min(x["l"] for x in b), max(x["h"] for x in b)
+            lignes += [f"🟢 Dernière résistance 15 min : {px(hi)} → clôture au-dessus = la hausse peut continuer",
+                       f"🔴 Sous {px(lo)} : le scénario haussier est invalidé"]
     except Exception:
         pass
     # Les directions affichées ici sont celles des clôtures réellement utilisées par le filtre d'entrée.
@@ -11710,13 +11719,17 @@ def texte_ecran(m, typ, d, minutes, r, cle, ligne=""):
     if len(D) > 9 and m in ("GOLD", "NASDAQ"):
         lib = lambda i: "HAUSSIER" if D[i] == 1 else "BAISSIER" if D[i] == -1 else "NEUTRE"
         lignes.append(f"🧭 Clôtures M5 {lib(2)} • M15 {lib(4)} • H1 {lib(7)} • H4 {lib(9)}")
-        if all(D[i] == d for i in (2, 4, 7, 9)):
+        if d == 0:
+            lignes.append("ℹ️ Cette zone n'impose aucun sens : le bot attend une réaction confirmée avant de classer LONG ou SHORT.")
+        elif all(D[i] == d for i in (2, 4, 7, 9)):
             lignes.append("✅ Les quatre unités clôturées sont alignées ; le bot vérifie encore la fraîcheur du prix et le déclencheur avant toute entrée.")
         else:
             lignes.append("⏳ Préparation uniquement : les quatre clôtures ne sont pas encore d'accord. Aucune entrée avant confirmation.")
     elif len(D) > 9 and m == "BTC":
         lignes.append(f"🧭 Clôtures H1 {'HAUSSIER' if D[7] == 1 else 'BAISSIER' if D[7] == -1 else 'NEUTRE'} • H4 {'HAUSSIER' if D[9] == 1 else 'BAISSIER' if D[9] == -1 else 'NEUTRE'}")
-        if D[7] != d or D[9] != d:
+        if d == 0:
+            lignes.append("ℹ️ La zone est informative ; elle ne déclenche aucune direction de trade à elle seule.")
+        elif D[7] != d or D[9] != d:
             lignes.append("⏳ Scénario en préparation : H1 et H4 ne confirment pas encore ce sens.")
     tend = (r or {}).get("confirme")
     if tend in (1, -1) and d in (1, -1) and d != tend and typ not in ("respire", "rebond", "feinte"):
@@ -11724,8 +11737,10 @@ def texte_ecran(m, typ, d, minutes, r, cle, ligne=""):
                    f"⏳ Mieux vaut attendre un retracement dans le sens confirmé par les grandes unités"]
     tr = (cle or {}).get("trade")
     if tr and tr.get("d") in (1, -1):
-        lignes.append(f"📌 Position ALIGN en cours : {'LONG' if tr['d'] == 1 else 'SHORT'}"
-                      + (" ✅ dans le même sens" if tr["d"] == d else " ⚠️ mouvement contre la position : le SL protège"))
+        commentaire_position = (" 🔎 zone technique en surveillance, sans biais directionnel supplémentaire" if d == 0
+                                else " ✅ dans le même sens" if tr["d"] == d
+                                else " ⚠️ mouvement contre la position : le SL protège")
+        lignes.append(f"📌 Position ALIGN en cours : {'LONG' if tr['d'] == 1 else 'SHORT'}" + commentaire_position)
     else:
         lignes.append("🙅 Ce n'est pas une entrée : attends le feu vert explicite du bot")
     lignes.append("🔔 Entrée, SL et TP précis : dans le bot, au moment de la validation")
@@ -11755,7 +11770,8 @@ def ecran_vers_telegram(etat):
         m, typ = p[1], p[2]
         ligne = p[5] if len(p) > 5 else ""
         try:
-            d = -1 if int(p[3]) < 0 else 1
+            direction_brute = int(p[3])
+            d = -1 if direction_brute < 0 else 1 if direction_brute > 0 else 0
             minutes = int(p[4]) if len(p) > 4 and p[4] else 0
         except ValueError:
             acquitter()
