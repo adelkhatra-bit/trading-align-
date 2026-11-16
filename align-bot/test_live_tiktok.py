@@ -669,7 +669,7 @@ class LiveOutbox(unittest.TestCase):
     def test_market_narration_is_factual_and_runs_independently_of_generic_coach(self):
         bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
         self.assertIn("function commentaireMarcheEnDirect(B, moyR, moyV, m)", bande)
-        self.assertIn("Date.now() - derniereTend > 75000", bande)
+        self.assertIn("Date.now() - derniereTend > 55000", bande)
         self.assertIn("derniereCoach", bande)
         self.assertIn("Date.now() - derniereTend < 40000", bande)
         self.assertIn("coachN++; derniereCoach = Date.now();", bande)
