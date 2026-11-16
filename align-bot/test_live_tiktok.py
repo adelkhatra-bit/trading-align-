@@ -282,6 +282,45 @@ class TestBandeRassure(unittest.TestCase):
         self.assertNotIn("65000", t); self.assertNotIn("Telegram", t)
 
 
+
+class LiveOutbox(unittest.TestCase):
+    def test_live_publier_persists_and_deduplicates_until_sent(self):
+        previous = ab._ETAT_COURANT.get("etat")
+        state = {}
+        ab._ETAT_COURANT["etat"] = state
+        try:
+            with mock.patch.object(ab, "LIVE_SUJET", "test-sujet"):
+                self.assertTrue(ab.live_publier("NEWS:message de test"))
+                self.assertTrue(ab.live_publier("NEWS:message de test"))
+            self.assertEqual(len(state.get("live_outbox", [])), 1)
+            with mock.patch.object(ab, "LIVE_SUJET", "test-sujet"), \
+                 mock.patch.object(ab.urllib.request, "urlopen", return_value=mock.MagicMock()):
+                self.assertEqual(ab.traiter_file_live(state, maintenant=100), 1)
+            self.assertEqual(state["live_outbox"], [])
+        finally:
+            if previous is None:
+                ab._ETAT_COURANT.pop("etat", None)
+            else:
+                ab._ETAT_COURANT["etat"] = previous
+
+    def test_live_publier_failure_is_retried_not_dropped(self):
+        previous = ab._ETAT_COURANT.get("etat")
+        state = {"live_outbox": [{"key": "x", "text": "message", "tries": 0, "next_t": 0}]}
+        ab._ETAT_COURANT["etat"] = state
+        try:
+            with mock.patch.object(ab, "LIVE_SUJET", "test-sujet"), \
+                 mock.patch.object(ab.urllib.request, "urlopen", side_effect=OSError("network down")):
+                self.assertEqual(ab.traiter_file_live(state, maintenant=100), 0)
+            self.assertEqual(len(state["live_outbox"]), 1)
+            self.assertEqual(state["live_outbox"][0]["tries"], 1)
+            self.assertGreater(state["live_outbox"][0]["next_t"], 100)
+        finally:
+            if previous is None:
+                ab._ETAT_COURANT.pop("etat", None)
+            else:
+                ab._ETAT_COURANT["etat"] = previous
+
+
 if __name__ == "__main__":
     unittest.main()
 
