@@ -4115,6 +4115,12 @@ def radar_climax(m, r, cle):
     b = (r.get("b15_long") or r.get("b15") or [])[:-1]  # la dernière est en formation
     if len(b) < 66:
         return None
+    # Le volume PAXG/Kraken est celui d'un jeton sur une seule plateforme, pas le volume du marché de l'or.
+    # Le radar volume Gold n'est autorisé que si la source est le proxy futures COMEX ; NASDAQ exige NQ futures.
+    if m in ("GOLD", "NASDAQ"):
+        source_requise = "COMEX GC=F" if m == "GOLD" else "CME NQ=F"
+        if not all(source_requise in str(x.get("volume_source") or "") for x in b[-41:]):
+            return None
     vols = [x.get("v") or 0 for x in b]
     cl = [x["c"] for x in b]
     e9 = ema(cl, 9)[-1]
