@@ -5591,7 +5591,7 @@ def envoyer_analyse_a(etat, cid, m, r, cle):
         armer_cloture(etat, cid, m, r, cle)
         lignes = chrono_txt(m, r, cle, time.time()).split("\n")
         utile = [l for l in lignes if l.startswith(("1️⃣", "2️⃣", "3️⃣", "4️⃣", "⏸", "⏳", "↩️", "⚡", "🕯 Prochaine"))]
-        _envoi_sur(cid, reply_markup=bouton_rappel(m), text="\n".join(
+        _envoi_sur_demande(cid, reply_markup=bouton_rappel(m), text="\n".join(
             [f"😎 RIEN N'A BOUGÉ — {ICONE.get(m, '')} {m}   {px(r['m1'][-1]['c'])}",
              f"🕒 Analyse de référence : {heure(der['t'])}"] + voyants_unites(r) + utile + [(statut_position(cle["trade"], r["m1"][-1]["c"]) if cle.get("trade") else statut_txt(0, cle.get("ordre")).strip()), "🔔 Je te préviens dès que ça change"]))
         # Un seul message (voyants inclus) ; l'avis IA complet reste derrière « 🧠 En savoir plus ».
@@ -5599,7 +5599,7 @@ def envoyer_analyse_a(etat, cid, m, r, cle):
     armer_cloture(etat, cid, m, r, cle)
     # Toutes les analyses passent par le même garde-fou 429 que les autres messages.
     # Une analyse refusée par Telegram n'est pas marquée comme livrée et pourra être retentée.
-    res = _envoi_sur(cid, text=texte_apercu(m, r, cle, vip=bool(autorise(etat, str(cid), str(cid)))),
+    res = _envoi_sur_demande(cid, text=texte_apercu(m, r, cle, vip=bool(autorise(etat, str(cid), str(cid)))),
                      reply_markup=markup_analyse(etat, m, r, cid))
     if not isinstance(res, dict) or res.get("ok") is not True:
         print(f"ANALYSE_NON_LIVREE market={m} chat={cid} reason=telegram_send_not_confirmed")
@@ -8170,6 +8170,19 @@ def _envoi_sur(cid, **kw):
     except Exception as ex:
         print("envoi", cid, ex)
         return None
+
+def _envoi_sur_demande(cid, **kw):
+    """Autorise uniquement la réponse privée déclenchée par une demande explicite d'analyse."""
+    ancien_chat = getattr(TELEGRAM_PULL_CONTEXT, "chat_id", None)
+    ancien_prive = getattr(TELEGRAM_PULL_CONTEXT, "private", False)
+    TELEGRAM_PULL_CONTEXT.chat_id = str(cid)
+    TELEGRAM_PULL_CONTEXT.private = True
+    try:
+        return _envoi_sur(cid, **kw)
+    finally:
+        TELEGRAM_PULL_CONTEXT.chat_id = ancien_chat
+        TELEGRAM_PULL_CONTEXT.private = ancien_prive
+
 
 def connecter_canal(etat, mcm):
     """Le bot vient d'être ajouté (ou retiré) comme administrateur d'une chaîne : il la prend comme chaîne VIP."""
