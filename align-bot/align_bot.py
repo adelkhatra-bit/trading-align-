@@ -3091,9 +3091,21 @@ def selectionner_coach_optin(etat, cid, marches):
 
 
 def coach_abonne(etat, cid, m):
-    """Opt-in persistant et explicite : le coach a été activé pour ce marché précis."""
+    """Opt-in persistant et explicite ; migre les anciennes validations auto / veille déjà consenties."""
     cid = str(cid)
-    return bot_on(etat, cid) and cid in {str(x) for x in (etat.get("coach_optin") or {}).get(m, [])}
+    if not bot_on(etat, cid):
+        return False
+    optins = {str(x) for x in (etat.get("coach_optin") or {}).get(m, [])}
+    if cid in optins:
+        return True
+    # Compatibilité des états déjà enregistrés : auto[m] et veille_cloture[m]
+    # n'étaient créés qu'après une action explicite de suivi du marché.
+    legacy_auto = cid in {str(x) for x in (etat.get("auto") or {}).get(m, [])}
+    legacy_veille = cid in {str(x) for x in (etat.get("veille_cloture") or {}).get(m, {})}
+    if legacy_auto or legacy_veille:
+        activer_coach_optin(etat, cid, m, True)
+        return True
+    return False
 
 
 def destinataires_gratuits(etat):
@@ -4601,7 +4613,8 @@ def boucle_chronos(etat):
 
 
 def inscrire_auto(etat, cid, m, notifier=True):
-    """Active le suivi de la prochaine position sans faire croire qu'un ordre broker est placé."""
+    """Active le coach persistant et la file ponctuelle de la prochaine position."""
+    activer_coach_optin(etat, cid, m, True)
     liste = etat.setdefault("auto", {}).setdefault(m, [])
     if cid not in liste:
         liste.append(cid)
@@ -8083,18 +8096,17 @@ def marche_du_message(texte):
 
 def destinataires_message(etat, chats, texte):
     # La chaîne de marché reste le flux public auquel ses membres ont choisi de s'abonner.
-    # En privé : aucune alerte automatique avant l'opt-in Coach explicite, marché par marché.
+    # En privé : consentement Coach obligatoire ; un message global n'est routé qu'aux coachs actifs.
     ens = marches_message(texte)
+    def abonne_au_message(cid):
+        marches = ens if ens else set(MARCHES)
+        return any(coach_abonne(etat, cid, m) and (not ens or m in marches_choisis(etat, cid))
+                   for m in marches)
     if etat.get("canal"):
-        prives = [str(c) for c in chats if str(c) != str(etat["canal"]) and ens
-                  and not vue_gratuite(etat, c)
-                  and etat.get("marches_par_chat", {}).get(str(c)) is not None
-                  and ens & marches_choisis(etat, c)
-                  and any(coach_abonne(etat, c, m) for m in ens)]
+        prives = [str(c) for c in chats if str(c) != str(etat["canal"])
+                  and not vue_gratuite(etat, c) and abonne_au_message(c)]
         return sorted(set([str(etat["canal"])] + prives))
-    cibles = [str(c) for c in chats if ens and bool(ens & marches_choisis(etat, c))
-              and any(coach_abonne(etat, c, m) for m in ens)]
-    return sorted(set(cibles))
+    return sorted(set(str(c) for c in chats if abonne_au_message(c)))
 
 def destinataires(etat, chats):
     """Téléphones qui reçoivent les signaux + la chaîne VIP."""
