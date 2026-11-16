@@ -11879,7 +11879,8 @@ def live_annonces(etat, m, textes):
             live_bande(etat, f"BULLE:🔁 {ic} {m} revient vers l'entrée : on respire 😎 • le bot est protégé 🛡 • "
                              f"⏱ clôture dans {min_avant_cloture15()} min" + FIN_BANDE, f"retour{m}", 900, toujours=True)
         elif ("PRÉ-ALERTE RETOURNEMENT" in t or "RETOURNEMENT EN OBSERVATION" in t
-              or "RETOURNEMENT EN PRÉPARATION" in t or "RETOURNEMENT LONG" in t or "RETOURNEMENT SHORT" in t):
+              or "RETOURNEMENT EN PRÉPARATION" in t or "RETOURNEMENT LONG" in t or "RETOURNEMENT SHORT" in t
+              or "RADAR CLIMAX — SURVEILLANCE / SCÉNARIO" in t):
             live_bande(etat, f"BULLE:↩ {ic} {m} : les petites unités signalent un retournement possible • on attend la confirmation des grandes unités" + FIN_BANDE,
                        f"ret{m}", 900, toujours=True)
             live_bande(etat, f"CMD:chrono:{max(30, 900 - int(time.time()) % 900)}:{m}", f"chronoret{m}", 900, toujours=True)
