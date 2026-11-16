@@ -4067,7 +4067,7 @@ def fibo_zones(m, r, cle):
             hausse = il < ih
             pct = (hi - p) / (hi - lo) * 100 if hausse else (p - lo) / (hi - lo) * 100
             dedans = 61.8 <= pct <= 78.6
-            deja = active.get(nom, bool(legacy.get(nom)))
+            deja = active.get(nom, legacy.get(nom) == f"{nom}|{round(hi, 2)}|{round(lo, 2)}")
             if dedans and not deja:
                 lignes.append(f"📐 Fibo {nom} : on est à {pct:.0f} % du dernier mouvement de {'hausse' if hausse else 'baisse'}")
             active[nom] = dedans
