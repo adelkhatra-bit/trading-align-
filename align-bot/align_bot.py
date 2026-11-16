@@ -512,7 +512,7 @@ def donnees_mtf_fraiches(m, r, now_ts=None):
     return -30 <= age_m1 <= 120
 
 
-def direction_confirmee_marche(m, dirs, d, contexte=None):
+def direction_confirmee_marche(m, dirs, d, contexte=None, now_ts=None):
     """Filtre d'entrée : GOLD/NASDAQ exigent quatre clôtures concordantes, un prix live frais et pas de déplacement live marqué contre le sens."""
     if d not in (1, -1):
         return 0
@@ -521,15 +521,18 @@ def direction_confirmee_marche(m, dirs, d, contexte=None):
         if len(D) < 10 or any(D[i] != d for i in (2, 4, 7, 9)):
             return 0
         if contexte is not None:
-            if not donnees_mtf_fraiches(m, contexte):
+            horloge = time.time() if now_ts is None else float(now_ts)
+            if not donnees_mtf_fraiches(m, contexte, horloge):
                 return 0
             m1 = contexte.get("m1") or []
             b5 = contexte.get("b5") or []
             atr5 = contexte.get("atr5") or contexte.get("atr") or 0
             if not m1 or len(b5) < 2 or atr5 <= 0:
                 return 0
-            # Le flux M1 doit être frais ; NASDAQ ne doit jamais trader sur un cours direct périmé.
-            if time.time() - m1[-1]["t"] > 120:
+            # La même horloge sert au contrôle des bougies et du flux M1
+            # (rejeux historiques et événements horodatés inclus).
+            age_m1 = horloge - float(m1[-1].get("t", 0))
+            if age_m1 < -30 or age_m1 > 120:
                 return 0
             # Le cours live ne doit pas avoir déjà retracé de plus de 0,75 ATR M5 contre la dernière clôture.
             ecart_live = m1[-1]["c"] - b5[-2]["c"]
@@ -7630,7 +7633,7 @@ def evenements_pine(etat, m, r, cle, now):
     alignement_ok = strategie_alignement(dirs_confirmation, d, r.get("dirW") or 0, r.get("market"))[1] == "CONFIRMÉ"
     if m in ("GOLD", "NASDAQ"):
         alignement_ok = alignement_ok and len(dirs_confirmation) > 9 and all(dirs_confirmation[i] == d for i in (2, 4, 7, 9))
-        alignement_ok = alignement_ok and direction_confirmee_marche(m, dirs_confirmation, d, r) == d
+        alignement_ok = alignement_ok and direction_confirmee_marche(m, dirs_confirmation, d, r, now_ts=now) == d
     if d and zp and strat and not cle.get("trade") and alignement_ok:
         barres = (r.get("m1") if strat == "SCALPING" else r.get("b5")) or []           # même bougie que le trait de l'indicateur (vue du plan)
         if len(barres) >= 3:
