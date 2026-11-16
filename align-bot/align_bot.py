@@ -11368,10 +11368,10 @@ def commentaires_live_de_secours(donnees):
         divergence_note = " avec divergence RSI" if reversal.get("divergence_rsi") else ""
         volume_ratio = reversal.get("volume_ratio")
         source_volume = str(c.get("source_volume") or "")
-        volume_label = "volume Kraken" if "Kraken" in source_volume else "volume proxy"
+        volume_label = "volume Kraken" if marche == "BTC" or "Kraken" in source_volume else "volume proxy"
         volume_note = f" et {volume_label} fort" if isinstance(volume_ratio, (int, float)) and volume_ratio >= 1.5 else ""
         divergence_note_en = " with RSI divergence" if reversal.get("divergence_rsi") else ""
-        volume_label_en = "Kraken volume" if "Kraken" in source_volume else "proxy volume"
+        volume_label_en = "Kraken volume" if marche == "BTC" or "Kraken" in source_volume else "proxy volume"
         volume_note_en = f" and strong {volume_label_en}" if isinstance(volume_ratio, (int, float)) and volume_ratio >= 1.5 else ""
         timeframe_prefix = "Unité courte" if reversal.get("timeframe") == "M5" else "Clôture de référence"
         timeframe_prefix_en = "Short timeframe" if reversal.get("timeframe") == "M5" else "Reference close"
@@ -11441,7 +11441,7 @@ def live_phrases_ia(etat, maintenant, derniers=None):
         # Une chasse de liquidité clôturée est un événement prioritaire : l'IA ne peut pas le masquer
         # avec deux phrases génériques, on réserve la seconde intervention à cette lecture factuelle.
         reversal = (donnees.get("marches", {}).get(marche, {}).get("surveillance_retournement") or {})
-        if reversal.get("direction") in (-1, 1) and len(secours.get(marche, [])) >= 2:
+        if (reversal.get("direction") in (-1, 1) or reversal.get("conflit")) and len(secours.get(marche, [])) >= 2:
             if len(existantes) >= 2:
                 existantes[1] = secours[marche][1]
             else:
