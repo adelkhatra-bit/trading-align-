@@ -18,10 +18,11 @@ permissions:
   actions: read    # lire l'état des runs : attendre que l'ancien worker ait fini de sauvegarder sa mémoire
 
 concurrency:
-  # Un seul worker de production. Sur push, ce workflow ne démarre qu'après
-  # le succès du workflow de validation indépendant.
+  # Un seul worker de production. Ne jamais annuler le worker actif :
+  # il doit terminer son tour et sauvegarder state.json (anti-doublons,
+  # abonnements, suivis et offsets Telegram) avant le worker suivant.
   group: align-bot
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   validate:

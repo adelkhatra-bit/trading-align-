@@ -27,6 +27,12 @@ class MemoireDuBot(unittest.TestCase):
         self.assertIn("< 240", bloc)                                                    # jamais plus de 4 minutes
         self.assertIn('x["id"] < me', bloc)                                           # n'attend que les workers plus anciens
 
+    def test_worker_actif_jamais_annule_avant_sauvegarde(self):
+        bloc = self.t[self.t.index("concurrency:"):self.t.index("jobs:")]
+        self.assertIn("group: align-bot", bloc)
+        self.assertIn("cancel-in-progress: false", bloc)
+        self.assertNotIn("cancel-in-progress: true", bloc)
+
     def test_permissions_minimales(self):
         entete = self.t[self.t.index("permissions:"):self.t.index("concurrency:")]
         self.assertIn("actions: read", entete)
