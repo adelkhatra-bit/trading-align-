@@ -2052,7 +2052,7 @@ TRAD = {
 "🤖 Positions prises par ton bot": "🤖 Positions taken by your bot", "🤖 Positions prises par mon bot": "🤖 Positions taken by my bot", "⏸ Arrêts manuels": "⏸ Manual stops",
 "⏸ Arrêter mon bot": "⏸ Stop my bot", "▶️ Relancer mon bot": "▶️ Restart my bot", "▶️ Ton bot est relancé": "▶️ Your bot is restarted",
 "🤖 Il entre tout seul dans la prochaine position": "🤖 It will enter the next position by itself", "⏸ Ton bot est arrêté": "⏸ Your bot is stopped",
-"🔔 Tu reçois toujours les positions": "🔔 You still get the positions", "▶️ Relance-le avec 🤖 Mon bot": "▶️ Restart it with 🤖 My bot",
+"🔔 Tu reçois toujours les positions": "🎙 Les coachs explicitement activés restent actifs jusqu'à leur arrêt", "▶️ Relance-le avec 🤖 Mon bot": "▶️ Restart it with 🤖 My bot",
 ": POSITION SUIVIE AUTOMATIQUEMENT": ": POSITION AUTOMATICALLY TRACKED", "📍 Repère prix : entrée ≈": "📍 Price guide: entry ≈", "💵 Risque max : 100 $ par position (compte 100K) : adapte ta taille": "💵 Max risk: $100 per position (100K account): adjust your size", "🎯 Je rentre dans la prochaine position": "🎯 I'm in for the next position",
 "✅ Noté ! Prochaine position": "✅ Got it! Next position", "📲 Place ton ordre limite dans la zone 🟨 (vue 15 min)": "📲 Place your limit order in the zone 🟨 (15-min chart)",
 "🤖 Dès que j'entre, tu es compté dedans automatiquement": "🤖 As soon as I enter, you're counted in automatically", "🎯 Le coach te suit : SL à BE, SL remonté, TP": "🎯 The coach follows you: SL to BE, raised SL, TP",
@@ -4682,7 +4682,7 @@ def menu_bot_gratuit(etat, cid):
     if dedans:
         lignes.append(f"🎯 En position : {', '.join(dedans)} (suivi jusqu'au TP / SL)")
     lignes += (["✅ Je te propose la prochaine position", "🙋 Tu choisis : tu la prends ou non"] if on else
-               ["⏸ Aucune position proposée", "🔒 Tu sais juste qu'une position VIP sort"])
+               ["⏸ Aucune position proposée", "🔕 Aucun message privé tant que tu n'as pas activé le suivi"])
     lignes += ["━━━━━━━━━━━━", "🎁 Position du jour : " + ("déjà utilisée (nouvelle demain)" if utilise else "disponible"),
                "📡 Marchés : " + " + ".join(NOMS_MARCHES[m] for m in MARCHES if m in marches_choisis(etat, cid))]
     _envoi_sur(cid, text="\n".join(lignes) + "\n\n" + texte_suivi(etat, cid), reply_markup=json.dumps({"inline_keyboard": [
