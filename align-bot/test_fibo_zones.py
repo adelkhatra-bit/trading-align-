@@ -93,6 +93,18 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertEqual(btc["mouvement"], "hausse")
         self.assertAlmostEqual(btc["retracement_pct"], 32.0, places=1)
 
+    def test_gold_nasdaq_wait_for_full_lookback_and_skip_ambiguous_single_bar_swing(self):
+        partial = mouvement_hausse(20) + [dict(t=20, o=132, h=133, l=131, c=132, v=10)]
+        r = {"m1": [dict(c=132)], "b15_long": partial}
+        self.assertNotIn("M15", ab.progression_fibonacci_live(r, "GOLD"))
+        self.assertIn("M15", ab.progression_fibonacci_live(r, "BTC"))
+
+        ambiguous = [dict(t=i, o=150, h=180, l=120, c=150, v=10) for i in range(49)]
+        ambiguous[20]["h"] = 220
+        ambiguous[20]["l"] = 80
+        r["b15_long"] = ambiguous
+        self.assertNotIn("M15", ab.progression_fibonacci_live(r, "NASDAQ"))
+
     def test_btc_does_not_receive_new_fibonacci_context(self):
         r = {"m1": [dict(c=132)], "b15_long": mouvement_hausse(48) + [dict(t=49, o=132, h=133, l=131, c=132, v=10)],
              "dirs": [1] * 11, "dirPlan": 1, "strat": "SWING", "rC": 54}
