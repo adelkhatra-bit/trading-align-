@@ -4794,8 +4794,9 @@ def texte_prix_topstep(m, tr, prix_graphique, prix_fut):
     return "\n".join(l)
 
 def prix_topstep_inscrits(etat, m, tr, prix_graphique):
-    """Envoie les niveaux Topstep à ceux qui ont choisi « Topstep » (le prix du contrat est lu en direct sur l'API)."""
-    qui = [c for c, v in (etat.get("plateforme") or {}).items() if v in ("topstep", "deux") and marche_autorise(etat, c, m)]
+    """Envoie les niveaux Topstep uniquement aux utilisateurs ayant activé le coach sur ce marché."""
+    qui = [str(c) for c, v in (etat.get("plateforme") or {}).items()
+           if v in ("topstep", "deux") and marche_autorise(etat, c, m) and coach_actif(etat, c, m)]
     if not qui or not topstep_trade:
         return 0
     try:
@@ -5538,7 +5539,8 @@ def prix_actuel(m):
         print("prix", ex); return None
 
 def noter(etat, cid, m, pos, sortie, motif):
-    """Enregistre la clôture réelle et distingue TP/SL et sortie manuelle."""
+    """Enregistre la clôture et arrête les nouvelles propositions après TP/SL, sans couper les autres positions ouvertes."""
+    cid = str(cid)
     pts = pos["d"] * (sortie - pos["e"])
     pct = pts / pos["e"] * 100
     motif_haut = str(motif).upper()
@@ -5554,14 +5556,34 @@ def noter(etat, cid, m, pos, sortie, motif):
     pos["fini"] = True
     resultat = "GAIN" if pts > 0 else "PERTE" if pts < 0 else "ÉGALITÉ"
     titre = f"🏁 CLÔTURE CONFIRMÉE — {nature} — {m}"
-    _envoi_sur(cid, reply_markup=markup_cloture(m), text=(
+    texte = (
         f"{titre}\n"
         f"{'✅' if pts > 0 else '❌' if pts < 0 else '➖'} Résultat : {resultat}\n"
         f"📌 Entrée : {px(pos['e'])}\n"
         f"🚪 Sortie confirmée : {px(sortie)}\n"
         f"📊 Performance : {pts:+,.2f} pts • {pct:+.2f} %\n".replace(",", " ")
         + f"🧾 Motif : {motif}\n"
-        + ("🎉 Objectif positif enregistré." if pts > 0 else "🛡 Risque clôturé. Le prochain signal sera traité séparément." if pts < 0 else "Position clôturée à l’équilibre.")))
+        + ("🎉 Objectif positif enregistré." if pts > 0 else "🛡 Risque clôturé. Le prochain signal sera traité séparément." if pts < 0 else "Position clôturée à l’équilibre."))
+    clavier = markup_cloture(m)
+    if nature in ("TP", "SL"):
+        restantes = en_position(etat, cid)
+        if restantes:
+            texte += "\n\n🎯 Suivi maintenu sur : " + ", ".join(restantes) + ". Aucune relance : je surveille uniquement cette position."
+        else:
+            # Plus aucune position ouverte : arrêt des nouvelles propositions jusqu'à une autorisation explicite.
+            off = etat.setdefault("bot_off", [])
+            if cid not in off:
+                off.append(cid)
+            for marche in MARCHES:
+                etat.setdefault("auto", {}).setdefault(marche, [])
+                etat["auto"][marche] = [x for x in etat["auto"][marche] if str(x) != cid]
+                etat.setdefault("veille_cloture", {}).setdefault(marche, {}).pop(cid, None)
+            texte += "\n\n⏸ Coach mis en pause : aucune nouvelle position ne sera proposée automatiquement.\nSouhaites-tu rechercher une autre position ?"
+            clavier = json.dumps({"inline_keyboard": [
+                [{"text": "✅ Oui, chercher une position", "callback_data": "next:yes"}],
+                [{"text": "⏸ Non, rester en pause", "callback_data": "next:no"}]
+            ]})
+    _envoi_sur(cid, reply_markup=clavier, text=texte)
 
 def texte_team(bj):
     """Bilan du jour SANS montant : nombre de TP et de SL ; la phrase « les profits ont couvert les SL » seulement si c'est VRAI."""
@@ -6042,15 +6064,33 @@ def traiter(etat, chats, updates):
                                    [{"text": "Non, pas maintenant", "callback_data": "coach:no"}]
                                ]}))
                     continue
+            if choix == "next":
+                telegram("answerCallbackQuery", callback_query_id=cb["id"], text="C'est noté")
+                if mk == "yes":
+                    etat["bot_off"] = [x for x in etat.get("bot_off", []) if str(x) != qui]
+                    if qui not in etat.get("coach_pending", []):
+                        etat.setdefault("coach_pending", []).append(qui)
+                    _envoi_sur(qui, text=("Choose the markets for your next setup." if qui in LANG_EN else
+                                          "Choisis les marchés à surveiller pour ta prochaine position."))
+                    menu_marches(etat, qui)
+                else:
+                    _envoi_sur(qui, text=("Coach remains paused. You can still request an analysis at any time." if qui in LANG_EN else
+                                          "Le coach reste en pause. Tu peux toujours demander une analyse à tout moment."))
+                continue
             if choix == "coach":
                 telegram("answerCallbackQuery", callback_query_id=cb["id"], text="C'est noté")
                 if mk == "yes":
+                    etat["bot_off"] = [x for x in etat.get("bot_off", []) if str(x) != qui]
                     if qui not in etat.get("coach_pending", []):
                         etat.setdefault("coach_pending", []).append(qui)
                     _envoi_sur(qui, text=("Choose one or more markets, then confirm." if qui in LANG_EN else
                                           "Choisis une ou plusieurs monnaies / marchés, puis valide."))
                     menu_marches(etat, qui)
                 else:
+                    etat.setdefault("bot_off", [])
+                    if qui not in etat["bot_off"]:
+                        etat["bot_off"].append(qui)
+                    etat["coach_pending"] = [x for x in etat.get("coach_pending", []) if str(x) != qui]
                     _envoi_sur(qui, text=("Coach not activated. You can still request an analysis from the menu." if qui in LANG_EN else
                                           "Coach non activé. Tu peux toujours demander une analyse depuis le menu."))
                 continue
@@ -11039,10 +11079,14 @@ def question_quotidienne(etat, chats, now=None):
     now = time.time() if now is None else float(now)
     jour = datetime.datetime.fromtimestamp(now, PARIS).strftime("%Y-%m-%d")
     deja = etat.setdefault("question_quotidienne", {})
-    cibles = {str(c) for c in chats} | {str(c) for c in etat.get("prospects", [])}
+    # Le rappel quotidien ne vise que les conversations privées actives, jamais les prospects.
+    # Aucun rappel pendant un suivi coach actif ou tant qu'une position est ouverte.
+    cibles = {str(c) for c in chats}
     canal = str(etat.get("canal") or "")
     for cid in sorted(cibles - {canal, ""}):
-        if deja.get(cid) == jour:
+        if deja.get(cid) == jour or en_position(etat, cid):
+            continue
+        if any(coach_actif(etat, cid, m) for m in MARCHES):
             continue
         clavier = json.dumps({"inline_keyboard": [
             [{"text": "✅ Oui, je trade", "callback_data": "trade:yes"}],
