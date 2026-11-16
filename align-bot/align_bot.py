@@ -7190,16 +7190,17 @@ def _radar_fond(txt):
     return re.sub(r"[\d.,]+", "#", "\n".join(x for x in lignes if not x.startswith("📏")))
 
 def destinataires_radar(etat, chats):
-    """Personnes qui suivent au moins un marché (« Valider et suivre ») + VIP qui ont coché au moins 2 marchés. Jamais la chaîne."""
+    """Radar privé réservé aux personnes ayant explicitement activé le coach pour le marché concerné."""
     canal = str(etat.get("canal") or "")
     out = set()
     for m, suivis in (etat.get("veille_cloture") or {}).items():
-        for cid, s in (suivis or {}).items():
-            if isinstance(s, dict) and s.get("multi"):
+        for cid, suivi in (suivis or {}).items():
+            if isinstance(suivi, dict) and suivi.get("multi") and coach_abonne(etat, cid, m):
                 out.add(str(cid))
     for cid in {str(c) for c in chats}:
         try:
-            if autorise(etat, cid, cid) and len(marches_choisis(etat, cid)) >= 2:
+            marches_actifs = {m for m in MARCHES if coach_abonne(etat, cid, m)}
+            if autorise(etat, cid, cid) and len(marches_actifs) >= 2:
                 out.add(cid)
         except Exception:
             pass
