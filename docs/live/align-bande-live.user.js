@@ -318,8 +318,9 @@
     lastEntryShow = signature; lastEntryAt = Date.now();
     const short = side === 'SHORT';
     showPopup.className = short ? 'bas' : 'haut';
-    showPopup.innerHTML = '<span class="emo">' + (short ? '🔴' : '🟢') + '</span><span class="copy"><strong>ENTRÉE VALIDÉE</strong><small>' +
-      esc(market) + ' · ' + side + '</small><small>SL · TP1 · TP2 suivis par le coach</small></span>';
+    const plan = /PLAN D'EXÉCUTION|Action : ENTRER/i.test(t);
+    showPopup.innerHTML = '<span class="emo">' + (short ? '🔴' : '🟢') + '</span><span class="copy"><strong>' + (plan ? 'SIGNAL VALIDÉ' : 'POSITION OUVERTE') + '</strong><small>' +
+      (plan ? 'Entrée possible · ' : 'Position ouverte · ') + esc(market) + ' · ' + side + '</small><small>SL · TP1 · TP2 du plan</small></span>';
     const r = zoneGraphique();
     showPopup.style.left = (r.left + r.width / 2) + 'px';
     showPopup.style.top = (r.top + Math.max(36, r.height * 0.22)) + 'px';
@@ -600,7 +601,7 @@
     }
     const bulle = txt.startsWith('BULLE:');
     if (bulle) txt = txt.slice(6).trim();
-    if (/J'ENTRE MAINTENANT|ENTRE EN POSITION|ENTRÉE CONFIRMÉE|POSITION OUVERTE/i.test(txt)) afficherShowEntree(txt);
+    if (/J'ENTRE MAINTENANT|ENTRE EN POSITION|ENTRÉE CONFIRMÉE|POSITION OUVERTE|PLAN D'EXÉCUTION|Action : ENTRER/i.test(txt)) afficherShowEntree(txt);
     // v8.0 (demande d'Adel) : un abonné booste le live depuis le bot → son prénom passe TOUT DE SUITE, avec feu d'artifice et merci
     if (/BOOSTE LE LIVE/i.test(txt)) { const pr = ((txt.match(/MERCI\s+([^!]+)!/i) || [])[1] || '').trim(); montrer(txt, false, 1, 'membre', true); feuArtifice('🚀 MERCI ' + pr.toUpperCase() + ' !'); setTimeout(() => coeurs(1, ['🙏']), 2500); return; }
     if (/TP\d? TOUCH|OBJECTIF FINAL|TP2 TOUCH/i.test(txt)) { feuArtifice(/TP2|FINAL/i.test(txt) ? '🏆 ÇA ENCAISSE !' : '💰 ÇA ENCAISSE !'); pluieBillets(45);
