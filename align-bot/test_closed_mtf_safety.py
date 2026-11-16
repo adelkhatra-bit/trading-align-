@@ -184,5 +184,35 @@ class ClosedMtfSafety(unittest.TestCase):
         self.assertEqual(ab.direction_confirmee_marche("BTC", [0] * 11, 1), 1)
 
 
+    def test_gold_nasdaq_live_coach_counts_closed_directions_not_forming_ones(self):
+        forming = [1] * 11
+        closed = [-1] * 11
+        now = int(time.time())
+        r = {
+            "market": "GOLD", "confirme": -1, "dirs": forming,
+            "dirs_cloturees": closed, "m1": [bar(now - 10, c=100.0)],
+            "sqzs": [0] * 11, "b15": [], "b5": [],
+        }
+        message = ab.texte_coach_live(
+            "GOLD", bar(now - 900, o=101.0, h=102.0, l=99.0, c=100.0), r, {}
+        )
+        self.assertIn("📉 Unités : 7/7 ⬇️", message)
+        self.assertIn("🔴 baisse", message)
+
+    def test_live_ai_context_uses_four_closed_timeframes_for_gold_nasdaq(self):
+        r = {
+            "dirPlan": -1, "dirs": [1] * 11, "dirs_cloturees": [-1] * 11,
+            "m1": [bar(int(time.time()) - 10, c=100.0)],
+            "b15": [], "b15_long": [], "b1h": [], "b1h_long": [],
+            "b4h": [], "b4h_long": [], "niveaux": [],
+        }
+        context = ab.contexte_technique_live({"GOLD": r})["marches"]["GOLD"]
+        self.assertEqual(context["biais_plan"], "baissier")
+        self.assertEqual(context["confirmation_m5_m15_h1_h4"], "quatre clôtures alignées à la baisse")
+        self.assertEqual(context["lecture_mtf_cloturee"], {"M5": -1, "M15": -1, "H1": -1, "H4": -1})
+        self.assertEqual(context["unites_haussieres_sur_11"], 0)
+        self.assertEqual(context["unites_baissieres_sur_11"], 11)
+
+
 if __name__ == "__main__":
     unittest.main()
