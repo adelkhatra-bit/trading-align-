@@ -2245,7 +2245,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
         self.assertTrue(align_bot.marche_autorise(state, "202", "GOLD"))
 
     def test_market_message_routing_keeps_btc_and_gold_separate(self):
-        state = {"marches_par_chat": {"101": "BTC", "202": "GOLD", "303": "BOTH"}, "canal": "-1000"}
+        state = {"marches_par_chat": {"101": "BTC", "202": "GOLD", "303": "BOTH"}, "coach_optin": {"BTC": ["101", "303"], "GOLD": ["202", "303"]}, "canal": "-1000"}
         chats = {"101", "202", "303"}
         btc = align_bot.destinataires_message(state, chats, "🟠 BTC — SIGNAL EN ATTENTE\\nPrix 70000")
         gold = align_bot.destinataires_message(state, chats, "🥇 GOLD — SIGNAL CONFIRMÉ\\nPrix 4000")
@@ -2323,7 +2323,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
     @unittest.mock.patch.object(align_bot, "TOUT_GRATUIT", False)   # ancien modèle (1 position offerte puis masquée), gardé pour plus tard
     def test_free_flow_one_proposed_position_then_masked(self):
         from unittest.mock import patch
-        state = {"prospects": ["7"], "proprio": ["1"], "proprio_gratuit": True, "lien": "https://t.me/+x", "GOLD": {"trade": {"cree": 5, "qui": {}}}}
+        state = {"prospects": ["7"], "proprio": ["1"], "proprio_gratuit": True, "coach_optin": {"GOLD": ["7", "1"]}, "lien": "https://t.me/+x", "GOLD": {"trade": {"cree": 5, "qui": {}}}}
         entree = "🥇 GOLD — J'ENTRE MAINTENANT\nEntrée 3990.50"
         with patch.object(align_bot, "telegram") as tg:
             align_bot.envoyer_prospects(state, "📰 NEWS USA DANS 1 H", False)
@@ -2344,7 +2344,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
     @unittest.mock.patch.object(align_bot, "TOUT_GRATUIT", False)   # ancien modèle (1 position offerte puis masquée), gardé pour plus tard
     def test_free_bot_off_gets_only_masked_and_respects_market(self):
         from unittest.mock import patch
-        state = {"prospects": ["7", "8"], "bot_off": ["7"], "marches_par_chat": {"8": "BTC"}, "GOLD": {"trade": {"cree": 5}}}
+        state = {"prospects": ["7", "8"], "bot_off": ["7"], "coach_optin": {"GOLD": ["7"], "BTC": ["8"]}, "marches_par_chat": {"8": "BTC"}, "GOLD": {"trade": {"cree": 5}}}
         with patch.object(align_bot, "telegram") as tg, patch.object(align_bot, "PROPRIO_VUE_GRATUITE", False):
             align_bot.envoyer_prospects(state, "🥇 GOLD — J'ENTRE MAINTENANT\nEntrée 3990.50", True)
         self.assertEqual([c.kwargs["chat_id"] for c in tg.call_args_list], ["7"])
@@ -2361,7 +2361,8 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
 
     def test_mixed_market_macro_alert_goes_to_each_concerned_account_with_only_its_markets(self):
         """Règle remplacée (demande d'Adel) : un message multi-marchés arrive à chaque compte concerné, mais réduit à SES marchés cochés."""
-        state = {"marches_par_chat": {"101": "BTC", "202": "GOLD", "303": "BOTH", "404": ["NASDAQ"]}}
+        state = {"marches_par_chat": {"101": "BTC", "202": "GOLD", "303": "BOTH", "404": ["NASDAQ"]},
+                 "coach_optin": {"BTC": ["101", "303"], "GOLD": ["202", "303"], "NASDAQ": ["404"]}}
         texte = "💵 DOLLAR EN FORTE HAUSSE\n🥇 GOLD : prudence\n🟠 BTC : prudence"
         recipients = align_bot.destinataires_message(state, {"101", "202", "303", "404"}, texte)
         self.assertEqual(set(recipients), {"101", "202", "303"})                  # 404 (NASDAQ seul) n'est pas concerné
@@ -2993,7 +2994,7 @@ class TestTelegramMarketButtonsJourney(unittest.TestCase):
         self.assertIn("501", [str(x) for x in state["auto"]["GOLD"]])
         self.assertIn("501", [str(x) for x in state["auto"]["NASDAQ"]])
         self.assertNotIn("501", [str(x) for x in state["auto"].get("BTC", [])])
-        self.assertTrue(any("Suivi activé : GOLD + NASDAQ" in k.get("text", "") for k in sent))
+        self.assertTrue(any("Coach privé activé pour : GOLD + NASDAQ" in k.get("text", "") for k in sent))
 
     def test_markets_confirm_message_is_clear_and_menu_closed(self):
         from unittest.mock import patch
@@ -3002,7 +3003,7 @@ class TestTelegramMarketButtonsJourney(unittest.TestCase):
             ok = align_bot.valider_et_suivre_marches(state, "501", 501, 77)
         self.assertTrue(ok)
         self.assertEqual(tg.call_args.args[0], "deleteMessage")
-        self.assertIn("✅ Suivi activé : GOLD", send.call_args.kwargs["text"])
+        self.assertIn("🧑‍🏫 Coach privé activé pour : GOLD", send.call_args.kwargs["text"])
         self.assertIn("501", [str(x) for x in state["auto"]["GOLD"]])
         with patch.object(align_bot, "telegram"), patch.object(align_bot, "_envoi_sur") as send:
             align_bot.LANG_EN.add("502")
@@ -3010,7 +3011,7 @@ class TestTelegramMarketButtonsJourney(unittest.TestCase):
                 align_bot.valider_et_suivre_marches({"marches_par_chat": {"502": ["BTC"]}}, "502", 502)
             finally:
                 align_bot.LANG_EN.discard("502")
-        self.assertIn("✅ Tracking on: BTC", send.call_args.kwargs["text"])
+        self.assertIn("🧑‍🏫 Coach activated: BTC", send.call_args.kwargs["text"])
 
     def test_both_label_translated_in_english(self):
         self.assertEqual(align_bot.traduire("🥇 + 🟠 Les deux"), "🥇 + 🟠 Both")
@@ -3036,12 +3037,13 @@ class TestTelegramFloodProtection(unittest.TestCase):
     def test_gauge_is_edited_at_most_once_per_minute(self):
         from unittest.mock import patch
         cle = {"jauge": {"1": 5}, "jauge_txt": {"1": "old"}, "jauge_t": {"1": 1000.0}}
+        state = {"coach_optin": {"GOLD": ["1"]}}
         with patch.object(align_bot, "jauge", side_effect=["p1", "p2", "p3"]), \
              patch.object(align_bot, "marche_autorise", return_value=True), \
              patch.object(align_bot.time, "time", side_effect=[1010.0, 1059.0, 1061.0, 1061.0]), \
              patch.object(align_bot, "telegram") as tg:
             for _ in range(3):
-                align_bot.maj_jauge({}, "GOLD", {}, cle, {"1"})
+                align_bot.maj_jauge(state, "GOLD", {}, cle, {"1"})
         edits = [c for c in tg.call_args_list if c.args[0] == "editMessageText"]
         self.assertEqual(len(edits), 1)
         self.assertEqual(edits[0].kwargs["text"], "p3")
