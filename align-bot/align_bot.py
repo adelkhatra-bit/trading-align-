@@ -4012,7 +4012,8 @@ def entree_retest(m, r, cle):
         return None
     x = b[-1]
     for d in (1, -1):
-        if not (dirs[2] == d and dirs[4] == d and dirs[7] == d and dirs[9] != -d):
+        h4_ok = dirs[9] == d if m in ("GOLD", "NASDAQ") else dirs[9] != -d
+        if not (dirs[2] == d and dirs[4] == d and dirs[7] == d and h4_ok):
             continue
         avant = b[-26:-6]
         niveau = max(y["h"] for y in avant) if d == 1 else min(y["l"] for y in avant)
@@ -4035,6 +4036,41 @@ def entree_retest(m, r, cle):
                 f"📍 Entrée ≈ {px(x['c'])}\n🛑 SL {'juste sous' if d == 1 else 'juste au-dessus de'} la mèche : {px(sl)}\n"
                 "🛡 BE dès que le gain = le risque\n🤖 Le bot ne la prend pas lui-même\n⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
     return None
+
+FIBO_UT = (("15 min", "b15", 48), ("1h", "b1h", 48), ("4h", "b4h", 30))
+
+def fibo_zones(m, r, cle):
+    """FIBONACCI EN TEMPS RÉEL (demande d'Adel 15/11) : pour chaque unité (15 min, 1h, 4h), dernier mouvement = plus haut /
+    plus bas des N dernières bougies ; le bot dit à quel % du retracement on est. Annonce quand le prix entre dans la zone
+    clé 61,8 – 78,6 % (zone de retournement probable), une fois par mouvement et par unité."""
+    p = r["m1"][-1]["c"] if r.get("m1") else None
+    if p is None:
+        return None
+    lignes = []
+    for nom, k, n in FIBO_UT:
+        b = (r.get(k) or [])[-n:]
+        if len(b) < 10:
+            continue
+        ih = max(range(len(b)), key=lambda i: b[i]["h"]); il = min(range(len(b)), key=lambda i: b[i]["l"])
+        hi, lo = b[ih]["h"], b[il]["l"]
+        if hi <= lo:
+            continue
+        hausse = il < ih                                  # le plus bas est venu avant le plus haut : mouvement de hausse
+        pct = (hi - p) / (hi - lo) * 100 if hausse else (p - lo) / (hi - lo) * 100
+        if not 61.8 <= pct <= 78.6:
+            continue
+        cle_mvt = f"{nom}|{round(hi, 2)}|{round(lo, 2)}"
+        deja = cle.setdefault("fibo_dit", {})
+        if deja.get(nom) == cle_mvt:
+            continue
+        deja[nom] = cle_mvt
+        lignes.append(f"📐 Fibo {nom} : on est à {pct:.0f} % du dernier mouvement de {'hausse' if hausse else 'baisse'}")
+    if not lignes:
+        return None
+    return (f"📐 ZONE FIBONACCI — {ICONE.get(m, '')} {m}\n" + "\n".join(lignes) +
+            "\n🎯 Zone clé 61,8 – 78,6 % : c'est là que le prix se retourne souvent\n"
+            "⏳ On attend la clôture de bougie pour savoir s'il rebondit ou s'il casse\n"
+            "⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
 
 def radar_climax(m, r, cle):
     """RADAR RETOURNEMENT (validé par Adel le 15/11, « oui radar ») — le LONG raté 62 → 65,5 k BTC :
@@ -6853,7 +6889,7 @@ def evenements_pine(etat, m, r, cle, now):
             f = lambda v: px(v)
             ev.append(dict(kind="sniper", **base, ordre="vente" if sn["d"] == -1 else "achat", za=f(sn["za"]), zb=f(sn["zb"]), sl=f(sn["sl"]), tp1=f(sn["tp1"]),
                            tp=f(sn["tp2"]), ut=sn["ut"], rejets="+".join(sn["rejets"]), rr=str(round(sn["rr"], 1)).replace(".", ","), rrp=str(round(sn["rr_plan"], 1)).replace(".", ",")))
-    if d and not cle.get("trade"):                       # ↩ SCALP INVERSE : une fois par niveau, 30 min mini (même règle que le sniper)
+    if d and not cle.get("trade") and m == "BTC":        # BTC seul : garder le scalp inverse historique ; Gold/NASDAQ sans position inversée
         try:
             si = scalp_inverse(r, d)
         except Exception:
@@ -9430,13 +9466,16 @@ def agent(m, r, cle, ferme):
         er_ = entree_retest(m, r, cle) if not tr else None   # résistance cassée qui devient support (règle d'Adel)
         if er_:
             out.append(er_)
+        fz_ = fibo_zones(m, r, cle)                   # Fibonacci en temps réel 15 min / 1h / 4h (demande d'Adel)
+        if fz_:
+            out.append(fz_)
         rc_ = radar_climax(m, r, cle)                 # radar retournement (volume climax + balayage + EMA9)
         if rc_ and not tr:
             out.append(rc_)
     except Exception as ex:
         print("radar_climax", ex)
     try:
-        rv_ = retournement_marche(m, r, cle)          # v71 : retournement par marché (même règle que le graphique)
+        rv_ = retournement_marche(m, r, cle) if (not tr or m == "BTC") else None  # aucune alerte inverse Gold/NASDAQ pendant une position ouverte
         if rv_ and not (tr and tr.get("d") == (1 if "LONG" in rv_.split("\n")[0] else -1)):
             out.append(rv_)
     except Exception as ex:
