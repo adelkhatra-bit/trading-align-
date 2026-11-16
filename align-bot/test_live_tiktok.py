@@ -413,9 +413,9 @@ class LiveOutbox(unittest.TestCase):
             "recherche_positions_active": [cid]
         }
         sent = []
-        with mock.patch.object(ab, "bot_on", return_value=True), \\
-             mock.patch.object(ab, "dans_chaine", return_value=False), \\
-             mock.patch.object(ab, "_envoi_sur", side_effect=lambda *a, **kw: sent.append((a, kw)) or {"ok": True}), \\
+        with mock.patch.object(ab, "bot_on", return_value=True), \
+             mock.patch.object(ab, "dans_chaine", return_value=False), \
+             mock.patch.object(ab, "_envoi_sur", side_effect=lambda *a, **kw: sent.append((a, kw)) or {"ok": True}), \
              mock.patch.object(ab, "markup_analyse", return_value=None):
             ab.notifier_coach_live(state, market, {"m1": [{"c": 99.0}]}, {"trade": trade})
         self.assertFalse(any("POSITION ALIGN DÉTECTÉE" in str(item) for item in sent))
