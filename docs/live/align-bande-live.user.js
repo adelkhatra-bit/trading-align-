@@ -180,7 +180,7 @@
   const voixBtn = document.createElement('button');
   voixBtn.id = 'align-live-voice';
   voixBtn.type = 'button';
-  voixBtn.textContent = '🔊 ACTIVER LE COMMENTATEUR';
+  voixBtn.textContent = '🔊 ACTIVER LA VOIX DU COACH';
   voixBtn.setAttribute('aria-pressed', 'false');
   voixBtn.title = 'Activer le commentateur vocal du live';
   voixBtn.style.cssText = 'position:fixed;right:18px;top:104px;z-index:10001;padding:11px 15px;border:2px solid #35d07f;border-radius:22px;background:linear-gradient(135deg,#123b2b,#10251f);color:#fff;font:800 13px system-ui;cursor:pointer;pointer-events:auto;box-shadow:0 0 18px rgba(53,208,127,.35)';
@@ -209,6 +209,7 @@
       window.speechSynthesis.cancel();
       window.speechSynthesis.resume();
       voixBtn.textContent = '🔊 COACH VOCAL ON';
+      voixBtn.setAttribute('aria-pressed', 'true');
       // Le clic explicite déverrouille la synthèse vocale du navigateur pour le direct.
       const accueil = new SpeechSynthesisUtterance(voixLangue === 'fr' ? 'Le coach ALIGN est en direct. Je commente maintenant ce que fait le marché.' : 'The ALIGN coach is live. I am now commenting on market action.');
       accueil.lang = voixLangue === 'fr' ? 'fr-FR' : 'en-US';
@@ -218,7 +219,8 @@
       voixDerniere = Date.now();
     } else {
       window.speechSynthesis.cancel();
-      voixBtn.textContent = '🔇 VOIX DU COACH OFF';
+      voixBtn.textContent = '🔇 ACTIVER LA VOIX DU COACH';
+      voixBtn.setAttribute('aria-pressed', 'false');
     }
   });
   function parlerLive(item) {
