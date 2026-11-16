@@ -7515,7 +7515,8 @@ def alertes_courtes(etat, chats, derniers, now=None):
                 if (ev["code"], ev["evt"]) in SESSIONS_GRATUIT:
                     libres.append(ev)
                 continue
-        evts.append(({"*"}, texte_session(etat, ev), texte_session(etat, ev, True), ev["mk"]))
+        marches_evt = marches_du_message(ev["mk"][0]) or {"*"}
+        evts.append((marches_evt, texte_session(etat, ev), texte_session(etat, ev, True), ev["mk"]))
         if (ev["code"], ev["evt"]) in SESSIONS_GRATUIT and ev["palier"] == 15:
             libres.append(ev)
     if modele3 and TOKEN:
