@@ -4,7 +4,7 @@ from unittest.mock import patch
 import align_bot as ab
 
 
-class ZoneConsumptionDirectionnelle(unittest.TestCase):
+class ZoneConsumptionDirectionnelle(unittest.TestCase):\n    """Regression coverage for directional mitigation percentages."""
     def b(self, high, low):
         return {"h": high, "l": low, "o": low, "c": high}
 
