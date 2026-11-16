@@ -113,5 +113,33 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
 
 
 
+    def test_breakout_with_reward_risk_below_minimum_is_not_opened(self):
+        r = {
+            "m1": [{"t": 1000, "o": 100.0, "h": 101.0, "l": 99.0, "c": 100.0}],
+            "r5": [50.0, 50.0], "confirme": 1, "t": 1000,
+            "posD": 0.5, "posW": 0.5, "b5": [], "atr": 1.0,
+            "dirs": [1] * 11
+        }
+        low_rr_plan = {"d": 1, "e": 100.0, "sl": 99.0, "tp1": 101.0, "tp2": 102.0,
+                       "rr": 1.0, "t15": 900, "src": "cassure 5 min"}
+        cle = {}
+        with unittest.mock.patch.object(align_bot, "manipulation"), \
+             unittest.mock.patch.object(align_bot, "meche_suspecte"), \
+             unittest.mock.patch.object(align_bot, "niveaux_cles"), \
+             unittest.mock.patch.object(align_bot, "resistance_fvg"), \
+             unittest.mock.patch.object(align_bot, "suivre_apres_sl"), \
+             unittest.mock.patch.object(align_bot, "radar_climax", return_value=None), \
+             unittest.mock.patch.object(align_bot, "retournement_marche", return_value=None), \
+             unittest.mock.patch.object(align_bot, "bloque_dw", return_value=False), \
+             unittest.mock.patch.object(align_bot, "plan_cassure", return_value=low_rr_plan), \
+             unittest.mock.patch.object(align_bot, "point_entree", return_value=None), \
+             unittest.mock.patch.object(align_bot, "memoire_refuse") as refuse:
+            out = align_bot.agent("BTC", r, cle, "")
+        self.assertNotIn("trade", cle)
+        refuse.assert_not_called()
+        self.assertTrue(any("pas de FVG" in str(x) for x in out))
+
+
+
 if __name__ == "__main__":
     unittest.main()
