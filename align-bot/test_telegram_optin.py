@@ -148,6 +148,41 @@ class TelegramOptIn(unittest.TestCase):
             ab.notifier_coach_live(etat, "GOLD", r, {})
         send.assert_not_called()
 
+    def test_bot_off_purge_les_messages_telegram_en_attente(self):
+        etat = {
+            "telegram_outbox": [
+                {"chat_id": "10", "text": "signal GOLD"},
+                {"chat_id": "11", "text": "signal BTC"},
+            ],
+            "bot_off": [],
+        }
+        with mock.patch.object(ab, "_envoi_sur"):
+            ab.regler_bot(etat, "10", False)
+        self.assertEqual(etat["telegram_outbox"], [{"chat_id": "11", "text": "signal BTC"}])
+        self.assertIn("10", etat["bot_off"])
+
+    def test_activation_coach_reactive_le_bot_et_le_consentement(self):
+        etat = {"bot_off": ["10"], "coach_optin": {"GOLD": []}}
+        ab.activer_coach_optin(etat, "10", "GOLD", True)
+        self.assertNotIn("10", etat["bot_off"])
+        self.assertTrue(ab.coach_abonne(etat, "10", "GOLD"))
+
+    def test_coach_live_reessaie_si_telegram_echoue_sans_avancer_le_curseur(self):
+        etat = {"coach_live": {"GOLD": {"10": {"expire": 9999999999, "dernier_t": 0}}}, "bot_off": []}
+        r = {"b15": [{"t": 1000, "o": 1, "h": 2, "l": 0, "c": 1}, {"t": 1900, "o": 1, "h": 2, "l": 0, "c": 1}]}
+        with (
+            mock.patch.object(ab, "dans_chaine", return_value=False),
+            mock.patch.object(ab, "texte_coach_live", return_value="coach"),
+            mock.patch.object(ab, "markup_analyse", return_value=None),
+            mock.patch.object(ab, "positions_bot", return_value=[]),
+            mock.patch.object(ab, "_envoi_sur", side_effect=[None, {"ok": True}]) as send,
+        ):
+            ab.notifier_coach_live(etat, "GOLD", r, {})
+            self.assertEqual(etat["coach_live"]["GOLD"]["10"]["dernier_t"], 0)
+            ab.notifier_coach_live(etat, "GOLD", r, {})
+        self.assertEqual(send.call_count, 2)
+        self.assertEqual(etat["coach_live"]["GOLD"]["10"]["dernier_t"], 1000)
+
     def test_texte_telegram_de_preparation_ne_parle_pas_de_fibonacci(self):
         tr = dict(d=-1, e=3900.0, sl=3910.0, tp1=3880.0, tp2=3860.0,
                   rr=2.0, strat="SWING", src="Fibonacci 50 → 78,6 %", n1="support 4h", n2="projection 2R", sl_ut="15 min", sl_h="02:00", za=3898.0, zb=3902.0)
