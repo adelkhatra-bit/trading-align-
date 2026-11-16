@@ -692,9 +692,9 @@ class TestLiveBoostCallbackDispatch(unittest.TestCase):
             "message": {"chat": {"id": 44, "type": "private"}},
             "data": "liveboost:x"
         }}
-        with mock.patch.object(ab, "LIVE_SUJET", "test-sujet"), \\
-             mock.patch.object(ab, "live_publier", side_effect=lambda t: published.append(t) or True), \\
-             mock.patch.object(ab, "_envoi_sur", side_effect=lambda cid, **kw: sent.append((cid, kw)) or {"ok": True}), \\
+        with mock.patch.object(ab, "LIVE_SUJET", "test-sujet"), \
+             mock.patch.object(ab, "live_publier", side_effect=lambda t: published.append(t) or True), \
+             mock.patch.object(ab, "_envoi_sur", side_effect=lambda cid, **kw: sent.append((cid, kw)) or {"ok": True}), \
              mock.patch.object(ab, "telegram", return_value={"ok": True}):
             ab.traiter(state, set(), [update])
         self.assertEqual(state["prenoms"]["44"], "Nora")
