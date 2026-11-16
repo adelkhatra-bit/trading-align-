@@ -11080,6 +11080,7 @@ def un_tour(etat, chats):
             if SHUTDOWN_REQUESTED.is_set():
                 return
             r["market"] = nom_marche  # applique les confirmations H1/H4 spécifiques à GOLD/NASDAQ avant le SNIPER
+            r["sniper"] = entree_sniper(r)  # recalcul après attribution du marché : calculer_analyse ne connaît pas encore GOLD/NASDAQ
             r["tv_indicator_mtf"] = fetch_tv_mtf(pair)
             fusionne_lectures_tradingview(r)
         except Exception as ex:
