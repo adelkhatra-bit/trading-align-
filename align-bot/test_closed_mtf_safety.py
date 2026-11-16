@@ -214,5 +214,19 @@ class ClosedMtfSafety(unittest.TestCase):
         self.assertEqual(context["unites_baissieres_sur_11"], 11)
 
 
+    def test_gold_nasdaq_next_closure_uses_closed_h1_h4_not_forming_candles(self):
+        r = {
+            "market": "GOLD",
+            "dirs": [1] * 11,
+            "dirs_cloturees": [1] * 11,
+            "confirme": 0,
+        }
+        r["dirs_cloturees"][9] = 0
+        self.assertEqual(ab.timeframe_attendu(r, {}), "4h")
+        # BTC deliberately retains its legacy timeframe selection.
+        r["market"] = "BTC"
+        self.assertEqual(ab.timeframe_attendu(r, {}), "1h")
+
+
 if __name__ == "__main__":
     unittest.main()
