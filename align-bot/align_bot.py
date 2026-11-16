@@ -3606,13 +3606,22 @@ def resume_volume(bars, provenance, timeframe_sec=0, now_ts=None):
     reference = valeurs[-21:-1]
     moyenne = sum(reference) / len(reference) if reference else 0.0
     ratio = recent / moyenne if moyenne > 0 else None
+    src = str(provenance or "").upper()
+    if "PAXG" in src:
+        interpretation = "volume du jeton PAXG sur Kraken uniquement ; ce n'est PAS le volume global du marché Gold et ne doit pas confirmer une entrée"
+    elif "COMEX GC=F" in src:
+        interpretation = "proxy du volume futures COMEX Gold ; pas le volume spot mondial, confirmation secondaire uniquement"
+    elif "CME NQ=F" in src:
+        interpretation = "proxy du volume futures Nasdaq NQ ; pas le volume total de l'indice cash, confirmation secondaire uniquement"
+    else:
+        interpretation = "volume indicatif du flux source ; ne confirme jamais seul une entrée"
     return {
         "disponible": True, "provenance": provenance, "derniere_bougie": round(recent, 4),
         "moyenne_20_bougies": round(moyenne, 4) if reference else None,
         "ratio_vs_moyenne": round(ratio, 2) if ratio is not None else None,
         "etat": ("pic" if ratio is not None and ratio >= 1.5 else "faible" if ratio is not None and ratio <= 0.7 else "normal" if ratio is not None else "reference_insuffisante"),
         "nb_bougies": len(valeurs),
-        "interpretation": "volume indicatif du flux source ; ne confirme jamais seul une entrée"
+        "interpretation": interpretation
     }
 
 
