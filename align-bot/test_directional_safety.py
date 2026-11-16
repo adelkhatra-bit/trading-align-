@@ -108,17 +108,25 @@ class DirectionSafety(unittest.TestCase):
         self.assertEqual(r["confirme"], 1)
 
     def test_gold_nasdaq_climax_is_watch_only_without_h1_h4_confluence(self):
-        bars = [candle(i * 900) for i in range(80)]
-        bars[-2] = candle(78 * 900, o=100, h=102, l=97, c=101, v=500)
         dirs = [0] * 11
         dirs[7], dirs[9] = -1, -1
-        r = dict(b15_long=bars, dirs=dirs, t=50000)
-        for market in ("GOLD", "NASDAQ"):
+        for market, source in (("GOLD", "COMEX GC=F Yahoo proxy"), ("NASDAQ", "CME NQ=F Yahoo proxy")):
+            bars = [dict(candle(i * 900), volume_source=source) for i in range(80)]
+            bars[-2] = dict(candle(78 * 900, o=100, h=102, l=97, c=101, v=500), volume_source=source)
+            r = dict(b15_long=bars, dirs=dirs, t=50000)
             msg = ab.radar_climax(market, r, {})
             self.assertIn("RADAR CLIMAX — SURVEILLANCE", msg)
             self.assertIn("Pas de position", msg)
             self.assertNotIn("Entrée ≈", msg)
             self.assertNotIn("prenable", msg)
+
+    def test_gold_climax_rejects_paxg_token_volume_as_market_volume(self):
+        bars = [dict(candle(i * 900), volume_source="Kraken PAXGUSD") for i in range(80)]
+        bars[-2] = dict(candle(78 * 900, o=100, h=102, l=97, c=101, v=500), volume_source="Kraken PAXGUSD")
+        dirs = [0] * 11
+        dirs[7], dirs[9] = -1, -1
+        r = dict(b15_long=bars, dirs=dirs, t=50000)
+        self.assertIsNone(ab.radar_climax("GOLD", r, {}))
 
     def test_gold_nasdaq_reversal_is_observation_only_btc_keeps_legacy(self):
         for market in ("GOLD", "NASDAQ"):
