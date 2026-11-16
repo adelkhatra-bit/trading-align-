@@ -4857,7 +4857,7 @@ def texte_prix_topstep(m, tr, prix_graphique, prix_fut):
 
 def prix_topstep_inscrits(etat, m, tr, prix_graphique):
     """Envoie les niveaux Topstep à ceux qui ont choisi « Topstep » (le prix du contrat est lu en direct sur l'API)."""
-    qui = [c for c, v in (etat.get("plateforme") or {}).items() if v in ("topstep", "deux") and marche_autorise(etat, c, m)]
+    qui = [c for c, v in (etat.get("plateforme") or {}).items() if v in ("topstep", "deux") and coach_abonne(etat, c, m) and marche_autorise(etat, c, m)]
     if not qui or not topstep_trade:
         return 0
     try:
@@ -10864,6 +10864,9 @@ def live_annoncer_debut(etat, chats):
         if cid in vus:
             continue
         vus.add(cid)
+        # L'annonce privée du live est un push : elle exige au moins un Coach explicitement actif.
+        if not any(coach_abonne(etat, cid, m) for m in MARCHES):
+            continue
         anglais = cid in LANG_EN
         try:
             _envoi_sur(cid, text=("🔴 ADEL IS LIVE\n📺 The ALIGN chart, live (YouTube • TikTok)\n🎮 You can take control of the chart"
