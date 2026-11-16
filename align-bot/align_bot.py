@@ -10144,13 +10144,18 @@ def progression_fibonacci_live(r, market=None):
     resultat = {}
     for unite, serie, fenetre in specifications:
         bougies = list(serie[:-1])[-fenetre:] if len(serie) > 1 else []
-        if len(bougies) < 10:
-            continue
         if market in ("GOLD", "NASDAQ"):
+            if len(bougies) < fenetre:
+                continue
             # En cas d'extrêmes répétés, prendre la dernière occurrence pour respecter le dernier swing confirmé.
             i_haut = max(range(len(bougies)), key=lambda i: (bougies[i]["h"], i))
             i_bas = min(range(len(bougies)), key=lambda i: (bougies[i]["l"], -i))
+            # Un seul chandelier qui porte simultanément le plus haut et le plus bas ne donne pas un sens fiable.
+            if i_haut == i_bas:
+                continue
         else:
+            if len(bougies) < 10:
+                continue
             # BTC conserve strictement la sélection historique.
             i_haut = max(range(len(bougies)), key=lambda i: bougies[i]["h"])
             i_bas = min(range(len(bougies)), key=lambda i: bougies[i]["l"])
