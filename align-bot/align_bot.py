@@ -10261,35 +10261,6 @@ def live_phrases_ia(etat, maintenant, derniers=None):
 
 
 
-    """Toutes les 30 min, l'IA GRATUITE (Gemini gratuit / Groq / IA sans clé) invente un lot de phrases FR + EN pour la bande."""
-    if not live_actif(etat) or maintenant - etat.get("live_ia_t", 0) < LIVE_IA_INTERVALLE:
-        return False
-    etat["live_ia_t"] = maintenant
-    h = datetime.datetime.fromtimestamp(maintenant, PARIS).hour
-    moment = "nuit" if h < 7 else "matin" if h < 12 else "après-midi" if h < 18 else "soirée"
-    consigne = ("Écris 6 phrases pour la bande qui défile d'un live TikTok / YouTube de trading (BTC, Gold, NASDAQ). "
-                "Format EXACT, une par ligne : phrase en français | la même phrase en anglais. "
-                "Tu es un trader SENIOR et commentateur live expert des marchés financiers (bougies, liquidité, sessions, news, discours des banques centrales) : "
-                "tu lis le marché, tu réagis à ce qui se passe et tu ANTICIPES, comme les meilleurs streamers trading. "
-                "tu t'adresses directement aux spectateurs (tu, la team), tu poses des questions (ça va rebondir ? cassure ou rejet ?), "
-                "tu mets une pression gentille (si personne ne tape je garde l'info, cinquante taps et je lâche un indice ; JAMAIS de chiffre). "
-                "Ton jeune, drôle, poli, sûr de lui, émojis bienvenus, 80 caractères max par phrase. "
-                "Varie à chaque fois : faire commenter (ça monte ou ça descend ? dis-le en commentaire), faire tapoter l'écran, petites blagues de trader "
-                "(« c'est pas parce que je dis prépare-toi que je t'ai dit d'y aller 😝 », attendre le feu vert, rester discipliné), vocabulaire des bougies avec un clin d'œil jeune, "
-                "s'abonner, partager, « tu veux mon avis ? lien en bio », suspense sur le prochain mouvement. "
-                "INTERDIT : aucun chiffre, aucun prix, pas les mots entrée, SL, TP, stop, Telegram ; aucune promesse de gain. "
-                "Réponds uniquement avec les 6 lignes.")
-    donnees = {"moment": moment, "deja_dites": [p[0] for p in etat.get("live_ia_paires", [])][:6]}
-    brut = ia(etat, consigne, donnees)
-    paires = phrases_bande_propres(brut)
-    print(f"LIVE_IA {len(paires)} phrases via {etat.get('ia_dernier_fournisseur')} {etat.get('ia_dernier_statut')} : {str(brut)[:160]!r}")
-    if not paires:
-        etat["live_ia_t"] = maintenant - LIVE_IA_INTERVALLE + 300     # v8.8 : échec → on réessaie dans 5 min (pas 30)
-        return False
-    etat["live_ia_paires"] = paires
-    return live_publier("IA:" + json.dumps(paires, ensure_ascii=False))
-
-
 def live_agenda(etat, maintenant):
     """Discours, annonces US et ouvertures de marché : la bande prévient 15 min avant et en direct (aucun chiffre de prix)."""
     if not live_actif(etat):
