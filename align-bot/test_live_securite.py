@@ -92,7 +92,7 @@ class DonneesLive(unittest.TestCase):
         for interdit in ("3983", "3990", "4000", "4001", "4010", "3950", "sl", "tp", "entree_prix", "token", "ghp_", "prix"):
             self.assertNotIn(interdit, txt.replace('"entree"', ""))
         etats = {m["m"]: m["etat"] for m in d["marches"]}
-        self.assertEqual(etats, {"GOLD": "preparation", "BTC": "calme", "NASDAQ": "entree"})
+        self.assertEqual(etats, {"GOLD": "preparation", "BTC": "calme", "NASDAQ": "signal"})
         with patch.object(ab, "cme_ouvert", return_value=False):
             ferme = {m["m"]: m["etat"] for m in ab.construire_live(etat, derniers, 1_800_000_000)["marches"]}
         self.assertEqual((ferme["GOLD"], ferme["NASDAQ"], ferme["BTC"]), ("ferme", "ferme", "calme"))
