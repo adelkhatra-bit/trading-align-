@@ -9674,15 +9674,6 @@ def agent(m, r, cle, ferme):
                 out.append(f"⚪ {m} : confirmation 1h / tendance 4h perdue. Ordre annulé, j'attends.")
             cle["aligne"] = 0; cle["prep"] = False; cle.pop("ordre", None)
             return out
-        # Gold/NASDAQ : aucun chemin (cassure, FVG, repli) ne contourne M15 + H1 + H4.
-        if not confluence_entree_mtf(m, r, d):
-            cle["prep"] = False
-            cle.pop("ordre", None)
-            cle["aligne"] = d
-            if r["t"] - cle.get("mtf_attente_t", 0) >= 3600:
-                cle["mtf_attente_t"] = r["t"]
-                out.append(f"⏳ {ICONE.get(m, '')} {m} : biais H1/H4 détecté, mais M5/M15 ne confirment pas encore ensemble. ANTICIPATION uniquement — aucune position.")
-            return out
         # Extrême Daily/Weekly : aucune poursuite dans le sens de la tendance.
         # On attend une correction ou un retournement confirmé ; on ne vend pas à découvert sans signal opposé validé.
         if bloque_dw(r, d, p):
@@ -9691,6 +9682,15 @@ def agent(m, r, cle, ferme):
             if alerte_extreme_due(cle, d, r["t"]):
                 out.append(texte_zone_extreme(m, r, d))
             cle["aligne"] = d
+            return out
+        # Gold/NASDAQ : aucun chemin (cassure, FVG, repli) ne contourne M15 + H1 + H4.
+        if not confluence_entree_mtf(m, r, d):
+            cle["prep"] = False
+            cle.pop("ordre", None)
+            cle["aligne"] = d
+            if r["t"] - cle.get("mtf_attente_t", 0) >= 3600:
+                cle["mtf_attente_t"] = r["t"]
+                out.append(f"⏳ {ICONE.get(m, '')} {m} : biais H1/H4 détecté, mais M5/M15 ne confirment pas encore ensemble. ANTICIPATION uniquement — aucune position.")
             return out
         # ── Entrée sur CASSURE confirmée (clôture 5 min au-delà du niveau) ──
         pc = plan_cassure(r, d)
