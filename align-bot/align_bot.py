@@ -5417,7 +5417,7 @@ def canal_resultats(etat, m, textes):
 
 
 def notifier_coach_live(etat, m, r, cle):
-    """Surveille sans échéance, signale immédiatement une nouvelle position puis commente les clôtures M15."""
+    """Surveille sans échéance ; ne pousse qu'une nouvelle position confirmée à l'utilisateur qui l'a demandée."""
     abonnes = etat.get("coach_live", {}).get(m) or {}
     if not abonnes:
         return
@@ -6442,7 +6442,7 @@ def traiter(etat, chats, updates):
                 boutons_stop = [[{"text": f"⏹ Arrêter {m}", "callback_data": f"coachstop:{m}"} for m in marches_recherche]]
                 _envoi_sur(qui, text=(f"🎯 RECHERCHE DE POSITION ACTIVE — {noms}\n"
                                       "🔎 ALIGN surveille les configurations confirmées en continu.\n"
-                                      "🕯 Le coach commente les clôtures M15 et les changements importants.\n"
+                                      "🔕 Aucun commentaire intermédiaire : je t'écris uniquement lorsqu'une position est confirmée.\n"
                                       "📍 Dès qu'une position est détectée, tu reçois ses niveaux et son suivi.\n"
                                       "🔕 Pas d'alerte automatique sur les autres marchés.\n"
                                       "⏹ La recherche reste active jusqu'à ton arrêt."), 
@@ -6768,7 +6768,7 @@ def traiter(etat, chats, updates):
                 if choix == "coachlive":
                     intro = (f"🎙 COACH COMMENTATEUR ACTIVÉ — {ICONE.get(mk, '')} {mk}\n"
                              "🔎 Surveillance continue : je cherche une configuration d'entrée confirmée, sans inventer de signal.\n"
-                             "🕯 Je commente les clôtures M15 et les changements importants jusqu'à détection d'une position.\n"
+                             "🔕 Aucun message de marché intermédiaire : uniquement une position confirmée.\n"
                              "📍 Dès qu'une position est ouverte par ALIGN, je poursuis son suivi.\n"
                              "⏹ Pour arrêter : le bouton sous mes messages.")
                     contenu = intro
@@ -6896,8 +6896,9 @@ def traiter(etat, chats, updates):
                     [{"text": "📊 Demander une analyse", "callback_data": "analysechoice:BOTH"}],
                     [{"text": "Pas aujourd'hui", "callback_data": "quiet:no"}]
                 ]})
-                _envoi_sur(cid, text=texte, reply_markup=clavier)
-                deja.append(cid)
+                res_bienvenue = _envoi_sur(cid, text=texte, reply_markup=clavier)
+                if isinstance(res_bienvenue, dict) and res_bienvenue.get("ok") is True:
+                    deja.append(cid)
             continue
         if cmd == "/boutons":
             _envoi_sur(cid, text="Choisis une action :", reply_markup=CLAVIER if autorise(etat, cid, msg.get("from", {}).get("id")) else CLAVIER_VISITEUR)
