@@ -8645,6 +8645,80 @@ def minutes_avant_fermeture_gold(ts=None):
 def annonce_proche(etat, maintenant):
     return any(abs(e["t"] - maintenant) <= 15 * 60 for e in etat.get("cal", {}).get("ev", []))
 
+def _mediane(valeurs):
+    v = sorted(float(x) for x in valeurs if x is not None)
+    if not v:
+        return 0.0
+    n = len(v)
+    return v[n // 2] if n % 2 else (v[n // 2 - 1] + v[n // 2]) / 2.0
+
+
+def _stabilisation_m5_apres(r, reference_ts):
+    """Exige 3 clôtures M5 après l'évènement et un retour des amplitudes vers leur base pré-évènement."""
+    bougies = [b for b in (r.get("b5") or []) if isinstance(b, dict) and b.get("t") is not None
+               and b.get("h") is not None and b.get("l") is not None]
+    avant = [b for b in bougies if int(b["t"]) < int(reference_ts)][-12:]
+    apres = [b for b in bougies if int(b["t"]) >= int(reference_ts)]
+    if len(avant) < 6 or len(apres) < 3:
+        return False
+    base = _mediane([max(0.0, float(b["h"]) - float(b["l"])) for b in avant])
+    if base <= 0:
+        return False
+    dernieres = apres[-3:]
+    amplitudes = [max(0.0, float(b["h"]) - float(b["l"])) for b in dernieres]
+    atr5 = float(r.get("atr5") or r.get("atr") or 0.0)
+    plafond = max(base * 1.8, atr5 * 0.9)
+    return max(amplitudes) <= plafond and _mediane(amplitudes) <= base * 1.35
+
+
+def _ouvertures_recentes(m, maintenant):
+    """Ouvertures réellement pertinentes, en fuseaux IANA pour respecter les changements d'heure."""
+    if m not in ("GOLD", "NASDAQ"):
+        return []
+    ouvertures = []
+    ny = ZoneInfo("America/New_York")
+    ct = ZoneInfo("America/Chicago")
+    date_ny = datetime.datetime.fromtimestamp(maintenant, ny).date()
+    for delta in (-1, 0):
+        jour = date_ny + datetime.timedelta(days=delta)
+        if jour.weekday() < 5:
+            h, minute = (8, 20) if m == "GOLD" else (9, 30)
+            ts = datetime.datetime(jour.year, jour.month, jour.day, h, minute, tzinfo=ny).timestamp()
+            if 0 <= maintenant - ts <= 3600:
+                ouvertures.append((ts, 20 * 60, "ouverture de New York" if m == "NASDAQ" else "ouverture COMEX Gold"))
+    date_ct = datetime.datetime.fromtimestamp(maintenant, ct).date()
+    for delta in (-1, 0):
+        jour = date_ct + datetime.timedelta(days=delta)
+        if jour.weekday() in (6, 0, 1, 2, 3):
+            ts = datetime.datetime(jour.year, jour.month, jour.day, 17, 0, tzinfo=ct).timestamp()
+            if 0 <= maintenant - ts <= 3600:
+                ouvertures.append((ts, 15 * 60, "réouverture CME"))
+    return sorted(ouvertures, key=lambda x: x[0], reverse=True)
+
+
+def pause_entree_marche(m, r, etat, maintenant=None):
+    """Bloque uniquement les nouvelles entrées après une ouverture/news jusqu'à stabilisation M5."""
+    maintenant = time.time() if maintenant is None else float(maintenant)
+    if m in ("GOLD", "NASDAQ"):
+        for ts, attente, libelle in _ouvertures_recentes(m, maintenant):
+            if maintenant < ts + attente:
+                return f"{libelle} : délai de sécurité de {attente // 60} min"
+            if not _stabilisation_m5_apres(r, ts):
+                return f"{libelle} : les 3 clôtures M5 ne sont pas encore stabilisées"
+    evenements = (etat.get("cal") or {}).get("ev") or []
+    for ev in evenements:
+        try:
+            ts = float(ev["t"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if ts - 15 * 60 <= maintenant <= ts + 20 * 60:
+            return f"actualité économique ({ev.get('titre', 'USD')}) : fenêtre de sécurité"
+        if ts + 20 * 60 < maintenant <= ts + 60 * 60 and not _stabilisation_m5_apres(r, ts):
+            return f"actualité économique ({ev.get('titre', 'USD')}) : réaction M5 encore instable"
+    return None
+
+
+
 # ───────── Agent : suit le trade du début à la fin ─────────
 def duree_txt(tr):
     """Combien de temps la position peut durer (TP1 et TP2), pour savoir si elle passe la nuit."""
@@ -9827,6 +9901,20 @@ def agent(m, r, cle, ferme):
                 out.append(f"⚪ {m} : confirmation 1h / tendance 4h perdue. Ordre annulé, j'attends.")
             cle["aligne"] = 0; cle["prep"] = False; cle.pop("ordre", None)
             return out
+        # Ouverture / news : invalider toute préparation et attendre une vraie stabilisation M5.
+        # La règle s'applique aux cassures ET aux replis, avant tout déclenchement d'entrée.
+        pause_ = pause_entree_marche(m, r, etat_courant if isinstance(etat_courant, dict) else {}, r.get("t", time.time()))
+        if pause_:
+            cle["prep"] = False
+            cle.pop("ordre", None)
+            cle.pop("traverse", None)
+            cle["aligne"] = d
+            k_pause = f"{m}:{pause_}"
+            if cle.get("pause_entree_key") != k_pause:
+                cle["pause_entree_key"] = k_pause
+                out.append(f"⏳ {ICONE.get(m, '')} {m} : ENTRÉES EN PAUSE\n{pause_}\n🕯 J'attends 3 clôtures M5 revenues à une volatilité normale. Aucune position n'est ouverte.")
+            return out
+        cle.pop("pause_entree_key", None)
         # Extrême Daily/Weekly : aucune poursuite dans le sens de la tendance.
         # On attend une correction ou un retournement confirmé ; on ne vend pas à découvert sans signal opposé validé.
         if bloque_dw(r, d, p):
