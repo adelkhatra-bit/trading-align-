@@ -7163,7 +7163,7 @@ def destinataires_radar(etat, chats):
     out = set()
     for m, suivis in (etat.get("veille_cloture") or {}).items():
         for cid, s in (suivis or {}).items():
-            if isinstance(s, dict) and s.get("multi"):
+            if isinstance(s, dict) and s.get("multi") and notifications_abonne(etat, cid, m):
                 out.add(str(cid))
     for cid in {str(c) for c in chats}:
         try:
@@ -7436,7 +7436,7 @@ def diffuser_evenements(etat, chats, evts):
     canal = str(etat.get("canal") or "")
     for cid in sorted(set().union(*dest_evt) if dest_evt else set()):
         choix = etat.get("marches_par_chat", {}).get(str(cid))
-        choisis = marches_notifications(etat, cid) if cid != canal else None
+        choisis = (marches_notifications(etat, cid) | set(en_position(etat, cid))) if cid != canal else None
         anglais = str(cid) in LANG_EN
         blocs = []
         for (marches, fr, en, mk), dests in zip(evts, dest_evt):
