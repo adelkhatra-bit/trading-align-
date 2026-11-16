@@ -72,6 +72,24 @@ class TelegramOptIn(unittest.TestCase):
         send.assert_not_called()
         self.assertNotIn("123", state["veille_cloture"]["GOLD"])
 
+    def test_gold_and_nasdaq_telegram_cards_show_clear_french_entry_sl_tp1_tp2(self):
+        cases = (("GOLD", -1, 4000.0, 4010.0, 3985.0, 3965.0, "SHORT"),
+                 ("NASDAQ", 1, 20000.0, 19980.0, 20030.0, 20070.0, "LONG"))
+        for market, direction, entry, stop, tp1, tp2, side in cases:
+            trade = {"d": direction, "e": entry, "sl": stop, "tp1": tp1, "tp2": tp2, "sl_ut": "5 min"}
+            r = {"m1": [{"c": entry, "h": entry + 1, "l": entry - 1}], "macro_data": {}, "niveaux": []}
+            with patch.object(ab, "niveaux_rs", return_value=(None, None)), \\
+                 patch.object(ab, "pips_txt", return_value="10 points"), \\
+                 patch.object(ab, "coach_fvg", return_value=[]), \\
+                 patch.object(ab, "dxy_court", return_value="neutre"), \\
+                 patch.object(ab, "news_prochaine_courte", return_value="aucune"), \\
+                 patch.object(ab, "statut_sys", return_value="SYSTÈME OK"):
+                text = ab.carte_coach(market, r, {}, "signal", tr=trade, etat={})
+            self.assertIn(f"{market} - {side}", text)
+            for label in ("🎯 Entrée :", "🛑 SL :", "💰 TP1 :", "🏁 TP2 :", "🤖 Agent Auto-Trade"):
+                self.assertIn(label, text)
+            self.assertIn("ENTRER", text)
+
     def test_no_telegram_fibonacci_push_function_remains(self):
         self.assertFalse(hasattr(ab, "fibo_zones"))
 
