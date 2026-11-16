@@ -132,10 +132,10 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn("if (!voixActive", self.js)
         self.assertIn("speechSynthesis.speak(utterance)", self.js)
         self.assertNotIn("voirFiboProgression", self.js)
-        self.assertIn("// @version      11.4", self.js)
+        self.assertIn("// @version      11.5", self.js)
         self.assertIn("@updateURL    https://raw.githubusercontent.com/adelkhatra-bit/trading-auto/main/docs/live/align-bande-live.user.js", self.js)
         self.assertIn("@downloadURL  https://raw.githubusercontent.com/adelkhatra-bit/trading-auto/main/docs/live/align-bande-live.user.js", self.js)
-        self.assertIn("const VERSION = '11.4'", self.js)
+        self.assertIn("const VERSION = '11.5'", self.js)
         self.assertIn("live-data/live.json", self.js)
         self.assertIn("10 * 60 * 1000", self.js)
         self.assertIn("synchroniserEtatBot()", self.js)
@@ -148,6 +148,10 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn("ne cours pas après un mouvement déjà parti", self.bot)
         self.assertIn("POSITION ALIGN ACTIVE SUR", self.js)
         self.assertIn("clearInterval(botEtatSyncT)", self.js)
+        self.assertIn("attends la confirmation, ne cours pas après le prix", self.js)
+        self.assertIn("wait for confirmation, never chase price", self.js)
+        for ancien in ("dépêche-toi", "retardataires", "hurry", "latecomers", "DÉPÊCHE-TOI", "HURRY:", "LIEN EN BIO, VITE !", "C'EST MAINTENANT !", "IT'S NOW!", "too late to get in", "too late to jump on"):
+            self.assertNotIn(ancien.lower(), self.js.lower())
 
 
 if __name__ == "__main__":
