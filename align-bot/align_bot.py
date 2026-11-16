@@ -8086,15 +8086,13 @@ def coach_actif(etat, cid, marche):
 
 
 def destinataires_message(etat, chats, texte):
-    """Diffusions privées uniquement sur opt-in coach explicite, marché par marché.
-    La chaîne publique/VIP garde son flux ; les messages globaux sans marché ne sont jamais poussés en privé."""
-    ens = marches_message(texte)
+    """Une seule destination privée : le bot ALIGN ; seuls les messages explicitement liés à un marché sont poussés."""
+    ens = set(getattr(texte, "marches", ()) or marches_message(texte)) & set(MARCHES)
     canal = str(etat.get("canal") or "")
-    # Un message global (session/news) ne part qu'aux utilisateurs qui ont activé
-    # le coach sur au moins un marché ; un message ciblé reste limité à ce marché.
-    marches_cibles = (ens & set(MARCHES)) if ens else set(MARCHES)
-    prives = [str(c) for c in chats if str(c) != canal
-              and any(m in marches_choisis(etat, c) and coach_actif(etat, c, m) for m in marches_cibles)]
+    # Pas de diffusion privée pour news, agenda, DXY ou messages globaux :
+    # l'utilisateur les consulte dans l'analyse demandée ou le live public.
+    prives = [str(c) for c in chats if str(c) != canal and ens
+              and any(m in marches_choisis(etat, c) and coach_actif(etat, c, m) for m in ens)]
     if canal:
         return sorted(set([canal] + prives))
     return sorted(set(prives))
