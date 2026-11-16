@@ -10,8 +10,10 @@ class PineClosedMtfGuard(unittest.TestCase):
         source = PINE.read_text(encoding="utf-8")
         self.assertIn("f_dir_confirme() =>", source)
         self.assertIn("d[1]", source)
+        import re
         for tf in ('"5"', '"15"', '"60"', '"240"'):
-            self.assertIn(f"request.security(syminfo.tickerid, {tf}, f_dir_confirme(), lookahead=barmerge.lookahead_on)", source)
+            pattern = rf'request\\.security\\(syminfo\\.tickerid,\\s*{re.escape(tf)},\\s*f_dir_confirme\\(\\),\\s*lookahead=barmerge\\.lookahead_on\\)'
+            self.assertRegex(source, pattern)
 
     def test_gold_nasdaq_trade_direction_is_blocked_without_four_way_confluence(self):
         source = PINE.read_text(encoding="utf-8")
