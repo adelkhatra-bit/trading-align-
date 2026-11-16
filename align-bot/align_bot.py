@@ -5892,9 +5892,12 @@ def cle_audit_trade(m, tr):
 
 
 def capturer_snapshot_audit(etat, m, r, cle, messages=None):
-    """Journal forensique compact : état ALIGN + Pine par UT + décision, à chaque cycle."""
+    """Journal forensique horodaté : décision, raisons de blocage, bougies et état Pine par UT."""
     try:
-        now = int(r.get("t") or time.time())
+        decision_ts = int(r.get("decision_ts") or time.time())
+        m5 = r.get("b5") or []
+        cycle_bar_t = int(m5[-1].get("t") or 0) if m5 else int(r.get("t") or 0)
+        cycle_close_t = cycle_bar_t + (300 if m5 else 900) if cycle_bar_t else None
         dirs = r.get("dirs") or []
         rsis = r.get("rsis") or []
         mtf = {}
@@ -5903,6 +5906,30 @@ def capturer_snapshot_audit(etat, m, r, cle, messages=None):
                 "direction": dirs[i] if i < len(dirs) else None,
                 "rsi": round(float(rsis[i]), 2) if i < len(rsis) and rsis[i] is not None else None
             }
+
+        # Dernière bougie de chaque UT clé, avec son heure d'ouverture/clôture et sa provenance.
+        sources = {
+            "1m": ("m1", 60, False), "3m": ("b3", 180, True), "5m": ("b5", 300, True),
+            "15m": ("b15", 900, True), "1h": ("b1h", 3600, True), "4h": ("b4h", 14400, True),
+            "Daily": ("bd", 86400, True), "Weekly": ("bw", 604800, True)
+        }
+        data = {}
+        champs_bougie = ("t", "o", "h", "l", "c", "v", "trades", "volume_source")
+        for tf, (key, duration, closed) in sources.items():
+            series = r.get(key) or []
+            if not series:
+                data[tf] = {"available": False, "count": 0}
+                continue
+            last = series[-1]
+            opened = int(last.get("t") or 0)
+            closed_at = opened + duration if opened else None
+            data[tf] = {
+                "available": True, "count": len(series), "closed": closed,
+                "bar_open_t": opened or None, "bar_close_t": closed_at,
+                "age_after_close_s": max(0, decision_ts - closed_at) if closed_at else None,
+                "last": {k: last.get(k) for k in champs_bougie if k in last}
+            }
+
         bridge = r.get("tv_indicator_mtf") or {}
         tv = {"available": bridge.get("available") is True,
               "reason": bridge.get("reason"),
@@ -5913,18 +5940,19 @@ def capturer_snapshot_audit(etat, m, r, cle, messages=None):
         champs_tv = ("fresh", "timestamp", "updatedAt", "time", "confirmed", "signal", "verdict",
                      "entry", "sl", "tp", "long_score", "short_score", "macro_bull", "macro_bear",
                      "anticipation", "anticipation_force", "zone_proche", "liq_haute_active")
-        for tf, snap in (bridge.get("snapshots") or {}).items():
-            if not isinstance(snap, dict):
+        for tf, snap_tv in (bridge.get("snapshots") or {}).items():
+            if not isinstance(snap_tv, dict):
                 continue
-            robot = snap.get("robotV12") or {}
+            robot = snap_tv.get("robotV12") or {}
             tv["snapshots"][str(tf)] = {
-                k: snap.get(k) for k in ("fresh", "timestamp", "updatedAt", "time", "confirmed", "ageMs")
-                if k in snap
+                k: snap_tv.get(k) for k in ("fresh", "timestamp", "updatedAt", "time", "confirmed", "ageMs")
+                if k in snap_tv
             }
             if isinstance(robot, dict):
                 tv["snapshots"][str(tf)]["robotV12"] = {
                     k: robot.get(k) for k in champs_tv if k in robot
                 }
+
         trade_actif = cle.get("trade")
         trade_clos = ((cle.get("fin") or [None])[0] if cle.get("fin") else None)
         ordre = cle.get("ordre")
@@ -5941,16 +5969,50 @@ def capturer_snapshot_audit(etat, m, r, cle, messages=None):
                                    "cloture_dans_ce_cycle" if trade_clos else "ordre_en_preparation")
             if trade_actif or trade_clos:
                 plan["audit_key"] = cle_audit_trade(m, trade)
+
+        decision = {"reason": None, "verdict": None, "detail": None}
+        try:
+            decision["reason"] = raison_attente(r, cle)
+        except Exception:
+            pass
+        try:
+            decision["verdict"], decision["detail"] = verdict(r, cle)
+        except Exception:
+            pass
+        d = r.get("confirme") or 0
+        filtres = {"news_block": bool(r.get("annonce")), "extended": None, "daily_weekly_extreme": None}
+        if d in (-1, 1):
+            try:
+                filtres["extended"] = bool(etire(r, d))
+            except Exception:
+                pass
+            try:
+                price = r.get("m1", [{}])[-1].get("c") if r.get("m1") else None
+                filtres["daily_weekly_extreme"] = bool(bloque_dw(r, d, price))
+            except Exception:
+                pass
+
         snap = {
-            "t": now, "price": r.get("m1", [{}])[-1].get("c") if r.get("m1") else None,
+            "t": decision_ts, "bar_t": cycle_bar_t or None, "bar_close_t": cycle_close_t,
+            "price": r.get("m1", [{}])[-1].get("c") if r.get("m1") else None,
             "confirm": r.get("confirme"), "sens": r.get("sens"), "score": r.get("score"),
             "pct": r.get("pctH"), "trend": r.get("trendS"), "momentum": r.get("momS"),
+            "strategy": r.get("strat"), "dirPlan": r.get("dirPlan"), "dirW": r.get("dirW"),
+            "filters": filtres, "decision": decision, "data": data,
             "mtf": mtf, "tradingview": tv, "trade": plan,
-            "messages": [str(x[0] if isinstance(x, tuple) else x)[:350] for x in (messages or [])[:5]]
+            "messages": [str(x[0] if isinstance(x, tuple) else x)[:250] for x in (messages or [])[:3]]
         }
         hist = etat.setdefault("audit_mtf", {}).setdefault(m, [])
-        # Un seul snapshot par timestamp de cycle et marché.
-        if not hist or hist[-1].get("t") != now:
+        signature = [snap["confirm"], list(dirs), snap["dirPlan"],
+                     plan.get("audit_key"), plan.get("plan_source"),
+                     tv.get("activeTimeframe"),
+                     [[tf, x.get("fresh"), (x.get("robotV12") or {}).get("signal")]
+                      for tf, x in sorted(tv["snapshots"].items())],
+                     decision.get("reason")]
+        # Un snapshot par clôture M5, plus un snapshot si le diagnostic change dans la même bougie.
+        meme_barre = bool(hist and cycle_bar_t and hist[-1].get("bar_t") == cycle_bar_t)
+        if not meme_barre or hist[-1].get("signature") != signature:
+            snap["signature"] = signature
             hist.append(snap)
         del hist[:-600]
     except Exception as ex:
