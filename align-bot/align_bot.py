@@ -4605,7 +4605,16 @@ def inscrire_auto(etat, cid, m, notifier=True):
     lancer_chrono(etat, cid, m, r)
 
 def bot_on(etat, cid):
-    return cid not in etat.get("bot_off", [])
+    return str(cid) not in {str(x) for x in etat.get("bot_off", [])}
+
+
+def purger_messages_en_attente(etat, cid):
+    """Annule les messages Telegram retardés quand l'utilisateur coupe le coach."""
+    cid = str(cid)
+    file_ = etat.setdefault("telegram_outbox", [])
+    avant = len(file_)
+    etat["telegram_outbox"] = [x for x in file_ if str(x.get("chat_id", "")) != cid]
+    return avant - len(etat["telegram_outbox"])
 
 def stats_bot(etat, cid):
     return etat.setdefault("stats_bot", {}).setdefault(cid, {"arrets": 0, "auto": 0})
@@ -4681,6 +4690,8 @@ def menu_bot(etat, cid):
 
 def regler_bot(etat, cid, on):
     off = etat.setdefault("bot_off", [])
+    if not on:
+        purger_messages_en_attente(etat, cid)
     if on and cid in off:
         off.remove(cid)
     elif not on and cid not in off:
@@ -6068,6 +6079,7 @@ def traiter(etat, chats, updates):
                     off = etat.setdefault("bot_off", [])
                     if qui not in off:
                         off.append(qui)       # stoppe les nouveaux signaux ; le suivi d'une position déjà ouverte reste actif
+                    purger_messages_en_attente(etat, qui)
                     etat["coach_pending"] = [x for x in etat.get("coach_pending", []) if str(x) != qui]
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="Bien noté")
                     continue
@@ -6090,6 +6102,7 @@ def traiter(etat, chats, updates):
                                           "Choisis les marchés à surveiller pour ta prochaine position."))
                     menu_marches(etat, qui)
                 else:
+                    purger_messages_en_attente(etat, qui)
                     _envoi_sur(qui, text=("Coach remains paused. You can still request an analysis at any time." if qui in LANG_EN else
                                           "Le coach reste en pause. Tu peux toujours demander une analyse à tout moment."))
                 continue
@@ -6104,6 +6117,7 @@ def traiter(etat, chats, updates):
                     etat.setdefault("bot_off", [])
                     if qui not in etat["bot_off"]:
                         etat["bot_off"].append(qui)
+                    purger_messages_en_attente(etat, qui)
                     etat["coach_pending"] = [x for x in etat.get("coach_pending", []) if str(x) != qui]
                     _envoi_sur(qui, text=("Coach not activated. You can still request an analysis from the menu." if qui in LANG_EN else
                                           "Coach non activé. Tu peux toujours demander une analyse depuis le menu."))
