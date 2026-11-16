@@ -911,7 +911,7 @@ def calculer_analyse(S, stable=None, comp_prev=None, market=None):
         # Même règle que Pine v25 : aucun plan directionnel exploitable avant les quatre clôtures et un flux frais.
     # BTC garde son filtre H1/H4 historique, mais sur les dernières bougies terminées et dans le sens du plan.
     dirPlan = direction_plan_autorisee(market, dirPlan, dirs_cloturees, ctx_live)
-    dirs_strategie = dirs_cloturees if market in ("GOLD", "NASDAQ") else dirs
+    dirs_strategie = dirs_cloturees
     strat_plan = strategie_alignement(dirs_strategie, dirPlan, dW_signal, market)[0]
     nom = ("★ ACHAT FORT" if fortHaut else "EXPLOSION ▲" if explHaut else "ZONE DE REBOND ▲") if sigHaut else \
           ("★ VENTE FORTE" if fortBas else "EXPLOSION ▼" if explBas else "ZONE DE RETOURNEMENT ▼") if sigBas else ""
@@ -1941,7 +1941,7 @@ def prochaine(r, cle):
     if d:
         return f"🔜 Prochaine entrée   {SENS[d]}"
     maj, n_ok = alignement(r)
-    fond = r["dirs"][9]
+    fond = (r.get("dirs_cloturees") or r["dirs"])[9]
     if not maj and fond:
         return f"🔜 Prochaine entrée   {SENS[fond]}   (⛔ 1h non confirmée)"
     return f"🔜 Prochaine entrée   {SENS[maj]}   ({n_ok}/2 • ⛔ pas encore validée)" if maj else "🔜 Prochaine entrée   ➖ pas encore de sens"
