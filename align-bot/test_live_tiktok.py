@@ -666,6 +666,13 @@ class LiveOutbox(unittest.TestCase):
 
 
 
+    def test_live_overlay_reads_consumption_percent_from_fvg_and_order_block_boxes(self):
+        bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
+        self.assertIn("function texteZone(t, m)", bande)
+        self.assertIn("consommée|consommé", bande)
+        self.assertIn("'% de zone consommée'", bande)
+        self.assertIn("' • ' + consommation", bande)
+
     def test_market_narration_is_factual_and_runs_independently_of_generic_coach(self):
         bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
         self.assertIn("function commentaireMarcheEnDirect(B, moyR, moyV, m)", bande)
