@@ -128,10 +128,12 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn("iaPools[codeMarche()]", self.js)
         self.assertIn("const pool = Object.keys(iaPools).length ? (iaPools[m] || []) : iaPool", self.js)
         self.assertIn("montrer(pool[iaN++ % pool.length], false, 1)", self.js)
-        self.assertNotIn("speechSynthesis", self.js)
+        self.assertIn("voixBtn.addEventListener", self.js)
+        self.assertIn("if (!voixActive", self.js)
+        self.assertIn("speechSynthesis.speak(utterance)", self.js)
         self.assertNotIn("voirFiboProgression", self.js)
-        self.assertIn("// @version      10.8", self.js)
-        self.assertIn("const VERSION = '10.8'", self.js)
+        self.assertIn("// @version      10.9", self.js)
+        self.assertIn("const VERSION = '10.9'", self.js)
 
 
 if __name__ == "__main__":

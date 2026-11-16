@@ -6653,19 +6653,26 @@ def traiter(etat, chats, updates):
             if choix in ("coachlive", "coachstop") and mk in MARCHES:
                 activer_coach_live(etat, qui, mk, choix == "coachlive")
                 r_now = DERNIERS.get(mk)
-                if choix == "coachlive" and r_now and len(r_now.get("b15") or []) > 1:
-                    try:
-                        _envoi_sur(qui, text=texte_coach_live(mk, r_now["b15"][-2], r_now, etat.get(mk, {}), positions_bot(etat)),
-                                   reply_markup=markup_analyse(etat, mk, r_now, qui))
-                    except Exception as ex:
-                        print("coach live immédiat", ex)
                 try:
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text=("🔴 Coach en direct activé" if choix == "coachlive" else "⏹ Coach en direct arrêté"))
                 except Exception:
                     pass
-                _envoi_sur(qui, text=(f"🎙 COACH COMMENTATEUR ACTIVÉ\n{ICONE.get(mk, '')} {mk}\n🕯 Je commente chaque clôture 15 min pendant 2 h\n"
-                                      "📺 Mets le live à côté : je t'explique ce qui se passe sur le graphique\n⏹ Pour m'arrêter : le bouton sous mes messages")
-                           if choix == "coachlive" else f"⏹ COACH EN DIRECT ARRÊTÉ — {ICONE.get(mk, '')} {mk}\n😴 Je ne t'envoie plus les clôtures")
+                if choix == "coachlive":
+                    intro = (f"🎙 COACH COMMENTATEUR ACTIVÉ — {ICONE.get(mk, '')} {mk}\n"
+                             "🕯 Je commente chaque clôture 15 min pendant 2 h\n"
+                             "📺 Garde le LIVE à côté : tu reçois l'explication avec les boutons d'analyse.\n"
+                             "⏹ Pour arrêter : le bouton sous mes messages.")
+                    contenu = intro
+                    clavier = None
+                    if r_now and len(r_now.get("b15") or []) > 1:
+                        try:
+                            contenu = texte_coach_live(mk, r_now["b15"][-2], r_now, etat.get(mk, {}), positions_bot(etat)) + "\n\n" + intro
+                            clavier = markup_analyse(etat, mk, r_now, qui)
+                        except Exception as ex:
+                            print("coach live immédiat", ex)
+                    _envoi_sur(qui, text=contenu, **({"reply_markup": clavier} if clavier else {}))
+                else:
+                    _envoi_sur(qui, text=f"⏹ COACH EN DIRECT ARRÊTÉ — {ICONE.get(mk, '')} {mk}\n😴 Je ne t'envoie plus les clôtures")
                 continue
             if choix == "auto" and mk in MARCHES:
                 # Le marché est déjà connu depuis le bouton de l'analyse : activation en un seul appui.
@@ -8132,9 +8139,11 @@ def valider_et_suivre_marches(etat, cid, user_id, message_id=None):
         _envoi_sur(cid, text=("Select at least one market to follow." if anglais else
                               "Coche au moins un marché pour activer les alertes."))
         return False
+    nouveau = cid in {str(x) for x in etat.get("coach_pending", [])}
     selectionner_marches_suivi(etat, cid, choisis)
-    for m in choisis:
-        inscrire_auto(etat, cid, m, notifier=False)
+    if not nouveau:
+        for m in choisis:
+            inscrire_auto(etat, cid, m, notifier=False)
     noms = " + ".join(m for m in choisis)
     if message_id:                      # ferme le menu : plus de cases ni de bouton à l'écran
         try:
@@ -8144,7 +8153,20 @@ def valider_et_suivre_marches(etat, cid, user_id, message_id=None):
                 telegram("editMessageReplyMarkup", chat_id=cid, message_id=message_id, reply_markup=json.dumps({"inline_keyboard": []}))
             except Exception as ex:
                 print("fermeture menu marchés", ex)
-    _envoi_sur(cid, text=(f"✅ Tracking on: {noms}" if anglais else f"✅ Suivi activé : {noms}") + "\n\n" + texte_suivi(etat, cid))
+    if nouveau:
+        actions = [[{"text": "🔎 Research markets" if anglais else "🔎 Faire une analyse",
+                     "callback_data": "analysechoice:BOTH"}]]
+        actions += [[{"text": (f"🎙 Live coach {m}" if anglais else f"🎙 Coach LIVE {m}"),
+                      "callback_data": f"coachlive:{m}"},
+                     {"text": (f"🔔 Entry alerts {m}" if anglais else f"🔔 Alertes {m}"),
+                      "callback_data": f"auto:{m}"}] for m in choisis]
+        _envoi_sur(cid, text=(f"✅ Markets selected: {noms}" if anglais else f"✅ Marchés sélectionnés : {noms}") +
+                   ("\n🔕 No automatic alerts are enabled. Use research on demand, or activate the live coach / entry alerts only for markets you choose."
+                    if anglais else
+                    "\n🔕 Aucune notification automatique n'est activée. Lance une analyse à la demande, ou active le coach LIVE / les alertes uniquement sur les marchés souhaités."),
+                   reply_markup=json.dumps({"inline_keyboard": actions}))
+    else:
+        _envoi_sur(cid, text=(f"✅ Tracking on: {noms}" if anglais else f"✅ Suivi activé : {noms}") + "\n\n" + texte_suivi(etat, cid))
     return True
 
 def basculer_marche(etat, cid, marche):
@@ -8238,15 +8260,17 @@ def menu_marches(etat, cid, message_id=None):
     tout = set(MARCHES) <= set(choisis)
     lignes = [[{"text": ("✅ " if m in choisis else "⬜ ") + NOMS_MARCHES[m], "callback_data": f"markets:{m}"}] for m in MARCHES]
     lignes.append([{"text": ("✅ " if tout else "⬜ ") + ("Everything" if anglais else "Tout recevoir"), "callback_data": "markets:ALL"}])
-    lignes.append([{"text": ("✅ Confirm & follow" if anglais else "✅ Valider et suivre"), "callback_data": "markets:OK"}])
+    nouveau = cid in {str(x) for x in etat.get("coach_pending", [])}
+    lignes.append([{"text": ("✅ Confirm my markets" if anglais else "✅ Valider mes marchés") if nouveau else
+                    ("✅ Confirm & follow" if anglais else "✅ Valider et suivre"), "callback_data": "markets:OK"}])
     coches = " + ".join(NOMS_MARCHES[m] for m in MARCHES if m in choisis)
     texte = ("📡 MY MARKETS\n━━━━━━━━━━━━━━━\n👆 Tap to tick / untick\n"
-             f"☑️ Ticked now: {coches}\n🔔 You only get alerts for ticked markets\n"
-             "📍 Prices can differ by a few points from your broker: follow the candles (wicks)"
+             f"☑️ Ticked now: {coches}\n" + ("🔕 No automatic alerts are enabled; use on-demand research or opt in to coach / alerts\n" if nouveau else "🔔 You only get alerts for ticked markets\n")
+             + "📍 Prices can differ by a few points from your broker: follow the candles (wicks)"
              if anglais else
              "📡 MES MARCHÉS\n━━━━━━━━━━━━━━━\n👆 Touche pour cocher / décocher\n"
-             f"☑️ Cochés en ce moment : {coches}\n🔔 Tu reçois uniquement les marchés cochés\n"
-             "📍 Le prix peut différer de quelques points selon ton broker : suis les bougies (mèches)")
+             f"☑️ Cochés en ce moment : {coches}\n" + ("🔕 Aucune alerte automatique active ; analyses à la demande et coach / alertes sur inscription\n" if nouveau else "🔔 Tu reçois uniquement les marchés cochés\n")
+             + "📍 Le prix peut différer de quelques points selon ton broker : suis les bougies (mèches)")
     if str(cid) in {str(x) for x in etat.get("coach_pending", [])}:
         texte += ("\n\nNew subscribers start with no market selected. Tick only the markets you want alerts for."
                   if anglais else
@@ -8644,6 +8668,83 @@ def minutes_avant_fermeture_gold(ts=None):
 
 def annonce_proche(etat, maintenant):
     return any(abs(e["t"] - maintenant) <= 15 * 60 for e in etat.get("cal", {}).get("ev", []))
+
+def _mediane(valeurs):
+    v = sorted(float(x) for x in valeurs if x is not None)
+    if not v:
+        return 0.0
+    n = len(v)
+    return v[n // 2] if n % 2 else (v[n // 2 - 1] + v[n // 2]) / 2.0
+
+
+def _stabilisation_m5_apres(r, reference_ts, maintenant=None):
+    """Exige 3 clôtures M5 après l'évènement et un retour des amplitudes vers leur base pré-évènement."""
+    maintenant = time.time() if maintenant is None else float(maintenant)
+    bougies = sorted([b for b in (r.get("b5") or []) if isinstance(b, dict) and b.get("t") is not None
+                      and b.get("h") is not None and b.get("l") is not None], key=lambda b: int(b["t"]))
+    if not bougies or maintenant - (int(bougies[-1]["t"]) + 300) > 600 or int(bougies[-1]["t"]) + 300 > maintenant + 60:
+        return False
+    avant = [b for b in bougies if int(b["t"]) < int(reference_ts)][-12:]
+    apres = [b for b in bougies if int(b["t"]) >= int(reference_ts)]
+    if len(avant) < 6 or len(apres) < 3:
+        return False
+    base = _mediane([max(0.0, float(b["h"]) - float(b["l"])) for b in avant])
+    if base <= 0:
+        return False
+    dernieres = apres[-3:]
+    amplitudes = [max(0.0, float(b["h"]) - float(b["l"])) for b in dernieres]
+    atr5 = float(r.get("atr5") or r.get("atr") or 0.0)
+    plafond = max(base * 1.8, atr5 * 0.9)
+    return max(amplitudes) <= plafond and _mediane(amplitudes) <= base * 1.35
+
+
+def _ouvertures_recentes(m, maintenant):
+    """Ouvertures réellement pertinentes, en fuseaux IANA pour respecter les changements d'heure."""
+    if m not in ("GOLD", "NASDAQ"):
+        return []
+    ouvertures = []
+    ny = ZoneInfo("America/New_York")
+    ct = ZoneInfo("America/Chicago")
+    date_ny = datetime.datetime.fromtimestamp(maintenant, ny).date()
+    for delta in (-1, 0):
+        jour = date_ny + datetime.timedelta(days=delta)
+        if jour.weekday() < 5:
+            h, minute = (8, 20) if m == "GOLD" else (9, 30)
+            ts = datetime.datetime(jour.year, jour.month, jour.day, h, minute, tzinfo=ny).timestamp()
+            if 0 <= maintenant - ts <= 2 * 3600:
+                ouvertures.append((ts, 20 * 60, "ouverture de New York" if m == "NASDAQ" else "ouverture COMEX Gold"))
+    date_ct = datetime.datetime.fromtimestamp(maintenant, ct).date()
+    for delta in (-1, 0):
+        jour = date_ct + datetime.timedelta(days=delta)
+        if jour.weekday() in (6, 0, 1, 2, 3):
+            ts = datetime.datetime(jour.year, jour.month, jour.day, 17, 0, tzinfo=ct).timestamp()
+            if 0 <= maintenant - ts <= 3600:
+                ouvertures.append((ts, 15 * 60, "réouverture CME"))
+    return sorted(ouvertures, key=lambda x: x[0], reverse=True)
+
+
+def pause_entree_marche(m, r, etat, maintenant=None):
+    """Bloque uniquement les nouvelles entrées après une ouverture/news jusqu'à stabilisation M5."""
+    maintenant = time.time() if maintenant is None else float(maintenant)
+    if m in ("GOLD", "NASDAQ"):
+        for ts, attente, libelle in _ouvertures_recentes(m, maintenant):
+            if maintenant < ts + attente:
+                return f"{libelle} : délai de sécurité de {attente // 60} min"
+            if not _stabilisation_m5_apres(r, ts, maintenant):
+                return f"{libelle} : les 3 clôtures M5 ne sont pas encore stabilisées"
+    evenements = (etat.get("cal") or {}).get("ev") or []
+    for ev in evenements:
+        try:
+            ts = float(ev["t"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if ts - 15 * 60 <= maintenant <= ts + 20 * 60:
+            return f"actualité économique ({ev.get('titre', 'USD')}) : fenêtre de sécurité"
+        if ts + 20 * 60 < maintenant <= ts + 90 * 60 and not _stabilisation_m5_apres(r, ts, maintenant):
+            return f"actualité économique ({ev.get('titre', 'USD')}) : réaction M5 encore instable"
+    return None
+
+
 
 # ───────── Agent : suit le trade du début à la fin ─────────
 def duree_txt(tr):
@@ -9827,6 +9928,20 @@ def agent(m, r, cle, ferme):
                 out.append(f"⚪ {m} : confirmation 1h / tendance 4h perdue. Ordre annulé, j'attends.")
             cle["aligne"] = 0; cle["prep"] = False; cle.pop("ordre", None)
             return out
+        # Ouverture / news : invalider toute préparation et attendre une vraie stabilisation M5.
+        # La règle s'applique aux cassures ET aux replis, avant tout déclenchement d'entrée.
+        pause_ = pause_entree_marche(m, r, _ETAT_COURANT.get("etat") or {}, time.time())
+        if pause_:
+            cle["prep"] = False
+            cle.pop("ordre", None)
+            cle.pop("traverse", None)
+            cle["aligne"] = d
+            k_pause = f"{m}:{pause_}"
+            if cle.get("pause_entree_key") != k_pause:
+                cle["pause_entree_key"] = k_pause
+                out.append(f"⏳ {ICONE.get(m, '')} {m} : ENTRÉES EN PAUSE\n{pause_}\n🕯 J'attends 3 clôtures M5 revenues à une volatilité normale. Aucune position n'est ouverte.")
+            return out
+        cle.pop("pause_entree_key", None)
         # Extrême Daily/Weekly : aucune poursuite dans le sens de la tendance.
         # On attend une correction ou un retournement confirmé ; on ne vend pas à découvert sans signal opposé validé.
         if bloque_dw(r, d, p):
@@ -11089,7 +11204,11 @@ def clavier_live(etat, cid, anglais=False):
         lignes.append([{"text": "🚀 Boost the live" if anglais else "🚀 Booster le live", "callback_data": "liveboost:x"}])
         lignes.append([{"text": LIVE_CHOIX[k][2], "callback_data": f"livemain:{k}"} for k in ("BTC", "GOLD", "NASDAQ")])
         lignes.append([{"text": LIVE_CHOIX[k][2], "callback_data": f"livemain:{k}"} for k in ("1", "5", "15", "60")])
-        lignes.append([{"text": f"🎙 {k}", "callback_data": f"coachlive:{k}"} for k in ("BTC", "GOLD", "NASDAQ")])
+        lignes.append([{"text": f"🎙 Coach {k}", "callback_data": f"coachlive:{k}"} for k in ("BTC", "GOLD", "NASDAQ")])
+        lignes.append([{"text": "🔎 Faire une analyse" if not anglais else "🔎 Research markets",
+                        "callback_data": "analysechoice:BOTH"}])
+        lignes.append([{"text": "📡 Sélectionner mes marchés" if not anglais else "📡 Select my markets",
+                        "callback_data": "marketsmenu:x"}])
     if str(cid) in {str(x) for x in proprio(etat)}:
         # v8.8 (demande d'Adel) : objectif de likes affiché à l'écran, puis « objectif atteint » avec feu d'artifice
         lignes.append([{"text": f"🎯 {k} likes", "callback_data": f"likeobj:{k}"} for k in ("1K", "5K", "10K", "20K")])

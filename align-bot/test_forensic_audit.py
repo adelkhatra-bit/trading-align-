@@ -1,3 +1,4 @@
+import json
 import sys
 import unittest
 import unittest.mock
@@ -291,6 +292,37 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
             price = align_bot.prix_actuel("NASDAQ")
         self.assertIsNone(price)
         http.assert_not_called()
+
+
+
+    def test_new_subscriber_market_selection_does_not_enable_push_alerts(self):
+        etat = {"coach_pending": ["new-user"],
+                "marches_par_chat": {"new-user": ["GOLD", "NASDAQ"]}}
+        sent = []
+        with unittest.mock.patch.object(align_bot, "autorise", return_value=True), \
+             unittest.mock.patch.object(align_bot, "_envoi_sur", side_effect=lambda cid, **kw: sent.append(kw)), \
+             unittest.mock.patch.object(align_bot, "inscrire_auto") as subscribe:
+            ok = align_bot.valider_et_suivre_marches(etat, "new-user", 123)
+        self.assertTrue(ok)
+        subscribe.assert_not_called()
+        self.assertNotIn("new-user", etat.get("auto", {}).get("GOLD", []))
+        self.assertNotIn("new-user", etat.get("auto", {}).get("NASDAQ", []))
+        markup = sent[-1]["reply_markup"]
+        self.assertIn("analysechoice:BOTH", markup)
+        self.assertIn("coachlive:GOLD", markup)
+        self.assertIn("coachlive:NASDAQ", markup)
+        self.assertIn("auto:GOLD", markup)
+        self.assertIn("Aucune notification automatique", sent[-1]["text"])
+
+    def test_new_subscriber_market_menu_uses_selection_only_label(self):
+        etat = {"coach_pending": ["new-user"], "marches_par_chat": {"new-user": []}}
+        sent = []
+        with unittest.mock.patch.object(align_bot, "_envoi_sur", side_effect=lambda cid, **kw: sent.append(kw)):
+            align_bot.menu_marches(etat, "new-user")
+        markup = json.loads(sent[-1]["reply_markup"])
+        labels = [button["text"] for row in markup["inline_keyboard"] for button in row]
+        self.assertTrue(any("Valider mes marchés" in label for label in labels))
+        self.assertFalse(any("Valider et suivre" in label for label in labels))
 
 
 
