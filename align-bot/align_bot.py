@@ -6004,12 +6004,12 @@ def capturer_snapshot_audit(etat, m, r, cle, messages=None):
             "messages": [str(x[0] if isinstance(x, tuple) else x)[:250] for x in (messages or [])[:3]]
         }
         hist = etat.setdefault("audit_mtf", {}).setdefault(m, [])
-        signature = (snap["confirm"], tuple(dirs), snap["dirPlan"],
+        signature = [snap["confirm"], list(dirs), snap["dirPlan"],
                      plan.get("audit_key"), plan.get("plan_source"),
                      tv.get("activeTimeframe"),
-                     tuple((tf, x.get("fresh"), (x.get("robotV12") or {}).get("signal"))
-                           for tf, x in sorted(tv["snapshots"].items())),
-                     decision.get("reason"))
+                     [[tf, x.get("fresh"), (x.get("robotV12") or {}).get("signal")]
+                      for tf, x in sorted(tv["snapshots"].items())],
+                     decision.get("reason")]
         # Un snapshot par clôture M5, plus un snapshot si le diagnostic change pendant la même bougie.
         meme_barre = bool(hist and cycle_bar_t and hist[-1].get("bar_t") == cycle_bar_t)
         if not meme_barre or hist[-1].get("signature") != signature:
