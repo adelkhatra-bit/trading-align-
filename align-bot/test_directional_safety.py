@@ -20,7 +20,10 @@ def retest_r(h4):
     bars[38] = candle(38 * 900, o=102.2, h=103.0, l=101.9, c=102.5)
     dirs = [0] * 11
     dirs[2], dirs[4], dirs[7], dirs[9] = 1, 1, 1, h4
-    return dict(b15=bars, dirs=dirs, atr=1.0, grosses=[(110.0, "4h"), (120.0, "Daily")], t=40000)
+    return dict(b15=bars, dirs=dirs, atr=1.0, atr5=1.0,
+                b5=[bar(0, 102.5, 103.0, 102.0, 102.5), bar(300, 102.5, 103.0, 102.0, 102.5)],
+                m1=[bar(int(__import__("time").time()), 102.5)],
+                grosses=[(110.0, "4h"), (120.0, "Daily")], t=40000)
 
 
 def reversal_r(dirs, volume_last=100, price=100.0):
@@ -159,7 +162,9 @@ class DirectionSafety(unittest.TestCase):
         bars[-2] = candle(78 * 900, o=100, h=102, l=97, c=101, v=500)
         dirs = [1] * 11
         r = dict(b15_long=bars, dirs=dirs, dirs_cloturees=dirs, t=50000,
-                 atr=1.0, grosses=[(110.0, "4h"), (120.0, "Daily")])
+                 b5=[bar(0, 100, 101, 99, 100), bar(300, 100, 101, 99, 100)],
+                 m1=[bar(int(__import__("time").time()), 101.0)], atr=1.0, atr5=1.0,
+                 grosses=[(110.0, "4h"), (120.0, "Daily")])
         for market in ("GOLD", "NASDAQ"):
             msg = ab.radar_climax(market, r, {})
             self.assertIn("RETOURNEMENT CONFIRMÉ — LONG POSSIBLE", msg)
@@ -225,6 +230,30 @@ class DirectionSafety(unittest.TestCase):
         self.assertIn("M5 baissière", nxt)
         self.assertIn("Aucune position pour l'instant", why)
 
+    def test_gold_nasdaq_live_price_invalidates_stale_direction_or_stale_feed(self):
+        dirs = [1] * 11
+        ctx = {"m1": [candle(int(__import__("time").time()), c=98.9)],
+               "b5": [candle(0, c=100.0), candle(300, c=100.0)], "atr5": 1.0}
+        self.assertEqual(ab.direction_confirmee_marche("GOLD", dirs, 1, ctx), 0)
+        ctx["m1"] = [candle(int(__import__("time").time()), c=100.2)]
+        self.assertEqual(ab.direction_confirmee_marche("NASDAQ", dirs, 1, ctx), 1)
+        ctx["m1"] = [candle(int(__import__("time").time()) - 180, c=100.2)]
+        self.assertEqual(ab.direction_confirmee_marche("NASDAQ", dirs, 1, ctx), 0)
+
+    def test_nasdaq_direct_refuses_old_cached_quote_after_feed_error(self):
+        now = int(__import__("time").time())
+        old = ab._CACHE.get("nq_live")
+        try:
+            ab._CACHE["nq_live"] = (now - 180, 20000.0)
+            with mock.patch.object(ab, "http_json", side_effect=RuntimeError("offline")), \
+                 mock.patch.object(ab.time, "time", return_value=now):
+                self.assertIsNone(ab.nasdaq_direct())
+        finally:
+            if old is None:
+                ab._CACHE.pop("nq_live", None)
+            else:
+                ab._CACHE["nq_live"] = old
+
     def test_gold_nasdaq_trigger_uses_last_closed_m5_not_forming_candle(self):
         closed = candle(300, o=100, h=100.5, l=99.5, c=100)
         forming = candle(600, o=100.2, h=100.9, l=99.5, c=100.8)
@@ -258,7 +287,7 @@ class DirectionSafety(unittest.TestCase):
                 dirs = [0, 0, m5, 0, m15, 0, 0, 1, 0, h4, 1]
                 r = dict(comp=0, dirs=dirs, dirs_cloturees=dirs,
                          sniper=None, dirPlan=1, strat="DAY", zone_pine={"zmil": 100},
-                         b5=bars, t=10000)
+                         b5=bars, m1=[candle(int(__import__("time").time()), c=102.0)], atr5=1.0, t=10000)
                 with mock.patch.object(ab, "etat_marche_hb", return_value=("ouvert", None)), \
                      mock.patch.object(ab, "hb_etat_surveille", return_value={"d": 1, "n": 9}), \
                      mock.patch.object(ab, "strategie_alignement", return_value=("DAY", "CONFIRMÉ")), \
