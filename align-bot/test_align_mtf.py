@@ -662,7 +662,13 @@ class AlignMtfRulesTest(unittest.TestCase):
     def test_english_rules_translate_current_risk_line_and_main_keyboard_placeholder(self):
         rules = align_bot.traduire(align_bot.REGLES)
         self.assertIn("Suggested risk: 0.5 to 1%", rules)
+        self.assertIn("4h trend • 1h confirmation", rules)
+        self.assertIn("Always place an SL", rules)
+        self.assertIn("No new entry 15 min", rules)
+        self.assertIn("TP1 hit", rules)
         self.assertNotIn("0,5 à 1 %", rules)
+        self.assertNotIn("Tendance 4h", rules)
+        self.assertNotIn("Toujours un SL", rules)
         import json
         keyboard = json.loads(align_bot.traduire_clavier(align_bot.CLAVIER))
         self.assertEqual(keyboard["input_field_placeholder"], "Choose an ALIGN action")
