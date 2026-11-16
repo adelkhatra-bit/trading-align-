@@ -121,7 +121,11 @@ class TelegramOptIn(unittest.TestCase):
     def test_texte_telegram_de_preparation_ne_parle_pas_de_fibonacci(self):
         tr = dict(d=-1, e=3900.0, sl=3910.0, tp1=3880.0, tp2=3860.0,
                   rr=2.0, strat="SWING", src="Fibonacci 50 → 78,6 %", n1="support 4h", n2="projection 2R", sl_ut="15 min", sl_h="02:00", za=3898.0, zb=3902.0)
-        self.assertNotIn("Fibonacci", ab.fmt_trade("GOLD", tr, 3901.0))
+        txt = ab.fmt_trade("GOLD", tr, 3901.0)
+        self.assertIn("TP1", txt)
+        self.assertIn("TP2", txt)
+        self.assertIn(ab.px(3860.0), txt)
+        self.assertNotIn("Fibonacci", txt)
 
 
 if __name__ == "__main__":
