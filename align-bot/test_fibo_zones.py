@@ -137,6 +137,7 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn("@downloadURL  https://raw.githubusercontent.com/adelkhatra-bit/trading-auto/main/docs/live/align-bande-live.user.js", self.js)
         self.assertIn("const VERSION = '11.2'", self.js)
         self.assertIn("live-data/live.json", self.js)
+        self.assertIn("10 * 60 * 1000", self.js)
         self.assertIn("synchroniserEtatBot()", self.js)
         self.assertIn("item.etat === 'entree'", self.js)
         self.assertIn("const anglais = langueBande() === 'en';", self.js)
