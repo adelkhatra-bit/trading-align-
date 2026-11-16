@@ -631,7 +631,7 @@
     b.style.background = x >= 0 ? 'linear-gradient(135deg,#0f9d58,#0b7a43)' : 'linear-gradient(135deg,#c62828,#8e1b1b)';
     b.innerHTML = '<small>' + (en ? '💰 ALIGN LIVE • REAL ACCOUNTS • ' : '💰 ALIGN EN DIRECT • VRAIS COMPTES • ') + esc(m || '') + '</small>'
       + (x >= 0 ? '+' : '−') + Math.abs(x).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' $'
-      + '<small>' + (en ? 'too late to get in 😏 next one: link in bio' : 'trop tard pour rentrer 😏 la prochaine : lien en bio') + '</small>';
+      + '<small>' + (en ? 'Do not enter late • next setup: link in bio' : 'Ne rentre pas en retard • prochaine configuration : lien en bio') + '</small>';
   }
   function recu(txt) {
     txt = String(txt || '').trim(); if (!txt) return;
@@ -1210,7 +1210,7 @@
       const fr = Math.floor(reste / 3) % 2 === 0;
       const lbl = enAttente
         ? (arme.d === -1 ? (fr ? '🔴 GROSSE DISTRIBUTION<br>' : '🔴 BIG SELL-OFF<br>') : (fr ? '🟢 GROSSE ACCUMULATION<br>' : '🟢 BIG ACCUMULATION<br>'))
-          + (reste <= 20 ? (fr ? 'C\'EST MAINTENANT !' : 'IT\'S NOW!') : (fr ? 'abonne-toi • partage 🎁' : 'follow • share 🎁'))
+          + (reste <= 20 ? (fr ? 'CLÔTURE EN COURS' : 'CANDLE CLOSING') : (fr ? 'attends la confirmation • lien en bio' : 'wait for confirmation • link in bio'))
         : (fr ? '⏱ CLÔTURE 15 MIN<br>ça va se décider 👀' : '⏱ 15 MIN CLOSE<br>it\'s about to decide 👀');
       const rr = pa ? Math.max(0, Math.ceil((pa.fin - Date.now()) / 1000)) : reste;
       const lbl2 = pa ? plateforme(fr ? '⚡ UNE POSITION ARRIVE<br>attends le feu vert 👉 lien en bio' : '⚡ A SETUP MAY BE COMING<br>wait for confirmation 👉 link in bio') : lbl;
@@ -1264,14 +1264,14 @@
   // v8.9 (demande d'Adel) : pub légère pendant qu'on attend le TP, jamais de prix
   const POS_TXT = ['🔥 LA TEAM, Y\'A DU MONDE DANS LE TRAIN ? 🚂 si t\'es dedans tapote l\'écran et écris OUI 👇 • partage le live pour qu\'il reste tout en haut 🙏',
     '🚀 TU VEUX FAIRE PARTIE DE L\'AVENTURE ? viens tester GRATUITEMENT en compte démo, zéro risque 😉 • tout est dans le lien en bio 👉',
-    '😎 ALIGN EST DÉJÀ DEDANS DEPUIS UN MOMENT… ET LE MARCHÉ SUIT LE PLAN 🍿 • trop tard pour monter : on ne court jamais après un train qui roule 🚄 • t\'es dedans ? tapote 👆 et écris OUI 👇 • tu l\'as loupé ? la prochaine fois, le lien en bio te prévient AVANT 😉',
+    '😎 ALIGN SUIT SON PLAN… on ne court jamais après un mouvement déjà parti 🚄 • si tu veux suivre la prochaine configuration, consulte le lien en bio',
     '😏 JE SUIS DEDANS AVEC VOUS LA TEAM ! qui est rentré avec moi ? tapote l\'écran 👆 • qui pensait que le marché allait me contredire ? 😝',
     '🍿 ALIGN EST EN POSITION, LE MARCHÉ FAIT LE SPECTACLE… vous, vous tapotez et vous partagez le live 😎 • ceux qui doutaient, on se reparle au TP 😜',
     '😇 TOUT VA BIEN, JE GÈRE… ceux qui sont rentrés sans feu vert, respirez 😂 • tapote si t\'es dans le train avec moi 🚂'];
   EN.push(['😏 JE SUIS DEDANS AVEC VOUS LA TEAM ! qui est rentré avec moi ? tapote l\'écran 👆 • qui pensait que le marché allait me contredire ? 😝', '😏 I\'M IN WITH YOU TEAM! who got in with me? tap the screen 👆 • who thought the market would prove me wrong? 😝'], ['🍿 ALIGN EST EN POSITION, LE MARCHÉ FAIT LE SPECTACLE… vous, vous tapotez et vous partagez le live 😎 • ceux qui doutaient, on se reparle au TP 😜', '🍿 ALIGN IS IN, THE MARKET PUTS ON THE SHOW… you tap and share the live 😎 • doubters, see you at the TP 😜'], ['😇 TOUT VA BIEN, JE GÈRE… ceux qui sont rentrés sans feu vert, respirez 😂 • tapote si t\'es dans le train avec moi 🚂', '😇 ALL GOOD, I\'VE GOT IT… those who jumped in without the green light, breathe 😂 • tap if you\'re on the train with me 🚂']);   // v10.4
   EN.push([POS_TXT[0], '🔥 TEAM, WHO\'S ON THE TRAIN? 🚂 if you\'re in, tap the screen and write YES 👇 • share the live to keep it on top 🙏'],
     [POS_TXT[1], '🚀 WANT TO BE PART OF THE ADVENTURE? try it FOR FREE on a demo account, zero risk 😉 • everything is in the link in bio 👉'],
-    [POS_TXT[2], '😎 ALIGN HAS BEEN IN FOR A WHILE… AND THE MARKET IS FOLLOWING THE PLAN 🍿 • too late to jump on: we never chase a moving train 🚄 • you\'re in? tap 👆 and write YES 👇 • missed it? next time, the link in bio warns you BEFORE 😉']);
+    [POS_TXT[2], '😎 ALIGN FOLLOWS ITS PLAN… we never chase a move that has already happened 🚄 • to follow the next setup, see the link in bio'],
   const posT = setInterval(() => { try {
     if (retour) return; const LG = lignesAlign(), E = LG['ENTRÉE'], S = LG.SL; if (!E || !S) return;
     const B = barres(3); if (!B.length) return; const p = B[B.length - 1][4], sens = S.y > E.y ? -1 : 1;
@@ -1331,7 +1331,7 @@
       const en = langueBande() === 'en', sens = (cel.t.match(/[▼▲]?\s*(SHORT|LONG)[^E\d]*/) || [''])[0].trim();
       masque.innerHTML = (masqueN++ % 12 < 8)
         ? '<span class="cle">' + (vert ? '▲' : '▼') + '</span> ' + (vert ? 'LONG ?' : 'SHORT ?') + ' • ' + (en ? 'ENTRY' : 'ENTRÉE') + ' <span class="cle">❓</span> • TP <span class="cle">❓</span> • SL <span class="cle">❓</span>'   // v9.6 : LONG vert / SHORT rouge en alternance
-        : (arme ? '<span class="cle">⏳</span> ' + (en ? 'IT\'S ALMOST TIME… CAN YOU GET IN? 👍 LINK IN BIO, HURRY!' : 'ÇA VA ÊTRE LE MOMENT… TU PEUX RENTRER ? 👍 LIEN EN BIO, VITE !')
+        : (arme ? '<span class="cle">⏳</span> ' + (en ? 'WAIT FOR CONFIRMATION • VIEW THE PLAN IN BIO' : 'ATTENDS LA CONFIRMATION • VOIR LE PLAN EN BIO')
           : '<span class="cle">🤔</span> ' + (en ? 'WANT TO KNOW IF YOU CAN GET IN? 👍 LINK IN BIO' : 'TU VEUX SAVOIR SI TU PEUX RENTRER ? 👍 LIEN EN BIO'));   // v8.3 : « vite » seulement quand le spectacle a vraiment annoncé un mouvement (pas de fake)
     } catch (e) {}
   }
@@ -1391,7 +1391,7 @@
       const xCol = Math.min(...vis.map(x => x.box.l)), larg = Math.max(...vis.map(x => x.box.r)) - xCol, en = langueBande() === 'en';
       const pNow = ((barres(1)[0]) || [])[4] || 0; etiqN++;
       const proche = x => pNow && Math.abs(pNow - x.o.y) / pNow < 0.002;
-      const defi = x => { const L = proche(x) ? (en ? ['⚡ GETTING CLOSE!', '👉 LINK IN BIO, HURRY!'] : ['⚡ ÇA APPROCHE !', '👉 LIEN EN BIO, VITE !'])
+      const defi = x => { const L = proche(x) ? (en ? ['⚡ KEY ZONE APPROACHING', '👉 VIEW THE PLAN'] : ['⚡ ZONE CLÉ EN APPROCHE', '👉 VOIR LE PLAN'])
         : (en ? ['👀 LINK IN BIO', '🤔 WANNA KNOW?', '😏 DARE YOU?'] : ['👀 LIEN EN BIO', '🤔 T\'AS ENVIE DE SAVOIR ?', '😏 CAP OU PAS CAP ?']); return L[Math.floor(etiqN / 12) % L.length]; };
       etiqBox.innerHTML = vis.map(x => '<div class="etq' + (proche(x) ? ' chaud' : '') + '" style="left:' + (xCol - 2) + 'px;top:' + (x.box.t - 2) + 'px;width:' + (larg + 4) + 'px;height:' + (x.box.b - x.box.t + 4) + 'px;background:' + x.col + ';color:' + x.tc + '">'
         + (x.n === 'ENTRÉE' && en ? 'ENTRY' : x.n) + ' <b>❓</b> <span>' + defi(x) + '</span></div>').join('');
