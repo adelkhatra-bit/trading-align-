@@ -5391,6 +5391,7 @@ def notifier_coach_live(etat, m, r, cle):
             continue
 
         # Une position nouvellement détectée ne doit pas attendre la prochaine clôture M15.
+        position_envoyee = False
         trade = cle.get("trade")
         if trade:
             position_key = "|".join(str(trade.get(k, "")) for k in ("d", "e", "sl", "tp1", "tp2"))
@@ -5403,9 +5404,13 @@ def notifier_coach_live(etat, m, r, cle):
                                       reply_markup=markup_analyse(etat, m, r, cid))
                 if isinstance(resultat, dict) and resultat.get("ok") is True:
                     info["position_key"] = position_key
+                    position_envoyee = True
         else:
             info.pop("position_key", None)
 
+        if position_envoyee and b is not None:
+            info["dernier_t"] = int(b["t"])
+            continue
         if b is None:
             continue
         if int(info.get("dernier_t", 0)) >= int(b["t"]):
