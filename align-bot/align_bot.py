@@ -23,6 +23,9 @@ TELEGRAM_UPDATES = queue.Queue()
 TELEGRAM_POLL_STOP = threading.Event()
 SHUTDOWN_REQUESTED = threading.Event()
 CALLBACKS_ACKNOWLEDGED = set()
+# Mode Telegram « pull » : seuls les messages déclenchés par l'utilisateur ou une entrée demandée sont autorisés.
+TELEGRAM_PULL_CONTEXT = threading.local()
+TELEGRAM_PULL_MODE = False  # activé par main(); les tests unitaires du wrapper restent isolés par défaut
 MARCHES = {"BTC": "XBTUSD", "GOLD": "XAUUSD", "NASDAQ": "NAS100"}  # BTC → FTMO (CFD 24/7) • GOLD → Topstep (MGC) / FTMO • NASDAQ → FX:NAS100 (TradingView)
 MIN_ALIGN, MIN_SQZ, MARGE_ATR, GAIN_MIN = 8, 4, 0.5, 1.5   # = réglages par défaut de l'indicateur ALIGN MTF PRO v24
 LIEN_RESULTATS = "https://t.me/+RajFd_hMgl1kNmQ0"     # groupe ALIGN Résultats (lien privé)
@@ -2921,6 +2924,33 @@ def traiter_file_telegram(etat, maintenant=None, limite=20):
     return envoyes
 
 
+def _telegram_position_attendue(texte):
+    """Les alertes de recherche autorisées se limitent à une entrée réellement ouverte par ALIGN."""
+    return est_entree(str(texte or "")) or "POSITION ALIGN DÉTECTÉE" in str(texte or "")
+
+
+def _telegram_sortant_autorise(methode, params):
+    """Aucun push spontané : réponse privée à une action explicite, ou entrée attendue après demande."""
+    if not TELEGRAM_PULL_MODE:
+        return True
+    if methode == "answerCallbackQuery":
+        return True
+    if not methode.startswith(("send", "copy", "forward", "edit")):
+        return True
+    cid = str(params.get("chat_id") or "")
+    contexte = str(getattr(TELEGRAM_PULL_CONTEXT, "chat_id", "") or "")
+    prive = bool(getattr(TELEGRAM_PULL_CONTEXT, "private", False))
+    if cid and prive and cid == contexte:
+        return True
+    etat = DERNIER_ETAT or {}
+    actifs = {str(x) for x in etat.get("recherche_positions_active", [])}
+    texte = str(params.get("text") or params.get("caption") or "")
+    if cid and cid in actifs and methode in ("sendMessage", "sendPhoto") and _telegram_position_attendue(texte):
+        return True
+    print(f"TELEGRAM_PULL_BLOCK method={methode} chat={cid or '-'}", flush=True)
+    return False
+
+
 def telegram(methode, **params):
     params_initiaux = dict(params)
     if methode == "answerCallbackQuery":
@@ -2928,6 +2958,8 @@ def telegram(methode, **params):
         if callback_id and callback_id in CALLBACKS_ACKNOWLEDGED:
             CALLBACKS_ACKNOWLEDGED.discard(callback_id)
             return {"ok": True, "result": True}
+    if not _telegram_sortant_autorise(methode, params):
+        return {"ok": True, "result": None, "blocked_by_pull_mode": True}
     if methode in ("sendMessage", "editMessageText") and "%%AGENT:" in str(params.get("text", "")):
         t_ = str(params["text"]); mk_ = re.search(r"📍 (\w+) - ", t_)
         params["text"] = re.sub(r"%%AGENT:(\w+)%%", lambda g: agent_pour(DERNIER_ETAT or {}, params.get("chat_id"), mk_.group(1) if mk_ else "", g.group(1)), t_)
@@ -2983,6 +3015,16 @@ def telegram(methode, **params):
             "type": methode, "text": str(texte or "")[:4096]
         })
         del JOURNAL_SORTANT[:-JOURNAL_MAX]
+    if methode in ("sendMessage", "sendPhoto") and resultat.get("ok"):
+        cid_envoye = str(params.get("chat_id") or "")
+        etat_courant = DERNIER_ETAT or {}
+        actifs = etat_courant.setdefault("recherche_positions_active", [])
+        texte_envoye = str(params.get("text") or params.get("caption") or "")
+        if cid_envoye in {str(x) for x in actifs} and _telegram_position_attendue(texte_envoye):
+            etat_courant["recherche_positions_active"] = [x for x in actifs if str(x) != cid_envoye]
+            for abonnes in (etat_courant.get("coach_live") or {}).values():
+                if isinstance(abonnes, dict):
+                    abonnes.pop(cid_envoye, None)
     return resultat
 
 # ───────── Boutons et jauge ─────────
@@ -4993,7 +5035,7 @@ def signature_cloture(texte):
         garde.append(re.sub(r"[\d.,]+", "#", l.strip()))          # les niveaux qui bougent de quelques points ne changent pas la décision
     return "|".join(garde)
 
-COACH_LIVE_DUREE = 2 * 3600          # le coach en direct parle 2 h, puis demande si on continue
+# Le coach LIVE reste actif jusqu'à l'arrêt manuel de l'utilisateur.
 
 
 def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
@@ -5375,12 +5417,12 @@ def canal_resultats(etat, m, textes):
 
 
 def notifier_coach_live(etat, m, r, cle):
-    """Envoie la carte « coach en direct » à chaque nouvelle clôture 15 min, aux abonnés qui l'ont activé pour ce marché."""
+    """Surveille sans échéance ; ne pousse qu'une nouvelle position confirmée à l'utilisateur qui l'a demandée."""
     abonnes = etat.get("coach_live", {}).get(m) or {}
-    bars = (r.get("b15") or [])[:-1]                 # la dernière bougie est en formation
-    if not abonnes or not bars:
+    if not abonnes:
         return
-    b = bars[-1]
+    bars = (r.get("b15") or [])[:-1]                 # la dernière bougie est en formation
+    b = bars[-1] if bars else None
     for cid, info in list(abonnes.items()):
         if not bot_on(etat, cid):
             continue
@@ -5389,10 +5431,29 @@ def notifier_coach_live(etat, m, r, cle):
             _envoi_sur(cid, text=f"🎙 Ton commentateur {ICONE.get(m, '')} {m}\n👉 Il est dans ta chaîne\n🔕 Ici, plus de doublon",
                        reply_markup=json.dumps({"inline_keyboard": [[{"text": f"🎙 Ouvrir {m}", "url": LIENS_CHAINES.get(m, BOT_LIEN)}]]}))
             continue
-        if time.time() >= float(info.get("expire", 0)):
-            abonnes.pop(cid, None)
-            _envoi_sur(cid, text=f"⏹ COACH EN DIRECT TERMINÉ — {ICONE.get(m, '')} {m}\n🙌 2 h ensemble, merci !\n🔁 On continue ?",
-                       reply_markup=json.dumps({"inline_keyboard": [[{"text": "🔴 Oui, 2 h de plus", "callback_data": f"coachlive:{m}"}]]}))
+
+        # Une position nouvellement détectée ne doit pas attendre la prochaine clôture M15.
+        position_envoyee = False
+        trade = cle.get("trade")
+        if trade:
+            position_key = "|".join(str(trade.get(k, "")) for k in ("d", "e", "sl", "tp1", "tp2"))
+            if position_key != info.get("position_key"):
+                message = (f"🎯 POSITION ALIGN DÉTECTÉE — {ICONE.get(m, '')} {m}\n"
+                           + resume_ordre(trade)
+                           + "\n📍 Suivi actif : SL / passage à BE / TP.\n"
+                           "ℹ️ ALIGN ne transmet aucun ordre à ton broker.")
+                resultat = _envoi_sur(cid, text=message,
+                                      reply_markup=markup_analyse(etat, m, r, cid))
+                if isinstance(resultat, dict) and resultat.get("ok") is True:
+                    info["position_key"] = position_key
+                    position_envoyee = True
+        else:
+            info.pop("position_key", None)
+
+        if position_envoyee and b is not None:
+            info["dernier_t"] = int(b["t"])
+            continue
+        if b is None:
             continue
         if int(info.get("dernier_t", 0)) >= int(b["t"]):
             flash = flash_commentateur(m, r, cle)
@@ -5409,10 +5470,27 @@ def notifier_coach_live(etat, m, r, cle):
 def activer_coach_live(etat, cid, m, actif=True):
     abonnes = etat.setdefault("coach_live", {}).setdefault(m, {})
     if actif:
+        # Cliquer explicitement sur le coach le réactive même si le bot avait été mis en pause.
+        etat["bot_off"] = [x for x in etat.get("bot_off", []) if str(x) != str(cid)]
+        actifs = etat.setdefault("recherche_positions_active", [])
+        if str(cid) not in {str(x) for x in actifs}:
+            actifs.append(str(cid))
         dernier = int(((DERNIERS.get(m) or {}).get("b15") or [{"t": 0}, {"t": 0}])[-2]["t"]) if len((DERNIERS.get(m) or {}).get("b15") or []) > 1 else 0
-        abonnes[str(cid)] = {"expire": time.time() + COACH_LIVE_DUREE, "dernier_t": dernier}
+        # Pas d'expiration automatique : surveillance jusqu'à arrêt manuel ou première entrée confirmée.
+        abonnes[str(cid)] = {"dernier_t": dernier}
     else:
         abonnes.pop(str(cid), None)
+        encore_actif = any(str(cid) in {str(x) for x in (a or {})} for a in (etat.get("coach_live") or {}).values())
+        if not encore_actif:
+            etat["recherche_positions_active"] = [x for x in etat.get("recherche_positions_active", []) if str(x) != str(cid)]
+
+def demarrer_recherche_positions(etat, cid):
+    """Démarre la veille persistante sur les marchés choisis, jusqu'à arrêt manuel."""
+    marches = tuple(sorted(marches_choisis(etat, cid)))
+    for m in marches:
+        activer_coach_live(etat, cid, m, True)
+    return marches
+
 
 
 def notifier_clotures(etat, m, r, cle):
@@ -6240,6 +6318,8 @@ def lien_validation(etat):
 def traiter(etat, chats, updates):
     """Boutons cliqués et messages reçus. Renvoie la liste des téléphones qui demandent une analyse."""
     demandes = []
+    TELEGRAM_PULL_CONTEXT.chat_id = None
+    TELEGRAM_PULL_CONTEXT.private = False
     for u in updates:
         etat["offset"] = u["update_id"] + 1
         message_recu = (u.get("message") or u.get("edited_message") or
@@ -6250,6 +6330,8 @@ def traiter(etat, chats, updates):
         chat_recu = (message_recu.get("chat") or
                      (callback_recu.get("message") or {}).get("chat") or
                      demande_recue.get("chat") or statut_recu.get("chat") or {})
+        TELEGRAM_PULL_CONTEXT.chat_id = str(chat_recu.get("id") or "") if chat_recu.get("type") == "private" else None
+        TELEGRAM_PULL_CONTEXT.private = chat_recu.get("type") == "private"
         type_message = next((k for k in ("photo", "document", "video", "voice", "audio",
                                          "sticker", "animation", "video_note", "location",
                                          "contact", "poll", "dice", "venue") if k in message_recu), "message")
@@ -6339,6 +6421,32 @@ def traiter(etat, chats, updates):
                     etat["coach_pending"] = [x for x in etat.get("coach_pending", []) if str(x) != qui]
                 continue
             if live_callback(etat, chats, cb, choix, mk, qui):
+                continue
+            if choix == "quiet":
+                try:
+                    telegram("answerCallbackQuery", callback_query_id=cb["id"], text="Bien noté")
+                except Exception:
+                    pass
+                continue
+            if choix == "searchpos" and mk == "BOTH":
+                try:
+                    telegram("answerCallbackQuery", callback_query_id=cb["id"], text="🎯 Recherche activée")
+                except Exception:
+                    pass
+                marches_recherche = demarrer_recherche_positions(etat, qui)
+                if not marches_recherche:
+                    _envoi_sur(qui, text="📡 Choisis d'abord les marchés à surveiller pour chercher une position.")
+                    menu_marches(etat, qui)
+                    continue
+                noms = " + ".join(marches_recherche)
+                boutons_stop = [[{"text": f"⏹ Arrêter {m}", "callback_data": f"coachstop:{m}"} for m in marches_recherche]]
+                _envoi_sur(qui, text=(f"🎯 RECHERCHE DE POSITION ACTIVE — {noms}\n"
+                                      "🔎 ALIGN surveille les configurations confirmées en continu.\n"
+                                      "🔕 Aucun commentaire intermédiaire : je t'écris uniquement lorsqu'une position est confirmée.\n"
+                                      "📍 Dès qu'une position est détectée, tu reçois ses niveaux et son suivi.\n"
+                                      "🔕 Pas d'alerte automatique sur les autres marchés.\n"
+                                      "⏹ La recherche reste active jusqu'à ton arrêt."), 
+                           reply_markup=json.dumps({"inline_keyboard": boutons_stop}))
                 continue
             if choix == "analysechoice" and (mk in MARCHES or mk == "BOTH"):
                 try:
@@ -6659,8 +6767,9 @@ def traiter(etat, chats, updates):
                     pass
                 if choix == "coachlive":
                     intro = (f"🎙 COACH COMMENTATEUR ACTIVÉ — {ICONE.get(mk, '')} {mk}\n"
-                             "🕯 Je commente chaque clôture 15 min pendant 2 h\n"
-                             "📺 Garde le LIVE à côté : tu reçois l'explication avec les boutons d'analyse.\n"
+                             "🔎 Surveillance continue : je cherche une configuration d'entrée confirmée, sans inventer de signal.\n"
+                             "🔕 Aucun message de marché intermédiaire : uniquement une position confirmée.\n"
+                             "📍 Dès qu'une position est ouverte par ALIGN, je poursuis son suivi.\n"
                              "⏹ Pour arrêter : le bouton sous mes messages.")
                     contenu = intro
                     clavier = None
@@ -6776,14 +6885,24 @@ def traiter(etat, chats, updates):
                 cmd = "/" + charge
         if cmd in COMMANDES:
             msg["text"] = tx = COMMANDES[cmd]
-        if cmd == "/start" and str(cid) not in (etat.get("niveaux") or {}) and str(cid) not in {str(x) for x in proprio(etat)}:
-            accueil_questionnaire(etat, cid)
-        if cmd in ("/start", "/boutons"):
-            # Les boutons reviennent toujours (si le clavier du téléphone les a cachés)
-            _envoi_sur(cid, text="⬇️ Tes boutons sont là 👇\n💡 Clavier caché ? Appuie sur l'icône ⌘ à droite du champ",
-                       reply_markup=CLAVIER if autorise(etat, cid, msg.get("from", {}).get("id")) else CLAVIER_VISITEUR)
-            if cid in etat.get("prospects", []) or cid in proprio(etat):
-                continue
+        if cmd == "/start":
+            # Un seul accueil par utilisateur ; toutes les autres actions passent par ses boutons.
+            deja = etat.setdefault("bienvenue_pull_v1", [])
+            if cid not in {str(x) for x in deja}:
+                prenom = etat.get("prenoms", {}).get(cid)
+                texte = f"Bonjour {prenom}, tu vas trader aujourd'hui ?" if prenom else "Bonjour, tu vas trader aujourd'hui ?"
+                clavier = json.dumps({"inline_keyboard": [
+                    [{"text": "🎯 Oui, chercher une position", "callback_data": "searchpos:BOTH"}],
+                    [{"text": "📊 Demander une analyse", "callback_data": "analysechoice:BOTH"}],
+                    [{"text": "Pas aujourd'hui", "callback_data": "quiet:no"}]
+                ]})
+                res_bienvenue = _envoi_sur(cid, text=texte, reply_markup=clavier)
+                if isinstance(res_bienvenue, dict) and res_bienvenue.get("ok") is True:
+                    deja.append(cid)
+            continue
+        if cmd == "/boutons":
+            _envoi_sur(cid, text="Choisis une action :", reply_markup=CLAVIER if autorise(etat, cid, msg.get("from", {}).get("id")) else CLAVIER_VISITEUR)
+            continue
         if tx in INVERSE:
             msg["text"] = tx = INVERSE[tx]
         bas = tx.lower()
@@ -6896,6 +7015,8 @@ def traiter(etat, chats, updates):
         # Pas de conversation libre : seuls les boutons et retours explicitement sollicités
         # (photo de gain ou pseudo TradingView après demande) sont traités.
         # Tout texte libre est ignoré, pour les visiteurs comme pour les abonnés.
+    TELEGRAM_PULL_CONTEXT.chat_id = None
+    TELEGRAM_PULL_CONTEXT.private = False
     return demandes
 AUTO_MARCHES = ("BTC", "GOLD", "NASDAQ")
 
@@ -10316,14 +10437,8 @@ def _traiter_lecture_rapide(etat, chats, update):
     cmd = words[0].split("@")[0].lower() if words else ""
     payload = words[1].lower() if len(words) > 1 else ""
     if cmd == "/start":
-        if payload:
-            return False
-        if not localement_autorise:
-            return False  # laisse le handler principal vérifier les abonnements Telegram
-        _envoi_sur(cid, text="⬇️ Tes boutons sont là 👇\n💡 Clavier caché ? Appuie sur l'icône ⌘ à droite du champ",
-                   reply_markup=CLAVIER)
-        update["_align_fast_handled"] = True
-        return True
+        # L'accueil unique est envoyé par le handler principal ; pas de second message rapide.
+        return False
     if cmd == "/boutons":
         if not localement_autorise:
             return False
@@ -11207,6 +11322,8 @@ def clavier_live(etat, cid, anglais=False):
         lignes.append([{"text": f"🎙 Coach {k}", "callback_data": f"coachlive:{k}"} for k in ("BTC", "GOLD", "NASDAQ")])
         lignes.append([{"text": "🔎 Faire une analyse" if not anglais else "🔎 Research markets",
                         "callback_data": "analysechoice:BOTH"}])
+        lignes.append([{"text": "🎯 Chercher une position" if not anglais else "🎯 Find a position",
+                        "callback_data": "searchpos:BOTH"}])
         lignes.append([{"text": "📡 Sélectionner mes marchés" if not anglais else "📡 Select my markets",
                         "callback_data": "marketsmenu:x"}])
     if str(cid) in {str(x) for x in proprio(etat)}:
@@ -11374,7 +11491,15 @@ def boucle_polling_telegram(etat, chats):
                 else:
                     _ack_callback_rapide(cb, toast_callback(cb.get("data", ""), anglais))
             else:
-                _traiter_lecture_rapide(etat, chats, update)
+                msg_rapide = update.get("message") or update.get("edited_message") or {}
+                chat_rapide = msg_rapide.get("chat") or {}
+                TELEGRAM_PULL_CONTEXT.chat_id = str(chat_rapide.get("id") or "") if chat_rapide.get("type") == "private" else None
+                TELEGRAM_PULL_CONTEXT.private = chat_rapide.get("type") == "private"
+                try:
+                    _traiter_lecture_rapide(etat, chats, update)
+                finally:
+                    TELEGRAM_PULL_CONTEXT.chat_id = None
+                    TELEGRAM_PULL_CONTEXT.private = False
             TELEGRAM_UPDATES.put(update)
 
 
@@ -11389,7 +11514,11 @@ def recevoir_updates_telegram(etat, chats, demandes):
         except queue.Empty:
             break
     if updates:
-        demandes.extend(traiter(etat, chats, updates))
+        try:
+            demandes.extend(traiter(etat, chats, updates))
+        finally:
+            TELEGRAM_PULL_CONTEXT.chat_id = None
+            TELEGRAM_PULL_CONTEXT.private = False
     return len(updates)
 
 
@@ -11843,7 +11972,7 @@ def un_tour(etat, chats):
     print(f"{len(envois)} signal(s) envoyé(s) à {len(chats)} téléphone(s)")
     sauver_etat(etat, chats)
 
-STATE_SCHEMA_VERSION = 2
+STATE_SCHEMA_VERSION = 3
 
 def charger_etat():
     """Charge l'état sans jamais repartir à zéro silencieusement si le fichier est abîmé."""
@@ -11863,6 +11992,15 @@ def charger_etat():
     # offset Telegram, suivis, résultats et journal) sans réinitialiser les instructions.
     etat.setdefault("journal_telegram", [])
     etat.setdefault("chats", [])
+    if version < 3:
+        # Migration unique : couper les anciens push et purger la file une seule fois.
+        # Ne surtout pas effacer les nouvelles recherches opt-in aux redémarrages suivants.
+        etat["coach_live"] = {}
+        etat["coach_pending"] = []
+        etat["recherche_positions_active"] = []
+        etat["telegram_outbox"] = []
+        etat["veille_cloture"] = {}
+        print("TELEGRAM_PULL_MIGRATION=enabled; legacy push subscriptions and queued messages cleared", flush=True)
     etat["schema_version"] = STATE_SCHEMA_VERSION
     if version < STATE_SCHEMA_VERSION:
         print(f"STATE_MIGRATION={version}->{STATE_SCHEMA_VERSION} (conservation des données)", flush=True)
@@ -11908,6 +12046,8 @@ def sauver_etat(etat, chats=None):
 
 
 def main():
+    global TELEGRAM_PULL_MODE
+    TELEGRAM_PULL_MODE = True
     etat = charger_etat()
     LANG_EN.clear(); LANG_EN.update(etat.get("en", []))
     MEMOIRE[:] = etat.get("memoire", []); LECONS[:] = etat.get("lecons_ia", [])

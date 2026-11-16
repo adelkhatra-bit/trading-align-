@@ -163,6 +163,7 @@ class LiveTikTok(unittest.TestCase):
         kb = json.loads(ab.clavier_live(self.etat, "2"))["inline_keyboard"]
         actions = {b.get("callback_data"): b["text"] for row in kb for b in row if b.get("callback_data")}
         self.assertIn("analysechoice:BOTH", actions)
+        self.assertIn("searchpos:BOTH", actions)
         self.assertIn("marketsmenu:x", actions)
         for market in ("BTC", "GOLD", "NASDAQ"):
             self.assertIn(f"coachlive:{market}", actions)
@@ -339,6 +340,98 @@ class LiveOutbox(unittest.TestCase):
                 ab._ETAT_COURANT.pop("etat", None)
             else:
                 ab._ETAT_COURANT["etat"] = previous
+
+
+    def test_coach_live_activation_reenables_bot_and_has_no_expiry(self):
+        market = "BTC"
+        cid = "user-42"
+        state = {"bot_off": [cid], "coach_live": {}}
+        bars = [{"t": 100}, {"t": 200}]
+        with mock.patch.object(ab, "DERNIERS", {market: {"b15": bars}}), \
+             mock.patch.object(ab.time, "time", return_value=500):
+            ab.activer_coach_live(state, cid, market, True)
+        self.assertNotIn(cid, state["bot_off"])
+        self.assertEqual(state["coach_live"][market][cid], {"dernier_t": 100})
+
+    def test_coach_live_ignores_legacy_expiry_and_keeps_monitoring(self):
+        market = "BTC"
+        cid = "user-42"
+        candle = {"t": 300, "o": 100, "h": 102, "l": 99, "c": 101}
+        state = {"coach_live": {market: {cid: {"expire": 1, "dernier_t": 0}}}}
+        sent = []
+        with mock.patch.object(ab, "bot_on", return_value=True), \
+             mock.patch.object(ab, "dans_chaine", return_value=False), \
+             mock.patch.object(ab, "_envoi_sur", side_effect=lambda *a, **kw: sent.append((a, kw)) or {"ok": True}), \
+             mock.patch.object(ab, "texte_coach_live", return_value="COACH BTC"), \
+             mock.patch.object(ab, "markup_analyse", return_value=None), \
+             mock.patch.object(ab, "positions_bot", return_value=[]), \
+             mock.patch.object(ab.time, "time", return_value=500):
+            ab.notifier_coach_live(state, market, {"b15": [candle, {"t": 600}]}, {})
+        self.assertIn(cid, state["coach_live"][market])
+        self.assertTrue(any("COACH BTC" in str(item) for item in sent))
+        self.assertFalse(any("COACH EN DIRECT TERMINÉ" in str(item) for item in sent))
+
+
+
+    def test_search_position_starts_persistent_coach_for_selected_markets(self):
+        state = {"marches_par_chat": {"user-42": ["BTC", "GOLD"]}, "bot_off": ["user-42"]}
+        with mock.patch.object(ab, "DERNIERS", {
+            "BTC": {"b15": [{"t": 100}, {"t": 200}]},
+            "GOLD": {"b15": [{"t": 300}, {"t": 400}]}
+        }):
+            selected = ab.demarrer_recherche_positions(state, "user-42")
+        self.assertEqual(selected, ("BTC", "GOLD"))
+        self.assertEqual(state["coach_live"]["BTC"]["user-42"], {"dernier_t": 100})
+        self.assertEqual(state["coach_live"]["GOLD"]["user-42"], {"dernier_t": 300})
+        self.assertNotIn("user-42", state["bot_off"])
+
+
+
+    def test_coach_live_sends_new_position_without_waiting_for_m15_close(self):
+        market = "BTC"
+        cid = "user-42"
+        trade = {"d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0}
+        state = {"coach_live": {market: {cid: {"dernier_t": 0}}}}
+        sent = []
+        with mock.patch.object(ab, "bot_on", return_value=True), \
+             mock.patch.object(ab, "dans_chaine", return_value=False), \
+             mock.patch.object(ab, "_envoi_sur", side_effect=lambda *a, **kw: sent.append((a, kw)) or {"ok": True}), \
+             mock.patch.object(ab, "markup_analyse", return_value=None):
+            ab.notifier_coach_live(state, market, {"m1": [{"c": 101.0}]}, {"trade": trade})
+        self.assertEqual(state["coach_live"][market][cid]["position_key"], "1|100.0|98.0|104.0|108.0")
+        self.assertTrue(any("POSITION ALIGN DÉTECTÉE" in str(item) and "TP1" in str(item) for item in sent))
+
+
+
+
+
+    def test_telegram_pull_mode_blocks_background_notifications(self):
+        with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True):
+            self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "other", "text": "ALERT"}))
+            self.assertFalse(ab._telegram_sortant_autorise("sendPhoto", {"chat_id": "channel", "photo": "x"}))
+
+    def test_telegram_pull_mode_allows_only_current_private_interaction(self):
+        with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True):
+            ab.TELEGRAM_PULL_CONTEXT.chat_id = "42"
+            ab.TELEGRAM_PULL_CONTEXT.private = True
+            try:
+                self.assertTrue(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "42", "text": "Analyse demandée"}))
+                self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "43", "text": "Unsolicited"}))
+            finally:
+                ab.TELEGRAM_PULL_CONTEXT.chat_id = None
+                ab.TELEGRAM_PULL_CONTEXT.private = False
+
+    def test_telegram_pull_mode_allows_entry_only_for_active_search(self):
+        previous = ab.DERNIER_ETAT
+        ab.DERNIER_ETAT = {"recherche_positions_active": ["42"]}
+        try:
+            with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True):
+                self.assertTrue(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "42", "text": "🟢 J'ENTRE MAINTENANT — GOLD"}))
+                self.assertTrue(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "42", "text": "🎯 POSITION ALIGN DÉTECTÉE — GOLD"}))
+                self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "42", "text": "Commentaire M15 : marché calme"}))
+        finally:
+            ab.DERNIER_ETAT = previous
+
 
 
 if __name__ == "__main__":
