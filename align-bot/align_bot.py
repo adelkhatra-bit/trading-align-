@@ -1464,10 +1464,11 @@ def ligne_retournement(r):
 def ligne_strategie(r):
     """Même lecture que la barre TradingView v24 : stratégie, état, score /100, motif."""
     d = r.get("dirPlan") or 0
-    strat, etat, motif = strategie_alignement(r.get("dirs"), d, r.get("dirW") or 0, r.get("market"))
+    dirs_strategie = r.get("dirs_cloturees") or r.get("dirs") or []
+    strat, etat, motif = strategie_alignement(dirs_strategie, d, r.get("dirW") or 0, r.get("market"))
     if not strat:
         return ligne_retournement(r) + [f"🏷 Stratégie : aucune — {motif}"]
-    total, p, dec = score_validation(strat, etat, r.get("dirs"), d, r.get("dirW") or 0, r.get("prix", 0),
+    total, p, dec = score_validation(strat, etat, dirs_strategie, d, r.get("dirW") or 0, r.get("prix", 0),
                                      r.get("plan"), r.get("atr", 0) or 0, r.get("rsis"), r.get("sens"),
                                      [x.get("v") for x in (r.get("b15") or [])])
     ic = "✅" if etat == "CONFIRMÉ" and total >= 75 else "⏳"
@@ -1498,7 +1499,8 @@ def lecture_unite_active(r):
 def strategie_mtf(r):
     """H4/H1 = fond, M15 = préparation, M5 = timing ; profil scalp/intraday/swing explicite."""
     fl = lambda x: "🟢⬆️" if x == 1 else "🔴⬇️" if x == -1 else "🟠➖"
-    D = r["dirs"]; d5, d15, d1h, d4h, dD = D[2], D[4], D[7], D[9], D[10]
+    D = r.get("dirs_cloturees") or r["dirs"] if r.get("market") in ("GOLD", "NASDAQ") else r["dirs"]
+    d5, d15, d1h, d4h, dD = D[2], D[4], D[7], D[9], D[10]
     profil = profil_strategie(r)
     l = ["🧭 STRATÉGIE MULTI-UT",
          f"🏔 Tendance principale 4 h : {fl(d4h)}",
@@ -4040,10 +4042,10 @@ def reprise_entree(m, r, cle):
     rp = cle.get("reprise")
     if not rp:
         return None
-    if m in ("GOLD", "NASDAQ") and direction_confirmee_marche(m, r.get("dirs_cloturees") or r.get("dirs"), rp.get("d")) != rp.get("d"):
-        return None
     if r.get("t", 0) - rp["t"] > 6 * 3600:
         cle.pop("reprise", None)
+        return None
+    if m in ("GOLD", "NASDAQ") and direction_confirmee_marche(m, r.get("dirs_cloturees") or r.get("dirs"), rp.get("d")) != rp.get("d"):
         return None
     b5 = (r.get("b5") or [])[:-1]
     atr = r.get("atr") or 0
@@ -4057,11 +4059,12 @@ def reprise_entree(m, r, cle):
     if abs(p - e) > 0.25 * atr or (b5[-1]["c"] - b5[-1]["o"]) * d <= 0:
         return None
     cle.pop("reprise", None)
+    tp2_txt = f" • 🏁 TP2 ≈ {px(rp['tp2'])}" if rp.get("tp2") is not None and d * (rp["tp2"] - rp["tp1"]) > 0 else ""
     return (f"🔁 REPRISE À L'ENTRÉE : {'LONG' if d == 1 else 'SHORT'} — {ICONE.get(m, '')} {m}\n"
             f"🧲 Le prix est revenu sur l'entrée {px(e)}, comme prévu 😎\n"
             "🕯 La bougie 5 min reclôture dans notre sens\n"
-            f"📍 Entrée ≈ {px(e)} • 🛑 SL ≈ {px(rp['sl'])} • 🎯 TP1 ≈ {px(rp['tp1'])}\n"
-            "💰 Deuxième passage sur le même mouvement : c'est comme ça qu'on fait le max\n"
+            f"📍 Entrée : {px(e)} • 🛑 SL : {px(rp['sl'])} • 🎯 TP1 : {px(rp['tp1'])}{tp2_txt}\n"
+            "💰 Deuxième passage sur le même mouvement, uniquement après confirmation des clôtures\n"
             "⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
 
 def entree_retest(m, r, cle):
@@ -4092,13 +4095,22 @@ def entree_retest(m, r, cle):
             return None
         vu[k] = r.get("t", 0)
         sl = (x["l"] - 0.1 * atr) if d == 1 else (x["h"] + 0.1 * atr)
+        entree = x["c"]
+        risque = abs(entree - sl)
+        if risque <= 0:
+            continue
+        (tp1, n1), (tp2, n2) = objectifs(r, d, entree, risque)
+        rr = abs(tp1 - entree) / risque
+        if d * (tp1 - entree) <= 0 or d * (tp2 - tp1) <= 0 or rr < GAIN_MIN:
+            continue
         ancien, nouveau = ("résistance", "support") if d == 1 else ("support", "résistance")
-        return (f"🎯 ENTRÉE SUR RETEST : {'LONG' if d == 1 else 'SHORT'} — {ICONE.get(m, '')} {m}\n"
+        return (f"🎯 ENTRÉE POSSIBLE SUR RETEST : {'LONG' if d == 1 else 'SHORT'} — {ICONE.get(m, '')} {m}\n"
                 f"🧱 L'ancienne {ancien} {px(niveau)} a été cassée à la clôture : elle devient {nouveau}\n"
                 "🛑 Le prix est revenu dessus et le marché bloque (clôture 15 min du bon côté)\n"
-                f"✅ 5 min + 15 min + 1h d'accord" + (" + 4h confirmé" if m in ("GOLD", "NASDAQ") else "") + "\n"
-                f"📍 Entrée ≈ {px(x['c'])}\n🛑 SL {'juste sous' if d == 1 else 'juste au-dessus de'} la mèche : {px(sl)}\n"
-                "🛡 BE dès que le gain = le risque\n🤖 Le bot ne la prend pas lui-même\n⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
+                f"✅ Clôtures 5 min + 15 min + 1 h d'accord" + (" + 4 h confirmées" if m in ("GOLD", "NASDAQ") else "") + "\n"
+                f"📍 Entrée : {px(entree)}\n🛑 SL : {px(sl)}\n🎯 TP1 : {px(tp1)} ({n1})\n🏁 TP2 : {px(tp2)} ({n2})\n"
+                f"⚖️ Gain/risque : 1:{rr:.1f}\n🛡 BE à +1R\n🤖 Signal à valider, le bot ne passe pas l'ordre\n"
+                "⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
     return None
 
 def radar_climax(m, r, cle):
@@ -4148,6 +4160,23 @@ def radar_climax(m, r, cle):
                         "⏳ J'attends l'accord des quatre unités clôturées.")
             e = cl[-1]
             mot = "plus bas" if sens == 1 else "plus haut"
+            if m in ("GOLD", "NASDAQ"):
+                risque = abs(e - sl)
+                if risque <= 0 or "grosses" not in r:
+                    return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\n"
+                            "Balayage détecté, mais niveaux TP/SL complets indisponibles.\n⛔ Aucune entrée publiée.")
+                (tp1, n1), (tp2, n2) = objectifs(r, sens, e, risque)
+                rr = abs(tp1 - e) / risque
+                if sens * (tp1 - e) <= 0 or sens * (tp2 - tp1) <= 0 or rr < GAIN_MIN:
+                    return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\n"
+                            "Le retournement est repéré, mais le gain/risque ne valide pas une position.\n⛔ Aucune entrée publiée.")
+                return (f"🔄 RETOURNEMENT CONFIRMÉ — {'LONG' if sens == 1 else 'SHORT'} POSSIBLE — {ICONE.get(m, '')} {m}\n"
+                        f"📊 Volume ×{vols[i] / moy:.1f} : épuisement détecté\n"
+                        f"🧹 Balayage du {mot} des 20 dernières bougies 15 min, clôture revenue\n"
+                        f"✅ Clôtures M5 + M15 + H1 + H4 dans le même sens\n"
+                        f"📍 Entrée : {px(e)}\n🛑 SL : {px(sl)}\n🎯 TP1 : {px(tp1)} ({n1})\n🏁 TP2 : {px(tp2)} ({n2})\n"
+                        f"⚖️ Gain/risque : 1:{rr:.1f}\n🤖 Signal à valider, aucun ordre automatique\n"
+                        "⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
             return (f"🔄 RETOURNEMENT : {'LONG' if sens == 1 else 'SHORT'} prenable — {ICONE.get(m, '')} {m}\n"
                     f"📊 Volume ×{vols[i] / moy:.1f} : le marché s'est épuisé\n"
                     f"🧹 Le {mot} des 20 dernières bougies 15 min a été balayé, puis la clôture est revenue\n"
