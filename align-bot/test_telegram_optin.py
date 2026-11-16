@@ -23,6 +23,7 @@ class TelegramOptIn(unittest.TestCase):
     def test_coach_live_is_explicit_and_market_scoped(self):
         state = {"coach_live": {"NASDAQ": {"123": {"expire": 9999999999}}}}
         self.assertTrue(ab.notifications_actives(state, "123", "NASDAQ"))
+        self.assertFalse(ab.bot_on(state, "123"))
         self.assertFalse(ab.notifications_actives(state, "123", "GOLD"))
         self.assertEqual(ab.destinataires_message(state, {"123"}, "💠 NASDAQ — COACH"), ["123"])
         self.assertEqual(ab.destinataires_message(state, {"123"}, "🥇 GOLD — COACH"), [])
@@ -103,8 +104,8 @@ class TelegramOptIn(unittest.TestCase):
                  "za": "4000", "zb": "4010", "sl": "4020", "tp1": "3980", "tp": "3960",
                  "ut": "5 min", "rejets": "2", "rr": "2,0", "rrp": "3,0"}
         with patch.object(ab, "_tournante", return_value=0):
-            fr = "\\n".join(ab.texte_pine({}, event, False))
-            en = "\\n".join(ab.texte_pine({}, event, True))
+            fr = "\n".join(ab.texte_pine({}, event, False))
+            en = "\n".join(ab.texte_pine({}, event, True))
         self.assertIn("ZONE D'ENTRÉE POSSIBLE", fr)
         self.assertIn("SHORT", fr)
         self.assertIn("TP1 3980", fr)
@@ -117,7 +118,7 @@ class TelegramOptIn(unittest.TestCase):
                  "rr": 1.5, "strat": "DAY", "za": 20000.0, "zb": 20000.0,
                  "src": "cassure 5 min", "niveau": 20010.0, "sl_ut": "5 min",
                  "n1": "résistance 1h", "n2": "résistance 4h"}
-        with patch.object(ab, "meche_sl", return_value="sous la mèche"), \\
+        with patch.object(ab, "meche_sl", return_value="sous la mèche"), \
              patch.object(ab, "duree_txt", return_value="Durée estimée : quelques heures"):
             text = ab.fmt_trade("NASDAQ", trade, 20005.0)
         self.assertIn("NASDAQ 100 / US100", text)
