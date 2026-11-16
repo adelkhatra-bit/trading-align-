@@ -26,7 +26,7 @@ def retest_r(h4):
 def reversal_r(dirs, volume_last=100, price=100.0):
     b5 = [candle(i * 300, 100 - (i % 3)) for i in range(20)]
     b15 = [candle(i * 900) for i in range(50)]
-    b15[-2]["v"] = volume_last
+    b15[-1]["v"] = volume_last
     b1 = [candle(i * 3600, 100, h=110, l=90) for i in range(10)]
     b4 = [candle(i * 14400, 100, h=130, l=70) for i in range(10)]
     return dict(dirs=dirs, b5=b5, b15=b15, b15_long=b15,
