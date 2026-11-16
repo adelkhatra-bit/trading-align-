@@ -93,6 +93,19 @@ class ClosedMtfSafety(unittest.TestCase):
             self.assertEqual(ab.direction_plan_autorisee(market, 1, aligned, stale), 0)
         self.assertEqual(ab.direction_plan_autorisee("BTC", 1, [0] * 11, {}), 1)
 
+    def test_gold_nasdaq_verdict_names_m5_m15_conflict_instead_of_blame_h1(self):
+        now = int(time.time())
+        ctx = fresh_context(now)
+        dirs = [1] * 11
+        dirs[2] = -1
+        r = dict(ctx, market="GOLD", dirs=dirs, dirs_cloturees=dirs.copy(), confirme=0,
+                 rsis=[50.0] * 11, atr=1.0)
+        titre, raison = ab.verdict(r, {})
+        self.assertIn("N'ENTRE PAS", titre)
+        self.assertIn("M5", raison)
+        self.assertIn("M15", raison)
+        self.assertNotIn("Le 1h ne confirme", raison)
+
     def test_strategy_blocks_gold_nasdaq_when_m5_or_m15_conflicts_but_preserves_btc(self):
         aligned = [1] * 11
         for market in ("GOLD", "NASDAQ"):
