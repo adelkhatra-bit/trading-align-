@@ -252,10 +252,11 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("PING|LIVE_SCREEN|", source)
         self.assertIn("setInterval(pingEcran, 25000)", source)
         self.assertIn("clearInterval(heartbeatT)", source)
-        self.assertIn("🔇 Voix OFF", source)
-        self.assertIn("🔊 Voix ON", source)
+        self.assertIn("🔊 ACTIVER LE COMMENTATEUR", source)
+        self.assertIn("🔊 COACH VOCAL ON", source)
         self.assertIn("voixBtn.remove()", source)
         self.assertIn("parlerLive(m)", source)
+        self.assertIn("Le coach ALIGN est en direct", source)
 
 
 
@@ -665,6 +666,31 @@ class LiveOutbox(unittest.TestCase):
 
 
 
+    def test_market_narration_is_factual_and_runs_independently_of_generic_coach(self):
+        bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
+        self.assertIn("function commentaireMarcheEnDirect(B, moyR, moyV, m)", bande)
+        self.assertIn("Date.now() - derniereTend > 75000", bande)
+        self.assertIn("derniereCoach", bande)
+        self.assertIn("Date.now() - derniereTend < 40000", bande)
+        self.assertIn("coachN++; derniereCoach = Date.now();", bande)
+        self.assertIn("🔊 ACTIVER LE COMMENTATEUR", bande)
+        self.assertIn("Le coach ALIGN est en direct", bande)
+
+    def test_ai_live_market_commentary_refreshes_every_ten_minutes(self):
+        state = {}
+        sent = []
+        with mock.patch.object(ab, "LIVE_IA_INTERVALLE", 600), \
+             mock.patch.object(ab, "live_actif", return_value=True), \
+             mock.patch.object(ab, "contexte_technique_live", return_value={"marches": {"BTC": {"biais_plan": "haussier"}}}), \
+             mock.patch.object(ab, "ia", return_value="BTC | Les acheteurs gardent la main mais le rythme ralentit. | Buyers remain in control but momentum is slowing."), \
+             mock.patch.object(ab, "live_publier", side_effect=lambda message: sent.append(message) or True):
+            self.assertTrue(ab.live_phrases_ia(state, 1000, {}))
+            self.assertFalse(ab.live_phrases_ia(state, 1599, {}))
+            self.assertTrue(ab.live_phrases_ia(state, 1600, {}))
+        self.assertEqual(len(sent), 2)
+        self.assertTrue(all(message.startswith("IA:") for message in sent))
+
+
 if __name__ == "__main__":
     unittest.main()
 
@@ -798,4 +824,5 @@ class TestLiveBoostCallbackDispatch(unittest.TestCase):
         self.assertEqual(state["prenoms"]["44"], "Nora")
         self.assertEqual(published, ["🙏 MERCI NORA ! Nora BOOSTE LE LIVE 🚀 ABONNE-TOI • PARTAGE"])
         self.assertTrue(any("Ton prénom doit apparaître" in kw.get("text", "") for _, kw in sent))
+
 
