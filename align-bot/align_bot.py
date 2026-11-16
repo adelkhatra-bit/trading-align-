@@ -4446,8 +4446,16 @@ def retournement_marche(m, r, cle):
     BTC conserve sa règle historique : M5 + M15 + H1 contre H4, avec les cibles et le SL existants.
     Une alerte par nouveau sens, jamais deux fois de suite."""
     dirs = r.get("dirs_cloturees") or r.get("dirs") or []
-    b5, b15 = (r.get("b5") or [])[:-1], (r.get("b15_long") or r.get("b15") or [])[:-1]   # dernières bougies en formation exclues
-    b1, b4 = (r.get("b1h") or [])[:-1], (r.get("b4h") or [])[:-1]
+    def bougies_terminees(key, fallback=None):
+        bars = list(r.get(key) or (r.get(fallback) if fallback else []) or [])
+        # Les adaptateurs Kraken/Yahoo/PAXG livrent déjà des bougies clôturées.
+        # Retirer uniquement une bougie explicitement marquée en formation (flux live).
+        return bars[:-1] if bars and bars[-1].get("forming") is True else bars
+
+    b5 = bougies_terminees("b5")
+    b15 = bougies_terminees("b15_long", "b15")
+    b1 = bougies_terminees("b1h")
+    b4 = bougies_terminees("b4h")
     if len(dirs) < 10 or len(b5) < 6 or len(b15) < 41 or len(b1) < 6 or len(b4) < 6:
         return None
     d5, d15, d60, d240 = dirs[2], dirs[4], dirs[7], dirs[9]
