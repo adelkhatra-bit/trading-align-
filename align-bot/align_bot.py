@@ -1961,7 +1961,7 @@ TRAD = {
 "📲 Je prépare mon ordre": "📲 Preparing my order", "⏳ J'attends le signal 🟢": "⏳ Waiting for the 🟢 signal",
 "🟢🟢🟢 J'ENTRE MAINTENANT —": "🟢🟢🟢 I'M ENTERING NOW —", "J'ENTRE MAINTENANT": "I'M ENTERING NOW",
 "🎯 Confiance": "🎯 Confidence", "15 min • 1 h • 4 h alignées": "15 min • 1 h • 4 h aligned",
-"Daily / Weekly favorables": "Daily / Weekly favourable", "Zone Fibonacci 50 – 78,6 %": "Fibonacci zone 50 – 78.6 %",
+"Daily / Weekly favorables": "Daily / Weekly favourable", "Zone de retracement validée": "Validated retracement zone",
 "Niveau 15m / 1h / 4h ou EMA": "15m / 1h / 4h level or EMA", "RSI en surcharge (": "RSI overextended (",
 "Confirmé en 1 h": "Confirmed on 1 h", "Gain / risque x": "Reward / risk x", "📍 POSITION SUIVIE AUTOMATIQUEMENT": "📍 POSITION AUTOMATICALLY TRACKED",
 "🕯 EN BOUGIES (marche sur toutes les plateformes) :": "🕯 IN CANDLES (works on every platform):",
