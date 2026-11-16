@@ -151,6 +151,12 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn("attends la confirmation, ne cours pas après le prix", self.js)
         self.assertIn("wait for confirmation, never chase price", self.js)
         self.assertNotIn("dépêche-toi, les retardataires ont toujours tort", self.js)
+        self.assertNotIn("DÉPÊCHE-TOI : UNE ENTRÉE SE PRÉPARE", self.js)
+        self.assertNotIn("LATECOMERS ARE ALWAYS WRONG", self.js)
+        self.assertNotIn("LINK IN BIO, HURRY!", self.js)
+        self.assertNotIn("LIEN EN BIO, VITE !", self.js)
+        self.assertIn("ATTENDS LA CONFIRMATION", self.js)
+        self.assertIn("WAIT FOR CONFIRMATION", self.js)
 
 
 if __name__ == "__main__":
