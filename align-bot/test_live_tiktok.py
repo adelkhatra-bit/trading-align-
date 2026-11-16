@@ -403,29 +403,6 @@ class LiveOutbox(unittest.TestCase):
 
 
 
-    def test_telegram_pull_mode_blocks_background_notifications(self):
-        self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "other", "text": "ALERT"}))
-        self.assertFalse(ab._telegram_sortant_autorise("sendPhoto", {"chat_id": "channel", "photo": "x"}))
-
-    def test_telegram_pull_mode_allows_only_current_private_interaction(self):
-        ab.TELEGRAM_PULL_CONTEXT.chat_id = "42"
-        ab.TELEGRAM_PULL_CONTEXT.private = True
-        try:
-            self.assertTrue(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "42", "text": "Analyse demandée"}))
-            self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "43", "text": "Unsolicited"}))
-        finally:
-            ab.TELEGRAM_PULL_CONTEXT.chat_id = None
-            ab.TELEGRAM_PULL_CONTEXT.private = False
-
-    def test_telegram_pull_mode_allows_entry_only_for_active_search(self):
-        previous = ab.DERNIER_ETAT
-        ab.DERNIER_ETAT = {"recherche_positions_active": ["42"]}
-        try:
-            self.assertTrue(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "42", "text": "🟢 J'ENTRE MAINTENANT — GOLD"}))
-            self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "42", "text": "Commentaire M15 : marché calme"}))
-        finally:
-            ab.DERNIER_ETAT = previous
-
 
 
     def test_telegram_pull_mode_blocks_background_notifications(self):
@@ -450,6 +427,7 @@ class LiveOutbox(unittest.TestCase):
         try:
             with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True):
                 self.assertTrue(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "42", "text": "🟢 J'ENTRE MAINTENANT — GOLD"}))
+                self.assertTrue(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "42", "text": "🎯 POSITION ALIGN DÉTECTÉE — GOLD"}))
                 self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "42", "text": "Commentaire M15 : marché calme"}))
         finally:
             ab.DERNIER_ETAT = previous
