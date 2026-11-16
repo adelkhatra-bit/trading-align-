@@ -1,6 +1,8 @@
 //@version=6
 // ═════════ PROPOSITION v25 — NON PUBLIÉE — À VALIDER PAR ADEL — NON COMPILÉE / NON TESTÉE SUR TRADINGVIEW ═════════
-// Seule modification : la logique de ENTRÉE / STOP (entrée sniper en cascade M1 -> M3 -> M5 -> M15). Design, couleurs, tableau, étiquettes, plan SWING (zone, TP) : IDENTIQUES à la v24.
+// Proposition logique : clôtures MTF non-repaint, confirmation H1+H4 obligatoire pour Gold/NASDAQ,
+// et conservation du BTC. Aucun changement de mise en page ni remplacement de la version publiée.
+ cascade M1 -> M3 -> M5 -> M15). Design, couleurs, tableau, étiquettes, plan SWING (zone, TP) : IDENTIQUES à la v24.
 // Cause racine corrigée : le tableau « niveaux » ne contient que 15 min / 1h / 4h / Daily ; aucun niveau M1 / M3 / M5 n'existait. Ils sont ajoutés
 // dans un tableau SÉPARÉ (niveauxSn), calculés comme les autres (pivots 5-5, deux derniers hauts / bas), et servent UNIQUEMENT à l'entrée sniper et à son SL.
 // Détail ligne à ligne : pine/PROPOSITION_v25_sniper.diff
