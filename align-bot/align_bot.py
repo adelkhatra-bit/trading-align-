@@ -6358,11 +6358,11 @@ def traiter(etat, chats, updates):
                     continue
                 noms = " + ".join(marches_recherche)
                 boutons_stop = [[{"text": f"⏹ Arrêter {m}", "callback_data": f"coachstop:{m}"} for m in marches_recherche]]
-                _envoi_sur(qui, text=(f"🎯 RECHERCHE DE POSITION ACTIVE — {noms}\\n"
-                                      "🔎 ALIGN surveille les configurations confirmées en continu.\\n"
-                                      "🕯 Le coach commente les clôtures M15 et les changements importants.\\n"
-                                      "📍 Dès qu'une position est détectée, tu reçois ses niveaux et son suivi.\\n"
-                                      "🔕 Pas d'alerte automatique sur les autres marchés.\\n"
+                _envoi_sur(qui, text=(f"🎯 RECHERCHE DE POSITION ACTIVE — {noms}\n"
+                                      "🔎 ALIGN surveille les configurations confirmées en continu.\n"
+                                      "🕯 Le coach commente les clôtures M15 et les changements importants.\n"
+                                      "📍 Dès qu'une position est détectée, tu reçois ses niveaux et son suivi.\n"
+                                      "🔕 Pas d'alerte automatique sur les autres marchés.\n"
                                       "⏹ La recherche reste active jusqu'à ton arrêt."), 
                            reply_markup=json.dumps({"inline_keyboard": boutons_stop}))
                 continue
