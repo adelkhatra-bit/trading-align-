@@ -3430,6 +3430,16 @@ class TelegramExplicitCoachOptInTest(unittest.TestCase):
             align_bot.entrer_inscrits(state, "BTC", trade, {"11", "22"})
         self.assertEqual(set(trade["qui"]), {"22"})
 
+    def test_pause_purges_pending_telegram_alerts_for_that_user_only(self):
+        state = {"telegram_outbox": [
+            {"chat_id": "11", "params": {"text": "old signal"}},
+            {"chat_id": 22, "params": {"text": "other user"}},
+            {"chat_id": 11, "params": {"text": "old coach update"}},
+        ]}
+        removed = align_bot.purger_messages_en_attente(state, "11")
+        self.assertEqual(removed, 2)
+        self.assertEqual([x["chat_id"] for x in state["telegram_outbox"]], [22])
+
     def test_daily_checkin_skips_active_coach_and_open_positions(self):
         now = datetime.datetime(2026, 11, 16, 9, 0, tzinfo=align_bot.PARIS).timestamp()
         state = {
