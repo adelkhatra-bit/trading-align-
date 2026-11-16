@@ -373,6 +373,20 @@ body.win{width:100vw;min-width:unset;height:100vh;max-height:100vh}
 .um{background:rgba(234,179,8,.15);color:#fde047}
 .uh{background:rgba(249,115,22,.15);color:#fdba74}
 .ux{background:rgba(239,68,68,.2);color:#fca5a5}
+/* ── COACH SHOWCASE — popup animé, non bloquant ── */
+#coachShow{display:none;position:fixed;z-index:9999;top:48px;left:10px;right:10px;align-items:center;gap:10px;padding:12px 13px;border:1px solid #3b82f6;border-radius:12px;background:linear-gradient(135deg,rgba(15,23,42,.98),rgba(30,41,59,.98));box-shadow:0 14px 38px rgba(0,0,0,.55),0 0 24px rgba(59,130,246,.22);pointer-events:none;opacity:0}
+#coachShow.show{display:flex;animation:coachShowIn .48s cubic-bezier(.2,.85,.25,1) forwards}
+#coachShow .coach-show-orbit{width:34px;height:34px;flex:0 0 34px;border-radius:50%;border:2px solid rgba(147,197,253,.35);display:grid;place-items:center;position:relative}
+#coachShow .coach-show-orbit:before{content:"";width:10px;height:10px;border-radius:50%;background:#60a5fa;box-shadow:0 0 13px #60a5fa;animation:coachCorePulse 1.25s ease-in-out infinite}
+#coachShow .coach-show-copy{min-width:0;display:flex;flex-direction:column;gap:3px;flex:1}
+#coachShowKicker{font-size:8px;font-weight:800;letter-spacing:.16em;color:#93c5fd}
+#coachShowTitle{font-size:12px;font-weight:900;letter-spacing:.04em;color:#f8fafc}
+#coachShowBody{font-size:10px;line-height:1.4;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#coachShowMarket{font-size:9px;font-weight:800;letter-spacing:.06em;color:#bfdbfe;border:1px solid rgba(147,197,253,.35);border-radius:6px;padding:4px 6px}
+@keyframes coachShowIn{0%{opacity:0;transform:translateY(-18px) scale(.96);filter:blur(3px)}65%{opacity:1;transform:translateY(3px) scale(1.01);filter:blur(0)}100%{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes coachCorePulse{0%,100%{transform:scale(.8);opacity:.75}50%{transform:scale(1.25);opacity:1}}
+@media(prefers-reduced-motion:reduce){#coachShow.show,#coachShow .coach-show-orbit:before{animation:none}}
+
 /* ── WINDOW ACTIONS ─────────────── */
 #windowActions{display:flex;gap:5px}
 #windowActions button{flex:1;padding:5px;border-radius:5px;border:1px solid #2d3748;
@@ -384,6 +398,15 @@ body.win{width:100vw;min-width:unset;height:100vh;max-height:100vh}
 <!-- ALERT BANNER -->
 <div id="alertBanner" style="display:none;padding:7px 12px;text-align:center;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;flex-shrink:0">
   <span id="alertText"></span>
+</div>
+<div id="coachShow" role="status" aria-live="polite" aria-atomic="true">
+  <div class="coach-show-orbit" aria-hidden="true"></div>
+  <div class="coach-show-copy">
+    <span id="coachShowKicker">ALIGN COACH • LIVE</span>
+    <strong id="coachShowTitle">ANALYSE ACTUALISÉE</strong>
+    <span id="coachShowBody"></span>
+  </div>
+  <span id="coachShowMarket">LIVE</span>
 </div>
 <!-- STICKY HEADER -->
 <div id="stickyHead">
