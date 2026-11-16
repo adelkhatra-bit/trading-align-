@@ -152,7 +152,7 @@ class EvenementsPine(unittest.TestCase):
 
     def test_confirmation_not_repeated_when_zone_moves(self):
         """Cas réel 12/11 : « CONFIRMATION SHORT » 16:16, 16:30, 16:47 (zone recalculée). Une seule par période, même sens."""
-        etat, r = {}, self.r(dirPlan=1, strat="DAY", dirs=[1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0])
+        etat, r = {}, self.r(dirPlan=1, strat="DAY", dirs=[1, 1, 1, 1, 1, 0, 0, 1, 0, 1, 0])
         r["b5"][-3] = dict(r["b5"][-3], c=98.5); r["b5"][-2] = dict(r["b5"][-2], c=99.6)
         self.assertEqual(self.kinds(self.lance(etat, "GOLD", r)), ["confirmation"])
         r2 = self.r(dirPlan=1, strat="DAY", dirs=r["dirs"])
