@@ -10,27 +10,33 @@ import align_bot as ab
 
 class TelegramOptIn(unittest.TestCase):
     def test_aucun_message_prive_sans_activation_coach(self):
-        etat = {"auto": {}, "marches_par_chat": {"10": ["GOLD"], "20": ["NASDAQ"]}, "bot_off": []}
+        etat = {"auto": {}, "coach_optin": {}, "marches_par_chat": {"10": ["GOLD"], "20": ["NASDAQ"]}, "bot_off": []}
         self.assertEqual(ab.destinataires_message(etat, ["10", "20"], "🥇 GOLD\nTP1 : 3900"), [])
         self.assertFalse(ab.coach_abonne(etat, "10", "GOLD"))
 
     def test_un_seul_marche_choisi_et_active_recoit_ses_alertes(self):
-        etat = {"auto": {"GOLD": ["10"], "NASDAQ": ["20"]},
+        etat = {"auto": {}, "coach_optin": {"GOLD": ["10"], "NASDAQ": ["20"]},
                 "marches_par_chat": {"10": ["GOLD"], "20": ["NASDAQ"], "30": ["GOLD"]}, "bot_off": []}
         self.assertEqual(ab.destinataires_message(etat, ["10", "20", "30"], "🥇 GOLD\nTP1 : 3900"), ["10"])
         self.assertEqual(ab.destinataires_message(etat, ["10", "20", "30"], "💠 NASDAQ\nTP1 : 22000"), ["20"])
 
     def test_chaine_publique_conserve_son_flux_et_prives_restent_optin(self):
-        etat = {"canal": "-100", "auto": {"GOLD": ["10"]},
+        etat = {"canal": "-100", "auto": {}, "coach_optin": {"GOLD": ["10"]},
                 "marches_par_chat": {"10": ["GOLD"], "20": ["GOLD"]}, "bot_off": []}
         self.assertEqual(ab.destinataires_message(etat, ["10", "20", "-100"], "🥇 GOLD\nTP1 : 3900"), ["-100", "10"])
 
+    def test_file_auto_a_usage_unique_ne_vaut_pas_optin_persistant(self):
+        etat = {"auto": {"GOLD": ["10"]}, "coach_optin": {},
+                "marches_par_chat": {"10": ["GOLD"]}, "bot_off": []}
+        self.assertFalse(ab.coach_abonne(etat, "10", "GOLD"))
+        self.assertEqual(ab.destinataires_message(etat, ["10"], "🥇 GOLD\\nTP1 : 3900"), [])
+
     def test_arret_bot_coupe_immediatement_le_flux_prive(self):
-        etat = {"auto": {"GOLD": ["10"]}, "marches_par_chat": {"10": ["GOLD"]}, "bot_off": ["10"]}
+        etat = {"auto": {}, "coach_optin": {"GOLD": ["10"]}, "marches_par_chat": {"10": ["GOLD"]}, "bot_off": ["10"]}
         self.assertEqual(ab.destinataires_message(etat, ["10"], "🥇 GOLD\nTP1 : 3900"), [])
 
     def test_prospects_et_rappels_gratuits_sont_silencieux_sans_optin(self):
-        etat = {"prospects": ["10", "11"], "auto": {}, "bot_off": []}
+        etat = {"prospects": ["10", "11"], "auto": {}, "coach_optin": {}, "bot_off": []}
         self.assertEqual(ab.destinataires_gratuits(etat), [])
         with mock.patch.object(ab, "TOKEN", "test"), mock.patch.object(ab, "telegram") as tg:
             ab.envoyer_prospects(etat, "🥇 GOLD - LONG\nEntrée 3900\nTP1 3920", True)
@@ -38,7 +44,7 @@ class TelegramOptIn(unittest.TestCase):
         tg.assert_not_called()
 
     def test_veille_cloture_ancienne_est_retiree_si_plus_optin(self):
-        etat = {"auto": {}, "marches_par_chat": {"10": ["GOLD"]},
+        etat = {"auto": {}, "coach_optin": {}, "marches_par_chat": {"10": ["GOLD"]},
                 "veille_cloture": {"GOLD": {"10": {"tf": "15 min", "dernier_t": 0}}}}
         with mock.patch.object(ab, "_envoi_sur") as send:
             ab.notifier_clotures(etat, "GOLD", {}, {})
@@ -46,7 +52,7 @@ class TelegramOptIn(unittest.TestCase):
         send.assert_not_called()
 
     def test_jauge_ne_cree_aucun_message_sans_optin(self):
-        etat = {"auto": {}, "marches_par_chat": {"10": ["GOLD"]}}
+        etat = {"auto": {}, "coach_optin": {}, "marches_par_chat": {"10": ["GOLD"]}}
         with mock.patch.object(ab, "telegram") as tg:
             ab.maj_jauge(etat, "GOLD", {"m1": [{"c": 3900}], "confirme": 0}, {}, {"10"})
         tg.assert_not_called()
