@@ -52,6 +52,7 @@ class LiveTikTok(unittest.TestCase):
         self.assertFalse(any("Telegram" in x for x in self.publie))
 
     def test_proprio_lance_le_live_et_tout_le_monde_est_prevenu(self):
+        self.etat.setdefault("auto", {}).update({"GOLD": ["2"], "BTC": ["3"]})
         ab.live_callback(self.etat, {"2"}, {"id": "x"}, "liveon", "x", "1")
         self.assertTrue(self.etat["live_on"])
         dest = {cid for cid, _ in self.envoye}
