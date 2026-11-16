@@ -2463,10 +2463,14 @@ class TestTradingViewReportRegression(unittest.TestCase):
     def test_installer_menu_refreshes_existing_version_four_users(self):
         from unittest.mock import patch
         state = {"menu": 4}
-        with patch.object(align_bot, "telegram", return_value={"ok": True}) as api:
+        calls = []
+        def telegram_ok(method, **kwargs):
+            calls.append((method, kwargs))
+            return {"ok": True}
+        with patch.dict(align_bot.installer_menu.__globals__, {"telegram": telegram_ok}):
             align_bot.installer_menu(state)
         self.assertEqual(state["menu"], 12)
-        self.assertTrue(any(call.args[0] == "setMyCommands" for call in api.call_args_list))
+        self.assertEqual(len([method for method, _ in calls if method == "setMyCommands"]), 2)
 
 class TestOneTapMarketAnalysis(unittest.TestCase):
     def test_analysis_button_asks_market_and_gold_choice_returns_only_gold_request(self):
@@ -2605,12 +2609,16 @@ class TestTelegramSimpleAnalysisLayout(unittest.TestCase):
     def test_telegram_command_menu_has_one_analysis_entry_not_separate_btc_gold_entries(self):
         from unittest.mock import patch
         import json
-        with patch.object(align_bot, "telegram", return_value={"ok": True}) as tg:
+        calls = []
+        def telegram_ok(method, **kwargs):
+            calls.append((method, kwargs))
+            return {"ok": True}
+        with patch.dict(align_bot.installer_menu.__globals__, {"telegram": telegram_ok}):
             align_bot.installer_menu({})
-        calls = [c for c in tg.call_args_list if c.args and c.args[0] == "setMyCommands"]
-        self.assertEqual(len(calls), 2)
-        for call in calls:
-            commands = json.loads(call.kwargs["commands"])
+        command_calls = [(method, kwargs) for method, kwargs in calls if method == "setMyCommands"]
+        self.assertEqual(len(command_calls), 2)
+        for _, kwargs in command_calls:
+            commands = json.loads(kwargs["commands"])
             names = [c["command"] for c in commands]
             self.assertIn("faire_analyse", names)
             self.assertNotIn("analyse_btc", names)
