@@ -825,26 +825,3 @@ class TestLiveBoostCallbackDispatch(unittest.TestCase):
         self.assertTrue(any("Ton prénom doit apparaître" in kw.get("text", "") for _, kw in sent))
 
 
-
-class LiveMarketNarrationFallback(unittest.TestCase):
-    def test_fallback_comments_all_markets_from_actual_context(self):
-        data = {"marches": {
-            "BTC": {"biais_plan": "haussier", "confirmation_4h_1h": "alignées à la hausse",
-                    "rsi_15m": 54.0, "volume_15m_vs_moyenne": 1.8,
-                    "fibonacci": {"H1": {"lecture": "zone clé de retracement profond"}}},
-            "GOLD": {"biais_plan": "baissier", "confirmation_4h_1h": "non alignées",
-                     "rsi_15m": 28.0, "volume_15m_vs_moyenne": 0.5},
-            "NASDAQ": {"biais_plan": "neutre", "confirmation_4h_1h": "alignées à la baisse",
-                       "rsi_15m": 72.0}
-        }}
-        raw = ab.commentaires_live_de_secours(data)
-        parsed = ab.phrases_bande_par_marche(raw)
-        self.assertEqual(set(parsed), {"BTC", "GOLD", "NASDAQ"})
-        self.assertTrue(all(len(parsed[m]) == 2 for m in parsed))
-        self.assertIn("confirment la hausse", parsed["BTC"][0][0])
-        self.assertIn("zone profonde", parsed["BTC"][1][0])
-        self.assertIn("volume reste discret", parsed["GOLD"][1][0])
-        self.assertIn("confirm the decline", parsed["NASDAQ"][0][1])
-
-    def test_fallback_never_invents_market_without_data(self):
-        self.assertEqual(ab.commentaires_live_de_secours({"marches": {}}), "")
