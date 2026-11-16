@@ -41,6 +41,16 @@ class TelegramOptIn(unittest.TestCase):
         self.assertFalse(ab.coach_abonne(etat, "10", "GOLD"))
         self.assertTrue(ab.coach_abonne(etat, "10", "NASDAQ"))
 
+    def test_desactivation_coach_efface_abonnement_et_alertes_en_attente(self):
+        etat = {"coach_optin": {"GOLD": ["10"]}, "auto": {"GOLD": ["10"]},
+                "veille_cloture": {"GOLD": {"10": {"tf": "15 min"}}},
+                "coach_live": {"GOLD": ["10"]}}
+        ab.activer_coach_optin(etat, "10", "GOLD", False)
+        self.assertFalse(ab.coach_abonne(etat, "10", "GOLD"))
+        self.assertEqual(etat["auto"]["GOLD"], [])
+        self.assertEqual(etat["veille_cloture"]["GOLD"], {})
+        self.assertEqual(etat["coach_live"]["GOLD"], [])
+
     def test_bot_off_bloque_l_auto_entree_sans_effacer_le_coach_valide(self):
         etat = {"auto": {}, "coach_optin": {"GOLD": ["10"]}, "marches_par_chat": {"10": ["GOLD"]}, "bot_off": ["10"]}
         self.assertTrue(ab.coach_abonne(etat, "10", "GOLD"))  # OFF bloque les entrées automatiques, pas le coach demandé
