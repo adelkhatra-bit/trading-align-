@@ -3104,18 +3104,12 @@ def selectionner_coach_optin(etat, cid, marches):
 
 
 def coach_abonne(etat, cid, m):
-    """Opt-in persistant ; migre les anciennes validations explicites auto / veille."""
+    """Opt-in persistant strict : seule l'activation explicite du Coach pour ce marché autorise les pushs."""
     cid = str(cid)
+    if not bot_on(etat, cid):
+        return False
     optins = {str(x) for x in (etat.get("coach_optin") or {}).get(m, [])}
-    if cid in optins:
-        return True
-    # Compatibilité : auto[m] et veille_cloture[m] n'étaient créés qu'après un clic explicite.
-    legacy_auto = cid in {str(x) for x in (etat.get("auto") or {}).get(m, [])}
-    legacy_veille = cid in {str(x) for x in (etat.get("veille_cloture") or {}).get(m, {})}
-    if legacy_auto or legacy_veille:
-        activer_coach_optin(etat, cid, m, True)
-        return True
-    return False
+    return cid in optins
 
 
 def destinataires_gratuits(etat):
