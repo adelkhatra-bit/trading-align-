@@ -60,6 +60,25 @@ class DirectionSafety(unittest.TestCase):
         _, reason_btc = ab._sniper({"market": "BTC", "dirPlan": 1, "dirs": [0,0,0,0,0,0,0,1,0,0,0]})
         self.assertNotIn("CONFLUENCE_H1_H4", reason_btc)
 
+    def test_every_gold_nasdaq_strategy_requires_h1_and_h4_same_direction(self):
+        for market in ("GOLD", "NASDAQ"):
+            for h1, h4 in ((1, 0), (0, 1), (-1, -1), (1, -1), (-1, 1)):
+                dirs = [1, 1, 1, 0, 1, 0, 0, h1, 0, h4, 1]
+                strat, status, reason = ab.strategie_alignement(dirs, 1, 1, market)
+                self.assertEqual(strat, "")
+                self.assertEqual(status, "EN ATTENTE")
+                self.assertIn("H4 et H1", reason)
+            dirs = [1, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1]
+            strat, status, _ = ab.strategie_alignement(dirs, 1, 1, market)
+            self.assertEqual(strat, "SWING")
+            self.assertEqual(status, "CONFIRMÉ")
+
+    def test_btc_keeps_its_existing_scalping_rule(self):
+        dirs = [1, 1, 1, 0, 1, 0, 0, 0, 0, -1, 0]
+        strat, status, _ = ab.strategie_alignement(dirs, 1, 0, "BTC")
+        self.assertEqual(strat, "SCALPING")
+        self.assertEqual(status, "CONFIRMÉ")
+
     def test_gold_nasdaq_climax_is_watch_only_without_h1_h4_confluence(self):
         bars = [candle(i * 900) for i in range(80)]
         bars[-2] = candle(78 * 900, o=100, h=102, l=97, c=101, v=500)
