@@ -27,6 +27,14 @@ class TelegramOptIn(unittest.TestCase):
         self.assertEqual(ab.destinataires_message(state, {"123"}, "💠 NASDAQ — COACH"), ["123"])
         self.assertEqual(ab.destinataires_message(state, {"123"}, "🥇 GOLD — COACH"), [])
 
+    def test_coach_live_does_not_enroll_user_into_automatic_positions(self):
+        state = {"coach_live": {"GOLD": {"123": {"expire": 9999999999}}}}
+        trade = {"d": 1, "e": 4000, "sl": 3990, "tp1": 4020, "tp2": 4050}
+        with patch.object(ab, "_envoi_sur"):
+            ab.entrer_inscrits(state, "GOLD", trade, ["123"])
+        self.assertNotIn("123", trade.get("qui", {}))
+        self.assertFalse(ab.bot_on(state, "123"))
+
     def test_global_channel_still_receives_publication_without_private_push(self):
         state = {"canal": "-100", "marches_par_chat": {"123": "GOLD"}}
         self.assertEqual(ab.destinataires_message(state, {"123"}, "🥇 GOLD — SIGNAL"), ["-100"])
@@ -78,11 +86,11 @@ class TelegramOptIn(unittest.TestCase):
         for market, direction, entry, stop, tp1, tp2, side in cases:
             trade = {"d": direction, "e": entry, "sl": stop, "tp1": tp1, "tp2": tp2, "sl_ut": "5 min"}
             r = {"m1": [{"c": entry, "h": entry + 1, "l": entry - 1}], "macro_data": {}, "niveaux": []}
-            with patch.object(ab, "niveaux_rs", return_value=(None, None)), \\
-                 patch.object(ab, "pips_txt", return_value="10 points"), \\
-                 patch.object(ab, "coach_fvg", return_value=[]), \\
-                 patch.object(ab, "dxy_court", return_value="neutre"), \\
-                 patch.object(ab, "news_prochaine_courte", return_value="aucune"), \\
+            with patch.object(ab, "niveaux_rs", return_value=(None, None)), \
+                 patch.object(ab, "pips_txt", return_value="10 points"), \
+                 patch.object(ab, "coach_fvg", return_value=[]), \
+                 patch.object(ab, "dxy_court", return_value="neutre"), \
+                 patch.object(ab, "news_prochaine_courte", return_value="aucune"), \
                  patch.object(ab, "statut_sys", return_value="SYSTÈME OK"):
                 text = ab.carte_coach(market, r, {}, "signal", tr=trade, etat={})
             self.assertIn(f"{market} - {side}", text)
@@ -90,8 +98,35 @@ class TelegramOptIn(unittest.TestCase):
                 self.assertIn(label, text)
             self.assertIn("ENTRER", text)
 
+    def test_sniper_telegram_alert_is_possible_entry_and_names_both_targets(self):
+        event = {"kind": "sniper", "m": "GOLD", "ic": "🥇", "ordre": "SHORT",
+                 "za": "4000", "zb": "4010", "sl": "4020", "tp1": "3980", "tp": "3960",
+                 "ut": "5 min", "rejets": "2", "rr": "2,0", "rrp": "3,0"}
+        with patch.object(ab, "_tournante", return_value=0):
+            fr = "\\n".join(ab.texte_pine({}, event, False))
+            en = "\\n".join(ab.texte_pine({}, event, True))
+        self.assertIn("ZONE D'ENTRÉE POSSIBLE", fr)
+        self.assertIn("SHORT", fr)
+        self.assertIn("TP1 3980", fr)
+        self.assertIn("TP2 3960", fr)
+        self.assertIn("POSSIBLE ENTRY ZONE", en)
+        self.assertIn("TP2 3960", en)
+
+    def test_nasdaq_execution_card_uses_nasdaq_symbol_and_shows_tp2(self):
+        trade = {"d": 1, "e": 20000.0, "sl": 19980.0, "tp1": 20030.0, "tp2": 20070.0,
+                 "rr": 1.5, "strat": "DAY", "za": 20000.0, "zb": 20000.0,
+                 "src": "cassure 5 min", "niveau": 20010.0, "sl_ut": "5 min",
+                 "n1": "résistance 1h", "n2": "résistance 4h"}
+        with patch.object(ab, "meche_sl", return_value="sous la mèche"), \\
+             patch.object(ab, "duree_txt", return_value="Durée estimée : quelques heures"):
+            text = ab.fmt_trade("NASDAQ", trade, 20005.0)
+        self.assertIn("NASDAQ 100 / US100", text)
+        self.assertIn("TP1 20030", text)
+        self.assertIn("TP2 20070", text)
+        self.assertIn("on laisse courir", text)
+
     def test_no_telegram_fibonacci_push_function_remains(self):
-        self.assertFalse(hasattr(ab, "fibo_zones"))
+        self.assertFalse(hasattr(ab, "fibo_zones"))\n        self.assertTrue(hasattr(ab, "progression_fibonacci_live"))
 
 
 if __name__ == "__main__":
