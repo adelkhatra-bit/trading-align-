@@ -174,7 +174,8 @@ class Modele3Ouverture(unittest.TestCase):
         msgs = ab.messages_ouverture(self.etat(), ev, derniers, T, True)
         self.assertEqual([m for m, _ in msgs], ["GOLD", "BTC"])                              # NASDAQ non concerné par Londres
         self.assertIn("⚡ Compression : explosion possible", dict(msgs)["BTC"])
-        envois, etat = [], {"marches_par_chat": {"adel": ["GOLD", "NASDAQ"], "btc": ["BTC"], "tous": ["BTC", "GOLD", "NASDAQ"]}}
+        envois, etat = [], {"marches_par_chat": {"adel": ["GOLD", "NASDAQ"], "btc": ["BTC"], "tous": ["BTC", "GOLD", "NASDAQ"]},
+                          "auto": {"GOLD": ["adel", "tous"], "BTC": ["btc", "tous"], "NASDAQ": ["adel", "tous"]}}
         with patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append((c, k["text"]))):
             ab.diffuser_messages(etat, {"adel", "btc", "tous"}, msgs)
         recu = {}
@@ -190,7 +191,7 @@ class Modele3Ouverture(unittest.TestCase):
         envois = []
         with patch.object(ab, "TOKEN", "x"), patch.object(ab, "evenements_sessions", return_value=[ev]), patch.object(ab, "evenements_pine", return_value=[]), \
              patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append((c, k["text"]))), patch.object(ab, "destinataires_gratuits", return_value=[]):
-            ab.alertes_courtes({}, {"vip"}, {"GOLD": self.r(), "BTC": self.r(73000.0)}, T)
+            ab.alertes_courtes({"auto": {"GOLD": ["vip"], "BTC": ["vip"]}}, {"vip"}, {"GOLD": self.r(), "BTC": self.r(73000.0)}, T)
         self.assertEqual(len(envois), 1)                                                     # GOLD + BTC regroupés en un seul message
         self.assertTrue(envois[0][1].startswith("🔔 OUVERTURE MARCHÉ : LONDRES"))
         self.assertIn("🥇 GOLD", envois[0][1]); self.assertIn("🟠 BTC", envois[0][1])
@@ -200,7 +201,7 @@ class Modele3Ouverture(unittest.TestCase):
         envois = []
         with patch.object(ab, "TOKEN", "x"), patch.object(ab, "evenements_sessions", return_value=[ev]), patch.object(ab, "evenements_pine", return_value=[]), \
              patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append((c, k["text"]))), patch.object(ab, "destinataires_gratuits", return_value=[]):
-            ab.alertes_courtes({}, {"vip"}, {}, T)
+            ab.alertes_courtes({"auto": {"GOLD": ["vip"], "BTC": ["vip"]}}, {"vip"}, {}, T)
         self.assertEqual(len(envois), 1)                                                     # l'alerte de session n'est jamais perdue
 
     def test_traduction_anglaise(self):
