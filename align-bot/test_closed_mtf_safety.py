@@ -93,6 +93,35 @@ class ClosedMtfSafety(unittest.TestCase):
             self.assertEqual(ab.direction_plan_autorisee(market, 1, aligned, stale), 0)
         self.assertEqual(ab.direction_plan_autorisee("BTC", 1, [0] * 11, {}), 1)
 
+    def test_tradingview_bridge_conflict_hides_gold_plan_and_markers(self):
+        base = {
+            "market": "GOLD", "dirs": [1] * 11, "dirs_cloturees": [1] * 11,
+            "dirPlan": 1, "confirme": 1, "strat": "SWING",
+            "zone_pine": {"za": 99.0, "zb": 101.0, "zmil": 100.0},
+            "sigHaut": True, "sigBas": False, "nom": "ACHAT",
+            "m1": [{"t": int(time.time()) - 10, "c": 100.0}],
+        }
+        bridge = {
+            "available": True, "activeTimeframe": "M5",
+            "snapshots": {"M5": {"fresh": True, "robotV12": {
+                "lecture_5m": "SHORT", "lecture_15m": "LONG", "lecture_60m": "LONG"
+            }}}
+        }
+        with unittest.mock.patch.object(ab, "analyser", return_value=base), \
+             unittest.mock.patch.object(ab, "fetch_tv_mtf", return_value=bridge), \
+             unittest.mock.patch.object(ab, "entree_sniper", return_value=None), \
+             unittest.mock.patch.object(ab, "tendance_armee"), \
+             unittest.mock.patch.object(ab, "annonce_proche", return_value=False), \
+             unittest.mock.patch.object(ab, "news_txt", return_value=""), \
+             unittest.mock.patch.object(ab, "contexte_macro", return_value=""):
+            result = ab.analyse_marche({}, "XAUUSD")
+        self.assertEqual(result["dirPlan"], 0)
+        self.assertEqual(result["confirme"], 0)
+        self.assertEqual(result["strat"], "")
+        self.assertIsNone(result["zone_pine"])
+        self.assertFalse(result["sigHaut"])
+        self.assertFalse(result["sigBas"])
+
     def test_gold_nasdaq_verdict_names_m5_m15_conflict_instead_of_blame_h1(self):
         now = int(time.time())
         ctx = fresh_context(now)
