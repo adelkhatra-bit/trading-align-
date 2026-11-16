@@ -18,8 +18,8 @@ class PineTp2Display(unittest.TestCase):
         base = (ROOT / "ALIGN_MTF_PRO_v24.pine").read_text(encoding="utf-8")
         proposal = (ROOT / "ALIGN_MTF_PRO_v24_4_PROPOSITION.pine").read_text(encoding="utf-8")
         expected = base.replace(
-            "//@version=6\\n",
-            "//@version=6\\n// PROPOSITION v24.4 — TP1 / TP2 visibles dès qu'un plan LONG / SHORT valide existe. NON PUBLIÉE.\\n",
+            "//@version=6\n",
+            "//@version=6\n// PROPOSITION v24.4 — TP1 / TP2 visibles dès qu'un plan LONG / SHORT valide existe. NON PUBLIÉE.\n",
             1,
         )
         replacements = (
@@ -28,8 +28,8 @@ class PineTp2Display(unittest.TestCase):
                 'voirTP2  = input.bool(true, "Afficher TP1 et TP2 sur le graphique", group=grpX)',
             ),
             (
-                "    if voirTP2 and tp1Ok\\n",
-                "    if voirTP2 and dirPlan != 0 and not na(tp1M) and not na(tp2M)\\n",
+                "    if voirTP2 and tp1Ok\n",
+                "    if voirTP2 and dirPlan != 0 and not na(tp1M) and not na(tp2M)\n",
             ),
             (
                 'eTk1 := label.new(bar_index + 12, tp1M, "✅ TP1 touché • SL à BE", style=label.style_label_left, color=color.new(color.lime, 10), textcolor=color.black, size=size.small)',
