@@ -2537,7 +2537,7 @@ class TestFollowPositionMarketChoice(unittest.TestCase):
         state = {
             "auto": {"BTC": [], "GOLD": ["101"]},
             "veille_cloture": {"GOLD": {"101": {"multi": True}}},
-            "marches_par_chat": {"101": "BOTH"}
+            "marches_par_chat": {"101": "BOTH", "202": ["BTC"]}
         }
         update = {"update_id": 99001, "callback_query": {
             "id": "follow-btc", "data": "followmarket:BTC",
