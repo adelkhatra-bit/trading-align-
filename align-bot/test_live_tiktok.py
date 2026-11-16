@@ -98,6 +98,11 @@ class LiveTikTok(unittest.TestCase):
         bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
         self.assertNotIn("sur Telegram", bande)
 
+    def test_position_confirmee_declenche_spectacle_visuel(self):
+        bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
+        self.assertIn("if (/POSITION ALIGN CONFIRMÉE|ENTRE EN POSITION/i.test(txt)) { feuArtifice(", bande)
+        self.assertIn("POSITION ALIGN CONFIRMÉE/i.test(txt))", bande)
+
     def test_boost_refuse_si_ecran_live_deconnecte(self):
         self.etat["live_on"] = True
         self.etat["live_screen_seen_t"] = __import__("time").time() - 120
