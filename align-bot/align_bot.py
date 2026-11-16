@@ -3826,7 +3826,7 @@ def resume_volume(bars, provenance, timeframe_sec=0, now_ts=None):
 def donnees_ia(m, r, cle):
     titre, raison = verdict(r, cle)
     o = (cle or {}).get("ordre") or {}
-    dirs = r.get("dirs") or [0] * 11
+    dirs = ((r.get("dirs_cloturees") or r.get("dirs")) if m in ("GOLD", "NASDAQ") else r.get("dirs")) or [0] * 11
     rsis = r.get("rsis") or [50] * 11
     data = {"marché": m, "prix": round(r["m1"][-1]["c"], 2),
             "sens 1m/5m/15m/1h/4h/Daily": [dirs[i] if len(dirs) > i else 0 for i in (0, 2, 4, 7, 9, 10)],
@@ -5342,7 +5342,7 @@ def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
         lecture = "👁 Le marché hésite 🤏"
     d = r.get("confirme") or 0
     tr = cle.get("trade")
-    dirs = r.get("dirs") or [0] * 11
+    dirs = ((r.get("dirs_cloturees") or r.get("dirs")) if m in ("GOLD", "NASDAQ") else r.get("dirs")) or [0] * 11
     idx = [i for i in (0, 1, 2, 4, 7, 9, 10) if i < len(dirs)]
     bas, haut = sum(1 for i in idx if dirs[i] == -1), sum(1 for i in idx if dirs[i] == 1)
     if bas > haut:
@@ -11109,13 +11109,27 @@ def contexte_technique_live(derniers):
         r = (derniers or {}).get(marche)
         if not isinstance(r, dict):
             continue
-        dirs = r.get("dirs") or []
+        dirs = ((r.get("dirs_cloturees") or r.get("dirs")) if marche in ("GOLD", "NASDAQ") else r.get("dirs")) or []
         sens = int(r.get("dirPlan") or r.get("sens") or 0)
         biais = {1: "haussier", -1: "baissier", 0: "neutre"}[1 if sens > 0 else -1 if sens < 0 else 0]
+        confirmation_complete = (
+            len(dirs) > 9 and dirs[2] == dirs[4] == dirs[7] == dirs[9] == 1
+        )
+        confirmation_complete_short = (
+            len(dirs) > 9 and dirs[2] == dirs[4] == dirs[7] == dirs[9] == -1
+        )
         contexte = {
             "biais_plan": biais,
             "confirmation_4h_1h": "alignées à la hausse" if len(dirs) > 9 and dirs[7] == dirs[9] == 1 else
                                   "alignées à la baisse" if len(dirs) > 9 and dirs[7] == dirs[9] == -1 else "non alignées",
+            "confirmation_m5_m15_h1_h4": "quatre clôtures alignées à la hausse" if confirmation_complete else
+                                         "quatre clôtures alignées à la baisse" if confirmation_complete_short else "quatre clôtures non alignées",
+            "lecture_mtf_cloturee": {
+                "M5": dirs[2] if len(dirs) > 2 else 0,
+                "M15": dirs[4] if len(dirs) > 4 else 0,
+                "H1": dirs[7] if len(dirs) > 7 else 0,
+                "H4": dirs[9] if len(dirs) > 9 else 0,
+            },
             "unites_haussieres_sur_11": sum(1 for d in dirs[:11] if d == 1),
             "unites_baissieres_sur_11": sum(1 for d in dirs[:11] if d == -1),
             "strategie": r.get("strat") or "aucune stratégie confirmée",
