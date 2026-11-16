@@ -963,6 +963,52 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertEqual(align_bot.traduire("📊 INDICATEURS PAR UNITÉ DE TEMPS"), "📊 TIMEFRAME INDICATORS")
         self.assertEqual(align_bot.traduire("📈 RSI PAR UNITÉ DE TEMPS"), "📈 RSI BY TIMEFRAME")
 
+    def test_telegram_pending_order_displays_entry_sl_tp1_and_tp2(self):
+        from unittest.mock import patch
+        r = {
+            "dirs": [1, 1, 1, 1, 1, 1, 1, 1, 0, 1, -1],
+            "rsis": [55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65],
+            "m1": [candle(1, c=67500.0)],
+            "confirme": 1, "posD": 0.55, "posW": 0.60,
+            "news": "Calendrier économique", "niv_cles": [], "asie": None,
+            "macro": [], "fvg": [], "atr": 100.0, "distrib": False, "accum": False,
+            "b5": [candle(i) for i in range(22)]
+        }
+        order = {"d": 1, "e": 67400.0, "sl": 67200.0, "tp1": 67800.0,
+                 "tp2": 68100.0, "za": 67350.0, "zb": 67450.0}
+        with patch.object(align_bot, "zone_txt", side_effect=lambda x: "milieu"), \
+             patch.object(align_bot, "strategie_mtf", return_value=["Tendance 4 h", "Confirmation 1 h"]), \
+             patch.object(align_bot, "verdict", return_value=("🟢 SETUP VALIDÉ", "Attendre la clôture 5 min.")), \
+             patch.object(align_bot, "ligne_cassure", return_value="Déclencheur : clôture 5 min"), \
+             patch.object(align_bot, "prochaine", return_value="Prochaine entrée : attendre le signal"):
+            message = align_bot.texte_etat("BTC", r, {"ordre": order})
+        self.assertIn("🎯 POINT VISÉ : 🟩 LONG", message)
+        self.assertIn("Entrée ≈ 67400", message)
+        self.assertIn("SL 67200", message)
+        self.assertIn("TP1 67800", message)
+        self.assertIn("TP2 68100", message)
+
+    def test_telegram_pending_order_does_not_invent_invalid_tp2(self):
+        from unittest.mock import patch
+        r = {
+            "dirs": [1, 1, 1, 1, 1, 1, 1, 1, 0, 1, -1],
+            "rsis": [55] * 11, "m1": [candle(1, c=67500.0)],
+            "confirme": 1, "posD": 0.55, "posW": 0.60,
+            "news": "Calendrier économique", "niv_cles": [], "asie": None,
+            "macro": [], "fvg": [], "atr": 100.0, "distrib": False, "accum": False,
+            "b5": [candle(i) for i in range(22)]
+        }
+        order = {"d": 1, "e": 67400.0, "sl": 67200.0, "tp1": 67800.0,
+                 "tp2": 67600.0, "za": 67350.0, "zb": 67450.0}
+        with patch.object(align_bot, "zone_txt", side_effect=lambda x: "milieu"), \
+             patch.object(align_bot, "strategie_mtf", return_value=["Tendance 4 h", "Confirmation 1 h"]), \
+             patch.object(align_bot, "verdict", return_value=("🟢 SETUP VALIDÉ", "Attendre la clôture 5 min.")), \
+             patch.object(align_bot, "ligne_cassure", return_value="Déclencheur : clôture 5 min"), \
+             patch.object(align_bot, "prochaine", return_value="Prochaine entrée : attendre le signal"):
+            message = align_bot.texte_etat("BTC", r, {"ordre": order})
+        self.assertIn("TP2 non disponible (plan incomplet)", message)
+        self.assertNotIn("TP2 67600", message)
+
     def test_multi_timeframe_strategy_uses_consistent_direction_colors(self):
         r = {"dirs": [1, 1, 1, 1, -1, 0, 0, -1, 0, 1, 0], "confirme": 0}
         message = "\\n".join(align_bot.strategie_mtf(r))
