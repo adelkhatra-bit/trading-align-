@@ -1969,7 +1969,7 @@ TRAD = {
 "📍 Repère prix   ≈": "📍 Price guide   ≈", "PRIX ACTUEL": "CURRENT PRICE", "ENTRÉE haut": "ENTRY top", "ENTRÉE bas": "ENTRY bottom", "ENTRÉE": "ENTRY",
 "Risque": "Risk", "Gain   ": "Reward ",
 "ℹ️ Ma position perso • pas un conseil • risque de perte": "ℹ️ My personal position • not advice • risk of loss",
-"📐 Zone = Fibonacci 50 → 78,6 % +": "📐 Zone = Fibonacci 50 → 78.6 % +",
+"📐 Zone = retracement technique +": "📐 Zone = technical retracement +",
 "est déjà parti": "has already moved", "😎 On ne court pas après le prix": "😎 We don't chase the price",
 ": alignement 15m / 1h / 4h perdu. Ordre annulé, j'attends.": ": 15m / 1h / 4h alignment lost. Order cancelled, waiting.",
 "aligné": "aligned", "sur 15m/1h/4h, MAIS prix": "on 15m/1h/4h, BUT price",
@@ -5274,11 +5274,12 @@ def accueil_liens(etat, cid, choix):
     selectionner_marches_suivi(etat, cid, marches)
     liens = {**LIENS_CHAINES, **(etat.get("liens_marche") or {})}
     boutons = [[{"text": f"{ICONE.get(mk, '')} Rejoindre ALIGN {mk}", "url": liens[mk]}] for mk in marches if liens.get(mk)]
-    boutons += [[{"text": f"🧑‍🏫 Coach {mk} : préviens-moi", "callback_data": f"auto:{mk}"}] for mk in marches]
+    boutons += [[{"text": f"🧑‍🏫 Activer le coach {mk}", "callback_data": f"auto:{mk}"}] for mk in marches]
     boutons.append([{"text": "🔴 Le live", "callback_data": "menulive:x"}])
-    _envoi_sur(cid, text="✅ C'EST PARTI\n━━━━━━━━━━━━━━━\n" + "\n".join(f"{ICONE.get(mk, '')} {mk} : suivi activé" for mk in marches)
-               + ("\n👇 Rejoins ta chaîne commentateur" if boutons else "") + "\n🔔 Active la cloche de la chaîne : tu ne rates rien"
-               + "\n━━━━━━━━━━━━━━━\n🎙 Chaîne = commentateur en direct\n🧑‍🏫 Ici = ton coach perso, positions, live",
+    _envoi_sur(cid, text="✅ MARCHÉS SÉLECTIONNÉS\n━━━━━━━━━━━━━━━\n" + "\n".join(f"{ICONE.get(mk, '')} {mk} : sélection enregistrée" for mk in marches)
+               + "\n🔕 Aucune alerte privée avant activation du coach pour le marché choisi."
+               + ("\n👇 Rejoins ta chaîne commentateur si tu souhaites aussi le live public." if liens else "")
+               + "\n━━━━━━━━━━━━━━━\n🧑‍🏫 Le coach privé ne suit que les marchés que tu actives.",
                **({"reply_markup": json.dumps({"inline_keyboard": boutons})} if boutons else {}))
 
 
@@ -6351,19 +6352,21 @@ def traiter(etat, chats, updates):
             if choix in ("coachlive", "coachstop") and mk in MARCHES:
                 activer_coach_live(etat, qui, mk, choix == "coachlive")
                 r_now = DERNIERS.get(mk)
+                texte_live = ""
                 if choix == "coachlive" and r_now and len(r_now.get("b15") or []) > 1:
                     try:
-                        _envoi_sur(qui, text=texte_coach_live(mk, r_now["b15"][-2], r_now, etat.get(mk, {}), positions_bot(etat)),
-                                   reply_markup=markup_analyse(etat, mk, r_now, qui))
+                        texte_live = "\n\n" + texte_coach_live(mk, r_now["b15"][-2], r_now, etat.get(mk, {}), positions_bot(etat))
                     except Exception as ex:
                         print("coach live immédiat", ex)
                 try:
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text=("🔴 Coach en direct activé" if choix == "coachlive" else "⏹ Coach en direct arrêté"))
                 except Exception:
                     pass
-                _envoi_sur(qui, text=(f"🎙 COACH COMMENTATEUR ACTIVÉ\n{ICONE.get(mk, '')} {mk}\n🕯 Je commente chaque clôture 15 min pendant 2 h\n"
-                                      "📺 Mets le live à côté : je t'explique ce qui se passe sur le graphique\n⏹ Pour m'arrêter : le bouton sous mes messages")
-                           if choix == "coachlive" else f"⏹ COACH EN DIRECT ARRÊTÉ — {ICONE.get(mk, '')} {mk}\n😴 Je ne t'envoie plus les clôtures")
+                message_coach = (f"🎙 COACH COMMENTATEUR ACTIVÉ — {ICONE.get(mk, '')} {mk}\n🕯 Une seule analyse à chaque clôture 15 min pendant 2 h."
+                                 "\n⏹ Pour arrêter : le bouton sous le message" + texte_live
+                                 if choix == "coachlive" else f"⏹ COACH EN DIRECT ARRÊTÉ — {ICONE.get(mk, '')} {mk}\n😴 Je ne t'envoie plus les clôtures")
+                _envoi_sur(qui, text=message_coach,
+                           **({"reply_markup": markup_analyse(etat, mk, r_now, qui)} if choix == "coachlive" and r_now else {}))
                 continue
             if choix == "auto" and mk in MARCHES:
                 # Le marché est déjà connu depuis le bouton de l'analyse : activation en un seul appui.
