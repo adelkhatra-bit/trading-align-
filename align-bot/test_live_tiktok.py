@@ -948,3 +948,18 @@ class LiveNarrationPrioritizesLiquiditySweep(unittest.TestCase):
         self.assertIn("reversal still needs confirmation", payload["GOLD"][1][1])
 
 
+
+
+class LiveClosedCandleContext(unittest.TestCase):
+    def test_context_uses_last_available_closed_m15_candle_for_sweep(self):
+        bars = []
+        for i in range(24):
+            bars.append({"t": i * 900, "o": 104.0, "h": 110.0, "l": 100.0, "c": 105.0, "v": 100.0})
+        bars.append({"t": 24 * 900, "o": 100.4, "h": 102.0, "l": 99.5, "c": 101.2, "v": 180.0})
+        latest = {
+            "b15_long": bars, "m1": [{"c": 101.2}], "atr": 2.0,
+            "dirs": [1] * 11, "dirPlan": 1, "niveaux": [], "rC": 54.0
+        }
+        context = ab.contexte_technique_live({"BTC": latest})
+        self.assertEqual(context["marches"]["BTC"]["surveillance_retournement"]["direction"], 1)
+        self.assertEqual(context["marches"]["BTC"]["surveillance_retournement"]["type"], "reprise_haussiere_apres_chasse")
