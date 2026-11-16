@@ -943,6 +943,8 @@ def _sniper(r):
     dirs, a3, a15, a5, zp = r.get("dirs") or [], r.get("atr3"), r.get("atr"), r.get("atr5") or r.get("atr"), r.get("zone_pine")
     m1, b3 = r.get("m1") or [], r.get("b3") or []
     b5, b15 = (r.get("b5") or [])[:-1], (r.get("b15") or [])[:-1]          # la dernière bougie M5 / M15 est en formation
+    if r.get("market") in ("GOLD", "NASDAQ") and len(dirs) >= 10 and (dirs[7] != d or dirs[9] != d):
+        return None, f"CONFLUENCE_H1_H4 refusée : {r.get('market')} exige H1 et H4 dans le même sens que le plan (H1={dirs[7]}, H4={dirs[9]}, plan={d})"
     if d not in (1, -1) or len(dirs) < 11 or not a3 or not a15 or not zp or len(m1) < 40 or len(b3) < 12 or len(b5) < 8 or len(b15) < 5:
         return None, f"DONNEES/PLAN absents (dirPlan={d}, zone={'oui' if zp else 'non'}, b3={len(b3)}, b5={len(b5)}, b15={len(b15)})"
     if (r["bull"] if d == 1 else r["bear"]) < MIN_ALIGN or r.get("sens") != d or dirs[9] == -d or dirs[7] == -d:
@@ -4012,7 +4014,8 @@ def entree_retest(m, r, cle):
         return None
     x = b[-1]
     for d in (1, -1):
-        if not (dirs[2] == d and dirs[4] == d and dirs[7] == d and dirs[9] != -d):
+        h4_ok = dirs[9] == d if m in ("GOLD", "NASDAQ") else dirs[9] != -d
+        if not (dirs[2] == d and dirs[4] == d and dirs[7] == d and h4_ok):
             continue
         avant = b[-26:-6]
         niveau = max(y["h"] for y in avant) if d == 1 else min(y["l"] for y in avant)
@@ -4044,6 +4047,7 @@ def radar_climax(m, r, cle):
     → position CONTRE-TENDANCE « prenable, risquée », SL sous la mèche du balayage ; le bot ne la prend pas lui-même.
     Une alerte par sens toutes les 2 h ; mémorise l'heure (radar_t) pour ne pas envoyer « FEINTE » juste après."""
     # 16/11 : le radar lisait « b15 » coupé à 30 bougies alors qu'il en faut 66 → il ne se déclenchait JAMAIS en réel (LONG raté).
+    dirs = r.get("dirs") or []
     b = (r.get("b15_long") or r.get("b15") or [])[:-1]  # la dernière est en formation
     if len(b) < 66:
         return None
@@ -4074,6 +4078,13 @@ def radar_climax(m, r, cle):
                 return None
             cle["radar_t"][str(sens)] = t
             cle["radar_dernier"] = t
+            if m in ("GOLD", "NASDAQ") and (len(dirs) < 10 or dirs[7] != sens or dirs[9] != sens):
+                h1_txt = "haussier" if len(dirs) > 7 and dirs[7] == 1 else "baissier" if len(dirs) > 7 and dirs[7] == -1 else "neutre"
+                h4_txt = "haussier" if len(dirs) > 9 and dirs[9] == 1 else "baissier" if len(dirs) > 9 and dirs[9] == -1 else "neutre"
+                return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\\n"
+                        f"Balayage et volume détectés, mais H1 est {h1_txt} et H4 {h4_txt}.\\n"
+                        "⛔ Pas de position contre le biais H1/H4 : aucune entrée ni aucun SL/TP à prendre.\\n"
+                        "⏳ J'attends que H1 et H4 confirment le même sens.")
             e = cl[-1]
             mot = "plus bas" if sens == 1 else "plus haut"
             return (f"🔄 RETOURNEMENT : {'LONG' if sens == 1 else 'SHORT'} prenable — {ICONE.get(m, '')} {m}\n"
@@ -4102,6 +4113,28 @@ def retournement_marche(m, r, cle):
     p = r["m1"][-1]["c"] if r.get("m1") else b15[-1]["c"]
     h1, l1 = max(x["h"] for x in b1[-6:]), min(x["l"] for x in b1[-6:])
     h4, l4 = max(x["h"] for x in b4[-6:]), min(x["l"] for x in b4[-6:])
+    if m in ("GOLD", "NASDAQ"):
+        sens_watch = 1 if d5 == 1 and d15 == 1 else -1 if d5 == -1 and d15 == -1 else 0
+        if not sens_watch or (m == "NASDAQ" and not vol_fort):
+            cle["rv_watch_sens"] = 0
+            return None
+        if (sens_watch == 1 and p >= h1) or (sens_watch == -1 and p <= l1):
+            cle["rv_watch_sens"] = 0
+            return None
+        if d60 == sens_watch and d240 == sens_watch:
+            cle["rv_watch_sens"] = 0
+            return None
+        if cle.get("rv_watch_sens") == sens_watch:
+            return None
+        cle["rv_watch_sens"] = sens_watch
+        sens_txt = "à la hausse" if sens_watch == 1 else "à la baisse"
+        h1_txt = "haussier" if d60 == 1 else "baissier" if d60 == -1 else "neutre"
+        h4_txt = "haussier" if d240 == 1 else "baissier" if d240 == -1 else "neutre"
+        return (f"👀 RETOURNEMENT EN OBSERVATION — {ICONE.get(m, '')} {m}\\n"
+                f"Les M5 et M15 se retournent {sens_txt}, mais H1 reste {h1_txt} et H4 {h4_txt}.\\n"
+                "⛔ PAS DE POSITION dans ce nouveau sens : aucune entrée, aucun SL/TP à prendre.\\n"
+                "⏳ J'attends la confirmation des clôtures H1 ET H4 dans le même sens, puis le déclencheur M5.\\n"
+                "ℹ️ Alerte de surveillance uniquement.")
     def ok(s):
         casc = d5 == s and d15 == s
         if m == "BTC":
@@ -6853,7 +6886,7 @@ def evenements_pine(etat, m, r, cle, now):
             f = lambda v: px(v)
             ev.append(dict(kind="sniper", **base, ordre="vente" if sn["d"] == -1 else "achat", za=f(sn["za"]), zb=f(sn["zb"]), sl=f(sn["sl"]), tp1=f(sn["tp1"]),
                            tp=f(sn["tp2"]), ut=sn["ut"], rejets="+".join(sn["rejets"]), rr=str(round(sn["rr"], 1)).replace(".", ","), rrp=str(round(sn["rr_plan"], 1)).replace(".", ",")))
-    if d and not cle.get("trade"):                       # ↩ SCALP INVERSE : une fois par niveau, 30 min mini (même règle que le sniper)
+    if d and not cle.get("trade") and m == "BTC":        # BTC seul : Gold/NASDAQ ne publient pas de position inverse
         try:
             si = scalp_inverse(r, d)
         except Exception:
@@ -9436,7 +9469,7 @@ def agent(m, r, cle, ferme):
     except Exception as ex:
         print("radar_climax", ex)
     try:
-        rv_ = retournement_marche(m, r, cle)          # v71 : retournement par marché (même règle que le graphique)
+        rv_ = retournement_marche(m, r, cle) if (not tr or m == "BTC") else None  # aucune alerte inverse Gold/NASDAQ pendant une position ouverte
         if rv_ and not (tr and tr.get("d") == (1 if "LONG" in rv_.split("\n")[0] else -1)):
             out.append(rv_)
     except Exception as ex:
@@ -11039,6 +11072,7 @@ def un_tour(etat, chats):
             recevoir_updates_telegram(etat, chats, demandes)
             if SHUTDOWN_REQUESTED.is_set():
                 return
+            r["market"] = nom_marche  # applique les confirmations H1/H4 spécifiques à GOLD/NASDAQ avant le SNIPER
             r["tv_indicator_mtf"] = fetch_tv_mtf(pair)
             fusionne_lectures_tradingview(r)
         except Exception as ex:
