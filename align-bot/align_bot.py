@@ -7981,6 +7981,10 @@ def valider_et_suivre_marches(etat, cid, user_id, message_id=None):
                    **({"reply_markup": bouton_payer(etat)} if etat.get("lien") else {}))
         return False
     choisis = [m for m in MARCHES if m in marches_choisis(etat, cid)]
+    if not choisis:
+        _envoi_sur(cid, text=("Select at least one market to follow." if anglais else
+                              "Coche au moins un marché pour activer les alertes."))
+        return False
     selectionner_marches_suivi(etat, cid, choisis)
     for m in choisis:
         inscrire_auto(etat, cid, m, notifier=False)
@@ -8003,9 +8007,10 @@ def basculer_marche(etat, cid, marche):
     selectionner_marches_suivi(etat, cid, sorted(actuels))
 
 def marches_choisis(etat, cid):
-    """Marchés cochés par la personne ; sans choix : tous les marchés."""
-    brut = etat.setdefault("marches_par_chat", {}).get(str(cid))
-    return _vers_ensemble(brut) or set(MARCHES)
+    """Marchés cochés par la personne ; anciens comptes sans préférence explicite conservent le réglage historique."""
+    preferences = etat.setdefault("marches_par_chat", {})
+    brut = preferences.get(str(cid))
+    return set(MARCHES) if brut is None else _vers_ensemble(brut)
 
 def marche_selection(etat, cid):
     """Compatibilité : « BTC », « GOLD », « BOTH » (BTC + GOLD) ou la liste des marchés cochés."""
@@ -8077,8 +8082,10 @@ def texte_suivi(etat, cid):
     return "\n".join(lignes)
 
 def menu_marches(etat, cid, message_id=None):
-    """Cases à cocher : chaque personne choisit ses marchés (ex. GOLD + NASDAQ, rien du BTC).
-    Avec message_id, le même menu est mis à jour sur place (pas de nouveau message à chaque case)."""
+    """Cases à cocher : les nouveaux abonnés choisissent explicitement leurs marchés; les anciens réglages restent inchangés."""
+    cid = str(cid)
+    if cid in {str(x) for x in etat.get("coach_pending", [])} and cid not in etat.setdefault("marches_par_chat", {}):
+        etat["marches_par_chat"][cid] = []  # opt-in explicite : aucun marché poussé par défaut aux nouveaux abonnés
     choisis = marches_choisis(etat, cid)
     anglais = str(cid) in LANG_EN
     tout = set(MARCHES) <= set(choisis)
@@ -8094,9 +8101,9 @@ def menu_marches(etat, cid, message_id=None):
              f"☑️ Cochés en ce moment : {coches}\n🔔 Tu reçois uniquement les marchés cochés\n"
              "📍 Le prix peut différer de quelques points selon ton broker : suis les bougies (mèches)")
     if str(cid) in {str(x) for x in etat.get("coach_pending", [])}:
-        texte += ("\n\nAll three markets are selected by default. Untick any market you do not want."
+        texte += ("\n\nNew subscribers start with no market selected. Tick only the markets you want alerts for."
                   if anglais else
-                  "\n\nPar défaut, BTC, GOLD et NASDAQ sont cochés. Décoche les marchés que tu ne souhaites pas suivre.")
+                  "\n\nAucun marché n'est suivi par défaut pour un nouvel abonné. Coche uniquement ceux pour lesquels tu souhaites recevoir des alertes.")
     clavier = json.dumps({"inline_keyboard": lignes})
     if message_id:
         try:
