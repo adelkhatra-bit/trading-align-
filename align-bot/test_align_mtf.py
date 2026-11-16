@@ -442,7 +442,7 @@ class AlignMtfRulesTest(unittest.TestCase):
 
     def test_multi_timeframe_watcher_retries_when_telegram_send_fails(self):
         from unittest.mock import patch
-        state = {"veille_cloture": {"GOLD": {"123": {
+        state = {"coach_optin": {"GOLD": ["123"]}, "veille_cloture": {"GOLD": {"123": {
             "multi": True, "derniers_t": {"5m": 300, "15m": 900, "1h": 3600, "4h": 14400},
             "expire": 999999
         }}}}
@@ -2548,7 +2548,7 @@ class TestFollowPositionMarketChoice(unittest.TestCase):
              patch.object(align_bot, "_envoi_sur"), patch.object(align_bot, "telegram"):
             align_bot.traiter(state, set(), [update])
         subscribe.assert_called_once_with(unittest.mock.ANY, "101", "BTC", notifier=False)
-        self.assertEqual(state["marches_par_chat"]["101"], "BTC")
+        self.assertEqual(state["marches_par_chat"]["101"], ["BTC"])
         self.assertNotIn("101", state["auto"]["GOLD"])
         self.assertNotIn("101", state["veille_cloture"]["GOLD"])
 
@@ -2966,7 +2966,7 @@ class TestTelegramMarketButtonsJourney(unittest.TestCase):
     def test_gold_only_never_receives_btc_and_both_receives_both(self):
         state = {}
         self._run(state, "followmarket:GOLD", 1)
-        self.assertEqual(state["marches_par_chat"]["501"], "GOLD")
+        self.assertEqual(state["marches_par_chat"]["501"], ["GOLD"])
         self.assertEqual(align_bot.destinataires_message(state, {"501"}, "🟠 BTC • LONG"), [])
         self.assertIn("501", align_bot.destinataires_message(state, {"501"}, "🥇 GOLD • SHORT"))
         self._run(state, "followmarket:BTC", 2)
@@ -2980,7 +2980,7 @@ class TestTelegramMarketButtonsJourney(unittest.TestCase):
         state = {}
         self._run(state, "followmarket:BOTH", 4)
         self._run(state, "auto:BTC", 5)
-        self.assertEqual(state["marches_par_chat"]["501"], "BOTH")
+        self.assertEqual(state["marches_par_chat"]["501"], ["BTC", "GOLD"])
         self.assertIn("501", align_bot.destinataires_message(state, {"501"}, "🥇 GOLD • SHORT"))
 
     def test_follow_confirmation_has_real_line_breaks(self):
