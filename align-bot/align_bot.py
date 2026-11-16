@@ -11163,6 +11163,43 @@ def progression_fibonacci_live(r, market=None):
     return resultat
 
 
+
+def detecter_chasse_liquidite(bars, atr_value):
+    """Détecte une fausse cassure clôturée d'un extrême récent, sans la transformer en signal d'entrée."""
+    b = [x for x in (bars or []) if isinstance(x, dict) and all(isinstance(x.get(k), (int, float)) for k in ("o", "h", "l", "c"))]
+    if len(b) < 22 or not isinstance(atr_value, (int, float)) or atr_value <= 0:
+        return None
+    precedente, x = b[-21:-1], b[-1]
+    support = min(y["l"] for y in precedente)
+    resistance = max(y["h"] for y in precedente)
+    corps = abs(x["c"] - x["o"])
+    meche_basse = min(x["o"], x["c"]) - x["l"]
+    meche_haute = x["h"] - max(x["o"], x["c"])
+    volume_ratio = None
+    volumes = [y.get("v") for y in precedente if isinstance(y.get("v"), (int, float)) and y.get("v") is not None]
+    if isinstance(x.get("v"), (int, float)) and x.get("v") is not None and len(volumes) >= 10:
+        moyenne = sum(volumes) / len(volumes)
+        if moyenne > 0:
+            volume_ratio = x["v"] / moyenne
+    div_baisse, div_hausse = divergence(b)
+    seuil = max(0.05 * atr_value, 1e-9)
+    balayage_bas = (
+        x["l"] < support - seuil and x["c"] > support and x["c"] > x["o"]
+        and meche_basse >= max(0.8 * corps, 0.08 * atr_value)
+    )
+    balayage_haut = (
+        x["h"] > resistance + seuil and x["c"] < resistance and x["c"] < x["o"]
+        and meche_haute >= max(0.8 * corps, 0.08 * atr_value)
+    )
+    if balayage_bas:
+        return {"direction": 1, "type": "reprise_haussiere_apres_chasse", "divergence_rsi": bool(div_hausse),
+                "volume_ratio": round(volume_ratio, 2) if volume_ratio is not None else None}
+    if balayage_haut:
+        return {"direction": -1, "type": "rejet_baissier_apres_chasse", "divergence_rsi": bool(div_baisse),
+                "volume_ratio": round(volume_ratio, 2) if volume_ratio is not None else None}
+    return None
+
+
 def contexte_technique_live(derniers):
     """Contexte factuel du commentateur IA, construit exclusivement depuis les analyses et bougies déjà chargées."""
     marches = {}
@@ -11204,6 +11241,9 @@ def contexte_technique_live(derniers):
         if marche in ("GOLD", "NASDAQ"):
             contexte["fibonacci"] = progression_fibonacci_live(r, marche)
         barres = (r.get("b15_long") or r.get("b15") or [])[:-1]
+        reversal = detecter_chasse_liquidite(barres, r.get("atr"))
+        if reversal:
+            contexte["surveillance_retournement"] = reversal
         volumes = [x.get("v") for x in barres[-41:] if isinstance(x.get("v"), (int, float)) and x.get("v") is not None]
         if len(volumes) >= 21:
             moyenne = sum(volumes[:-1]) / max(1, len(volumes) - 1)
@@ -11311,7 +11351,19 @@ def commentaires_live_de_secours(donnees):
             suite, suite_en = "Le prix approche une zone technique : observons sa réaction.", "Price is approaching a technical zone: let's watch its reaction."
         else:
             suite, suite_en = "Attendons une clôture claire avant de conclure.", "Let's wait for a clear close before drawing a conclusion."
-        fr2, en2 = f"{momentum} et {flux} ; {suite}", f"{momentum_en} and {flux_en}; {suite_en}"
+        reversal = c.get("surveillance_retournement") or {}
+        if reversal.get("direction") == 1:
+            fr2, en2 = (
+                "Les vendeurs ont balayé un support puis la clôture a repris au-dessus : possible chasse à la liquidité, mais le retournement doit encore être confirmé.",
+                "Sellers swept a support and the close reclaimed it: a possible liquidity grab, but the reversal still needs confirmation."
+            )
+        elif reversal.get("direction") == -1:
+            fr2, en2 = (
+                "Les acheteurs ont balayé une résistance puis la clôture est repassée dessous : possible piège haussier, mais le retournement doit encore être confirmé.",
+                "Buyers swept a resistance and the close fell back below: a possible bull trap, but the reversal still needs confirmation."
+            )
+        else:
+            fr2, en2 = f"{momentum} et {flux} ; {suite}", f"{momentum_en} and {flux_en}; {suite_en}"
         lignes.extend((f"{marche} | {fr1} | {en1}", f"{marche} | {fr2} | {en2}"))
     return "\n".join(lignes)
 
@@ -11334,7 +11386,9 @@ def live_phrases_ia(etat, maintenant, derniers=None):
         "Pour CHAQUE marché fourni, écris exactement 2 phrases courtes en français et leur traduction anglaise. "
         "Format exact : MARCHÉ | phrase française | phrase anglaise. "
         "Utilise les tendances multi-unités, la confirmation H4/H1, le RSI, le volume, les supports/résistances et surtout "
-        "la lecture du retracement Fibonacci M15/H1/H4 quand elle est disponible. "
+        "la lecture du retracement Fibonacci M15/H1/H4 quand elle est disponible, et les éventuelles chasses de liquidité "
+        "ou fausses cassures confirmées par une bougie clôturée. Distingue une baisse momentanée, un vrai breakdown "
+        "et une reprise haussière après balayage des stops ; ne confonds jamais une mèche avec une cassure confirmée. "
         "Si le prix est dans la zone Fibonacci 61,8–78,6 %, explique naturellement qu'il teste une zone de retracement profonde "
         "ou une zone technique importante ; ne récite jamais les chiffres. Si le retracement est léger, intermédiaire, dépassé "
         "ou absent, adapte exactement le commentaire. Relie le Fibonacci à la tendance et aux autres confirmations, ne le présente "
