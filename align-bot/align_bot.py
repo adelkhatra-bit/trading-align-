@@ -5925,16 +5925,22 @@ def capturer_snapshot_audit(etat, m, r, cle, messages=None):
                 tv["snapshots"][str(tf)]["robotV12"] = {
                     k: robot.get(k) for k in champs_tv if k in robot
                 }
-        trade = cle.get("trade") or ((cle.get("fin") or [None])[0] if cle.get("fin") else None) or cle.get("ordre")
+        trade_actif = cle.get("trade")
+        trade_clos = ((cle.get("fin") or [None])[0] if cle.get("fin") else None)
+        ordre = cle.get("ordre")
+        trade = trade_actif or trade_clos or ordre
         plan = {}
         if isinstance(trade, dict):
             for k in ("d", "e", "sl", "sl0", "tp1", "tp2", "cree", "statut", "src", "type",
-                      "sl_ut", "sl_h", "n1", "n2", "rr"):
+                      "sl_ut", "sl_h", "n1", "n2", "rr", "za", "zb", "zmil"):
                 if k in trade:
                     v = trade[k]
                     if isinstance(v, (str, int, float, bool)) or v is None:
                         plan[k] = v
-            plan["audit_key"] = cle_audit_trade(m, trade)
+            plan["plan_source"] = ("position_ouverte" if trade_actif else
+                                   "cloture_dans_ce_cycle" if trade_clos else "ordre_en_preparation")
+            if trade_actif or trade_clos:
+                plan["audit_key"] = cle_audit_trade(m, trade)
         snap = {
             "t": now, "price": r.get("m1", [{}])[-1].get("c") if r.get("m1") else None,
             "confirm": r.get("confirme"), "sens": r.get("sens"), "score": r.get("score"),
