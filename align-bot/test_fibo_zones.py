@@ -58,8 +58,8 @@ class FiboTelegram(unittest.TestCase):
             return [dict(t=i * step, o=100+i*0.01, h=100.5+i*0.01,
                          l=99.5+i*0.01, c=100+i*0.01, v=100) for i in range(n)]
         s = dict(m1=series(600, 60), m5=series(120, 300), m15=series(60, 900),
-                 m30=series(60, 1800), h1=series(60, 3600), h4=series(35, 14400),
-                 d1=series(40, 86400), w1=series(40, 604800))
+                 m30=series(60, 1800), h1=series(60, 3600), h4=series(60, 14400),
+                 d1=series(60, 86400), w1=series(60, 604800))
         r = ab.calculer_analyse(s)
         self.assertEqual(len(r["b15_fibo"]), 48)
         self.assertEqual(len(r["b1h_fibo"]), 48)
