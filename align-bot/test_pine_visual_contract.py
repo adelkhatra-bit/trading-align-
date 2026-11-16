@@ -4,7 +4,7 @@ from pathlib import Path
 
 class TradingViewVisualContractTest(unittest.TestCase):
     def setUp(self):
-        self.pine = (Path(__file__).parent / "pine" / "ALIGN_MTF_PRO_v24.pine").read_text(encoding="utf-8")
+        self.pine = (Path(__file__).parent / "pine" / "ALIGN_MTF_PRO_v25_PROPOSITION.pine").read_text(encoding="utf-8")
 
     def test_tp2_has_its_own_projected_line_and_label(self):
         self.assertIn("lTP2 := line.new(x1, tp2", self.pine)
