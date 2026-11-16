@@ -13,8 +13,8 @@ def serie(retest=True):
     b[29] = dict(t=29 * 900, o=100.4, h=101.5, l=99.9 if retest else 101.0, c=101.2, v=1)   # retour sur 100 puis clôture au-dessus
     b.append(dict(t=30 * 900, o=101.2, h=101.3, l=101.1, c=101.2, v=1))                   # en formation
     return dict(b15=b, dirs=UP, atr=2.0, atr5=2.0,
-                 b5=[bar(0, 101.2), bar(300, 101.2)],
-                 m1=[bar(int(__import__("time").time()), 101.2)],
+                 b5=[dict(t=0, o=101.2, h=102.0, l=100.5, c=101.2), dict(t=300, o=101.2, h=102.0, l=100.5, c=101.2)],
+                 m1=[dict(t=int(__import__("time").time()), o=101.2, h=101.2, l=101.2, c=101.2)],
                  grosses=[(105.0, "4h"), (110.0, "Daily")], t=30 * 900)
 
 
