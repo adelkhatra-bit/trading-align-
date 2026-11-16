@@ -11409,6 +11409,14 @@ def live_phrases_ia(etat, maintenant, derniers=None):
     secours = phrases_bande_par_marche(commentaires_live_de_secours(donnees))
     for marche in marches_disponibles:
         existantes = paires.setdefault(marche, [])
+        # Une chasse de liquidité clôturée est un événement prioritaire : l'IA ne peut pas le masquer
+        # avec deux phrases génériques, on réserve la seconde intervention à cette lecture factuelle.
+        reversal = (donnees.get("marches", {}).get(marche, {}).get("surveillance_retournement") or {})
+        if reversal.get("direction") in (-1, 1) and len(secours.get(marche, [])) >= 2:
+            if len(existantes) >= 2:
+                existantes[1] = secours[marche][1]
+            else:
+                existantes.append(secours[marche][1])
         for phrase in secours.get(marche, []):
             if len(existantes) >= 2:
                 break
