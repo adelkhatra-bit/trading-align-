@@ -2245,7 +2245,8 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
         self.assertTrue(align_bot.marche_autorise(state, "202", "GOLD"))
 
     def test_market_message_routing_keeps_btc_and_gold_separate(self):
-        state = {"marches_par_chat": {"101": "BTC", "202": "GOLD", "303": "BOTH"}, "canal": "-1000"}
+        state = {"marches_par_chat": {"101": "BTC", "202": "GOLD", "303": "BOTH"}, "canal": "-1000",
+                 "auto": {"BTC": ["101", "303"], "GOLD": ["202", "303"]}}
         chats = {"101", "202", "303"}
         btc = align_bot.destinataires_message(state, chats, "🟠 BTC — SIGNAL EN ATTENTE\\nPrix 70000")
         gold = align_bot.destinataires_message(state, chats, "🥇 GOLD — SIGNAL CONFIRMÉ\\nPrix 4000")
@@ -2323,7 +2324,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
     @unittest.mock.patch.object(align_bot, "TOUT_GRATUIT", False)   # ancien modèle (1 position offerte puis masquée), gardé pour plus tard
     def test_free_flow_one_proposed_position_then_masked(self):
         from unittest.mock import patch
-        state = {"prospects": ["7"], "proprio": ["1"], "proprio_gratuit": True, "lien": "https://t.me/+x", "GOLD": {"trade": {"cree": 5, "qui": {}}}}
+        state = {"prospects": ["7"], "proprio": ["1"], "proprio_gratuit": True, "lien": "https://t.me/+x", "auto": {"GOLD": ["7", "1"]}, "GOLD": {"trade": {"cree": 5, "qui": {}}}}
         entree = "🥇 GOLD — J'ENTRE MAINTENANT\nEntrée 3990.50"
         with patch.object(align_bot, "telegram") as tg:
             align_bot.envoyer_prospects(state, "📰 NEWS USA DANS 1 H", False)
@@ -2347,8 +2348,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
         state = {"prospects": ["7", "8"], "bot_off": ["7"], "marches_par_chat": {"8": "BTC"}, "GOLD": {"trade": {"cree": 5}}}
         with patch.object(align_bot, "telegram") as tg, patch.object(align_bot, "PROPRIO_VUE_GRATUITE", False):
             align_bot.envoyer_prospects(state, "🥇 GOLD — J'ENTRE MAINTENANT\nEntrée 3990.50", True)
-        self.assertEqual([c.kwargs["chat_id"] for c in tg.call_args_list], ["7"])
-        self.assertIn("OFF", tg.call_args_list[0].kwargs["text"])
+        self.assertEqual(tg.call_count, 0)  # aucune notification, même masquée, sans consentement
 
     def test_share_reminder_once_per_planned_day(self):
         import datetime
@@ -2361,7 +2361,8 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
 
     def test_mixed_market_macro_alert_goes_to_each_concerned_account_with_only_its_markets(self):
         """Règle remplacée (demande d'Adel) : un message multi-marchés arrive à chaque compte concerné, mais réduit à SES marchés cochés."""
-        state = {"marches_par_chat": {"101": "BTC", "202": "GOLD", "303": "BOTH", "404": ["NASDAQ"]}}
+        state = {"marches_par_chat": {"101": "BTC", "202": "GOLD", "303": "BOTH", "404": ["NASDAQ"]},
+                 "auto": {"BTC": ["101", "303"], "GOLD": ["202", "303"]}}
         texte = "💵 DOLLAR EN FORTE HAUSSE\n🥇 GOLD : prudence\n🟠 BTC : prudence"
         recipients = align_bot.destinataires_message(state, {"101", "202", "303", "404"}, texte)
         self.assertEqual(set(recipients), {"101", "202", "303"})                  # 404 (NASDAQ seul) n'est pas concerné
