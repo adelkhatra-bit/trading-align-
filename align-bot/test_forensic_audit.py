@@ -141,5 +141,13 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
 
 
 
+    def test_telegram_pause_copy_explains_on_demand_analysis(self):
+        source = (Path(__file__).parent / "align_bot.py").read_text(encoding="utf-8")
+        self.assertIn("Plus de nouvelles alertes automatiques", source)
+        self.assertIn("Faire une analyse", source)
+        self.assertNotIn("Tu reçois toujours les positions", source)
+
+
+
 if __name__ == "__main__":
     unittest.main()
