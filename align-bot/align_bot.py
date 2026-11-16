@@ -4698,7 +4698,8 @@ def regler_bot(etat, cid, on):
 def entrer_inscrits(etat, m, tr, chats=()):
     """Le bot vient d'entrer : il fait entrer automatiquement tous les membres dont le bot est ON,
     plus ceux qui ont appuyé sur 🎯, au prix d'entrée du bot (coach + résultats comptés)."""
-    auto = [c for c in chats if bot_on(etat, c) and marche_autorise(etat, c, m) and not vue_gratuite(etat, c) and c != etat.get("canal")]
+    auto = [c for c in chats if coach_actif(etat, c, m) and marche_autorise(etat, c, m)
+            and not vue_gratuite(etat, c) and c != etat.get("canal")]
     for cid in list(dict.fromkeys(etat.get("auto", {}).pop(m, []) + auto)):
         if isinstance(tr.setdefault("qui", {}).get(cid), dict):
             continue
