@@ -63,29 +63,31 @@ class DirectionSafety(unittest.TestCase):
     def test_btc_retest_rule_is_unchanged(self):
         self.assertIn("ENTRÉE SUR RETEST : LONG", ab.entree_retest("BTC", retest_r(0), {}))
 
-    def test_sniper_requires_both_h1_and_h4_for_gold_nasdaq(self):
+    def test_sniper_requires_both_h1_and_h4_for_gold_nasdaq_in_both_directions(self):
         for market in ("GOLD", "NASDAQ"):
-            for h1, h4 in ((1, 0), (0, 1), (-1, -1), (1, -1)):
-                dirs = [0] * 11
-                dirs[7], dirs[9] = h1, h4
-                proposal, reason = ab._sniper({"market": market, "dirPlan": 1, "dirs": dirs})
-                self.assertIsNone(proposal)
-                self.assertIn("CONFLUENCE_H1_H4", reason)
+            for d in (1, -1):
+                for h1, h4 in ((d, 0), (0, d), (-d, -d), (d, -d), (-d, d)):
+                    dirs = [0] * 11
+                    dirs[7], dirs[9] = h1, h4
+                    proposal, reason = ab._sniper({"market": market, "dirPlan": d, "dirs": dirs})
+                    self.assertIsNone(proposal)
+                    self.assertIn("CONFLUENCE_H1_H4", reason)
         _, reason_btc = ab._sniper({"market": "BTC", "dirPlan": 1, "dirs": [0,0,0,0,0,0,0,1,0,0,0]})
         self.assertNotIn("CONFLUENCE_H1_H4", reason_btc)
 
     def test_every_gold_nasdaq_strategy_requires_h1_and_h4_same_direction(self):
         for market in ("GOLD", "NASDAQ"):
-            for h1, h4 in ((1, 0), (0, 1), (-1, -1), (1, -1), (-1, 1)):
-                dirs = [1, 1, 1, 0, 1, 0, 0, h1, 0, h4, 1]
-                strat, status, reason = ab.strategie_alignement(dirs, 1, 1, market)
-                self.assertEqual(strat, "")
-                self.assertEqual(status, "EN ATTENTE")
-                self.assertIn("H4 et H1", reason)
-            dirs = [1, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1]
-            strat, status, _ = ab.strategie_alignement(dirs, 1, 1, market)
-            self.assertEqual(strat, "SWING")
-            self.assertEqual(status, "CONFIRMÉ")
+            for d in (1, -1):
+                for h1, h4 in ((d, 0), (0, d), (-d, -d), (d, -d), (-d, d)):
+                    dirs = [d, d, d, 0, d, 0, 0, h1, 0, h4, d]
+                    strat, status, reason = ab.strategie_alignement(dirs, d, d, market)
+                    self.assertEqual(strat, "")
+                    self.assertEqual(status, "EN ATTENTE")
+                    self.assertIn("H4 et H1", reason)
+                dirs = [d, d, d, 0, d, 0, 0, d, 0, d, d]
+                strat, status, _ = ab.strategie_alignement(dirs, d, d, market)
+                self.assertEqual(strat, "SWING")
+                self.assertEqual(status, "CONFIRMÉ")
 
     def test_btc_keeps_its_existing_scalping_rule(self):
         dirs = [1, 1, 1, 0, 1, 0, 0, 0, 0, -1, 0]
