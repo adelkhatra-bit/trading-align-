@@ -10741,8 +10741,10 @@ def live_annonces(etat, m, textes):
         elif "RETOUR VERS L'ENTRÉE" in t:
             live_bande(etat, f"BULLE:🔁 {ic} {m} revient vers l'entrée : on respire 😎 • le bot est protégé 🛡 • "
                              f"⏱ clôture dans {min_avant_cloture15()} min" + FIN_BANDE, f"retour{m}", 900, toujours=True)
-        elif "RETOURNEMENT EN PRÉPARATION" in t:
-            live_bande(etat, f"BULLE:↩ {ic} {m} : regarde la ligne RETOURNEMENT • le marché peut se retourner" + FIN_BANDE, f"ret{m}", 900, toujours=True)
+        elif ("RETOURNEMENT EN OBSERVATION" in t or "RETOURNEMENT EN PRÉPARATION" in t
+              or "RETOURNEMENT LONG" in t or "RETOURNEMENT SHORT" in t):
+            live_bande(etat, f"BULLE:↩ {ic} {m} : les petites unités se retournent • on attend la confirmation des grandes unités" + FIN_BANDE,
+                       f"ret{m}", 900, toujours=True)
         elif "MANIPULATION" in t or "MÈCHE SUSPECTE" in t:
             live_bande(etat, f"BULLE:🎣 {ic} {m} : grosse mèche = chasse aux stops • on attend la clôture" + FIN_BANDE, f"meche{m}", 900, toujours=True)
 
