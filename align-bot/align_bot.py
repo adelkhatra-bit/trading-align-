@@ -4675,10 +4675,10 @@ def menu_bot(etat, cid):
     on = bot_on(etat, cid)
     # Lecture sans écriture : ce menu peut être affiché pendant une analyse en cours.
     st = etat.get("stats_bot", {}).get(str(cid), {"arrets": 0, "auto": 0})
-    _envoi_sur(cid, text=(f"🤖 MON BOT   {'▶️ ON' if on else '⏸ OFF'}\n━━━━━━━━━━━━\n"
-                          + ("✅ Il entre tout seul dans chaque position\n👀 Vue 15 min • SL un peu sous / au-dessus de la mèche\n🎯 Le coach te suit jusqu'au TP\n"
-                             if on else "⏸ Il n'entre plus pour toi\n🔔 Tu reçois quand même les positions\n")
-                          + f"━━━━━━━━━━━━\n🤖 Positions prises par ton bot   {st['auto']}\n⏸ Arrêts manuels   {st['arrets']}"
+    _envoi_sur(cid, text=(f"🤖 MON BOT   {'▶️ ALERTES ON' if on else '🔕 ALERTES OFF'}\n━━━━━━━━━━━━\n"
+                          + ("🔔 Alertes activées sur les marchés cochés\n📩 Je te préviens aux étapes utiles du setup et de la position\n"
+                             if on else "🔕 Plus de nouvelles alertes automatiques\n📊 Tu peux demander une analyse à tout moment avec « Faire une analyse »\n")
+                          + f"━━━━━━━━━━━━\n🤖 Positions suivies   {st['auto']}\n⏸ Arrêts manuels   {st['arrets']}"
                           + "\n\n" + texte_suivi(etat, cid)),
                reply_markup=json.dumps({"inline_keyboard": [[{"text": "⏸ Arrêter mon bot", "callback_data": "botoff:x"} if on
                                                             else {"text": "▶️ Relancer mon bot", "callback_data": "boton:x"}],
@@ -4705,8 +4705,8 @@ def regler_bot(etat, cid, on):
             txt += f"\n🎯 Ta position {', '.join(dedans)} reste suivie jusqu'au TP / SL"
         _envoi_sur(cid, reply_markup=CLAVIER_VISITEUR, text=txt)
         return
-    _envoi_sur(cid, reply_markup=CLAVIER, text=("▶️ Ton bot est relancé\n🤖 Il entre tout seul dans la prochaine position" if on
-                                                else "⏸ Ton bot est arrêté\n🔔 Tu reçois toujours les positions\n▶️ Relance-le avec 🤖 Mon bot"))
+    _envoi_sur(cid, reply_markup=CLAVIER, text=("🔔 Tes alertes sont réactivées\n📡 Tu recevras les alertes des marchés cochés"
+                                                if on else "🔕 Alertes automatiques suspendues\n📊 Tu peux toujours demander une analyse avec « Faire une analyse »\n▶️ Réactive les alertes depuis 🤖 Mon bot"))
 
 def entrer_inscrits(etat, m, tr, chats=()):
     """Le bot vient d'entrer : il fait entrer automatiquement tous les membres dont le bot est ON,
