@@ -6052,8 +6052,6 @@ def traiter(etat, chats, updates):
                 if mk == "no":
                     etat.setdefault("trade_jour", {})[qui] = datetime.datetime.now(PARIS).strftime("%Y-%m-%d")
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="Bien noté")
-                    _envoi_sur(qui, text=("Noted. No trading alerts today." if qui in LANG_EN else
-                                          "C'est noté. Aucun signal ni rappel de trading aujourd'hui."))
                     continue
                 if mk == "yes":
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="Très bien")
@@ -6083,8 +6081,6 @@ def traiter(etat, chats, updates):
                     etat["bot_off"] = [x for x in etat.get("bot_off", []) if str(x) != qui]
                     if qui not in etat.get("coach_pending", []):
                         etat.setdefault("coach_pending", []).append(qui)
-                    _envoi_sur(qui, text=("Choose one or more markets, then confirm." if qui in LANG_EN else
-                                          "Choisis une ou plusieurs monnaies / marchés, puis valide."))
                     menu_marches(etat, qui)
                 else:
                     etat.setdefault("bot_off", [])
