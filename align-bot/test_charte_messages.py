@@ -43,7 +43,7 @@ class CarteCoach(unittest.TestCase):
             tm.time.return_value = T
             txt = ab.carte_coach("GOLD", self.r(), {}, "signal", tr=self.TR, validite="clôture 15 min (14:15)", signal="Rejet 5 min + 4h/1h", etat=self.etat())
         self.assertEqual(txt.split("\n"), [
-            "🔴 GOLD - SHORT", "", "🛑 SL : 3999,99 · 48 pips", "🎯 Entrée : 3995,20", "💰 TP1 : 3985", "🏁 TP2 : 3895,54", "⚖️ R:R : 1:2,1", "⏱ Valide : clôture 15 min (14:15)", "",
+            "🔴 GOLD - SHORT", "", "🛑 SL : 3999,99 · 48 pips", "🎯 Entrée : 3995,20", "💰 TP1 : 3985", "🏁 TP2 : 3895,54", "⚖️ R:R : 1:2,1", "🛡️ À TP1 : remonte le SL à BE, puis laisse courir jusqu'au TP2.", "⏱ Valide : clôture 15 min (14:15)", "",
             "📊 Contexte :", "🔹 Signal : Rejet 5 min + 4h/1h", "🔹 DXY : Haussier ⚠️ +0,13 %/1h", "🔹 News : CPI USA 14:30 (dans 15 min)",
             "🔹 Niveaux : R: 3995 | S: 3970", "", "🤖 Agent Auto-Trade : %%AGENT:signal%%", "🛡️ Action : ENTRER", "", "🔌 Sys: TV❌ News✅ DXY✅ Agent✅"])
 
@@ -73,7 +73,7 @@ class CarteCoach(unittest.TestCase):
             self.assertEqual(ab.raison_2_mots(brut), court)
 
     def test_agent_auto_trade_par_compte(self):
-        e = {"bot_off": ["off"], "canal": "canal", "GOLD": {}}
+        e = {"bot_off": ["off"], "canal": "canal", "notifications_on": ["on"], "marches_par_chat": {"on": ["GOLD"]}, "GOLD": {}}
         self.assertEqual(ab.agent_pour(e, "off", "GOLD", "attente"), "OFF")
         self.assertEqual(ab.agent_pour(e, "on", "GOLD", "attente"), "Attente")
         self.assertEqual(ab.agent_pour(e, "on", "GOLD", "signal"), "ON")
@@ -83,7 +83,7 @@ class CarteCoach(unittest.TestCase):
     def test_substitution_par_destinataire_dans_telegram(self):
         envoyes = []
         txt = "📍 GOLD - ATTENTE\n\n🤖 Agent Auto-Trade : %%AGENT:attente%%"
-        with patch.object(ab, "DERNIER_ETAT", {"bot_off": ["off"]}), patch.object(ab, "TOKEN", "x"), \
+        with patch.object(ab, "DERNIER_ETAT", {"bot_off": ["off"], "notifications_on": ["on"], "marches_par_chat": {"on": ["GOLD"]}}), patch.object(ab, "TOKEN", "x"), \
              patch.object(ab, "_telegram_verifie_cooldown", lambda *a, **k: None), patch.object(ab, "api_telegram", create=True), \
              patch("time.sleep"), patch("urllib.request.urlopen", side_effect=lambda req, timeout=None: envoyes.append(req.data) or (_ for _ in ()).throw(RuntimeError("stop"))):
             for cid in ("on", "off"):
@@ -174,7 +174,7 @@ class Modele3Ouverture(unittest.TestCase):
         msgs = ab.messages_ouverture(self.etat(), ev, derniers, T, True)
         self.assertEqual([m for m, _ in msgs], ["GOLD", "BTC"])                              # NASDAQ non concerné par Londres
         self.assertIn("⚡ Compression : explosion possible", dict(msgs)["BTC"])
-        envois, etat = [], {"marches_par_chat": {"adel": ["GOLD", "NASDAQ"], "btc": ["BTC"], "tous": ["BTC", "GOLD", "NASDAQ"]}}
+        envois, etat = [], {"marches_par_chat": {"adel": ["GOLD", "NASDAQ"], "btc": ["BTC"], "tous": ["BTC", "GOLD", "NASDAQ"]}, "auto": {"GOLD": ["adel", "tous"], "BTC": ["btc", "tous"]}}
         with patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append((c, k["text"]))):
             ab.diffuser_messages(etat, {"adel", "btc", "tous"}, msgs)
         recu = {}
@@ -190,7 +190,7 @@ class Modele3Ouverture(unittest.TestCase):
         envois = []
         with patch.object(ab, "TOKEN", "x"), patch.object(ab, "evenements_sessions", return_value=[ev]), patch.object(ab, "evenements_pine", return_value=[]), \
              patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append((c, k["text"]))), patch.object(ab, "destinataires_gratuits", return_value=[]):
-            ab.alertes_courtes({}, {"vip"}, {"GOLD": self.r(), "BTC": self.r(73000.0)}, T)
+            ab.alertes_courtes({"auto": {"GOLD": ["vip"], "BTC": ["vip"]}}, {"vip"}, {"GOLD": self.r(), "BTC": self.r(73000.0)}, T)
         self.assertEqual(len(envois), 1)                                                     # GOLD + BTC regroupés en un seul message
         self.assertTrue(envois[0][1].startswith("🔔 OUVERTURE MARCHÉ : LONDRES"))
         self.assertIn("🥇 GOLD", envois[0][1]); self.assertIn("🟠 BTC", envois[0][1])
@@ -200,7 +200,7 @@ class Modele3Ouverture(unittest.TestCase):
         envois = []
         with patch.object(ab, "TOKEN", "x"), patch.object(ab, "evenements_sessions", return_value=[ev]), patch.object(ab, "evenements_pine", return_value=[]), \
              patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append((c, k["text"]))), patch.object(ab, "destinataires_gratuits", return_value=[]):
-            ab.alertes_courtes({}, {"vip"}, {}, T)
+            ab.alertes_courtes({"auto": {"GOLD": ["vip"], "BTC": ["vip"]}}, {"vip"}, {}, T)
         self.assertEqual(len(envois), 1)                                                     # l'alerte de session n'est jamais perdue
 
     def test_traduction_anglaise(self):
