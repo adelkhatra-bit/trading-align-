@@ -133,6 +133,8 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn("speechSynthesis.speak(utterance)", self.js)
         self.assertNotIn("voirFiboProgression", self.js)
         self.assertIn("// @version      11.0", self.js)
+        self.assertIn("@updateURL    https://raw.githubusercontent.com/adelkhatra-bit/trading-auto/main/docs/live/align-bande-live.user.js", self.js)
+        self.assertIn("@downloadURL  https://raw.githubusercontent.com/adelkhatra-bit/trading-auto/main/docs/live/align-bande-live.user.js", self.js)
         self.assertIn("const VERSION = '11.0'", self.js)
         self.assertIn("live-data/live.json", self.js)
         self.assertIn("synchroniserEtatBot()", self.js)
