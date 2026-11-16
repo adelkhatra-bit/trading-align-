@@ -152,8 +152,8 @@ class MessagesEtRegles(unittest.TestCase):
         self.assertEqual(len(ev), 1)
         fr = ab.texte_pine({}, ev[0]); en = ab.texte_pine({}, ev[0], True)
         self.assertLessEqual(len(fr), 3)
-        self.assertIn("🎯 Entrée sniper 🥇 GOLD : vente", fr[0]); self.assertIn("SL ", fr[1]); self.assertIn("TP1", fr[1]); self.assertIn("3895,54", fr[1])
-        self.assertIn("Sniper entry", en[0]); self.assertIn("sell", en[0]); self.assertNotIn("vente", " ".join(en))
+        self.assertIn("🎯 ZONE D'ENTRÉE POSSIBLE 🥇 GOLD : SHORT", fr[0]); self.assertIn("SL ", fr[1]); self.assertIn("TP1", fr[1]); self.assertIn("3895,54", fr[1])
+        self.assertIn("POSSIBLE ENTRY ZONE", en[0]); self.assertIn("SHORT", en[0]); self.assertNotIn("vente", " ".join(en))
         self.assertEqual(len({" ".join(ab.texte_pine({"al_rot": {"p:sniper:GOLD": k}}, ev[0])) for k in (-1, 0, 1)}), 3)
         etat2, ev2, _ = self.evenement(etat, now=r["m1"][-1]["t"] + 60, k=None)
         self.assertEqual(ev2, [])                                                                 # une seule fois (même niveau, même UT)
@@ -196,7 +196,7 @@ class SensDansLeGratuit(unittest.TestCase):
 
     def test_free_preparation_keeps_the_bias_without_levels(self):
         envois = []
-        etat = {"prospects": ["900"]}
+        etat = {"prospects": ["900"], "auto": {"GOLD": ["900"]}}
         with patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append(k["text"])), patch.object(ab, "bot_on", return_value=True):
             ab.alerte_gratuite_preparation(etat, "🔔 JE PRÉPARE UNE POSITION — 🥇 GOLD\n🟥 SHORT ⬇️ descend\n📌 Entrée : 4012,5")
         self.assertIn("Biais : baissier", envois[0]); self.assertNotIn("4012", envois[0]); self.assertNotIn("SHORT", envois[0])
