@@ -212,6 +212,31 @@ class DirectionSafety(unittest.TestCase):
         self.assertEqual(seen["market"], "GOLD")
         sniper.assert_called_once_with(out)
 
+    def test_gold_nasdaq_trigger_uses_last_closed_m5_not_forming_candle(self):
+        closed = candle(300, o=100, h=100.5, l=99.5, c=100)
+        forming = candle(600, o=100.2, h=100.9, l=99.5, c=100.8)
+        r = {"b5": [closed, forming], "market": "GOLD"}
+        self.assertEqual(ab.derniere_bougie_m5_declencheur(r, "GOLD"), closed)
+        self.assertEqual(ab.derniere_bougie_m5_declencheur(r, "NASDAQ"), closed)
+        self.assertEqual(ab.derniere_bougie_m5_declencheur(r, "BTC"), forming)
+        self.assertIsNone(ab.rejet(r, 1, 100, 1.0))  # la mèche haussière provisoire n'est pas une clôture
+        r["market"] = "BTC"
+        self.assertIsNotNone(ab.rejet(r, 1, 100, 1.0))  # comportement BTC historique préservé
+
+    def test_gold_nasdaq_breakout_waits_for_m5_close_btc_legacy_unchanged(self):
+        bars = [candle(i * 300, o=99.8, h=100.0, l=99.5, c=99.8) for i in range(22)]
+        candidate = candle(22 * 300, o=99.8, h=100.0, l=99.5, c=100.0)
+        forming = candle(23 * 300, o=100.0, h=101.2, l=99.9, c=101.0)
+        bars.extend([candidate, forming])
+        r = {"b5": bars, "r5": [50, 50, 50], "atr": 1.0, "atr5": 1.0,
+             "m1": [candle(23 * 60, c=101.0)], "grosses": [(105.0, "4h"), (110.0, "Daily")]}
+        r["market"] = "GOLD"
+        self.assertIsNone(ab.plan_cassure(r, 1))
+        r["market"] = "NASDAQ"
+        self.assertIsNone(ab.plan_cassure(r, 1))
+        r["market"] = "BTC"
+        self.assertIsNotNone(ab.plan_cassure(r, 1))
+
     def test_gold_nasdaq_confirmation_alert_requires_all_four_closed_timeframes(self):
         bars = [candle(0, c=98), candle(300, c=99), candle(600, c=101), candle(900, c=102)]
         for market in ("GOLD", "NASDAQ"):
