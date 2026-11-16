@@ -2558,7 +2558,7 @@ class TestFollowPositionMarketChoice(unittest.TestCase):
             "auto": {"BTC": ["101", "202"], "GOLD": []},
             "coach_optin": {"BTC": ["202"]},
             "veille_cloture": {"BTC": {"101": {"multi": True}, "202": {"multi": True}}},
-            "marches_par_chat": {"101": "BOTH"}
+            "marches_par_chat": {"101": "BOTH", "202": ["BTC"]}
         }
         update = {"update_id": 99003, "callback_query": {
             "id": "follow-gold", "data": "followmarket:GOLD",
