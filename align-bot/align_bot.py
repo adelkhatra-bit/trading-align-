@@ -1178,6 +1178,23 @@ def profil_strategie(r):
                       else "PRÉPARATION — attendre l’alignement ou le retournement M5"}
 
 
+def mouvement_recent_m1(r, nb=5):
+    """Décrit le mouvement réellement observé sur les dernières clôtures M1, séparément du biais H1/H4."""
+    bars = r.get("m1") or []
+    if len(bars) < nb + 1:
+        return "📈 Mouvement court terme M1 : données insuffisantes"
+    try:
+        depart = float(bars[-nb - 1]["c"])
+        actuel = float(bars[-1]["c"])
+        if depart <= 0:
+            raise ValueError("prix de référence invalide")
+    except (KeyError, TypeError, ValueError):
+        return "📈 Mouvement court terme M1 : données indisponibles"
+    variation = (actuel / depart - 1) * 100
+    sens = "HAUSSE" if variation > 0 else "BAISSE" if variation < 0 else "STABLE"
+    return f"📈 Mouvement court terme ({nb} clôtures M1) : {sens} {variation:+.2f}%"
+
+
 def texte_etat(nom_marche, r, cle=None, vip=True):
     """Carte Telegram complète : mise en page uniquement, aucune rubrique d'analyse supprimée."""
     # Codes visuels constants : vert = hausse, rouge = baisse, orange = neutre.
@@ -1200,7 +1217,7 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
              "🔴 Biais baissier confirmé" if maj == -1 else
              "🟠 Pas de biais confirmé en 1h / 4h")
     l = [entete, "━━━━━━━━━━━━━━━━━━", "📡 LECTURE DU MARCHÉ",
-         "BIAIS GÉNÉRAL", biais,
+         mouvement_recent_m1(r), "BIAIS DE FOND (H1 / H4)", biais,
          "━━━━━━━━━━━━━━━━━━", "📊 INDICATEURS PAR UNITÉ DE TEMPS",
          "  /  ".join(f"{nom} {fl(D[i])}" for nom, i in ut),
          "━━━━━━━━━━━━━━━━━━", "📈 RSI PAR UNITÉ DE TEMPS",
@@ -4183,7 +4200,8 @@ def texte_apercu(m, r, cle, vip=True):
     lignes = [
         f"{ICONE.get(m, '📊')} {m} — {px(prix)}",
         f"🚦 {decision}",
-        f"🧭 Biais à surveiller : {direction}" + (f" ({type_})" if type_ and not direction.startswith(('AUCUNE', 'Non confirmée', 'À confirmer')) else ""),
+        f"🧭 Biais de fond à surveiller : {direction}" + (f" ({type_})" if type_ and not direction.startswith(('AUCUNE', 'Non confirmée', 'À confirmer')) else ""),
+        mouvement_recent_m1(r),
         (f"⏰ Réouverture : {r['ferme_txt']} (heure de Paris)" + (" • ta position est en pause, je la reprends à la réouverture" if tr else ""))
         if r.get("ferme_txt") else "⚠️ Le biais n'est pas une autorisation d'entrée." if not tr else "📍 Position ouverte : suis les alertes du coach.",
         "",
@@ -4209,7 +4227,7 @@ def texte_apercu(m, r, cle, vip=True):
         lignes += [""] + jour_
     elif r.get("news") and vip:
         lignes += [news_courte(r["news"])]
-    lignes += ["", "👇 Détails : boutons ci-dessous", "ℹ️ Aucun ordre n'est envoyé automatiquement à ton broker."]
+    lignes += ["", "👇 Détails : boutons ci-dessous", "ℹ️ Cette carte ne passe aucun ordre. Le module broker est séparé et dépend de ses réglages ADMIN / TEST / RÉEL."]
     return "\n".join(lignes)
 
 DERNIERS = {}               # dernière analyse de chaque marché (pour le chrono)
