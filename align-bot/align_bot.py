@@ -5567,18 +5567,25 @@ def noter(etat, cid, m, pos, sortie, motif):
     clavier = markup_cloture(m)
     if nature in ("TP", "SL"):
         restantes = en_position(etat, cid)
+        # Après une clôture, on coupe toute recherche de nouvelle entrée.
+        # Seuls les suivis des marchés où une position est encore ouverte restent autorisés.
+        for marche in MARCHES:
+            etat.setdefault("auto", {}).setdefault(marche, [])
+            etat["auto"][marche] = [x for x in etat["auto"][marche] if str(x) != cid]
+            if marche not in restantes:
+                etat.setdefault("veille_cloture", {}).setdefault(marche, {}).pop(cid, None)
+                (etat.get("coach_live", {}).get(marche) or {}).pop(cid, None)
         if restantes:
-            texte += "\n\n🎯 Suivi maintenu sur : " + ", ".join(restantes) + ". Aucune relance : je surveille uniquement cette position."
+            texte += "\n\n🎯 Suivi maintenu uniquement sur : " + ", ".join(restantes) + ". Aucune nouvelle position ne sera proposée."
         else:
-            # Plus aucune position ouverte : arrêt des nouvelles propositions jusqu'à une autorisation explicite.
+            # Plus aucune position ouverte : arrêt complet du coach jusqu'à une autorisation explicite.
             off = etat.setdefault("bot_off", [])
             if cid not in off:
                 off.append(cid)
             for marche in MARCHES:
-                etat.setdefault("auto", {}).setdefault(marche, [])
-                etat["auto"][marche] = [x for x in etat["auto"][marche] if str(x) != cid]
                 etat.setdefault("veille_cloture", {}).setdefault(marche, {}).pop(cid, None)
-            texte += "\n\n⏸ Coach mis en pause : aucune nouvelle position ne sera proposée automatiquement.\nSouhaites-tu rechercher une autre position ?"
+                (etat.get("coach_live", {}).get(marche) or {}).pop(cid, None)
+            texte += "\n\n⏸ Coach mis en pause : aucune nouvelle position ni commentaire automatique.\nSouhaites-tu rechercher une autre position ?"
             clavier = json.dumps({"inline_keyboard": [
                 [{"text": "✅ Oui, chercher une position", "callback_data": "next:yes"}],
                 [{"text": "⏸ Non, rester en pause", "callback_data": "next:no"}]
@@ -11081,6 +11088,9 @@ def question_quotidienne(etat, chats, now=None):
         if deja.get(cid) == jour or en_position(etat, cid):
             continue
         if any(coach_actif(etat, cid, m) for m in MARCHES):
+            continue
+        # Un commentateur live explicitement actif compte aussi comme un suivi en cours.
+        if any(str(cid) in (etat.get("coach_live", {}).get(m) or {}) for m in MARCHES):
             continue
         clavier = json.dumps({"inline_keyboard": [
             [{"text": "✅ Oui, je trade", "callback_data": "trade:yes"}],
