@@ -9539,6 +9539,31 @@ def point_entree(r, d, p):
     return dict(d=d, e=e, sl=sl, tp1=t1[0], n1=nom(t1), tp2=t2[0], n2=nom(t2), rr=abs(t1[0] - e) / risque, src=src,
                 za=za, zb=zb, f50=z50, f618=z618, f786=z786, sl_h=bougie_protegee(r["b15"][-3:], d, sl), sl_ut="15 min")
 
+def conserver_ordre_entree(cle, candidat, d, prix, atr, timestamp):
+    """Fige un ordre de retest pour éviter de poursuivre le marché en déplaçant l'entrée à chaque tick."""
+    ancien = (cle or {}).get("ordre")
+    if not ancien:
+        cle["ordre"] = candidat
+        cle["ordre_t"] = timestamp
+        return candidat, True
+    risque = abs(float(ancien.get("e", 0)) - float(ancien.get("sl", 0)))
+    age = float(timestamp) - float(cle.get("ordre_t", timestamp))
+    invalide = (
+        ancien.get("d") != d
+        or not ancien.get("sl_h")
+        or atr <= 0
+        or risque > RISQUE_MAX * atr * 1.05
+        or d * (float(prix) - float(ancien.get("sl", 0))) <= 0
+        or age > 4 * 3600
+    )
+    if invalide:
+        cle["ordre"] = candidat
+        cle["ordre_t"] = timestamp
+        cle.pop("touche_t", None)
+        cle.pop("traverse", None)
+        return candidat, True
+    return ancien, False
+
 def retenir_prenom(etat, cid, frm):
     """Le coach parle à la personne par son prénom Telegram (comme un humain)."""
     p = ((frm or {}).get("first_name") or "").strip().split(" ")[0][:20]
@@ -10505,13 +10530,15 @@ def agent(m, r, cle, ferme):
             alerte_repli(out, m, r, cle, d, p)
         elif r["dirs"][2] == d:
             cle["retrace_vu"] = False
-        # On ajuste le point tant que le prix n'est pas encore arrivé (les niveaux bougent)
+        # L'entrée reste figée : une nouvelle bougie ne doit jamais rapprocher artificiellement le prix d'entrée.
+        # On ne remplace que si le sens change, le SL est invalidé, le risque dépasse le plafond,
+        # les données de protection manquent ou l'ordre a dépassé sa durée de validité.
         if not cle.get("prep"):
-            cle["ordre"] = o
-        ancien = cle.get("ordre")
-        if ancien and (not ancien.get("sl_h") or abs(ancien["e"] - ancien["sl"]) > RISQUE_MAX * r["atr"] * 1.05):
-            cle["ordre"] = o                     # ancien ordre (SL trop grand ou sans heure de bougie) remplacé
-        o = cle.get("ordre", o)
+            o, remplace = conserver_ordre_entree(cle, o, d, p, r["atr"], r["t"])
+            if remplace:
+                cle["prep"] = False
+        else:
+            o = cle.get("ordre", o)
         if not cle.get("prep"):
             cle.pop("traverse", None)
         dist = d * (p - o["e"])       # < 0 = le prix n'est pas encore arrivé au point d'entrée
