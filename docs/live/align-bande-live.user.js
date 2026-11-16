@@ -180,9 +180,10 @@
   const voixBtn = document.createElement('button');
   voixBtn.id = 'align-live-voice';
   voixBtn.type = 'button';
-  voixBtn.textContent = '🔊 ACTIVER LA VOIX DU COACH';
+  voixBtn.textContent = '🔊 ACTIVER LE COMMENTATEUR';
+  voixBtn.setAttribute('aria-pressed', 'false');
   voixBtn.title = 'Activer le commentateur vocal du live';
-  voixBtn.style.cssText = 'position:fixed;right:18px;top:104px;z-index:10001;padding:8px 12px;border:1px solid rgba(255,255,255,.55);border-radius:18px;background:rgba(18,18,28,.82);color:#fff;font:700 13px system-ui;cursor:pointer;pointer-events:auto';
+  voixBtn.style.cssText = 'position:fixed;right:18px;top:104px;z-index:10001;padding:11px 15px;border:2px solid #35d07f;border-radius:22px;background:linear-gradient(135deg,#123b2b,#10251f);color:#fff;font:800 13px system-ui;cursor:pointer;pointer-events:auto;box-shadow:0 0 18px rgba(53,208,127,.35)';
   document.body.appendChild(voixBtn);
   const voixLangueBtn = document.createElement('button');
   voixLangueBtn.type = 'button';
@@ -482,7 +483,7 @@
     const pool = Object.keys(iaPools).length ? (iaPools[m] || []) : iaPool;  // commentaires du marché affiché uniquement
     if (!pool.length) return;
     montrer(pool[iaN++ % pool.length], false, 1);
-  }, 4 * 60 * 1000);
+  }, 55 * 1000);
   let astuceN = 0;
   const astuceT = setInterval(() => {
     if (occupe || file.length) return;            // jamais par-dessus une vraie info (TP, SL, news…)
