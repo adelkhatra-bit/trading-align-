@@ -1352,7 +1352,7 @@ def strategie_alignement(dirs, d, dW=0, market=None):
         return "", "AUCUNE", "Pas de direction exploitable"
     D = list(dirs or []) + [0] * 11
     if market in ("GOLD", "NASDAQ") and (D[7] != d or D[9] != d):
-        return "", "EN ATTENTE", f"{market} : H1 et H4 doivent clôturer dans le même sens que le plan (H1={D[7]}, H4={D[9]}, plan={d})"
+        return "", "EN ATTENTE", f"{market} : H4 et H1 doivent clôturer dans le même sens que le plan (H1={D[7]}, H4={D[9]}, plan={d})"
     if market in ("GOLD", "NASDAQ") and (D[2] != d or D[4] != d):
         return "", "EN ATTENTE", f"{market} : M5 et M15 doivent aussi clôturer dans le même sens (M5={D[2]}, M15={D[4]}, plan={d})"
     u = lambda i: D[i] == d
@@ -4173,7 +4173,7 @@ def radar_climax(m, r, cle):
                 lib = lambda i: "haussier" if len(dirs) > i and dirs[i] == 1 else "baissier" if len(dirs) > i and dirs[i] == -1 else "neutre"
                 return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\n"
                         f"Clôtures M5={lib(2)}, M15={lib(4)}, H1={lib(7)}, H4={lib(9)} : elles ne confirment pas toutes le même sens.\n"
-                        "⛔ Aucune entrée, aucun SL/TP à prendre pour l'instant.\n"
+                        "⛔ Pas de position : aucune entrée, aucun SL/TP à prendre pour l'instant.\n"
                         "⏳ J'attends l'accord des quatre unités clôturées.")
             e = cl[-1]
             mot = "plus bas" if sens == 1 else "plus haut"
