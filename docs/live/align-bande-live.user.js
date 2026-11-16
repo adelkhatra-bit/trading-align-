@@ -298,7 +298,7 @@
     if (/stop touch|SL TOUCH/i.test(t)) return 'sl';
     if (/REJOINT LA TEAM|BIENVENUE|nouvel abonn/i.test(t)) return 'membre';
     if (/FRÔLÉ|FROLE|DIRECTION TP|approche du TP|vers le TP/i.test(t)) return 'proche';
-    if (/prépare-toi|ENTRE EN POSITION|zone clé|pas de panique|revient vers l'entrée|NEWS/i.test(t)) return 'alerte';
+    if (/prépare-toi|ENTRE EN POSITION|POSITION ALIGN CONFIRMÉE|zone clé|pas de panique|revient vers l'entrée|NEWS/i.test(t)) return 'alerte';
     return '';
   }
   // v6.3 (règle d'Adel) : AUCUN chiffre de prix sur la bande — on intrigue, le détail est dans le lien en bio
@@ -356,7 +356,7 @@
   function cleMarche(t) { const x = String(t || '').match(/BTC|GOLD|XAU|NASDAQ|NAS/i); return x ? x[0].toUpperCase().replace('XAU', 'GOLD').replace(/^NAS$/, 'NASDAQ') : ''; }
   function botSuivi(t) {
     const k = cleMarche(t); if (!k) return;
-    if (/ENTRE EN POSITION/i.test(t)) botPos[k] = Date.now();
+    if (/ENTRE EN POSITION|POSITION ALIGN CONFIRMÉE/i.test(t)) botPos[k] = Date.now();
     else if (/TP2 TOUCH|OBJECTIF FINAL|SL TOUCH|STOP TOUCH|POSITION (FERMÉE|CLÔTURÉE)/i.test(t)) delete botPos[k];
   }
   // Le flux ntfy annonce les nouvelles entrées, mais un live ouvert après le bot peut manquer l'événement.
@@ -659,7 +659,7 @@
       setTimeout(() => montrer('🆓 TOI AUSSI TU VEUX ENCAISSER AVEC LA TEAM ? crée ton compte démo GRATUIT et active ton coach • lien en bio • ce n\'est pas un conseil en investissement', false, 1, 'membre', true), 22000); }
     if (/\bSL\b[^\n]{0,12}TOUCH|STOP TOUCH/i.test(txt)) setTimeout(() => coeurs(1, ['😢']), 3600);
     if (/PLONGE|DIVING/i.test(txt)) { coeurs(1, ['🌊']); setTimeout(() => coeurs(1, ['😄']), 5000); }   // v10.7 : quand ça coule aussi
-    if (/ENTRE EN POSITION/i.test(txt)) { feuArtifice('🚀 POSITION CONFIRMÉE !'); coeurs(12, ['🚀', '🔥', '💚']); }
+    if (/ENTRE EN POSITION|POSITION ALIGN CONFIRMÉE/i.test(txt)) { feuArtifice('🚀 POSITION CONFIRMÉE !'); coeurs(12, ['🚀', '🔥', '💚']); }
     else if (/ACCÉLÈRE|SPEEDING UP|DIRECTION TP/i.test(txt)) { coeurs(1, ['🚀']); setTimeout(() => coeurs(1, ['😄']), 5000); }   // v11.1 : spectacle renforcé uniquement sur une entrée réelle
     montrer(txt, bulle, 2);
     const em = (txt.slice(0, 4).match(/🔮|🧱|🛏/) || [])[0]; if (em) setTimeout(() => coeurs(1, [em]), 1500);   // v7.3 : animation « le graphique parle »
