@@ -149,5 +149,30 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
 
 
 
+    def test_new_telegram_subscriber_starts_with_no_markets_and_must_opt_in(self):
+        etat = {"coach_pending": ["new-user"]}
+        with unittest.mock.patch.object(align_bot, "_envoi_sur") as send:
+            align_bot.menu_marches(etat, "new-user")
+        self.assertEqual(align_bot.marches_choisis(etat, "new-user"), set())
+        align_bot.basculer_marche(etat, "new-user", "GOLD")
+        self.assertEqual(align_bot.marches_choisis(etat, "new-user"), {"GOLD"})
+        send.assert_called_once()
+
+    def test_legacy_telegram_subscriber_keeps_existing_all_markets_default(self):
+        etat = {}
+        self.assertEqual(align_bot.marches_choisis(etat, "legacy-user"), set(align_bot.MARCHES))
+
+    def test_market_follow_cannot_be_confirmed_without_selection(self):
+        etat = {"marches_par_chat": {"new-user": []}}
+        with unittest.mock.patch.object(align_bot, "autorise", return_value=True), \
+             unittest.mock.patch.object(align_bot, "_envoi_sur") as send, \
+             unittest.mock.patch.object(align_bot, "selectionner_marches_suivi") as save:
+            ok = align_bot.valider_et_suivre_marches(etat, "new-user", 123)
+        self.assertFalse(ok)
+        save.assert_not_called()
+        self.assertIn("Coche au moins un marché", send.call_args.kwargs["text"])
+
+
+
 if __name__ == "__main__":
     unittest.main()
