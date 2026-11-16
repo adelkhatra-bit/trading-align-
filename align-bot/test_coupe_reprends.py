@@ -1,5 +1,5 @@
 """Demande d'Adel 15/11 : TP1 touché + retour annoncé vers l'entrée → coupe tout, puis reprise à l'entrée."""
-import os, sys, unittest
+import os, sys, unittest, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import align_bot as ab
 
@@ -7,9 +7,15 @@ CONTRE = [-1, -1, -1, -1, 1, 1, 1, 1, 1, 1, 1]
 
 
 def r_(dirs, p, bougie15=-1, bougie5=1, t=1000):
-    b15 = [dict(t=0, o=110, h=111, l=105, c=110 + 2 * bougie15, v=1), dict(t=900, o=1, h=1, l=1, c=1, v=1)]
-    b5 = [dict(t=0, o=100, h=101, l=99, c=100 + bougie5, v=1), dict(t=300, o=1, h=1, l=1, c=1, v=1)]
-    return dict(dirs=dirs, b15=b15, b5=b5, atr=4.0, t=t, m1=[dict(c=p)])
+    now = int(time.time())
+    b15 = [dict(t=now - 1800, o=110, h=111, l=105, c=110 + 2 * bougie15, v=1),
+           dict(t=now - 900, o=1, h=1, l=1, c=1, v=1)]
+    b5 = [dict(t=now - 600, o=100, h=101, l=99, c=100 + bougie5, v=1),
+          dict(t=now - 300, o=1, h=1, l=1, c=1, v=1)]
+    b1h = [dict(t=now - 7200, o=100, h=101, l=99, c=100, v=1), dict(t=now - 3600, o=100, h=101, l=99, c=100, v=1)]
+    b4h = [dict(t=now - 28800, o=100, h=101, l=99, c=100, v=1), dict(t=now - 14400, o=100, h=101, l=99, c=100, v=1)]
+    return dict(dirs=dirs, dirs_cloturees=dirs, b15=b15, b5=b5, b1h=b1h, b4h=b4h,
+                r5=[50, 50, 50], atr=4.0, atr5=1.0, t=t, m1=[dict(t=now - 30, c=p)])
 
 
 class Coupe(unittest.TestCase):
@@ -19,8 +25,8 @@ class Coupe(unittest.TestCase):
         self.assertTrue(any("encaisse TOUT" in x for x in l))
         self.assertIsNone(ab.coupe_et_reprends("GOLD", r_(CONTRE, 109), cle, tr, 109))   # une seule fois
         self.assertIsNone(ab.reprise_entree("GOLD", r_(CONTRE, 104), cle))              # pas encore revenu
-        t = ab.reprise_entree("GOLD", r_(CONTRE, 100.5, t=2000), cle)
-        self.assertIn("REPRISE À L'ENTRÉE : LONG", t); self.assertIn("SL ≈ 95", t)
+        t = ab.reprise_entree("GOLD", r_([1] * 11, 100.5, t=2000), cle)
+        self.assertIn("REPRISE À L'ENTRÉE : LONG", t); self.assertIn("SL : 95", t)
         self.assertNotIn("reprise", cle)
 
     def test_pas_de_coupe_si_unites_ok(self):
