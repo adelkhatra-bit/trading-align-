@@ -4005,7 +4005,7 @@ def reprise_entree(m, r, cle):
 def entree_retest(m, r, cle):
     """ENTRÉE SUR RETEST (règle d'Adel 15/11) : une résistance cassée à la CLÔTURE devient support (et inversement) ;
     quand le prix revient dessus, que le marché bloque (mèche de rejet + clôture 15 min du bon côté) et que les unités
-    5 min / 15 min / 1h sont toutes d'accord (4h pas contre), on propose l'entrée à la clôture, SL un tout petit peu
+    5 min / 15 min / 1h sont d'accord ; GOLD/NASDAQ exigent aussi 4h dans le même sens (BTC conserve la règle historique), on propose l'entrée à la clôture, SL un tout petit peu
     sous (sur) la mèche de la dernière bougie. Une alerte par niveau toutes les 2 h ; le bot ne la prend pas lui-même."""
     b = (r.get("b15") or [])[:-1]
     dirs = r.get("dirs") or []
@@ -4034,7 +4034,7 @@ def entree_retest(m, r, cle):
         return (f"🎯 ENTRÉE SUR RETEST : {'LONG' if d == 1 else 'SHORT'} — {ICONE.get(m, '')} {m}\n"
                 f"🧱 L'ancienne {ancien} {px(niveau)} a été cassée à la clôture : elle devient {nouveau}\n"
                 "🛑 Le prix est revenu dessus et le marché bloque (clôture 15 min du bon côté)\n"
-                "✅ 5 min + 15 min + 1h d'accord\n"
+                f"✅ 5 min + 15 min + 1h d'accord" + (" + 4h confirmé" if m in ("GOLD", "NASDAQ") else "") + "\n"
                 f"📍 Entrée ≈ {px(x['c'])}\n🛑 SL {'juste sous' if d == 1 else 'juste au-dessus de'} la mèche : {px(sl)}\n"
                 "🛡 BE dès que le gain = le risque\n🤖 Le bot ne la prend pas lui-même\n⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
     return None
@@ -4044,7 +4044,7 @@ def radar_climax(m, r, cle):
     1) volume climax : une des 4 dernières bougies 15 min CLÔTURÉES a un volume ≥ 3 × la moyenne des 40 d'avant (épuisement) ;
     2) balayage : une de ces bougies est passée sous le plus bas (sur le plus haut) des 20 bougies d'avant, puis la clôture est revenue au-dessus ;
     3) confirmation : la dernière clôture 15 min repasse au-dessus (au-dessous) de l'EMA9.
-    → position CONTRE-TENDANCE « prenable, risquée », SL sous la mèche du balayage ; le bot ne la prend pas lui-même.
+    → BTC conserve l'alerte historique ; GOLD/NASDAQ restent en surveillance si H1 et H4 ne confirment pas le même sens.
     Une alerte par sens toutes les 2 h ; mémorise l'heure (radar_t) pour ne pas envoyer « FEINTE » juste après."""
     # 16/11 : le radar lisait « b15 » coupé à 30 bougies alors qu'il en faut 66 → il ne se déclenchait JAMAIS en réel (LONG raté).
     dirs = r.get("dirs") or []
@@ -4098,9 +4098,9 @@ def radar_climax(m, r, cle):
 
 def retournement_marche(m, r, cle):
     """v71 = Pine « RETOURNEMENT PAR MARCHÉ » (mesuré sur 60 jours de bougies 5 min) :
-    GOLD : 5m + 15m retournés contre le 1h • NASDAQ : idem + gros volume 15 min • BTC : 5m + 15m + 1h retournés contre le 4h.
-    Cibles : haut/bas des 6 dernières bougies 1h puis 4h ; SL : dernier creux/sommet 5 min ; BE dès que le gain = le risque.
-    Une alerte par nouveau sens (comme alert() du Pine), jamais deux fois de suite."""
+    GOLD/NASDAQ : M5/M15 contre H1/H4 = observation uniquement, jamais une position avant confirmation H1+H4.
+    BTC conserve sa règle historique : M5 + M15 + H1 contre H4, avec les cibles et le SL existants.
+    Une alerte par nouveau sens, jamais deux fois de suite."""
     dirs = r.get("dirs") or []
     b5, b15 = (r.get("b5") or [])[:-1], (r.get("b15_long") or r.get("b15") or [])[:-1]   # 16/11 : 41 bougies 15 min nécessaires (b15 = 30 → muet)
     b1, b4 = r.get("b1h") or [], r.get("b4h") or []
