@@ -9956,18 +9956,57 @@ def live_actif(etat):
     return LIVE_24H or bool(etat.get("live_on"))
 
 def live_publier(texte):
-    """Envoie une ligne au graphique du live. Ne bloque jamais le bot (échec = ignoré)."""
+    """Ajoute une ligne à la file persistante du live ; l'envoi réseau est traité séparément."""
     if not LIVE_SUJET or not texte:
         return False
     try:
-        req = urllib.request.Request("https://ntfy.sh/" + urllib.parse.quote(LIVE_SUJET),
-                                     data=str(texte)[:3800 if str(texte).startswith("IA:") else 200].encode("utf-8"),   # v8.9 : le lot IA (JSON) était coupé à 200 caractères → illisible
-                                     headers={"User-Agent": "align-bot"})
-        with urllib.request.urlopen(req, timeout=8):
-            return True
-    except Exception as ex:
-        print("live publier", ex)
+        etat = _ETAT_COURANT.get("etat")
+    except NameError:
+        etat = None
+    if not isinstance(etat, dict):
+        print("LIVE_OUTBOX_UNAVAILABLE: état du bot non initialisé", flush=True)
         return False
+    contenu = str(texte)[:3800 if str(texte).startswith("IA:") else 200]
+    cle = hashlib.sha256(contenu.encode("utf-8")).hexdigest()[:24]
+    file = etat.setdefault("live_outbox", [])
+    if any(x.get("key") == cle for x in file):
+        return True
+    if len(file) >= 300:
+        print("LIVE_OUTBOX_FULL", flush=True)
+        return False
+    file.append({"key": cle, "text": contenu, "tries": 0, "next_t": 0})
+    return True
+
+
+def traiter_file_live(etat, maintenant=None, limite=30):
+    """Publie la file ntfy avec reprises bornées ; un échec réseau ne supprime plus le message immédiatement."""
+    maintenant = time.time() if maintenant is None else float(maintenant)
+    if not LIVE_SUJET:
+        return 0
+    file = etat.setdefault("live_outbox", [])
+    envoyes = 0
+    for item in list(file)[:max(1, int(limite))]:
+        if float(item.get("next_t", 0) or 0) > maintenant:
+            continue
+        try:
+            req = urllib.request.Request("https://ntfy.sh/" + urllib.parse.quote(LIVE_SUJET),
+                                         data=str(item.get("text") or "").encode("utf-8"),
+                                         headers={"User-Agent": "align-bot"})
+            with urllib.request.urlopen(req, timeout=8):
+                pass
+        except Exception as ex:
+            item["tries"] = int(item.get("tries", 0)) + 1
+            if item["tries"] >= 8:
+                file.remove(item)
+                print(f"LIVE_OUTBOX_DROP tries={item['tries']} error={type(ex).__name__}", flush=True)
+                continue
+            attente = min(300, 5 * (2 ** min(item["tries"], 6)))
+            item["next_t"] = maintenant + attente
+            print(f"LIVE_OUTBOX_RETRY tries={item['tries']} in={attente}s error={type(ex).__name__}", flush=True)
+        else:
+            file.remove(item)
+            envoyes += 1
+    return envoyes
 
 def live_pnl(etat, m, cle, r, now=None):
     """Demande d'Adel (15/11) : fenêtre « 💰 ALIGN EN DIRECT » sur le live avec le gain RÉEL en cours des comptes,
@@ -10842,6 +10881,7 @@ def un_tour(etat, chats):
     if TOKEN:
         recevoir_updates_telegram(etat, chats, demandes)
         traiter_file_telegram(etat, limite=20)
+        traiter_file_live(etat, limite=30)
         if SHUTDOWN_REQUESTED.is_set():
             return
         if etat.get("clavier") != 9:
@@ -11295,6 +11335,7 @@ def main():
             demandes = []
             recevoir_updates_telegram(etat, chats, demandes)
             traiter_file_telegram(etat, limite=10)
+            traiter_file_live(etat, limite=10)
             for marche, derniere in list(DERNIERS.items()):
                 try:
                     maj_chronos(etat, marche, derniere)
