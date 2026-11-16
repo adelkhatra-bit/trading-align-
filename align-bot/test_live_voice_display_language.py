@@ -11,7 +11,8 @@ class LiveVoiceDisplayLanguage(unittest.TestCase):
         source = LIVE_JS.read_text(encoding="utf-8")
         self.assertIn("const anglais = langueBande() === 'en';", source)
         self.assertIn("if (!!item.en !== anglais) return;", source)
-        queue = source[source.index("function suivant() {"):source.index("let extra = [];")]
+        start = source.index("function suivant() {")
+        queue = source[start:start + 1200]
         self.assertLess(queue.index("flash.className ="), queue.index("bande.classList.add('on')"))
         self.assertLess(queue.index("bande.classList.add('on')"), queue.index("parlerLive(m);"))
 
