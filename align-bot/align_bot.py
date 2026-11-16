@@ -10913,8 +10913,9 @@ def _ack_callback_rapide(cb, text):
 # l'écoute : texte → bande qui défile ; « CMD:… » → change l'unité de temps / le marché 15 s puis revient.
 # Jamais le sens, l'entrée, le SL ni le TP sur la bande (règle du live).
 # Canal privé bot → graphique : secret GitHub ALIGN_LIVE_SUJET, sinon dérivé du jeton Telegram (jamais écrit dans le dépôt public)
-LIVE_SUJET = (os.environ.get("ALIGN_LIVE_SUJET", "").strip() or
-              ("align-live-" + hashlib.sha256(("align-live:" + TOKEN).encode()).hexdigest()[:16] if TOKEN else ""))
+# Topic public commun avec docs/live/align-bande-live.user.js. Ne pas le dériver du token Telegram :
+# le script TradingView et le worker doivent publier/lire exactement le même canal.
+LIVE_SUJET = "align-live-2a4bccafd9548d93"
 LIVE_LIEN = os.environ.get("ALIGN_LIVE_LIEN", "https://www.tiktok.com/@adelkhatra/live").strip()
 PRIX_MAIN_STARS = int(os.environ.get("PRIX_MAIN_STARS", "25"))         # ≈ 0,50 € pour l'abonné
 LIVE_DUREE_MAIN = 15
@@ -11448,7 +11449,14 @@ def ecran_lire():
         return []
     _ECRAN_T[0] = time.time()
     etat = _ETAT_COURANT.get("etat") or {}
-    depuis = etat.get("ecran_id") or "10m"
+    # Si le heartbeat est périmé, ignorer l'ancien offset : il peut appartenir à un ancien topic
+    # ou masquer les nouveaux pings après un changement de canal / restauration de cache.
+    try:
+        dernier_ping = float(etat.get("live_screen_seen_t", 0) or 0)
+    except (TypeError, ValueError):
+        dernier_ping = 0
+    heartbeat_perime = time.time() - dernier_ping > 75
+    depuis = "10m" if heartbeat_perime else (etat.get("ecran_id") or "10m")
     try:
         url = "https://ntfy.sh/" + urllib.parse.quote(LIVE_SUJET + "-ecran") + "/json?poll=1&since=" + urllib.parse.quote(str(depuis))
         with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "align-bot"}), timeout=8) as rep:
@@ -11515,8 +11523,19 @@ def ecran_vers_telegram(etat):
     """Lit les événements de l'écran du live et les publie en détail dans la chaîne du marché (sans son)."""
     for brut in ecran_lire():
         p = brut.split("|")        # EVT|BTC|pression|-1|7 ou PING|LIVE_SCREEN|timestamp
-        if len(p) >= 2 and p[0] == "PING" and p[1] == "LIVE_SCREEN":
-            etat["live_screen_seen_t"] = time.time()
+        if len(p) >= 3 and p[0] == "PING" and p[1] == "LIVE_SCREEN":
+            # Le timestamp vient du navigateur (Date.now en millisecondes). Ne jamais
+            # considérer un vieux message ntfy rejoué comme une présence actuelle.
+            try:
+                emis = float(p[2])
+                if emis > 10 ** 12:
+                    emis /= 1000.0
+            except (TypeError, ValueError):
+                continue
+            maintenant = time.time()
+            if emis <= 0 or maintenant - emis > 90 or emis - maintenant > 30:
+                continue
+            etat["live_screen_seen_t"] = emis
             continue
         if len(p) < 4 or p[0] != "EVT" or p[1] not in MARCHES:
             continue
