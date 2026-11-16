@@ -25,12 +25,12 @@ class TelegramOptIn(unittest.TestCase):
                 "marches_par_chat": {"10": ["GOLD"], "20": ["GOLD"]}, "bot_off": []}
         self.assertEqual(ab.destinataires_message(etat, ["10", "20", "-100"], "🥇 GOLD\nTP1 : 3900"), ["-100", "10"])
 
-    def test_ancienne_file_auto_est_migree_en_optin_persistant(self):
+    def test_file_auto_ponctuelle_ne_vaut_pas_activation_persistante(self):
         etat = {"auto": {"GOLD": ["10"]}, "coach_optin": {},
                 "marches_par_chat": {"10": ["GOLD"]}, "bot_off": []}
-        self.assertTrue(ab.coach_abonne(etat, "10", "GOLD"))
-        self.assertIn("10", etat["coach_optin"]["GOLD"])
-        self.assertEqual(ab.destinataires_message(etat, ["10"], "🥇 GOLD\nTP1 : 3900"), ["10"])
+        self.assertFalse(ab.coach_abonne(etat, "10", "GOLD"))
+        self.assertNotIn("10", (etat.get("coach_optin") or {}).get("GOLD", []))
+        self.assertEqual(ab.destinataires_message(etat, ["10"], "🥇 GOLD\nTP1 : 3900"), [])
 
     def test_activation_persistante_sur_un_marche_et_pas_les_autres(self):
         etat = {"auto": {}, "coach_optin": {}, "bot_off": []}
@@ -43,7 +43,10 @@ class TelegramOptIn(unittest.TestCase):
 
     def test_bot_off_bloque_l_auto_entree_sans_effacer_le_coach_valide(self):
         etat = {"auto": {}, "coach_optin": {"GOLD": ["10"]}, "marches_par_chat": {"10": ["GOLD"]}, "bot_off": ["10"]}
-        self.assertTrue(ab.coach_abonne(etat, "10", "GOLD"))
+        self.assertFalse(ab.coach_abonne(etat, "10", "GOLD"))  # OFF bloque immédiatement les alertes privées
+        etat["bot_off"] = []
+        self.assertTrue(ab.coach_abonne(etat, "10", "GOLD"))   # le consentement persiste, seul le bot était arrêté
+        etat["bot_off"] = ["10"]
         trade = {"d": 1, "e": 3900.0, "sl": 3890.0, "tp1": 3920.0, "tp2": 3940.0, "qui": {}, "sl_h": "mèche basse"}
         with mock.patch.object(ab, "_envoi_sur") as send:
             ab.entrer_inscrits(etat, "GOLD", trade, {"10"})
@@ -77,7 +80,7 @@ class TelegramOptIn(unittest.TestCase):
         self.assertIn("10", trade["qui"])
         self.assertEqual(send.call_count, 1)
         self.assertEqual(etat.get("auto", {}).get("GOLD", []), [])
-        self.assertTrue(ab.coach_abonne(etat, "10", "GOLD"))
+        self.assertFalse(ab.coach_abonne(etat, "10", "GOLD"))  # le suivi ponctuel ne devient pas un abonnement permanent
 
     def test_prospects_et_rappels_gratuits_sont_silencieux_sans_optin(self):
         etat = {"prospects": ["10", "11"], "auto": {}, "coach_optin": {}, "bot_off": []}
