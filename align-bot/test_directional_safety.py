@@ -20,7 +20,7 @@ def retest_r(h4):
     bars[38] = candle(38 * 900, o=102.2, h=103.0, l=101.9, c=102.5)
     dirs = [0] * 11
     dirs[2], dirs[4], dirs[7], dirs[9] = 1, 1, 1, h4
-    return dict(b15=bars, dirs=dirs, atr=1.0, t=40000)
+    return dict(b15=bars, dirs=dirs, atr=1.0, grosses=[(110.0, "4h"), (120.0, "Daily")], t=40000)
 
 
 def reversal_r(dirs, volume_last=100, price=100.0):
@@ -40,11 +40,15 @@ LONG_BTC = [1, 1, 1, 0, 1, 1, 1, 1, -1, -1, -1]
 class DirectionSafety(unittest.TestCase):
     def test_gold_retest_requires_h4_confirmation(self):
         self.assertIsNone(ab.entree_retest("GOLD", retest_r(0), {}))
-        self.assertIn("ENTRÉE SUR RETEST : LONG", ab.entree_retest("GOLD", retest_r(1), {}))
+        msg = ab.entree_retest("GOLD", retest_r(1), {})
+        self.assertIn("ENTRÉE POSSIBLE SUR RETEST : LONG", msg)
+        self.assertIn("TP1 :", msg); self.assertIn("TP2 :", msg)
 
     def test_nasdaq_retest_requires_h4_confirmation(self):
         self.assertIsNone(ab.entree_retest("NASDAQ", retest_r(0), {}))
-        self.assertIn("ENTRÉE SUR RETEST : LONG", ab.entree_retest("NASDAQ", retest_r(1), {}))
+        msg = ab.entree_retest("NASDAQ", retest_r(1), {})
+        self.assertIn("ENTRÉE POSSIBLE SUR RETEST : LONG", msg)
+        self.assertIn("TP1 :", msg); self.assertIn("TP2 :", msg)
 
     def test_btc_retest_rule_is_unchanged(self):
         self.assertIn("ENTRÉE SUR RETEST : LONG", ab.entree_retest("BTC", retest_r(0), {}))
@@ -149,6 +153,20 @@ class DirectionSafety(unittest.TestCase):
             self.assertIn("RADAR CLIMAX — SURVEILLANCE", msg)
             self.assertIn("Clôtures M5=baissier, M15=baissier, H1=haussier, H4=haussier", msg)
             self.assertIn("Aucune entrée", msg)
+
+    def test_gold_nasdaq_confirmed_climax_includes_tp1_tp2_and_risk_reward(self):
+        bars = [candle(i * 900) for i in range(80)]
+        bars[-2] = candle(78 * 900, o=100, h=102, l=97, c=101, v=500)
+        dirs = [1] * 11
+        r = dict(b15_long=bars, dirs=dirs, dirs_cloturees=dirs, t=50000,
+                 atr=1.0, grosses=[(110.0, "4h"), (120.0, "Daily")])
+        for market in ("GOLD", "NASDAQ"):
+            msg = ab.radar_climax(market, r, {})
+            self.assertIn("RETOURNEMENT CONFIRMÉ — LONG POSSIBLE", msg)
+            self.assertIn("TP1 :", msg)
+            self.assertIn("TP2 :", msg)
+            self.assertIn("Gain/risque", msg)
+            self.assertNotIn("sans TP", msg)
 
     def test_gold_nasdaq_climax_is_watch_only_without_h1_h4_confluence(self):
         bars = [candle(i * 900) for i in range(80)]
