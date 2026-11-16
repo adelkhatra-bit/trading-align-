@@ -7506,7 +7506,7 @@ def construire_live(etat, derniers, now=None):
                         "ut": int(e["n"]), "seuil": MIN_ALIGN,
                         "profil": {"SWING": "SWING", "DAY": "INTRADAY", "SCALPING": "SCALP"}.get(e["strat"], "aucun"),
                         "mouvement5m_pct": mouvement, "bougie5m": bougie, "volume_ratio": volume_ratio,
-                        "volume_source": volume_source, "atr5_pct": atr_pct, "reste15": 900 - int(now) % 900})
+                        "volume_source": volume_source, "atr5_pct": atr_pct})
     return {"v": 2, "maj": int(now), "bot": "@" + str(etat.get("bot") or "align_mtf_adel_bot"), "marches": marches}
 
 def _api_github(chemin, methode="GET", corps=None):
@@ -10297,7 +10297,10 @@ def texte_ecran(m, typ, d, minutes, r, cle, ligne=""):
 def ecran_vers_telegram(etat):
     """Publie les événements live ; un échec Telegram laisse l'événement en attente pour le prochain passage."""
     for evenement in ecran_lire():
-        event_id, brut = evenement.get("id"), evenement.get("message", "")
+        if isinstance(evenement, str):
+            event_id, brut = None, evenement
+        else:
+            event_id, brut = evenement.get("id"), evenement.get("message", "")
         def avancer():
             if event_id:
                 etat["ecran_id"] = event_id
