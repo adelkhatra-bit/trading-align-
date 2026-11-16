@@ -73,7 +73,7 @@ class MarketEntryStabilisationTests(unittest.TestCase):
         now = event + 10 * 60
         state = {"cal": {"ev": [{"t": event, "titre": "CPI"}]}}
         r = {"m1": [{"t": now, "o": 100.0, "h": 101.0, "l": 99.0, "c": 100.0}],
-             "r5": [50.0, 50.0], "confirme": 1, "t": now}
+             "r5": [50.0, 50.0], "confirme": 1, "t": now, "posD": 0.5, "posW": 0.5}
         cle = {"prep": True, "ordre": {"e": 100.0, "sl": 99.0}}
         patches = [
             unittest.mock.patch.dict(align_bot._ETAT_COURANT, {"etat": state}, clear=False),
