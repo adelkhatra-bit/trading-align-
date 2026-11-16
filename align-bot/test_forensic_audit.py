@@ -294,5 +294,34 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
 
 
 
+    def test_new_subscriber_market_selection_does_not_enable_push_alerts(self):
+        etat = {"coach_pending": ["new-user"],
+                "marches_par_chat": {"new-user": ["GOLD", "NASDAQ"]}}
+        sent = []
+        with unittest.mock.patch.object(align_bot, "autorise", return_value=True), \
+             unittest.mock.patch.object(align_bot, "_envoi_sur", side_effect=lambda cid, **kw: sent.append(kw)), \
+             unittest.mock.patch.object(align_bot, "inscrire_auto") as subscribe:
+            ok = align_bot.valider_et_suivre_marches(etat, "new-user", 123)
+        self.assertTrue(ok)
+        subscribe.assert_not_called()
+        self.assertNotIn("new-user", etat.get("auto", {}).get("GOLD", []))
+        self.assertNotIn("new-user", etat.get("auto", {}).get("NASDAQ", []))
+        markup = sent[-1]["reply_markup"]
+        self.assertIn("analysechoice:BOTH", markup)
+        self.assertIn("coachlive:GOLD", markup)
+        self.assertIn("coachlive:NASDAQ", markup)
+        self.assertIn("auto:GOLD", markup)
+        self.assertIn("Aucune notification automatique", sent[-1]["text"])
+
+    def test_new_subscriber_market_menu_uses_selection_only_label(self):
+        etat = {"coach_pending": ["new-user"], "marches_par_chat": {"new-user": []}}
+        sent = []
+        with unittest.mock.patch.object(align_bot, "_envoi_sur", side_effect=lambda cid, **kw: sent.append(kw)):
+            align_bot.menu_marches(etat, "new-user")
+        self.assertIn("Valider mes marchés", sent[-1]["text"])
+        self.assertNotIn("Valider et suivre", sent[-1]["text"])
+
+
+
 if __name__ == "__main__":
     unittest.main()
