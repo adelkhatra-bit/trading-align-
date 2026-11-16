@@ -8265,21 +8265,16 @@ def menu_marches(etat, cid, message_id=None):
                     ("✅ Confirm & follow" if anglais else "✅ Valider et suivre"), "callback_data": "markets:OK"}])
     coches = " + ".join(NOMS_MARCHES[m] for m in MARCHES if m in choisis)
     texte = ("📡 MY MARKETS\n━━━━━━━━━━━━━━━\n👆 Tap to tick / untick\n"
-             f"☑️ Ticked now: {coches}\n🔔 You only get alerts for ticked markets\n"
-             "📍 Prices can differ by a few points from your broker: follow the candles (wicks)"
+             f"☑️ Ticked now: {coches}\n" + ("🔕 No automatic alerts are enabled; use on-demand research or opt in to coach / alerts\n" if nouveau else "🔔 You only get alerts for ticked markets\n")
+             + "📍 Prices can differ by a few points from your broker: follow the candles (wicks)"
              if anglais else
              "📡 MES MARCHÉS\n━━━━━━━━━━━━━━━\n👆 Touche pour cocher / décocher\n"
-             f"☑️ Cochés en ce moment : {coches}\n🔔 Tu reçois uniquement les marchés cochés\n"
-             "📍 Le prix peut différer de quelques points selon ton broker : suis les bougies (mèches)")
+             f"☑️ Cochés en ce moment : {coches}\n" + ("🔕 Aucune alerte automatique active ; analyses à la demande et coach / alertes sur inscription\n" if nouveau else "🔔 Tu reçois uniquement les marchés cochés\n")
+             + "📍 Le prix peut différer de quelques points selon ton broker : suis les bougies (mèches)")
     if str(cid) in {str(x) for x in etat.get("coach_pending", [])}:
         texte += ("\n\nNew subscribers start with no market selected. Tick only the markets you want alerts for."
                   if anglais else
                   "\n\nAucun marché n'est suivi par défaut pour un nouvel abonné. Coche uniquement ceux pour lesquels tu souhaites recevoir des alertes.")
-    if nouveau:
-        texte = texte.replace("🔔 You only get alerts for ticked markets",
-                              "🔕 No automatic alerts are enabled; use on-demand research or opt in to coach / alerts")
-        texte = texte.replace("🔔 Tu reçois uniquement les marchés cochés",
-                              "🔕 Aucune alerte automatique n'est activée ; analyses à la demande et coach / alertes sur inscription")
     clavier = json.dumps({"inline_keyboard": lignes})
     if message_id:
         try:
