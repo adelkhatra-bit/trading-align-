@@ -5412,6 +5412,14 @@ def activer_coach_live(etat, cid, m, actif=True):
     else:
         abonnes.pop(str(cid), None)
 
+def demarrer_recherche_positions(etat, cid):
+    """Démarre la veille persistante sur les marchés choisis, jusqu'à arrêt manuel."""
+    marches = tuple(sorted(marches_choisis(etat, cid)))
+    for m in marches:
+        activer_coach_live(etat, cid, m, True)
+    return marches
+
+
 
 def notifier_clotures(etat, m, r, cle):
     """Envoie les clôtures nouvelles une fois chacune, sur les UT suivies par l'utilisateur."""
@@ -6337,6 +6345,26 @@ def traiter(etat, chats, updates):
                     etat["coach_pending"] = [x for x in etat.get("coach_pending", []) if str(x) != qui]
                 continue
             if live_callback(etat, chats, cb, choix, mk, qui):
+                continue
+            if choix == "searchpos" and mk == "BOTH":
+                try:
+                    telegram("answerCallbackQuery", callback_query_id=cb["id"], text="🎯 Recherche activée")
+                except Exception:
+                    pass
+                marches_recherche = demarrer_recherche_positions(etat, qui)
+                if not marches_recherche:
+                    _envoi_sur(qui, text="📡 Choisis d'abord les marchés à surveiller pour chercher une position.")
+                    menu_marches(etat, qui)
+                    continue
+                noms = " + ".join(marches_recherche)
+                boutons_stop = [[{"text": f"⏹ Arrêter {m}", "callback_data": f"coachstop:{m}"} for m in marches_recherche]]
+                _envoi_sur(qui, text=(f"🎯 RECHERCHE DE POSITION ACTIVE — {noms}\\n"
+                                      "🔎 ALIGN surveille les configurations confirmées en continu.\\n"
+                                      "🕯 Le coach commente les clôtures M15 et les changements importants.\\n"
+                                      "📍 Dès qu'une position est détectée, tu reçois ses niveaux et son suivi.\\n"
+                                      "🔕 Pas d'alerte automatique sur les autres marchés.\\n"
+                                      "⏹ La recherche reste active jusqu'à ton arrêt."), 
+                           reply_markup=json.dumps({"inline_keyboard": boutons_stop}))
                 continue
             if choix == "analysechoice" and (mk in MARCHES or mk == "BOTH"):
                 try:
@@ -11206,6 +11234,8 @@ def clavier_live(etat, cid, anglais=False):
         lignes.append([{"text": f"🎙 Coach {k}", "callback_data": f"coachlive:{k}"} for k in ("BTC", "GOLD", "NASDAQ")])
         lignes.append([{"text": "🔎 Faire une analyse" if not anglais else "🔎 Research markets",
                         "callback_data": "analysechoice:BOTH"}])
+        lignes.append([{"text": "🎯 Chercher une position" if not anglais else "🎯 Find a position",
+                        "callback_data": "searchpos:BOTH"}])
         lignes.append([{"text": "📡 Sélectionner mes marchés" if not anglais else "📡 Select my markets",
                         "callback_data": "marketsmenu:x"}])
     if str(cid) in {str(x) for x in proprio(etat)}:
