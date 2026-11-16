@@ -3429,3 +3429,46 @@ class TelegramExplicitCoachOptInTest(unittest.TestCase):
         with unittest.mock.patch.object(align_bot, "_envoi_sur", return_value={"ok": True}):
             align_bot.entrer_inscrits(state, "BTC", trade, {"11", "22"})
         self.assertEqual(set(trade["qui"]), {"22"})
+
+    def test_daily_checkin_skips_active_coach_and_open_positions(self):
+        now = datetime.datetime(2026, 11, 16, 9, 0, tzinfo=align_bot.PARIS).timestamp()
+        state = {
+            "auto": {"BTC": ["11"]},
+            "BTC": {"trade": {"qui": {"22": {"e": 100, "d": 1, "fini": False}}}}
+        }
+        sent = []
+        with unittest.mock.patch.object(align_bot, "_envoi_sur",
+                                        side_effect=lambda cid, **kw: sent.append(str(cid)) or {"ok": True}):
+            align_bot.question_quotidienne(state, {"11", "22", "33"}, now)
+        self.assertEqual(sent, ["33"])
+
+    def test_tp_closes_bot_and_asks_before_next_position(self):
+        state = {
+            "auto": {"BTC": ["11"], "GOLD": ["11"], "NASDAQ": []},
+            "BTC": {"trade": {"qui": {"11": {"e": 100.0, "d": 1, "fini": False}}}},
+            "bot_off": []
+        }
+        sent = []
+        with unittest.mock.patch.object(align_bot, "_envoi_sur",
+                                        side_effect=lambda cid, **kw: sent.append(kw) or {"ok": True}):
+            align_bot.noter(state, "11", "BTC", state["BTC"]["trade"]["qui"]["11"], 104.0, "TP1 touché")
+        self.assertIn("11", state["bot_off"])
+        self.assertTrue(all("11" not in state["auto"][m] for m in align_bot.MARCHES))
+        self.assertEqual(len(sent), 1)
+        self.assertIn("next:yes", sent[0]["reply_markup"])
+        self.assertIn("rechercher une autre position", sent[0]["text"])
+
+    def test_tp_keeps_monitoring_other_open_market_without_restart_prompt(self):
+        state = {
+            "auto": {"BTC": ["11"], "GOLD": ["11"]},
+            "BTC": {"trade": {"qui": {"11": {"e": 100.0, "d": 1, "fini": False}}}},
+            "GOLD": {"trade": {"qui": {"11": {"e": 200.0, "d": -1, "fini": False}}}},
+            "bot_off": []
+        }
+        sent = []
+        with unittest.mock.patch.object(align_bot, "_envoi_sur",
+                                        side_effect=lambda cid, **kw: sent.append(kw) or {"ok": True}):
+            align_bot.noter(state, "11", "BTC", state["BTC"]["trade"]["qui"]["11"], 104.0, "TP1 touché")
+        self.assertNotIn("11", state["bot_off"])
+        self.assertIn("Suivi maintenu sur : GOLD", sent[0]["text"])
+        self.assertNotIn("next:yes", sent[0]["reply_markup"])
