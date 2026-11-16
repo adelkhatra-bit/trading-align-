@@ -363,6 +363,7 @@
   // Le flux ntfy annonce les nouvelles entrées, mais un live ouvert après le bot peut manquer l'événement.
   // Le JSON public expose seulement l'état (entree/preparation), jamais la direction ni les niveaux.
   const BOT_STATE_URL = 'https://raw.githubusercontent.com/adelkhatra-bit/trading-auto/live-data/live.json';
+  const botEtatConnu = {};
   let botEtatSyncT = null;
   async function synchroniserEtatBot() {
     try {
@@ -374,8 +375,17 @@
       for (const item of (Array.isArray(data.marches) ? data.marches : [])) {
         const k = cleMarche(item && item.m);
         if (!k) continue;
-        if (item.etat === 'entree') botPos[k] = Date.now();
-        else delete botPos[k];
+        if (item.etat === 'entree') {
+          const dejaAnnonce = !!botPos[k] && Date.now() - botPos[k] < 12 * 3600 * 1000;
+          botPos[k] = Date.now();
+          // Si la page LIVE a raté l'événement ntfy d'entrée ou s'ouvre après le bot,
+          // elle annonce l'état réellement ouvert une seule fois et relance le coach d'ambiance.
+          if (!dejaAnnonce) montrer('🎯 POSITION ALIGN ACTIVE SUR ' + k + ' • le coach suit le trade avec la team • lien en bio', true, 1, 'proche', false);
+          botEtatConnu[k] = 'entree';
+        } else {
+          delete botPos[k];
+          botEtatConnu[k] = String(item.etat || 'calme');
+        }
       }
     } catch (e) {}
   }
