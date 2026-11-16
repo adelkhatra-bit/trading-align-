@@ -631,12 +631,12 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertEqual([align_bot.TRAD.get(b["text"], b["text"]) for b in fr_buttons], [b["text"] for b in en_buttons])
         self.assertEqual([b["text"] for b in en_buttons], [
             "❓ Why this decision?", "🧠 Learn more", "🎯 Levels / prices",
-            "⏱ All timeframes", "🗂 Message history", "🧑‍🏫 Coach: warn me ", "🎙 Live commentator coach"
+            "⏱ All timeframes", "🗂 Message history", "🧑‍🏫 Activate the coach", "🎙 Live commentator coach"
         ])
 
     def test_all_static_telegram_inline_button_labels_have_english_translations(self):
         labels = [
-            "🧑‍🏫 Coach : préviens-moi", "❓ Pourquoi cette décision ?",
+            "🧑‍🏫 Coach : préviens-moi", "🧑‍🏫 Activer le coach", "🔕 Désactiver le coach", "❓ Pourquoi cette décision ?",
             "📊 Analyse complète", "🧠 En savoir plus", "🎯 Niveaux / prix", "⏱ Toutes les unités",
             "🗂 Historique des messages", "🟢 Je suis rentré",
             "🧑‍🏫 Coach : préviens-moi ", "📍 Ma position • SL / TP",
@@ -891,7 +891,7 @@ class AlignMtfRulesTest(unittest.TestCase):
         callbacks = [button.get("callback_data") for row in keyboard for button in row if button.get("callback_data")]
         self.assertTrue({"❓ Pourquoi cette décision ?", "🧠 En savoir plus", "🎯 Niveaux / prix",
                          "⏱ Toutes les unités", "🗂 Historique des messages",
-                         "🧑‍🏫 Coach : préviens-moi "}.issubset(set(labels)))
+                         "🧑‍🏫 Activer le coach"}.issubset(set(labels)))
         self.assertTrue({"why:GOLD", "details:GOLD", "levels:GOLD", "timeframes:GOLD",
                          "history:GOLD", "auto:GOLD"}.issubset(set(callbacks)))
 
@@ -2569,7 +2569,7 @@ class TestFollowPositionMarketChoice(unittest.TestCase):
              patch.object(align_bot, "_envoi_sur"), patch.object(align_bot, "telegram"):
             align_bot.traiter(state, set(), [update])
         subscribe.assert_called_once_with(unittest.mock.ANY, "101", "GOLD", notifier=False)
-        self.assertEqual(state["marches_par_chat"]["101"], "GOLD")
+        self.assertEqual(state["marches_par_chat"]["101"], ["GOLD"])
         self.assertEqual(state["auto"]["BTC"], ["202"])
         self.assertNotIn("101", state["veille_cloture"]["BTC"])
         self.assertIn("202", state["veille_cloture"]["BTC"])
@@ -2594,7 +2594,7 @@ class TestFollowPositionMarketChoice(unittest.TestCase):
              patch.object(align_bot, "_envoi_sur"), patch.object(align_bot, "telegram"):
             align_bot.traiter(state, set(), [update])
         self.assertEqual([call.args[2] for call in subscribe.call_args_list], ["BTC", "GOLD"])
-        self.assertEqual(state["marches_par_chat"]["102"], "BOTH")
+        self.assertEqual(state["marches_par_chat"]["102"], ["BTC", "GOLD"])
 
 
 class TestTelegramSimpleAnalysisLayout(unittest.TestCase):
