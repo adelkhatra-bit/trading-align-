@@ -23,6 +23,8 @@ TELEGRAM_UPDATES = queue.Queue()
 TELEGRAM_POLL_STOP = threading.Event()
 SHUTDOWN_REQUESTED = threading.Event()
 CALLBACKS_ACKNOWLEDGED = set()
+# Mode Telegram « pull » : seuls les messages déclenchés par l'utilisateur ou une entrée demandée sont autorisés.
+TELEGRAM_PULL_CONTEXT = threading.local()
 MARCHES = {"BTC": "XBTUSD", "GOLD": "XAUUSD", "NASDAQ": "NAS100"}  # BTC → FTMO (CFD 24/7) • GOLD → Topstep (MGC) / FTMO • NASDAQ → FX:NAS100 (TradingView)
 MIN_ALIGN, MIN_SQZ, MARGE_ATR, GAIN_MIN = 8, 4, 0.5, 1.5   # = réglages par défaut de l'indicateur ALIGN MTF PRO v24
 LIEN_RESULTATS = "https://t.me/+RajFd_hMgl1kNmQ0"     # groupe ALIGN Résultats (lien privé)
@@ -2921,6 +2923,26 @@ def traiter_file_telegram(etat, maintenant=None, limite=20):
     return envoyes
 
 
+def _telegram_sortant_autorise(methode, params):
+    """Aucun push spontané : réponse privée à une action explicite, ou entrée attendue après demande."""
+    if methode == "answerCallbackQuery":
+        return True
+    if not methode.startswith(("send", "copy", "forward", "edit")):
+        return True
+    cid = str(params.get("chat_id") or "")
+    contexte = str(getattr(TELEGRAM_PULL_CONTEXT, "chat_id", "") or "")
+    prive = bool(getattr(TELEGRAM_PULL_CONTEXT, "private", False))
+    if cid and prive and cid == contexte:
+        return True
+    etat = DERNIER_ETAT or {}
+    actifs = {str(x) for x in etat.get("recherche_positions_active", [])}
+    texte = str(params.get("text") or params.get("caption") or "")
+    if cid and cid in actifs and methode in ("sendMessage", "sendPhoto") and est_entree(texte):
+        return True
+    print(f"TELEGRAM_PULL_BLOCK method={methode} chat={cid or '-'}", flush=True)
+    return False
+
+
 def telegram(methode, **params):
     params_initiaux = dict(params)
     if methode == "answerCallbackQuery":
@@ -2928,6 +2950,8 @@ def telegram(methode, **params):
         if callback_id and callback_id in CALLBACKS_ACKNOWLEDGED:
             CALLBACKS_ACKNOWLEDGED.discard(callback_id)
             return {"ok": True, "result": True}
+    if not _telegram_sortant_autorise(methode, params):
+        return {"ok": True, "result": None, "blocked_by_pull_mode": True}
     if methode in ("sendMessage", "editMessageText") and "%%AGENT:" in str(params.get("text", "")):
         t_ = str(params["text"]); mk_ = re.search(r"📍 (\w+) - ", t_)
         params["text"] = re.sub(r"%%AGENT:(\w+)%%", lambda g: agent_pour(DERNIER_ETAT or {}, params.get("chat_id"), mk_.group(1) if mk_ else "", g.group(1)), t_)
@@ -2983,6 +3007,16 @@ def telegram(methode, **params):
             "type": methode, "text": str(texte or "")[:4096]
         })
         del JOURNAL_SORTANT[:-JOURNAL_MAX]
+    if methode in ("sendMessage", "sendPhoto") and resultat.get("ok"):
+        cid_envoye = str(params.get("chat_id") or "")
+        etat_courant = DERNIER_ETAT or {}
+        actifs = etat_courant.setdefault("recherche_positions_active", [])
+        texte_envoye = str(params.get("text") or params.get("caption") or "")
+        if cid_envoye in {str(x) for x in actifs} and est_entree(texte_envoye):
+            etat_courant["recherche_positions_active"] = [x for x in actifs if str(x) != cid_envoye]
+            for abonnes in (etat_courant.get("coach_live") or {}).values():
+                if isinstance(abonnes, dict):
+                    abonnes.pop(cid_envoye, None)
     return resultat
 
 # ───────── Boutons et jauge ─────────
@@ -5430,11 +5464,17 @@ def activer_coach_live(etat, cid, m, actif=True):
     if actif:
         # Cliquer explicitement sur le coach le réactive même si le bot avait été mis en pause.
         etat["bot_off"] = [x for x in etat.get("bot_off", []) if str(x) != str(cid)]
+        actifs = etat.setdefault("recherche_positions_active", [])
+        if str(cid) not in {str(x) for x in actifs}:
+            actifs.append(str(cid))
         dernier = int(((DERNIERS.get(m) or {}).get("b15") or [{"t": 0}, {"t": 0}])[-2]["t"]) if len((DERNIERS.get(m) or {}).get("b15") or []) > 1 else 0
-        # Pas d'expiration automatique : surveillance jusqu'à l'arrêt manuel.
+        # Pas d'expiration automatique : surveillance jusqu'à arrêt manuel ou première entrée confirmée.
         abonnes[str(cid)] = {"dernier_t": dernier}
     else:
         abonnes.pop(str(cid), None)
+        encore_actif = any(str(cid) in {str(x) for x in (a or {})} for a in (etat.get("coach_live") or {}).values())
+        if not encore_actif:
+            etat["recherche_positions_active"] = [x for x in etat.get("recherche_positions_active", []) if str(x) != str(cid)]
 
 def demarrer_recherche_positions(etat, cid):
     """Démarre la veille persistante sur les marchés choisis, jusqu'à arrêt manuel."""
@@ -6270,6 +6310,8 @@ def lien_validation(etat):
 def traiter(etat, chats, updates):
     """Boutons cliqués et messages reçus. Renvoie la liste des téléphones qui demandent une analyse."""
     demandes = []
+    TELEGRAM_PULL_CONTEXT.chat_id = None
+    TELEGRAM_PULL_CONTEXT.private = False
     for u in updates:
         etat["offset"] = u["update_id"] + 1
         message_recu = (u.get("message") or u.get("edited_message") or
@@ -6280,6 +6322,8 @@ def traiter(etat, chats, updates):
         chat_recu = (message_recu.get("chat") or
                      (callback_recu.get("message") or {}).get("chat") or
                      demande_recue.get("chat") or statut_recu.get("chat") or {})
+        TELEGRAM_PULL_CONTEXT.chat_id = str(chat_recu.get("id") or "") if chat_recu.get("type") == "private" else None
+        TELEGRAM_PULL_CONTEXT.private = chat_recu.get("type") == "private"
         type_message = next((k for k in ("photo", "document", "video", "voice", "audio",
                                          "sticker", "animation", "video_note", "location",
                                          "contact", "poll", "dice", "venue") if k in message_recu), "message")
@@ -6369,6 +6413,12 @@ def traiter(etat, chats, updates):
                     etat["coach_pending"] = [x for x in etat.get("coach_pending", []) if str(x) != qui]
                 continue
             if live_callback(etat, chats, cb, choix, mk, qui):
+                continue
+            if choix == "quiet":
+                try:
+                    telegram("answerCallbackQuery", callback_query_id=cb["id"], text="Bien noté")
+                except Exception:
+                    pass
                 continue
             if choix == "searchpos" and mk == "BOTH":
                 try:
@@ -6827,14 +6877,23 @@ def traiter(etat, chats, updates):
                 cmd = "/" + charge
         if cmd in COMMANDES:
             msg["text"] = tx = COMMANDES[cmd]
-        if cmd == "/start" and str(cid) not in (etat.get("niveaux") or {}) and str(cid) not in {str(x) for x in proprio(etat)}:
-            accueil_questionnaire(etat, cid)
-        if cmd in ("/start", "/boutons"):
-            # Les boutons reviennent toujours (si le clavier du téléphone les a cachés)
-            _envoi_sur(cid, text="⬇️ Tes boutons sont là 👇\n💡 Clavier caché ? Appuie sur l'icône ⌘ à droite du champ",
-                       reply_markup=CLAVIER if autorise(etat, cid, msg.get("from", {}).get("id")) else CLAVIER_VISITEUR)
-            if cid in etat.get("prospects", []) or cid in proprio(etat):
-                continue
+        if cmd == "/start":
+            # Un seul accueil par utilisateur ; toutes les autres actions passent par ses boutons.
+            deja = etat.setdefault("bienvenue_pull_v1", [])
+            if cid not in {str(x) for x in deja}:
+                prenom = etat.get("prenoms", {}).get(cid) or "toi"
+                texte = f"Bonjour {prenom}, tu vas trader aujourd'hui ?"
+                clavier = json.dumps({"inline_keyboard": [
+                    [{"text": "🎯 Oui, chercher une position", "callback_data": "searchpos:BOTH"}],
+                    [{"text": "📊 Demander une analyse", "callback_data": "analysechoice:BOTH"}],
+                    [{"text": "Pas aujourd'hui", "callback_data": "quiet:no"}]
+                ]})
+                _envoi_sur(cid, text=texte, reply_markup=clavier)
+                deja.append(cid)
+            continue
+        if cmd == "/boutons":
+            _envoi_sur(cid, text="Choisis une action :", reply_markup=CLAVIER if autorise(etat, cid, msg.get("from", {}).get("id")) else CLAVIER_VISITEUR)
+            continue
         if tx in INVERSE:
             msg["text"] = tx = INVERSE[tx]
         bas = tx.lower()
@@ -6947,6 +7006,8 @@ def traiter(etat, chats, updates):
         # Pas de conversation libre : seuls les boutons et retours explicitement sollicités
         # (photo de gain ou pseudo TradingView après demande) sont traités.
         # Tout texte libre est ignoré, pour les visiteurs comme pour les abonnés.
+    TELEGRAM_PULL_CONTEXT.chat_id = None
+    TELEGRAM_PULL_CONTEXT.private = False
     return demandes
 AUTO_MARCHES = ("BTC", "GOLD", "NASDAQ")
 
@@ -10367,14 +10428,8 @@ def _traiter_lecture_rapide(etat, chats, update):
     cmd = words[0].split("@")[0].lower() if words else ""
     payload = words[1].lower() if len(words) > 1 else ""
     if cmd == "/start":
-        if payload:
-            return False
-        if not localement_autorise:
-            return False  # laisse le handler principal vérifier les abonnements Telegram
-        _envoi_sur(cid, text="⬇️ Tes boutons sont là 👇\n💡 Clavier caché ? Appuie sur l'icône ⌘ à droite du champ",
-                   reply_markup=CLAVIER)
-        update["_align_fast_handled"] = True
-        return True
+        # L'accueil unique est envoyé par le handler principal ; pas de second message rapide.
+        return False
     if cmd == "/boutons":
         if not localement_autorise:
             return False
@@ -11427,7 +11482,15 @@ def boucle_polling_telegram(etat, chats):
                 else:
                     _ack_callback_rapide(cb, toast_callback(cb.get("data", ""), anglais))
             else:
-                _traiter_lecture_rapide(etat, chats, update)
+                msg_rapide = update.get("message") or update.get("edited_message") or {}
+                chat_rapide = msg_rapide.get("chat") or {}
+                TELEGRAM_PULL_CONTEXT.chat_id = str(chat_rapide.get("id") or "") if chat_rapide.get("type") == "private" else None
+                TELEGRAM_PULL_CONTEXT.private = chat_rapide.get("type") == "private"
+                try:
+                    _traiter_lecture_rapide(etat, chats, update)
+                finally:
+                    TELEGRAM_PULL_CONTEXT.chat_id = None
+                    TELEGRAM_PULL_CONTEXT.private = False
             TELEGRAM_UPDATES.put(update)
 
 
@@ -11916,6 +11979,12 @@ def charger_etat():
     # offset Telegram, suivis, résultats et journal) sans réinitialiser les instructions.
     etat.setdefault("journal_telegram", [])
     etat.setdefault("chats", [])
+    # Migration de sécurité : couper les anciens abonnements push et vider les messages en attente.
+    etat["coach_live"] = {}
+    etat["coach_pending"] = []
+    etat["recherche_positions_active"] = []
+    etat["telegram_outbox"] = []
+    etat["veille_cloture"] = {}
     etat["schema_version"] = STATE_SCHEMA_VERSION
     if version < STATE_SCHEMA_VERSION:
         print(f"STATE_MIGRATION={version}->{STATE_SCHEMA_VERSION} (conservation des données)", flush=True)
