@@ -252,7 +252,7 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("PING|LIVE_SCREEN|", source)
         self.assertIn("setInterval(pingEcran, 25000)", source)
         self.assertIn("clearInterval(heartbeatT)", source)
-        self.assertIn("🔊 ACTIVER LA VOIX DU COACH", source)
+        self.assertIn("🔊 ACTIVER LE COMMENTATEUR", source)
         self.assertIn("🔊 COACH VOCAL ON", source)
         self.assertIn("voixBtn.remove()", source)
         self.assertIn("parlerLive(m)", source)
@@ -672,7 +672,7 @@ class LiveOutbox(unittest.TestCase):
         self.assertIn("Date.now() - derniereTend > 75000", bande)
         self.assertIn("derniereCoach", bande)
         self.assertIn("coachN++; derniereCoach = Date.now();", bande)
-        self.assertIn("🔊 ACTIVER LA VOIX DU COACH", bande)
+        self.assertIn("🔊 ACTIVER LE COMMENTATEUR", bande)
         self.assertIn("Le coach ALIGN est en direct", bande)
 
     def test_ai_live_market_commentary_refreshes_every_ten_minutes(self):
