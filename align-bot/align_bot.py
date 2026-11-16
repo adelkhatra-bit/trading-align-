@@ -10220,7 +10220,7 @@ def phrases_bande_par_marche(brut):
 
 
 def live_phrases_ia(etat, maintenant, derniers=None):
-    """Génère des commentaires IA fondés sur les données réelles déjà calculées, marché par marché."""
+    """Génère des commentaires IA par marché depuis les analyses en mémoire, sans nouvel appel de données."""
     if not live_actif(etat) or maintenant - etat.get("live_ia_t", 0) < LIVE_IA_INTERVALLE:
         return False
     etat["live_ia_t"] = maintenant
