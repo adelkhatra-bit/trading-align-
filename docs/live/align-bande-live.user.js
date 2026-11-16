@@ -310,12 +310,12 @@
     else if (/TP2 TOUCH|OBJECTIF FINAL|SL TOUCH|STOP TOUCH|POSITION (FERMÉE|CLÔTURÉE)/i.test(t)) delete botPos[k];
   }
   function afficherShowEntree(t) {
-    const head = String(t || '').split(/\\r?\\n/)[0];
+    const head = String(t || '').split(/\r?\n/)[0];
     const market = cleMarche(head) || codeMarche();
     const side = /SHORT|VENTE/i.test(head) ? 'SHORT' : /LONG|ACHAT/i.test(head) ? 'LONG' : 'POSITION';
-    const signature = market + '|' + side + '|' + head;
-    if (signature === lastEntryShow) return;
-    lastEntryShow = signature;
+    const signature = market + '|' + side + '|' + head.replace(/[0-9][0-9., ]*/g, '#');
+    if (signature === lastEntryShow && Date.now() - lastEntryAt < 120000) return;
+    lastEntryShow = signature; lastEntryAt = Date.now();
     const short = side === 'SHORT';
     showPopup.className = short ? 'bas' : 'haut';
     showPopup.innerHTML = '<span class="emo">' + (short ? '🔴' : '🟢') + '</span><span class="copy"><strong>ENTRÉE VALIDÉE</strong><small>' +
@@ -327,7 +327,7 @@
     showPopup.classList.remove('go'); void showPopup.offsetWidth; showPopup.classList.add('go');
     lueur(short ? -1 : 1);
     clearTimeout(showTimer);
-    showTimer = setTimeout(() => { showPopup.classList.remove('go'); showPopup.style.display = 'none'; }, 2900);
+    showTimer = setTimeout(() => { showPopup.classList.remove('go'); }, 2900);
   }
   EN.push([' a touché l\'objectif du graphique • pas de position du coach cette fois ⏳ • attends le prochain cycle : lien en bio', ' touched the chart target • no coach trade this time ⏳ • wait for the next cycle: link in bio']);
   function botDedans(m) { const t = botPos[cleMarche(m)]; return !!t && Date.now() - t < 12 * 3600 * 1000; }
@@ -654,7 +654,7 @@
   const cssShow = document.createElement('style');
   cssShow.textContent = `
   #align-show{position:fixed;z-index:10001;pointer-events:none;display:none;align-items:center;gap:14px;padding:10px 26px;
-    border-radius:18px;font:900 40px/1.1 system-ui,Segoe UI,Arial,sans-serif;color:#fff;white-space:nowrap;
+    border-radius:18px;font:900 40px/1.1 system-ui,Segoe UI,Arial,sans-serif;color:#fff;white-space:normal;max-width:calc(100vw - 32px);
     text-shadow:0 3px 6px rgba(0,0,0,.55);box-shadow:0 8px 30px rgba(0,0,0,.55);transform:translateX(-50%)}
   #align-show.go{display:flex;animation:showPop 2.8s cubic-bezier(.2,1.4,.4,1) forwards}
   #align-show.bas{background:linear-gradient(90deg,#ff1744,#ff6d00)} #align-show.haut{background:linear-gradient(90deg,#00c853,#00e5ff);color:#000;text-shadow:none}
@@ -682,7 +682,7 @@
   const cadre = document.createElement('div'); cadre.id = 'align-cadre'; document.body.appendChild(cadre);
   const chrono = document.createElement('div'); chrono.id = 'align-chrono'; document.body.appendChild(chrono);
   const showPopup = document.createElement('div'); showPopup.id = 'align-show'; document.body.appendChild(showPopup);
-  let showTimer = 0, lastEntryShow = '';
+  let showTimer = 0, lastEntryShow = '', lastEntryAt = 0;
 
   function nomMarche() {
     const s = String((chart() && chart().symbol()) || '');
