@@ -1272,6 +1272,7 @@
   EN.push([POS_TXT[0], '🔥 TEAM, WHO\'S ON THE TRAIN? 🚂 if you\'re in, tap the screen and write YES 👇 • share the live to keep it on top 🙏'],
     [POS_TXT[1], '🚀 WANT TO BE PART OF THE ADVENTURE? try it FOR FREE on a demo account, zero risk 😉 • everything is in the link in bio 👉'],
     [POS_TXT[2], '😎 ALIGN FOLLOWS ITS PLAN… we never chase a move that has already happened 🚄 • to follow the next setup, see the link in bio'],
+  );
   const posT = setInterval(() => { try {
     if (retour) return; const LG = lignesAlign(), E = LG['ENTRÉE'], S = LG.SL; if (!E || !S) return;
     const B = barres(3); if (!B.length) return; const p = B[B.length - 1][4], sens = S.y > E.y ? -1 : 1;
