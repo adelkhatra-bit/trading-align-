@@ -132,6 +132,7 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn("if (!voixActive", self.js)
         self.assertIn("speechSynthesis.speak(utterance)", self.js)
         self.assertIn("const anglais = !!item.en;", self.js)
+        self.assertIn("POSITION ALIGN CONFIRMÉE", self.js[self.js.index("function botSuivi"):self.js.index("function synchroniserEtatBot")])
         self.assertIn("telegram", self.js[self.js.index("function sansPrix"):self.js.index("function montrer")])
         self.assertIn("feuArtifice", self.js[self.js.index("POSITION CONFIRMÉE")-60:self.js.index("POSITION CONFIRMÉE")+80])
         self.assertIn("Tu veux savoir si le feu vert est confirmé ?", self.bot)
