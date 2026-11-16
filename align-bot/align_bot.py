@@ -8709,7 +8709,7 @@ def _ouvertures_recentes(m, maintenant):
         if jour.weekday() < 5:
             h, minute = (8, 20) if m == "GOLD" else (9, 30)
             ts = datetime.datetime(jour.year, jour.month, jour.day, h, minute, tzinfo=ny).timestamp()
-            if 0 <= maintenant - ts <= 3600:
+            if 0 <= maintenant - ts <= 2 * 3600:
                 ouvertures.append((ts, 20 * 60, "ouverture de New York" if m == "NASDAQ" else "ouverture COMEX Gold"))
     date_ct = datetime.datetime.fromtimestamp(maintenant, ct).date()
     for delta in (-1, 0):
@@ -8738,7 +8738,7 @@ def pause_entree_marche(m, r, etat, maintenant=None):
             continue
         if ts - 15 * 60 <= maintenant <= ts + 20 * 60:
             return f"actualité économique ({ev.get('titre', 'USD')}) : fenêtre de sécurité"
-        if ts + 20 * 60 < maintenant <= ts + 60 * 60 and not _stabilisation_m5_apres(r, ts, maintenant):
+        if ts + 20 * 60 < maintenant <= ts + 90 * 60 and not _stabilisation_m5_apres(r, ts, maintenant):
             return f"actualité économique ({ev.get('titre', 'USD')}) : réaction M5 encore instable"
     return None
 
