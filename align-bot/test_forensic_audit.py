@@ -226,5 +226,49 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
 
 
 
+    def test_closed_trade_creates_a_linked_learning_case_from_pre_entry_and_entry_snapshots(self):
+        trade = {"d": 1, "e": 100.0, "sl": 98.0, "sl0": 98.0, "tp1": 104.0, "tp2": 108.0,
+                 "cree": 1700000200, "src": "FVG", "profil": {"m": "BTC", "type": "repli", "d": 1, "session": "Londres"}}
+        key = align_bot.cle_audit_trade("BTC", trade)
+        pre = {"t": 1700000100, "price": 99.8, "confirm": 1, "mtf": {"4h": {"direction": 1}},
+               "trade": {"plan_source": "ordre_en_preparation", "d": 1, "e": 100.0}}
+        entry = {"t": 1700000200, "price": 100.0, "confirm": 1, "strategy": "SWING",
+                 "mtf": {"4h": {"direction": 1}, "1h": {"direction": 1}},
+                 "decision": {"verdict": "ENTRÉE VALIDÉE"},
+                 "trade": {"plan_source": "position_ouverte", "audit_key": key}}
+        etat = {"audit_mtf": {"BTC": [pre, entry]}}
+        align_bot.journal_trade(etat, "BTC", trade, 104.0, "TP1 TOUCHÉ", 2.0)
+        case = etat["cas_apprentissage"][0]
+        self.assertEqual(case["audit_key"], key)
+        self.assertEqual(case["label"], "WIN")
+        self.assertEqual(case["result_r"], 2.0)
+        self.assertEqual(case["pre_entry_t"], 1700000100)
+        self.assertEqual(case["entry_snapshot_t"], 1700000200)
+        self.assertEqual(case["evidence"], "complete")
+        self.assertEqual(case["entry_features"]["mtf"]["4h"]["direction"], 1)
+        self.assertEqual(etat["journal_trades"][0]["learning_evidence"], "complete")
+
+    def test_learning_case_is_idempotent_for_a_replayed_trade_close(self):
+        trade = {"d": -1, "e": 200.0, "sl": 204.0, "cree": 1700000300}
+        etat = {"audit_mtf": {"GOLD": []}}
+        align_bot.enregistrer_cas_apprentissage(etat, "GOLD", trade, 204.0, "SL TOUCHÉ", -2.0)
+        align_bot.enregistrer_cas_apprentissage(etat, "GOLD", trade, 204.0, "SL TOUCHÉ", -2.0)
+        self.assertEqual(len(etat["cas_apprentissage"]), 1)
+        self.assertEqual(etat["cas_apprentissage"][0]["label"], "LOSS")
+
+    def test_telegram_push_only_reaches_active_subscribers_of_the_tagged_market(self):
+        class BitcoinMessage(align_bot.Msg):
+            marches = frozenset({"BTC"})
+        etat = {
+            "auto": {"BTC": ["btc-user", "paused-user"], "GOLD": ["gold-user"]},
+            "marches_par_chat": {"btc-user": ["BTC"], "paused-user": ["BTC"], "gold-user": ["GOLD"]},
+            "bot_off": ["paused-user"]
+        }
+        dest = align_bot.destinataires_message(etat, {"btc-user", "paused-user", "gold-user", "not-subscribed"},
+                                               BitcoinMessage("BTC — signal confirmé"))
+        self.assertEqual(dest, ["btc-user"])
+
+
+
 if __name__ == "__main__":
     unittest.main()
