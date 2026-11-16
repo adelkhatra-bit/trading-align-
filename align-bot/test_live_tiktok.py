@@ -890,8 +890,9 @@ class LiveMarketNarrationFallback(unittest.TestCase):
         self.assertTrue(all(len(parsed[m]) == 2 for m in parsed))
         self.assertIn("confirment la hausse", parsed["BTC"][0][0])
         self.assertIn("zone profonde", parsed["BTC"][1][0])
-        self.assertIn("volume reste discret", parsed["GOLD"][1][0])
+        self.assertIn("volume proxy reste discret", parsed["GOLD"][1][0])
         self.assertIn("confirm the decline", parsed["NASDAQ"][0][1])
+        self.assertIn("volume is unavailable", parsed["NASDAQ"][1][1])
 
     def test_fallback_never_invents_market_without_data(self):
         self.assertEqual(ab.commentaires_live_de_secours({"marches": {}}), "")
