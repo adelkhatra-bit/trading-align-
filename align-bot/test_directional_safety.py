@@ -7,6 +7,7 @@ from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import align_bot as ab
+from test_entree_retest import serie as serie_retest
 
 
 def candle(t, o=100.0, h=101.0, l=99.0, c=100.0, v=100):
@@ -14,23 +15,13 @@ def candle(t, o=100.0, h=101.0, l=99.0, c=100.0, v=100):
 
 
 def retest_r(h4):
-    # Reutilise la géométrie du fixture de test_entree_retest : un retest LONG
-    # frais, avec SL/TP mesurables et bougie M15 de formation séparée.
-    now = int(time.time())
-    bars = [candle(now - (30 - i) * 900, o=99, h=100.0, l=98, c=99) for i in range(30)]
-    for i in range(25, 29):
-        bars[i] = candle(now - (30 - i) * 900, o=100.5, h=103.0, l=100.2, c=102.0)
-    bars[29] = candle(now - 900, o=100.4, h=101.5, l=99.9, c=101.2)
-    bars.append(candle(now, o=101.2, h=101.3, l=101.1, c=101.2))
-    dirs = [0] * 11
-    dirs[2], dirs[4], dirs[7], dirs[9] = 1, 1, 1, h4
-    return dict(
-        b15=bars, b5=[candle(now - 600, c=101.2), candle(now - 300, c=101.2), candle(now, c=101.2)],
-        b1h=[candle(now - 7200), candle(now - 3600), candle(now)],
-        b4h=[candle(now - 28800), candle(now - 14400), candle(now)],
-        m1=[candle(now - 30, c=101.2)], r5=[50, 50, 50],
-        grosses=[(110.0, "4h"), (120.0, "Daily")], atr=2.0, atr5=1.0, t=now
-    )
+    # Source unique du scénario retest, partagé avec les tests unitaires dédiés.
+    r = serie_retest()
+    dirs = list(r["dirs"])
+    dirs[9] = h4
+    r["dirs"] = dirs
+    r["dirs_cloturees"] = dirs.copy()
+    return r
 
 def reversal_r(dirs, volume_last=100, price=100.0):
     b5 = [candle(i * 300, 100 - (i % 3)) for i in range(20)]
