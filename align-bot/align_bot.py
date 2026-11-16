@@ -9903,7 +9903,7 @@ def agent(m, r, cle, ferme):
             return out
         # Ouverture / news : invalider toute préparation et attendre une vraie stabilisation M5.
         # La règle s'applique aux cassures ET aux replis, avant tout déclenchement d'entrée.
-        pause_ = pause_entree_marche(m, r, etat_courant if isinstance(etat_courant, dict) else {}, r.get("t", time.time()))
+        pause_ = pause_entree_marche(m, r, _ETAT_COURANT.get("etat") or {}, r.get("t", time.time()))
         if pause_:
             cle["prep"] = False
             cle.pop("ordre", None)
