@@ -3150,14 +3150,22 @@ def marche_demande(txt):
     return "GOLD"                   # demande générale = Gold uniquement
 
 def tendance_armee(r, cle):
-    """Une fois 4h + 1h alignées, la tendance reste armée pendant le repli 5m tant que les deux UT ne s'inversent pas."""
+    """Conserve le biais pendant un repli seulement si H1/H4 restent conformes au marché."""
     d = r["confirme"]
     if d:
         cle["arme"] = d
         return r
     a = cle.get("arme")
-    if a and r["dirs"][9] == a and r["dirs"][7] != -a:
-        r["confirme"] = a; r["repli"] = True
+    dirs = r.get("dirs") or []
+    if len(dirs) < 10:
+        cle["arme"] = 0
+        return r
+    # Gold/NASDAQ : H1 neutre n'est pas une confirmation ; il faut H1 = H4 = biais.
+    # BTC conserve sa tolérance historique au H1 neutre tant qu'il ne s'inverse pas.
+    h1_ok = dirs[7] == a if r.get("market") in ("GOLD", "NASDAQ") else dirs[7] != -a
+    if a and dirs[9] == a and h1_ok:
+        r["confirme"] = a
+        r["repli"] = True
     elif a:
         cle["arme"] = 0
     return r
