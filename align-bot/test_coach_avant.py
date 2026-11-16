@@ -41,13 +41,14 @@ class CoachEnDirect(unittest.TestCase):
         self.assertEqual(len(envoyes), 1)
         self.assertIn("COACH COMMENTATEUR", envoyes[0]); self.assertIn("Bougie en baisse", envoyes[0]); self.assertIn("BILAN 15 MIN", envoyes[0])
 
-    def test_fin_apres_2h_propose_de_continuer(self):
+    def test_ancienne_expiration_de_2h_est_ignoree(self):
         envoyes = []
         etat = {"coach_live": {"GOLD": {"9": {"expire": 0, "dernier_t": 0}}}}
         r = {"b15": [dict(t=0, o=1, h=1, l=1, c=1), dict(t=900, o=1, h=1, l=1, c=1)]}
-        with mock.patch.object(ab, "_envoi_sur", side_effect=lambda cid, **k: envoyes.append(k["text"]) or {"ok": True}):
+        with mock.patch.object(ab, "bot_on", return_value=True), mock.patch.object(ab, "dans_chaine", return_value=False), mock.patch.object(ab, "_envoi_sur", side_effect=lambda cid, **k: envoyes.append(k["text"]) or {"ok": True}), mock.patch.object(ab, "texte_coach_live", return_value="COACH GOLD"), mock.patch.object(ab, "markup_analyse", return_value=None), mock.patch.object(ab, "positions_bot", return_value=[]), mock.patch.object(ab.time, "time", return_value=1000):
             ab.notifier_coach_live(etat, "GOLD", r, {})
-        self.assertIn("TERMINÉ", envoyes[0]); self.assertEqual(etat["coach_live"]["GOLD"], {})
+        self.assertIn("9", etat["coach_live"]["GOLD"])
+        self.assertFalse(any("TERMINÉ" in x for x in envoyes))
 
 class FlashCommentateur(unittest.TestCase):
     def test_mouvement_brusque(self):
