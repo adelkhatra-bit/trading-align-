@@ -643,7 +643,7 @@ def decaler(bars, e):
         return bars
     return [dict(b, o=b["o"] + e, h=b["h"] + e, l=b["l"] + e, c=b["c"] + e) for b in bars]
 
-def analyser(pair, mem=None):
+def analyser(pair, mem=None, market=None):
     """Télécharge les bougies puis calcule l'analyse (logique identique à l'indicateur Pine ALIGN MTF PRO v24).
     mem = mémoire persistante du marché (sens stable, plan figé, retournement) ; sans mémoire : calcul instantané."""
     m1, m5, m15, h1, h4, d1 = (bougies(pair, i) for i in (1, 5, 15, 60, 240, 1440))
@@ -657,7 +657,7 @@ def analyser(pair, mem=None):
         e = 0.0
     if e:
         S = {k: decaler(v, e) for k, v in S.items()}
-    r = analyser_avec_memoire(S, mem)
+    r = analyser_avec_memoire(S, mem, market)
     r["ecart_tv"] = e
     return r
 
@@ -720,7 +720,7 @@ def _structures_ut(series):
             out[k] = None
     return out
 
-def calculer_analyse(S, stable=None, comp_prev=None):
+def calculer_analyse(S, stable=None, comp_prev=None, market=None):
     """Calcul pur à partir des bougies S (m1, m5, m15, m30, h1, h4, d1, w1). Aucun accès réseau."""
     m1, m5, m15, h1, h4, d1, w1 = (S[k] for k in ("m1", "m5", "m15", "h1", "h4", "d1", "w1"))
     series = {"1": m1, "3": regrouper(m1, 3, 60), "5": m5, "10": regrouper(m5, 2, 300), "15": m15,
@@ -787,7 +787,7 @@ def calculer_analyse(S, stable=None, comp_prev=None):
     # Parité Pine v24 : une zone de retournement valide est prioritaire ; sinon les grosses UT décident.
     dirBrut = 1 if zoneHaut else -1 if zoneBas else 1 if longT >= 2 else -1 if longT <= -2 else 1 if retHaut else -1 if retBas else sens
     dirPlan = dirBrut if stable is None else stable
-    strat_plan = strategie_alignement(dirs, dirPlan, etat_ut(w1)[0] if len(w1) >= 50 else 0)[0]
+    strat_plan = strategie_alignement(dirs, dirPlan, etat_ut(w1)[0] if len(w1) >= 50 else 0, market)[0]
     nom = ("★ ACHAT FORT" if fortHaut else "EXPLOSION ▲" if explHaut else "ZONE DE REBOND ▲") if sigHaut else \
           ("★ VENTE FORTE" if fortBas else "EXPLOSION ▼" if explBas else "ZONE DE RETOURNEMENT ▼") if sigBas else ""
     # ═══ STRATÉGIE : 4h = tendance principale, 1h = confirmation ═══
@@ -838,24 +838,24 @@ def calculer_analyse(S, stable=None, comp_prev=None):
                 dirW=dW_, ohlc15=b[-30:], b3=series["3"][-80:], atr3=(atr(series["3"], 14)[-1] if len(series["3"]) >= 16 else None),
                 struct_ut=_structures_ut(series))
 
-def analyser_avec_memoire(S, mem=None):
+def analyser_avec_memoire(S, mem=None, market=None):
     """Sens stable, plan figé et retournement exactement comme l'indicateur (vue 15 min = unité de référence du bot).
     À chaque clôture 15 min : le sens stable avance, puis le plan est recalculé (entrée / TP1 / TP2 / SL figés
     jusqu'à la clôture suivante). Le SL franchi à la clôture annule la position et ouvre un RETOURNEMENT."""
     m15 = S["m15"]
     if mem is None or len(m15) < 3:
-        r = calculer_analyse(S)
+        r = calculer_analyse(S, market=market)
         r["pine"] = None
         return r
     t = m15[-1]["t"]
     if mem.get("bar_t") is None:
-        r0 = calculer_analyse(S)
+        r0 = calculer_analyse(S, market=market)
         mem.update(bar_t=t, stable=r0["dirBrut"], comp=r0["comp"], comp_prev=None, ret_dir=0, ret_age=0)
         mem.update(figer_plan(r0, r0["dirBrut"]))
     elif t != mem["bar_t"]:
         # une bougie 15 min vient de se clôturer : on relit l'état à sa clôture (dernier instant de cette bougie)
         S2 = dict(S, m15=m15[:-1])
-        rc = calculer_analyse(S2, stable=mem["stable"], comp_prev=mem.get("comp_prev"))
+        rc = calculer_analyse(S2, stable=mem["stable"], comp_prev=mem.get("comp_prev"), market=market)
         sl_old, dir_fig = mem.get("sl"), mem.get("dir_fig") or 0
         franchi = sl_old is not None and ((dir_fig == -1 and rc["prix"] > sl_old) or (dir_fig == 1 and rc["prix"] < sl_old))
         stable = dir_stable_pas(mem["stable"], rc["dirBrut"], rc["dirs"][4], rc["dirs"][7])
@@ -867,9 +867,9 @@ def analyser_avec_memoire(S, mem=None):
             if mem["ret_age"] > 40:
                 mem["ret_dir"] = 0
         mem["stable"], mem["comp"], mem["bar_t"] = stable, rc["comp"], t
-        rc = calculer_analyse(S2, stable=stable, comp_prev=mem["comp_prev"])
+        rc = calculer_analyse(S2, stable=stable, comp_prev=mem["comp_prev"], market=market)
         mem.update(figer_plan(rc, stable))
-    r = calculer_analyse(S, stable=mem["stable"], comp_prev=mem.get("comp_prev"))
+    r = calculer_analyse(S, stable=mem["stable"], comp_prev=mem.get("comp_prev"), market=market)
     mem["comp"] = r["comp"]
     r["plan_fige"] = dict(e=mem["ent"], sl=mem["sl"], tp1=mem["tp1"], tp2=mem["tp2"], n1=mem["n1"], n2=mem["n2"],
                           rr=abs(mem["tp1"] - mem["ent"]) / max(abs(mem["ent"] - mem["sl"]), 1e-9),
@@ -1299,7 +1299,7 @@ FENETRES_UT = {
 }
 
 
-def strategie_alignement(dirs, d, dW=0):
+def strategie_alignement(dirs, d, dW=0, market=None):
     """Règles SCALPING / DAY / SWING, identiques à l'indicateur TradingView v12.
     SWING : W1/D1 contexte, H4 retracement ou aligné, H1 confirmation.
     DAY : H4 contexte, H1 direction, M15 retracement, M5 déclenchement.
@@ -1307,6 +1307,8 @@ def strategie_alignement(dirs, d, dW=0):
     if not d:
         return "", "AUCUNE", "Pas de direction exploitable"
     D = list(dirs or []) + [0] * 11
+    if market in ("GOLD", "NASDAQ") and (D[7] != d or D[9] != d):
+        return "", "EN ATTENTE", f"{market} : H4 et H1 doivent clôturer dans le même sens que le plan (H1={D[7]}, H4={D[9]}, plan={d})"
     u = lambda i: D[i] == d
     o = lambda i: D[i] == -d
     uW, oW = dW == d, dW == -d
@@ -1351,7 +1353,7 @@ def retournement_confirme(cle, d, r):
 
 def strategie_trade(r, d):
     """Fige sur la position le type (SWING / DAY / SCALPING) lu au moment de l'entrée."""
-    strat, etat_, motif = strategie_alignement(r.get("dirs"), d, r.get("dirW") or 0)
+    strat, etat_, motif = strategie_alignement(r.get("dirs"), d, r.get("dirW") or 0, r.get("market"))
     return {"strat": strat, "strat_etat": etat_, "strat_motif": motif} if strat else {}
 
 
@@ -1420,7 +1422,7 @@ def ligne_retournement(r):
 def ligne_strategie(r):
     """Même lecture que la barre TradingView v24 : stratégie, état, score /100, motif."""
     d = r.get("dirPlan") or 0
-    strat, etat, motif = strategie_alignement(r.get("dirs"), d, r.get("dirW") or 0)
+    strat, etat, motif = strategie_alignement(r.get("dirs"), d, r.get("dirW") or 0, r.get("market"))
     if not strat:
         return ligne_retournement(r) + [f"🏷 Stratégie : aucune — {motif}"]
     total, p, dec = score_validation(strat, etat, r.get("dirs"), d, r.get("dirW") or 0, r.get("prix", 0),
@@ -5468,7 +5470,7 @@ def hb_etat_surveille(r):
     """Ce que l'indicateur surveille, uniquement à partir des vraies données : sens, UT alignées, zone, profil, trait de décision."""
     d = r.get("dirPlan") or 0
     strat = r.get("strat") or ""
-    etat_s = strategie_alignement(r.get("dirs"), d, r.get("dirW") or 0)[1] if d else "AUCUNE"
+    etat_s = strategie_alignement(r.get("dirs"), d, r.get("dirW") or 0, r.get("market"))[1] if d else "AUCUNE"
     n = r.get("bull", 0) if d == 1 else r.get("bear", 0) if d == -1 else max(r.get("bull", 0), r.get("bear", 0))
     zp = r.get("zone_pine") if d else None
     a = float(r.get("atr") or 0) or 1.0
@@ -6898,7 +6900,7 @@ def evenements_pine(etat, m, r, cle, now):
                 ev.append(dict(kind="scalp_inv", **base, si=si, dp=d))
     zp, strat = r.get("zone_pine"), r.get("strat") or ""
     zp = trait_indicateur(r, d) or zp                  # v24.3 : trait blanc « Clôture … ce trait » de l'indicateur sur la vue de validation
-    alignement_ok = strategie_alignement(r.get("dirs"), d, r.get("dirW") or 0)[1] == "CONFIRMÉ"
+    alignement_ok = strategie_alignement(r.get("dirs"), d, r.get("dirW") or 0, r.get("market"))[1] == "CONFIRMÉ"
     if m in ("GOLD", "NASDAQ"):
         dirs_confirmation = r.get("dirs") or []
         alignement_ok = alignement_ok and len(dirs_confirmation) > 9 and dirs_confirmation[7] == d and dirs_confirmation[9] == d
@@ -11079,7 +11081,7 @@ def un_tour(etat, chats):
         if SHUTDOWN_REQUESTED.is_set():
             return
         try:
-            r = analyser(pair, etat.setdefault(nom_marche, {}).setdefault("pine", {}))
+            r = analyser(pair, etat.setdefault(nom_marche, {}).setdefault("pine", {}), nom_marche)
             recevoir_updates_telegram(etat, chats, demandes)
             if SHUTDOWN_REQUESTED.is_set():
                 return
