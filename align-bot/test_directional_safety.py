@@ -73,11 +73,82 @@ class DirectionSafety(unittest.TestCase):
             self.assertEqual(strat, "SWING")
             self.assertEqual(status, "CONFIRMÉ")
 
+    def test_gold_nasdaq_strategy_also_requires_m5_and_m15(self):
+        for market in ("GOLD", "NASDAQ"):
+            for idx in (2, 4):
+                dirs = [1, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1]
+                dirs[idx] = -1
+                strat, status, reason = ab.strategie_alignement(dirs, 1, 1, market)
+                self.assertEqual(strat, "")
+                self.assertEqual(status, "EN ATTENTE")
+                self.assertIn("M5 et M15", reason)
+
+    def test_gold_nasdaq_confirmation_helper_rejects_short_term_countertrend(self):
+        aligned = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        self.assertEqual(ab.direction_confirmee_marche("GOLD", aligned, 1), 1)
+        for idx in (2, 4, 7, 9):
+            dirs = aligned.copy()
+            dirs[idx] = -1
+            self.assertEqual(ab.direction_confirmee_marche("GOLD", dirs, 1), 0)
+            self.assertEqual(ab.direction_confirmee_marche("NASDAQ", dirs, 1), 0)
+        self.assertEqual(ab.direction_confirmee_marche("BTC", [0] * 11, 1), 1)
+
+    def test_cloture_direction_ignore_bougie_m5_m15_en_formation(self):
+        closed = [candle(i * 60, o=100 + i, h=101 + i, l=99 + i, c=100 + i) for i in range(50)]
+        forming = candle(50 * 60, o=150, h=151, l=-1001, c=-1000)
+        series = {k: closed + [forming] if k in {"1", "5", "15", "30", "1h", "4h", "D"} else closed
+                  for k in ab.UT}
+        dirs = ab.directions_cloturees(series)
+        self.assertEqual(dirs[2], 1)
+        self.assertEqual(dirs[4], 1)
+        self.assertEqual(ab.etat_ut(series["5"])[0], -1)
+
+    def test_tendance_armee_ne_rearme_pas_gold_si_m5_m15_baissiers(self):
+        dirs = [1] * 11
+        dirs[2] = -1
+        dirs[4] = -1
+        r = {"market": "GOLD", "confirme": 0, "dirs": [1] * 11, "dirs_cloturees": dirs}
+        cle = {"arme": 1}
+        ab.tendance_armee(r, cle)
+        self.assertEqual(r["confirme"], 0)
+        self.assertEqual(cle["arme"], 0)
+        self.assertFalse(r.get("repli"))
+
+    def test_reprise_entree_gold_attend_le_realignement_des_quatre_ut(self):
+        dirs = [1] * 11
+        dirs[2] = -1
+        r = {"t": 1000, "m1": [candle(900, c=100)], "b5": [candle(900)],
+             "atr": 1.0, "dirs_cloturees": dirs}
+        cle = {"reprise": {"d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "t": 900}}
+        self.assertIsNone(ab.reprise_entree("GOLD", r, cle))
+        self.assertIn("reprise", cle)
+
+    def test_sniper_gold_nasdaq_refuse_m5_ou_m15_a_contre_sens(self):
+        for market in ("GOLD", "NASDAQ"):
+            for idx in (2, 4):
+                dirs = [1] * 11
+                dirs[idx] = -1
+                proposal, reason = ab._sniper({"market": market, "dirPlan": 1, "dirs_cloturees": dirs})
+                self.assertIsNone(proposal)
+                self.assertIn("CONFLUENCE_M5_M15", reason)
+
     def test_btc_keeps_its_existing_scalping_rule(self):
         dirs = [1, 1, 1, 0, 1, 0, 0, 0, 0, -1, 0]
         strat, status, _ = ab.strategie_alignement(dirs, 1, 0, "BTC")
         self.assertEqual(strat, "SCALPING")
         self.assertEqual(status, "CONFIRMÉ")
+
+    def test_gold_nasdaq_climax_is_watch_only_when_m5_m15_disagree_even_if_h1_h4_align(self):
+        bars = [candle(i * 900) for i in range(80)]
+        bars[-2] = candle(78 * 900, o=100, h=102, l=97, c=101, v=500)
+        dirs = [1] * 11
+        dirs[2], dirs[4] = -1, -1
+        r = dict(b15_long=bars, dirs=dirs, dirs_cloturees=dirs, t=50000)
+        for market in ("GOLD", "NASDAQ"):
+            msg = ab.radar_climax(market, r, {})
+            self.assertIn("RADAR CLIMAX — SURVEILLANCE", msg)
+            self.assertIn("Clôtures M5=baissier, M15=baissier, H1=haussier, H4=haussier", msg)
+            self.assertIn("Aucune entrée", msg)
 
     def test_gold_nasdaq_climax_is_watch_only_without_h1_h4_confluence(self):
         bars = [candle(i * 900) for i in range(80)]
@@ -123,11 +194,13 @@ class DirectionSafety(unittest.TestCase):
         self.assertEqual(seen["market"], "GOLD")
         sniper.assert_called_once_with(out)
 
-    def test_gold_nasdaq_confirmation_alert_requires_h1_and_h4(self):
+    def test_gold_nasdaq_confirmation_alert_requires_all_four_closed_timeframes(self):
         bars = [candle(0, c=98), candle(300, c=99), candle(600, c=101), candle(900, c=102)]
         for market in ("GOLD", "NASDAQ"):
-            for h4, expected in ((0, False), (1, True)):
-                r = dict(comp=0, dirs=[0, 0, 1, 0, 1, 0, 0, 1, 0, h4, 1],
+            cases = ((1, 1, 0, False), (1, 1, 1, True), (-1, 1, 1, False), (1, -1, 1, False))
+            for m5, m15, h4, expected in cases:
+                dirs = [0, 0, m5, 0, m15, 0, 0, 1, 0, h4, 1]
+                r = dict(comp=0, dirs=dirs, dirs_cloturees=dirs,
                          sniper=None, dirPlan=1, strat="DAY", zone_pine={"zmil": 100},
                          b5=bars, t=10000)
                 with mock.patch.object(ab, "etat_marche_hb", return_value=("ouvert", None)), \
@@ -136,7 +209,7 @@ class DirectionSafety(unittest.TestCase):
                      mock.patch.object(ab, "trait_indicateur", return_value=None):
                     events = ab.evenements_pine({}, market, r, {}, 50000)
                 has_confirmation = "confirmation" in [e["kind"] for e in events]
-                self.assertEqual(has_confirmation, expected, (market, h4, events))
+                self.assertEqual(has_confirmation, expected, (market, m5, m15, h4, events))
 
     def test_gold_nasdaq_do_not_emit_inverse_scalp_events_btc_keeps_legacy(self):
         r = dict(comp=0, dirs=[0,0,1,0,1,0,0,1,0,1,1],
@@ -159,6 +232,15 @@ class DirectionSafety(unittest.TestCase):
         inverse.assert_called_once()
         self.assertIn("scalp_inv", [e["kind"] for e in events])
 
+
+    def test_pine_v25_uses_closed_m5_m15_h1_h4_for_gold_nasdaq(self):
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pine", "ALIGN_MTF_PRO_v25.pine")
+        pine = open(path, encoding="utf-8").read()
+        self.assertIn("isGoldNasdaq", pine)
+        self.assertIn("lookahead=barmerge.lookahead_on", pine)
+        self.assertIn("dirPlan = isGoldNasdaq and not gnConfluence ? 0 : dirStable", pine)
+        self.assertIn("gnConfluence and dirStable == 1", pine)
+        self.assertIn("gnConfluence and dirStable == -1", pine)
 
 if __name__ == "__main__":
     unittest.main()
