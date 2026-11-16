@@ -1,4 +1,4 @@
-"""Regression tests for ALIGN live speech/display language synchronization."""
+"""Regression tests for independent ALIGN live voice language."""
 from pathlib import Path
 import unittest
 
@@ -7,21 +7,19 @@ LIVE_JS = ROOT.parent / "docs" / "live" / "align-bande-live.user.js"
 
 
 class LiveVoiceDisplayLanguage(unittest.TestCase):
-    def test_speech_runs_after_the_current_item_language_is_displayed(self):
+    def test_speech_uses_the_independent_voice_language_preference(self):
         source = LIVE_JS.read_text(encoding="utf-8")
-        self.assertIn("const anglais = langueBande() === 'en';", source)
-        self.assertIn("if (!!item.en !== anglais) return;", source)
-        start = source.index("function suivant() {")
-        render = source.index("flash.className =", start)
-        show = source.index("bande.classList.add('on')", start)
-        speak = source.index("parlerLive(m);", start)
-        self.assertLess(render, show)
-        self.assertLess(show, speak)
+        start = source.index("function parlerLive(item)")
+        end = source.index("let extra = [];", start)
+        speech = source[start:end]
+        self.assertIn("const anglais = voixLangue === 'en';", speech)
+        self.assertIn("if (!!item.en !== anglais) return;", speech)
+        self.assertNotIn("langueBande()", speech)
 
-    def test_voice_stays_locked_to_the_language_currently_shown(self):
+    def test_voice_language_switch_does_not_change_the_bilingual_display(self):
         source = LIVE_JS.read_text(encoding="utf-8")
-        self.assertIn("const anglais = langueBande() === 'en';", source)
-        self.assertIn("if (!!item.en !== anglais) return;", source)
+        self.assertIn("const anglais = voixLangue === 'en';", source)
+        self.assertIn("langueBande()", source)
 
 
 if __name__ == "__main__":
