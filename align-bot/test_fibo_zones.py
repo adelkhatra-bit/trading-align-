@@ -1,5 +1,6 @@
 """Régression Fibonacci Telegram : Gold/NASDAQ commentés une fois à l'entrée de zone ; BTC inchangé."""
 import os, sys, unittest
+from unittest import mock
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import align_bot as ab
 
@@ -60,7 +61,8 @@ class FiboTelegram(unittest.TestCase):
         s = dict(m1=series(600, 60), m5=series(120, 300), m15=series(150, 900),
                  m30=series(60, 1800), h1=series(100, 3600), h4=series(60, 14400),
                  d1=series(60, 86400), w1=series(60, 604800))
-        r = ab.calculer_analyse(s)
+        with mock.patch.object(ab, "etat_ut", return_value=(0, 0, 50)):
+            r = ab.calculer_analyse(s)
         self.assertEqual(len(r["b15_fibo"]), 48)
         self.assertEqual(len(r["b1h_fibo"]), 48)
         self.assertEqual(len(r["b4h_fibo"]), 30)
