@@ -126,6 +126,19 @@ class TelegramOptIn(unittest.TestCase):
         self.assertIn("TP2 20070", text)
         self.assertIn("laisse courir", text)
 
+    def test_btc_sniper_wording_remains_unchanged(self):
+        event = {"kind": "sniper", "m": "BTC", "ic": "🟠", "ordre": "vente",
+                 "za": "90000", "zb": "90100", "sl": "90500", "tp1": "89500", "tp": "89000",
+                 "ut": "5 min", "rejets": "2", "rr": "2,0", "rrp": "3,0"}
+        with patch.object(ab, "_tournante", return_value=0):
+            fr = "\\n".join(ab.texte_pine({}, event, False))
+            en = "\\n".join(ab.texte_pine({}, event, True))
+        self.assertIn("Entrée sniper", fr)
+        self.assertIn("vente", fr)
+        self.assertIn("Sniper entry", en)
+        self.assertIn("sell", en)
+        self.assertIn("TP plan", fr)
+
     def test_no_telegram_fibonacci_push_function_remains(self):
         self.assertFalse(hasattr(ab, "fibo_zones"))
         self.assertTrue(hasattr(ab, "progression_fibonacci_live"))
