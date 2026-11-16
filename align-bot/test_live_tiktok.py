@@ -558,8 +558,8 @@ class LiveOutbox(unittest.TestCase):
             return []
         queue = ab.queue.Queue()
         queue.put(update)
-        with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True), \\
-             mock.patch.object(ab, "TELEGRAM_UPDATES", queue), \\
+        with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True), \
+             mock.patch.object(ab, "TELEGRAM_UPDATES", queue), \
              mock.patch.object(ab, "traiter", side_effect=fake_traiter):
             ab.recevoir_updates_telegram({}, set(), [])
         self.assertEqual(observed, [True, False])
@@ -579,8 +579,8 @@ class LiveOutbox(unittest.TestCase):
             return []
         queue = ab.queue.Queue()
         queue.put(update)
-        with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True), \\
-             mock.patch.object(ab, "TELEGRAM_UPDATES", queue), \\
+        with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True), \
+             mock.patch.object(ab, "TELEGRAM_UPDATES", queue), \
              mock.patch.object(ab, "traiter", side_effect=fake_traiter):
             ab.recevoir_updates_telegram({}, set(), [])
         self.assertEqual(observed, [True, False])
