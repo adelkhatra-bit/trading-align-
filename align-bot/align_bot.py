@@ -5914,7 +5914,7 @@ COMMANDES = {"/faire_analyse": "📊 Faire une analyse", "/analyse_btc": "🟠 A
 
 def installer_menu(etat):
     """Bouton « Menu » à gauche du champ + description du bot (une seule fois par version)."""
-    if etat.get("menu") == 11:
+    if etat.get("menu") == 12:
         return
     fr = [("faire_analyse", "📊 Faire une analyse"), ("mon_bot", "🤖 Mon bot ON / OFF"),
           ("resultats", "📈 Mes résultats"), ("gain", "📸 Partager mon gain"), ("vip", "💎 Devenir VIP"),
@@ -5923,9 +5923,16 @@ def installer_menu(etat):
           ("resultats", "📈 My results"), ("gain", "📸 Share my profit"), ("vip", "💎 Become VIP"),
           ("live", "🔴 The live"), ("gagnantes", "🏆 Winning trades"), ("perdantes", "❌ Losing trades"), ("boutons", "⌨️ Bring back the buttons"), ("francais", "🌐 Français")]
     try:
-        telegram("setMyCommands", commands=json.dumps([{"command": c, "description": d} for c, d in fr]))
-        telegram("setMyCommands", commands=json.dumps([{"command": c, "description": d} for c, d in en]), language_code="en")
-        telegram("setChatMenuButton", menu_button=json.dumps({"type": "commands"}))
+        res_fr = telegram("setMyCommands", commands=json.dumps([{"command": c, "description": d} for c, d in fr]))
+        if not isinstance(res_fr, dict) or res_fr.get("ok") is not True:
+            raise RuntimeError("setMyCommands FR non confirmé par Telegram")
+        res_en = telegram("setMyCommands", commands=json.dumps([{"command": c, "description": d} for c, d in en]), language_code="en")
+        if not isinstance(res_en, dict) or res_en.get("ok") is not True:
+            raise RuntimeError("setMyCommands EN non confirmé par Telegram")
+        res_menu = telegram("setChatMenuButton", menu_button=json.dumps({"type": "commands"}))
+        if not isinstance(res_menu, dict) or res_menu.get("ok") is not True:
+            raise RuntimeError("setChatMenuButton non confirmé par Telegram")
+        print("TELEGRAM_MENU_COMMANDS_OK fr=/live en=/live")
         try:
             # RÈGLE OBLIGATOIRE : le nom du bot ne se change JAMAIS depuis le code.
             # Telegram bloque setMyName pendant des heures : c'est ce qui a rendu le bot sourd le 11/11/2026.
@@ -5940,9 +5947,11 @@ def installer_menu(etat):
                                                   "🤖 Les abonnés au suivi sont enregistrés automatiquement à l'ouverture du signal.\n"
                                                   "📍 Suivi personnel : SL, BE, TP et sortie manuelle depuis Telegram.\n\n"
                                                   "ℹ️ Mes positions perso, pas un conseil. Le trading comporte un risque de perte."))
-        etat["menu"] = 11
+        etat["menu"] = 12
     except Exception as ex:
-        print("menu", ex)
+        # Ne pas marquer la version comme installée si Telegram a refusé les commandes.
+        # Le prochain démarrage réessaiera automatiquement.
+        print("TELEGRAM_MENU_INSTALL_FAILED", ex)
 
 def recevoir_gain(etat, cid, msg):
     """📸 Partager mon gain : seulement une IMAGE, vérifiée par le propriétaire avant publication. Renvoie True si traité."""
