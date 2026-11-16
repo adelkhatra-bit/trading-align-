@@ -44,6 +44,30 @@ class PlanFVG(unittest.TestCase):
         self.assertLess(fv["sl"], -110)
         self.assertIn("FVG verte 5 min", fv["src"])
 
+    def test_tp2_projete_au_dela_du_tp1_si_aucun_second_niveau_short(self):
+        st = ab.structure_fvg(serie_short())
+        fv = ab.plan_fvg(-1, st, 120, 125, 120, None, "5 min", market="GOLD")
+        self.assertIsNotNone(fv)
+        self.assertGreater(-1 * (fv["tp2"] - fv["tp1"]), 0)
+        self.assertTrue(ab.tp2_affichable(-1, fv["tp1"], fv["tp2"]))
+        self.assertIn("projection", fv["n2"])
+
+    def test_tp2_projete_au_dela_du_tp1_si_aucun_second_niveau_long(self):
+        inv = [bougie(-x["o"], -x["l"], -x["h"], -x["c"], x["t"]) for x in serie_short()]
+        st = ab.structure_fvg(inv)
+        fv = ab.plan_fvg(1, st, -120, -125, -120, None, "5 min", market="NASDAQ")
+        self.assertIsNotNone(fv)
+        self.assertGreater(1 * (fv["tp2"] - fv["tp1"]), 0)
+        self.assertTrue(ab.tp2_affichable(1, fv["tp1"], fv["tp2"]))
+        self.assertIn("projection", fv["n2"])
+
+    def test_btc_conserve_le_comportement_tp2_historique(self):
+        st = ab.structure_fvg(serie_short())
+        fv = ab.plan_fvg(-1, st, 120, 125, 120, None, "5 min", market="BTC")
+        if fv is not None:
+            self.assertEqual(fv["tp2"], fv["tp1"])
+            self.assertFalse(ab.tp2_affichable(-1, fv["tp1"], fv["tp2"]))
+
     def test_sans_fvg_plan_origine(self):
         calme = [bougie(100, 100.5, 99.5, 100, i) for i in range(40)]
         self.assertIsNone(ab.plan_fvg(-1, ab.structure_fvg(calme), 101, 102, 98, 97, "5 min"))
