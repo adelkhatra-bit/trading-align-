@@ -8275,6 +8275,11 @@ def menu_marches(etat, cid, message_id=None):
         texte += ("\n\nNew subscribers start with no market selected. Tick only the markets you want alerts for."
                   if anglais else
                   "\n\nAucun marché n'est suivi par défaut pour un nouvel abonné. Coche uniquement ceux pour lesquels tu souhaites recevoir des alertes.")
+    if nouveau:
+        texte = texte.replace("🔔 You only get alerts for ticked markets",
+                              "🔕 No automatic alerts are enabled; use on-demand research or opt in to coach / alerts")
+        texte = texte.replace("🔔 Tu reçois uniquement les marchés cochés",
+                              "🔕 Aucune alerte automatique n'est activée ; analyses à la demande et coach / alertes sur inscription")
     clavier = json.dumps({"inline_keyboard": lignes})
     if message_id:
         try:
