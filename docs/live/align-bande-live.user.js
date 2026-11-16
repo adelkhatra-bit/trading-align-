@@ -1032,11 +1032,11 @@
     return Object.values(res);
   }
   function texteZone(t, m) {
-    const consommation = (String(t).match(/(\\d{1,3})\\s*%\\s*(?:consommée|consommé)/i) || [])[1];
+    const consommation = (String(t).match(/(\d{1,3})\s*%\s*(?:consommée|consommé)/i) || [])[1];
     const etat = consommation == null ? '' : ' • ' + consommation + '% de zone consommée';
     return /FVG/i.test(t) ? '🧲 ' + m + ' • ZONE FVG' + etat + ' : le marché est en train de combler ce déséquilibre 👀 rebond ou cassure ? 📲 en temps réel : lien en bio 🎁'
-      : /ORDER|OB\\b/i.test(t) ? '🏦 ' + m + ' • ORDER BLOCK' + etat + ' : la zone institutionnelle est en cours de mitigation 👀 📲 en temps réel : lien en bio 🎁'
-      : '👀 ' + m + ' • ' + String(t).toUpperCase() + ' : zone clé du marché • ce qu\\'elle annonce : 📲 lien en bio 🎁';
+      : /ORDER|OB\b/i.test(t) ? '🏦 ' + m + ' • ORDER BLOCK' + etat + ' : la zone institutionnelle est en cours de mitigation 👀 📲 en temps réel : lien en bio 🎁'
+      : '👀 ' + m + ' • ' + String(t).toUpperCase() + ' : zone clé du marché • ce qu\'elle annonce : 📲 lien en bio 🎁';
   }
   // prix sous le doigt / la souris (coordonnées de la page → prix du graphique)
   function prixA(yPage) {
