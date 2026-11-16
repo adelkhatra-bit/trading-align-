@@ -11165,12 +11165,13 @@ def progression_fibonacci_live(r, market=None):
 
 
 
-def detecter_chasse_liquidite(bars, atr_value):
+def detecter_chasse_liquidite(bars, atr_value, lookback=20):
     """Détecte une fausse cassure clôturée d'un extrême récent, sans la transformer en signal d'entrée."""
     b = [x for x in (bars or []) if isinstance(x, dict) and all(isinstance(x.get(k), (int, float)) for k in ("o", "h", "l", "c"))]
-    if len(b) < 22 or not isinstance(atr_value, (int, float)) or atr_value <= 0:
+    lookback = max(5, min(60, int(lookback)))
+    if len(b) < lookback + 1 or not isinstance(atr_value, (int, float)) or atr_value <= 0:
         return None
-    precedente, x = b[-21:-1], b[-1]
+    precedente, x = b[-lookback-1:-1], b[-1]
     support = min(y["l"] for y in precedente)
     resistance = max(y["h"] for y in precedente)
     corps = abs(x["c"] - x["o"])
@@ -11243,9 +11244,15 @@ def contexte_technique_live(derniers):
             contexte["fibonacci"] = progression_fibonacci_live(r, marche)
         # Les fournisseurs Kraken/Yahoo et regrouper() retirent déjà les bougies en formation : la dernière M15 est clôturée.
         barres = (r.get("b15_long") or r.get("b15") or [])
-        reversal = detecter_chasse_liquidite(barres, r.get("atr"))
-        if reversal:
-            contexte["surveillance_retournement"] = reversal
+        # Le M5 repère tôt les balayages ; le M15 apporte une confirmation plus robuste.
+        reversal15 = detecter_chasse_liquidite(barres, r.get("atr"), lookback=20)
+        reversal5 = detecter_chasse_liquidite(r.get("b5") or [], r.get("atr5") or r.get("atr"), lookback=12)
+        if reversal15 and reversal5 and reversal15["direction"] != reversal5["direction"]:
+            contexte["surveillance_retournement"] = {"direction": 0, "conflit": True, "timeframe": "M5/M15"}
+        elif reversal15:
+            contexte["surveillance_retournement"] = dict(reversal15, timeframe="M15")
+        elif reversal5:
+            contexte["surveillance_retournement"] = dict(reversal5, timeframe="M5", precoce=True)
         volumes = [x.get("v") for x in barres[-41:] if isinstance(x.get("v"), (int, float)) and x.get("v") is not None]
         if len(volumes) >= 21:
             moyenne = sum(volumes[:-1]) / max(1, len(volumes) - 1)
@@ -11354,15 +11361,26 @@ def commentaires_live_de_secours(donnees):
         else:
             suite, suite_en = "Attendons une clôture claire avant de conclure.", "Let's wait for a clear close before drawing a conclusion."
         reversal = c.get("surveillance_retournement") or {}
-        if reversal.get("direction") == 1:
+        unite_reversal = reversal.get("timeframe") or "M15"
+        divergence = " avec divergence RSI" if reversal.get("divergence_rsi") else ""
+        volume_ratio = reversal.get("volume_ratio")
+        volume_note = " et volume en hausse" if isinstance(volume_ratio, (int, float)) and volume_ratio >= 1.5 else ""
+        if reversal.get("conflit"):
             fr2, en2 = (
-                "Les vendeurs ont balayé un support puis la clôture a repris au-dessus : possible chasse à la liquidité, mais le retournement doit encore être confirmé.",
-                "Sellers swept a support and the close reclaimed it: a possible liquidity grab, but the reversal still needs confirmation."
+                "Le M5 et le M15 montrent des réactions opposées : le marché hésite, attendons une clôture cohérente.",
+                "M5 and M15 show opposite reactions: the market is undecided, let's wait for a consistent close."
+            )
+        elif reversal.get("direction") == 1:
+            prefixe = "Le M5 repère tôt" if unite_reversal == "M5" else "Le M15 confirme une première réaction"
+            fr2, en2 = (
+                f"{prefixe} un balayage sous le support{divergence}{volume_note}, puis une clôture au-dessus : possible reprise haussière, pas encore un signal confirmé.",
+                f"{unite_reversal} detects a sweep below support{(' with RSI divergence' if reversal.get('divergence_rsi') else '')}{(' and rising volume' if volume_note else '')}, followed by a close above: possible bullish recovery, not yet a confirmed signal."
             )
         elif reversal.get("direction") == -1:
+            prefixe = "Le M5 repère tôt" if unite_reversal == "M5" else "Le M15 confirme une première réaction"
             fr2, en2 = (
-                "Les acheteurs ont balayé une résistance puis la clôture est repassée dessous : possible piège haussier, mais le retournement doit encore être confirmé.",
-                "Buyers swept a resistance and the close fell back below: a possible bull trap, but the reversal still needs confirmation."
+                f"{prefixe} un balayage au-dessus de la résistance{divergence}{volume_note}, puis une clôture dessous : possible rejet baissier, pas encore un signal confirmé.",
+                f"{unite_reversal} detects a sweep above resistance{(' with RSI divergence' if reversal.get('divergence_rsi') else '')}{(' and rising volume' if volume_note else '')}, followed by a close below: possible bearish rejection, not yet a confirmed signal."
             )
         else:
             fr2, en2 = f"{momentum} et {flux} ; {suite}", f"{momentum_en} and {flux_en}; {suite_en}"
@@ -11389,8 +11407,9 @@ def live_phrases_ia(etat, maintenant, derniers=None):
         "Format exact : MARCHÉ | phrase française | phrase anglaise. "
         "Utilise les tendances multi-unités, la confirmation H4/H1, le RSI, le volume, les supports/résistances et surtout "
         "la lecture du retracement Fibonacci M15/H1/H4 quand elle est disponible, et les éventuelles chasses de liquidité "
-        "ou fausses cassures confirmées par une bougie clôturée. Distingue une baisse momentanée, un vrai breakdown "
-        "et une reprise haussière après balayage des stops ; ne confonds jamais une mèche avec une cassure confirmée. "
+        "ou fausses cassures confirmées par une bougie clôturée. Le M5 sert d'alerte précoce, le M15 de confirmation plus robuste. "
+        "Distingue une baisse momentanée, un vrai breakdown et une reprise haussière après balayage des stops ; "
+        "ne confonds jamais une mèche avec une cassure confirmée et signale les désaccords M5/M15. "
         "Si le prix est dans la zone Fibonacci 61,8–78,6 %, explique naturellement qu'il teste une zone de retracement profonde "
         "ou une zone technique importante ; ne récite jamais les chiffres. Si le retracement est léger, intermédiaire, dépassé "
         "ou absent, adapte exactement le commentaire. Relie le Fibonacci à la tendance et aux autres confirmations, ne le présente "
