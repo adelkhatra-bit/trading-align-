@@ -150,7 +150,7 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn("clearInterval(botEtatSyncT)", self.js)
         self.assertIn("attends la confirmation, ne cours pas après le prix", self.js)
         self.assertIn("wait for confirmation, never chase price", self.js)
-        for ancien in ("dépêche-toi", "retardataires", "hurry up", "latecomers", "DÉPÊCHE-TOI", "HURRY:"):
+        for ancien in ("dépêche-toi", "retardataires", "hurry", "latecomers", "DÉPÊCHE-TOI", "HURRY:", "LIEN EN BIO, VITE !", "C'EST MAINTENANT !", "IT'S NOW!", "too late to get in", "too late to jump on"):
             self.assertNotIn(ancien.lower(), self.js.lower())
 
 
