@@ -11181,14 +11181,14 @@ def clavier_live(etat, cid, anglais=False):
     lignes = []
     if live_actif(etat):
         lignes.append([{"text": "📺 Watch the live" if anglais else "📺 Regarder le live", "url": LIVE_LIEN}])
-        lignes.append([{"text": "🔎 Faire une analyse" if not anglais else "🔎 Research markets",
-                        "callback_data": "analysechoice:BOTH"}])
-        lignes.append([{"text": "📡 Sélectionner mes marchés" if not anglais else "📡 Select my markets",
-                        "callback_data": "marketsmenu:x"}])
         lignes.append([{"text": "🚀 Boost the live" if anglais else "🚀 Booster le live", "callback_data": "liveboost:x"}])
         lignes.append([{"text": LIVE_CHOIX[k][2], "callback_data": f"livemain:{k}"} for k in ("BTC", "GOLD", "NASDAQ")])
         lignes.append([{"text": LIVE_CHOIX[k][2], "callback_data": f"livemain:{k}"} for k in ("1", "5", "15", "60")])
         lignes.append([{"text": f"🎙 Coach {k}", "callback_data": f"coachlive:{k}"} for k in ("BTC", "GOLD", "NASDAQ")])
+        lignes.append([{"text": "🔎 Faire une analyse" if not anglais else "🔎 Research markets",
+                        "callback_data": "analysechoice:BOTH"}])
+        lignes.append([{"text": "📡 Sélectionner mes marchés" if not anglais else "📡 Select my markets",
+                        "callback_data": "marketsmenu:x"}])
     if str(cid) in {str(x) for x in proprio(etat)}:
         # v8.8 (demande d'Adel) : objectif de likes affiché à l'écran, puis « objectif atteint » avec feu d'artifice
         lignes.append([{"text": f"🎯 {k} likes", "callback_data": f"likeobj:{k}"} for k in ("1K", "5K", "10K", "20K")])
