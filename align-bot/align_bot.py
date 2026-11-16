@@ -954,6 +954,8 @@ def entree_sniper(r):
 
 def _sniper(r):
     """(proposition ou None, raison du refus) : la raison sert au diagnostic du rejeu, jamais à Telegram."""
+    if not donnees_mtf_fraiches(r.get("market", ""), r):
+        return None, "DONNEES_MTF_PERIMEES"
     d = r.get("dirPlan") or 0
     dirs, a3, a15, a5, zp = r.get("dirs") or [], r.get("atr3"), r.get("atr"), r.get("atr5") or r.get("atr"), r.get("zone_pine")
     m1, b3 = r.get("m1") or [], r.get("b3") or []
@@ -7033,6 +7035,7 @@ def evenements_pine(etat, m, r, cle, now):
         elif prev_c >= MIN_SQZ and comp <= MIN_SQZ - 2:
             ev.append(dict(kind="relache", **base))
     mem.update(n=n, comp=comp)
+    entree_fraiche = donnees_mtf_fraiches(m, r)
     b15, atr_ = r.get("b15") or [], float(r.get("atr") or 0)
     if len(b15) >= 3 and atr_ > 0:                      # impulsion : dernière bougie 15 min CLÔTURÉE, grande et pleine
         x = b15[-2]; rng = x["h"] - x["l"]
@@ -7045,7 +7048,7 @@ def evenements_pine(etat, m, r, cle, now):
     elif rd and not rc and not mem.get("rd"):
         ev.append(dict(kind="ret_cancel", **base))
     mem["rc"], mem["rd"] = rc, bool(rd)
-    sn = r.get("sniper")
+    sn = r.get("sniper") if entree_fraiche else None
     if sn and not cle.get("trade"):                      # entrée sniper en cascade : une fois par UT et par niveau, 30 min mini ; s'ajoute au plan, ne le remplace pas
         cle_sn = f"{sn['d']}:{sn['ut']}:{round(sn['niveau'] / max(sn['niveau'] * 0.0004, 1e-9))}"
         if mem.get("sn_cle") != cle_sn and now - mem.get("sn_t", 0) >= 1800:
@@ -7069,7 +7072,7 @@ def evenements_pine(etat, m, r, cle, now):
     if m in ("GOLD", "NASDAQ"):
         dirs_confirmation = r.get("dirs") or []
         alignement_ok = alignement_ok and len(dirs_confirmation) > 9 and dirs_confirmation[7] == d and dirs_confirmation[9] == d
-    if d and zp and strat and not cle.get("trade") and alignement_ok:
+    if entree_fraiche and d and zp and strat and not cle.get("trade") and alignement_ok:
         barres = (r.get("m1") if strat == "SCALPING" else r.get("b5")) or []           # même bougie que le trait de l'indicateur (vue du plan)
         if len(barres) >= 3:
             c1, c0, t1 = barres[-2]["c"], barres[-3]["c"], barres[-2]["t"]
