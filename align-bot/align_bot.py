@@ -5399,7 +5399,7 @@ def notifier_clotures(etat, m, r, cle):
     """Envoie les clôtures nouvelles une fois chacune, sur les UT suivies par l'utilisateur."""
     champs = TF_CHAMPS
     for cid, suivi in list(etat.get("veille_cloture", {}).get(m, {}).items()):
-        if not marche_autorise(etat, cid, m):
+        if not marche_autorise(etat, cid, m) or not coach_actif(etat, cid, m):
             etat["veille_cloture"][m].pop(cid, None)
             continue
         if suivi.get("multi"):
@@ -6023,6 +6023,34 @@ def traiter(etat, chats, updates):
             choix, _, mk = cb.get("data", "").partition(":")
             qui = str(cb_chat["id"])
             retenir_prenom(etat, qui, cb.get("from"))
+            if choix == "trade":
+                if mk == "no":
+                    etat.setdefault("trade_jour", {})[qui] = datetime.datetime.now(PARIS).strftime("%Y-%m-%d")
+                    telegram("answerCallbackQuery", callback_query_id=cb["id"], text="Bien noté")
+                    _envoi_sur(qui, text=("Noted. No trading alerts today." if qui in LANG_EN else
+                                          "C'est noté. Aucun signal ni rappel de trading aujourd'hui."))
+                    continue
+                if mk == "yes":
+                    telegram("answerCallbackQuery", callback_query_id=cb["id"], text="Très bien")
+                    _envoi_sur(qui, text=("Would you like to activate your personal coach?" if qui in LANG_EN else
+                                          "Souhaites-tu activer ton coach personnel ?"),
+                               reply_markup=json.dumps({"inline_keyboard": [
+                                   [{"text": "🧑‍🏫 Oui, activer le coach", "callback_data": "coach:yes"}],
+                                   [{"text": "Non, pas maintenant", "callback_data": "coach:no"}]
+                               ]}))
+                    continue
+            if choix == "coach":
+                telegram("answerCallbackQuery", callback_query_id=cb["id"], text="C'est noté")
+                if mk == "yes":
+                    if qui not in etat.get("coach_pending", []):
+                        etat.setdefault("coach_pending", []).append(qui)
+                    _envoi_sur(qui, text=("Choose one or more markets, then confirm." if qui in LANG_EN else
+                                          "Choisis une ou plusieurs monnaies / marchés, puis valide."))
+                    menu_marches(etat, qui)
+                else:
+                    _envoi_sur(qui, text=("Coach not activated. You can still request an analysis from the menu." if qui in LANG_EN else
+                                          "Coach non activé. Tu peux toujours demander une analyse depuis le menu."))
+                continue
             if live_callback(etat, chats, cb, choix, mk, qui):
                 continue
             if choix == "analysechoice" and (mk in MARCHES or mk == "BOTH"):
@@ -6097,7 +6125,9 @@ def traiter(etat, chats, updates):
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="✅ Marchés enregistrés")
                 except Exception:
                     pass
-                valider_et_suivre_marches(etat, qui, cb.get("from", {}).get("id"), (cb.get("message") or {}).get("message_id"))
+                active = valider_et_suivre_marches(etat, qui, cb.get("from", {}).get("id"), (cb.get("message") or {}).get("message_id"))
+                if active:
+                    etat["coach_pending"] = [x for x in etat.get("coach_pending", []) if str(x) != qui]
                 continue
             if choix == "markets" and (mk in MARCHES or mk in ("BOTH", "ALL")):
                 if mk in MARCHES:
@@ -7135,19 +7165,10 @@ def _radar_fond(txt):
     return re.sub(r"[\d.,]+", "#", "\n".join(x for x in lignes if not x.startswith("📏")))
 
 def destinataires_radar(etat, chats):
-    """Personnes qui suivent au moins un marché (« Valider et suivre ») + VIP qui ont coché au moins 2 marchés. Jamais la chaîne."""
+    """Le radar privé n'est disponible qu'aux utilisateurs ayant activé le coach."""
     canal = str(etat.get("canal") or "")
-    out = set()
-    for m, suivis in (etat.get("veille_cloture") or {}).items():
-        for cid, s in (suivis or {}).items():
-            if isinstance(s, dict) and s.get("multi"):
-                out.add(str(cid))
-    for cid in {str(c) for c in chats}:
-        try:
-            if autorise(etat, cid, cid) and len(marches_choisis(etat, cid)) >= 2:
-                out.add(cid)
-        except Exception:
-            pass
+    out = {str(cid) for m, suivis in (etat.get("auto") or {}).items()
+           for cid in (suivis or []) if coach_actif(etat, cid, m)}
     return sorted(out - {canal})
 
 def _radar_supprimer(cid, mid):
@@ -7460,21 +7481,11 @@ def alertes_courtes(etat, chats, derniers, now=None):
             evts.append(({m}, texte_pine(etat, ev), texte_pine(etat, ev, True)))
     if evts and TOKEN:
         diffuser_evenements(etat, chats, evts)
-    if libres and TOKEN:
-        for cid in destinataires_gratuits(etat):
-            for ev in libres:
-                msgs = messages_ouverture(etat, ev, derniers, now, False) if ev["evt"] == "ouvre" and ev["palier"] == 15 else []
-                if msgs:
-                    mes = [texte for m, texte in msgs if marche_autorise(etat, cid, m)]
-                    if mes:
-                        _envoi_sur(cid, text=fusion_ouvertures(mes))
-                else:
-                    fr, en = texte_session(etat, ev), texte_session(etat, ev, True)
-                    _envoi_sur(cid, text="\n".join(regrouper_alertes([en if str(cid) in LANG_EN else fr])))
+    # Les alertes gratuites de session sont remplacées par la question quotidienne unique.
 
 def alerte_gratuite_preparation(etat, texte, now=None):
-    """Gratuit : version réduite d'une alerte de préparation VIP (« JE PRÉPARE UNE POSITION », « PRÉPARE-TOI », « POINT D'ENTRÉE À VENIR ») :
-    jamais de sens ni de niveaux, une fois par marché toutes les 30 min, seulement si son bot est sur ON et le marché coché."""
+    """Les teasers automatiques gratuits sont désactivés : l'utilisateur demande lui-même l'analyse."""
+    return
     tete = texte.split("\n")[0].upper()
     if not any(k in tete for k in ("JE PRÉPARE UNE POSITION", "PRÉPARE-TOI", "POINT D'ENTRÉE À VENIR")):
         return
@@ -7628,8 +7639,9 @@ DODO_TXT = ["😴 Tu dors ? Le marché aussi…\n🔔 Je te réveille dès qu'un
             "😴 Le marché fait la sieste\n🔔 Garde les notifications : une position peut tomber"]
 
 def envoyer_differes(etat, now=None, dodo=True):
-    """v7.4 (modèle d'Adel, 15/11) : les gratuits dont l'essai est validé (1er TP) reçoivent les positions en DIFFÉRÉ ;
-    et une fois par jour, s'il ne se passe rien, un petit « tu dors ? » pour garder le contact."""
+    """Ancien système désactivé : aucune position ou relance différée en privé."""
+    etat["differe"] = []
+    return 0
     now = now or time.time()
     file_ = etat.setdefault("differe", [])
     prets = [x for x in file_ if x.get("t", 0) <= now]
@@ -7645,6 +7657,8 @@ def envoyer_differes(etat, now=None, dodo=True):
             print("différé", x.get("c"), ex)
     if not dodo:
         return
+    # Les relances quotidiennes sont remplacées par la question quotidienne unique.
+    return
     maint = datetime.datetime.now(PARIS); jour = maint.strftime("%Y-%m-%d")
     if 14 <= maint.hour < 22 and etat.get("dodo_jour") != jour and not any((etat.get(m_) or {}).get("trade") for m_ in MARCHES):
         etat["dodo_jour"] = jour
@@ -7657,8 +7671,8 @@ def envoyer_differes(etat, now=None, dodo=True):
                     print("dodo", cid, ex)
 
 def envoyer_prospects(etat, texte, signal, clavier=None):
-    """GRATUIT (visiteurs + propriétaire en vue gratuite) : 1 position proposée par jour si le bot est ON,
-    sinon un simple avis masqué quand une position sort. Jamais de news ni d'analyse : c'est le VIP."""
+    """Aucune position gratuite n'est poussée automatiquement en privé."""
+    return
     entree = signal and est_entree(texte)
     jour = datetime.datetime.now(PARIS).strftime("%Y-%m-%d")
     if etat.get("offerte_jour") != jour:           # 1 position GRATUITE par jour : on remet les compteurs à zéro
@@ -8022,17 +8036,23 @@ def marche_du_message(texte):
     ens = marches_du_message(texte)
     return None if not ens else (next(iter(ens)) if len(ens) == 1 else "BOTH")
 
+def coach_actif(etat, cid, marche):
+    """Autorisation explicite : le coach doit être activé pour ce marché, et le bot doit être ON."""
+    cid = str(cid)
+    return bot_on(etat, cid) and cid in {str(x) for x in (etat.get("auto", {}).get(marche) or [])}
+
+
 def destinataires_message(etat, chats, texte):
-    # Le flux complet (news, analyses, toutes les positions) part dans la chaîne VIP (commune : tous les marchés).
-    # Chaque personne ne reçoit EN PRIVÉ que les marchés qu'elle a cochés (filtrage ligne par ligne au moment de l'envoi, voir filtrer_texte_par_marches).
+    """Diffusions privées uniquement sur opt-in coach explicite, marché par marché.
+    La chaîne publique/VIP garde son flux ; les messages globaux sans marché ne sont jamais poussés en privé."""
     ens = marches_message(texte)
-    if etat.get("canal"):
-        prives = [str(c) for c in chats if not vue_gratuite(etat, c) and str(c) != str(etat["canal"])
-                  and etat.get("marches_par_chat", {}).get(str(c)) is not None and ens
-                  and ens & marches_choisis(etat, c)]
-        return sorted(set([str(etat["canal"])] + prives))
-    cibles = [str(c) for c in chats if not ens or bool(ens & marches_choisis(etat, c))]
-    return sorted(set(cibles))
+    canal = str(etat.get("canal") or "")
+    prives = [str(c) for c in chats if str(c) != canal and ens
+              and bool(ens & marches_choisis(etat, c))
+              and any(coach_actif(etat, c, m) for m in ens if m in MARCHES)]
+    if canal:
+        return sorted(set([canal] + prives))
+    return sorted(set(prives))
 
 def destinataires(etat, chats):
     """Téléphones qui reçoivent les signaux + la chaîne VIP."""
@@ -8087,7 +8107,8 @@ def jauge(m, r, cle, cid=None, canal=False):
 
 def maj_jauge(etat, m, r, cle, chats, canal=None):
     for cid in list(chats) + ([canal] if canal else []):
-        if cid != canal and not marche_autorise(etat, cid, m):
+        if cid != canal and (not marche_autorise(etat, cid, m) or
+                              (not coach_actif(etat, cid, m) and not en_position(etat, cid))):
             mid = cle.get("jauge", {}).pop(cid, None)
             cle.get("jauge_txt", {}).pop(cid, None)
             if mid:
@@ -11008,6 +11029,26 @@ def surveiller_releve():
         except Exception as ex:
             print("surveiller releve", type(ex).__name__, flush=True)
 
+def question_quotidienne(etat, chats, now=None):
+    """Un seul message privé par jour : demande si la personne compte trader aujourd'hui."""
+    now = time.time() if now is None else float(now)
+    jour = datetime.datetime.fromtimestamp(now, PARIS).strftime("%Y-%m-%d")
+    deja = etat.setdefault("question_quotidienne", {})
+    cibles = {str(c) for c in chats} | {str(c) for c in etat.get("prospects", [])}
+    canal = str(etat.get("canal") or "")
+    for cid in sorted(cibles - {canal, ""}):
+        if deja.get(cid) == jour:
+            continue
+        clavier = json.dumps({"inline_keyboard": [
+            [{"text": "✅ Oui, je trade", "callback_data": "trade:yes"}],
+            [{"text": "❌ Non, pas aujourd'hui", "callback_data": "trade:no"}]
+        ]})
+        texte = "Are you trading today?" if cid in LANG_EN else "Vas-tu trader aujourd'hui ?"
+        resultat = _envoi_sur(cid, text=texte, reply_markup=clavier)
+        if isinstance(resultat, dict) and resultat.get("ok") is True:
+            deja[cid] = jour
+
+
 def un_tour(etat, chats):
     """Un tour complet : messages reçus, analyse BTC + Gold, envois, jauges, sauvegarde."""
     LANG_EN.clear(); LANG_EN.update(etat.get("en", []))
@@ -11022,6 +11063,7 @@ def un_tour(etat, chats):
         traiter_file_live(etat, limite=30)
         if SHUTDOWN_REQUESTED.is_set():
             return
+        question_quotidienne(etat, chats)
         if etat.get("clavier") != 9:
             # Le nouveau clavier sera joint au prochain vrai message du bot.
             # Aucun message vide, promotionnel ou de démarrage n'est envoyé.
@@ -11297,11 +11339,7 @@ def un_tour(etat, chats):
                 epingler(etat, cid)
             menu_canal_vip(etat)
             menu_canal_resultats(etat)
-        # Rappel de partage : côté gratuit seulement (jamais dans la chaîne VIP), 1 fois au jour prévu
-        if TOKEN and partage_du(etat):
-            txt, kb = message_partage(etat)
-            for cid in destinataires_gratuits(etat):
-                _envoi_sur(cid, text=txt, reply_markup=kb)
+        # Aucun rappel promotionnel privé : une seule question quotidienne est autorisée.
     except Exception as ex:
         print("annonces", ex)
     if TOKEN:
