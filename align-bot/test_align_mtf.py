@@ -3482,3 +3482,75 @@ class TelegramExplicitCoachOptInTest(unittest.TestCase):
         self.assertNotIn("11", state["bot_off"])
         self.assertIn("Suivi maintenu uniquement sur : GOLD", sent[0]["text"])
         self.assertNotIn("next:yes", sent[0]["reply_markup"])
+
+
+class TelegramTp1Tp2BridgeTests(unittest.TestCase):
+    def _snapshot(self, robot, timeframe="M15"):
+        return {"tv_indicator_mtf": {
+            "available": True,
+            "activeTimeframe": timeframe,
+            "snapshots": {timeframe: {"fresh": True, "confirmed": True, "robotV12": robot}}
+        }}
+
+    def test_indicator_bridge_reads_both_targets_for_long(self):
+        plan = align_bot.plan_indicateur(self._snapshot({
+            "entry": 100, "sl": 95, "tp1": 110, "tp2": 120, "signal": "LONG"
+        }))
+        self.assertTrue(plan["available"])
+        self.assertEqual((plan["tp1"], plan["tp2"], plan["tp"]), (110.0, 120.0, 110.0))
+
+    def test_indicator_bridge_reads_both_targets_for_short(self):
+        plan = align_bot.plan_indicateur(self._snapshot({
+            "entry": 100, "sl": 105, "tp1": 90, "tp2": 80, "signal": "SHORT"
+        }))
+        self.assertTrue(plan["available"])
+        self.assertEqual((plan["tp1"], plan["tp2"]), (90.0, 80.0))
+
+    def test_indicator_bridge_keeps_legacy_single_tp_without_inventing_tp2(self):
+        plan = align_bot.plan_indicateur(self._snapshot({
+            "entry": 100, "sl": 95, "tp": 110, "signal": "LONG"
+        }))
+        self.assertTrue(plan["available"])
+        self.assertEqual(plan["tp1"], 110.0)
+        self.assertIsNone(plan["tp2"])
+
+    def test_indicator_bridge_rejects_tp2_on_wrong_side_of_tp1(self):
+        plan = align_bot.plan_indicateur(self._snapshot({
+            "entry": 100, "sl": 95, "tp1": 110, "tp2": 105, "signal": "LONG"
+        }))
+        self.assertFalse(plan["available"])
+        self.assertIn("géométrie", plan["reason"])
+
+    def _market(self):
+        return {
+            "dirs": [1] * 11, "rsis": [55] * 11,
+            "m1": [candle(1, c=67500.0)], "confirme": 1,
+            "posD": 0.55, "posW": 0.60, "news": "Calendrier économique",
+            "niv_cles": [], "asie": None, "macro": [], "fvg": [],
+            "atr": 100.0, "distrib": False, "accum": False,
+            "b5": [candle(i) for i in range(22)]
+        }
+
+    def _render(self, order):
+        from unittest.mock import patch
+        with patch.object(align_bot, "zone_txt", side_effect=lambda x: "milieu"), \\
+             patch.object(align_bot, "strategie_mtf", return_value=["Tendance 4 h", "Confirmation 1 h"]), \\
+             patch.object(align_bot, "verdict", return_value=("🟢 SETUP VALIDÉ", "Attendre la clôture 5 min.")), \\
+             patch.object(align_bot, "ligne_cassure", return_value="Déclencheur : clôture 5 min"), \\
+             patch.object(align_bot, "prochaine", return_value="Prochaine entrée : attendre le signal"):
+            return align_bot.texte_etat("BTC", self._market(), {"ordre": order})
+
+    def test_pending_order_displays_valid_tp1_and_tp2(self):
+        message = self._render({"d": 1, "e": 67400.0, "sl": 67200.0,
+                                "tp1": 67800.0, "tp2": 68100.0,
+                                "za": 67350.0, "zb": 67450.0})
+        self.assertIn("TP1 67800", message)
+        self.assertIn("TP2 68100", message)
+
+    def test_pending_order_does_not_invent_invalid_tp2(self):
+        message = self._render({"d": 1, "e": 67400.0, "sl": 67200.0,
+                                "tp1": 67800.0, "tp2": 67600.0,
+                                "za": 67350.0, "zb": 67450.0})
+        self.assertIn("TP2 non disponible (plan incomplet)", message)
+        self.assertNotIn("TP2 67600", message)
+
