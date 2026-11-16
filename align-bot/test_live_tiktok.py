@@ -158,6 +158,26 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("C'est à toi", self.envoye[-2][1]["text"])
         self.assertIn("PRENDS LA MAIN", self.envoye[-1][1]["text"])      # le menu du live redescend en bas
 
+    def test_live_menu_exposes_research_market_selection_and_coach_controls(self):
+        self.etat["live_on"] = True
+        kb = json.loads(ab.clavier_live(self.etat, "2"))["inline_keyboard"]
+        actions = {b.get("callback_data"): b["text"] for row in kb for b in row if b.get("callback_data")}
+        self.assertIn("analysechoice:BOTH", actions)
+        self.assertIn("marketsmenu:x", actions)
+        for market in ("BTC", "GOLD", "NASDAQ"):
+            self.assertIn(f"coachlive:{market}", actions)
+
+    def test_live_script_has_click_to_enable_voice_and_cleans_it_up(self):
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")
+        source = open(path, encoding="utf-8").read()
+        self.assertIn("speechSynthesis.speak(utterance)", source)
+        self.assertIn("🔇 Voix OFF", source)
+        self.assertIn("🔊 Voix ON", source)
+        self.assertIn("voixBtn.remove()", source)
+        self.assertIn("parlerLive(m)", source)
+
+
+
 class CartesRelieesAuGraphique(unittest.TestCase):
     def test_zone_parle_comme_le_graphique_en_anglais_aussi(self):
         fr = ("🟩 Le prix entre dans la ZONE du graphique\n🟨 Ligne jaune ENTRÉE : attends la CLÔTURE 15 min EN DESSOUS\n"
