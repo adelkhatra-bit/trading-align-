@@ -662,13 +662,14 @@
     if (bulle) txt = txt.slice(6).trim();
     // v8.0 (demande d'Adel) : un abonné booste le live depuis le bot → son prénom passe TOUT DE SUITE, avec feu d'artifice et merci
     if (/BOOSTE LE LIVE/i.test(txt)) { const pr = ((txt.match(/MERCI\s+([^!]+)!/i) || [])[1] || '').trim(); montrer(txt, false, 1, 'membre', true); feuArtifice('🚀 MERCI ' + pr.toUpperCase() + ' !'); setTimeout(() => coeurs(1, ['🙏']), 2500); return; }
+    if (/POSITION ALIGN CONFIRMÉE|ENTRE EN POSITION/i.test(txt)) { feuArtifice('🚀 POSITION CONFIRMÉE !'); coeurs(12, ['🚀', '🔥', '💚']); }
     if (/TP\d? TOUCH|OBJECTIF FINAL|TP2 TOUCH/i.test(txt)) { feuArtifice(/TP2|FINAL/i.test(txt) ? '🏆 ÇA ENCAISSE !' : '💰 ÇA ENCAISSE !'); pluieBillets(45);
       // v10.0 (demande d'Adel) : un TP mérite un petit cadeau → on invite à liker / envoyer une rose, sans jamais forcer
       setTimeout(() => montrer('🌹 LA TEAM VIENT D\'ENCAISSER ! si t\'as kiffé, une petite rose ou un like ❤️ ça motive le coach • merci à ceux qui gâtent le live 🎁', false, 1, 'membre', true), 9000);
       setTimeout(() => montrer('🆓 TOI AUSSI TU VEUX ENCAISSER AVEC LA TEAM ? crée ton compte démo GRATUIT et active ton coach • lien en bio • ce n\'est pas un conseil en investissement', false, 1, 'membre', true), 22000); }
     if (/\bSL\b[^\n]{0,12}TOUCH|STOP TOUCH/i.test(txt)) setTimeout(() => coeurs(1, ['😢']), 3600);
     if (/PLONGE|DIVING/i.test(txt)) { coeurs(1, ['🌊']); setTimeout(() => coeurs(1, ['😄']), 5000); }   // v10.7 : quand ça coule aussi
-    else if (/ACCÉLÈRE|SPEEDING UP|DIRECTION TP|ENTRE EN POSITION/i.test(txt)) { coeurs(1, ['🚀']); setTimeout(() => coeurs(1, ['😄']), 5000); }   // v10.5 (Adel) : fusée quand ça part fort + sourire   // v7.1 : smiley triste, on se refait
+    else if (/ACCÉLÈRE|SPEEDING UP|DIRECTION TP|ENTRE EN POSITION|POSITION ALIGN CONFIRMÉE/i.test(txt)) { coeurs(1, ['🚀']); setTimeout(() => coeurs(1, ['😄']), 5000); }   // v10.5 (Adel) : fusée quand ça part fort + sourire   // v7.1 : smiley triste, on se refait
     montrer(txt, bulle, 2);
     const em = (txt.slice(0, 4).match(/🔮|🧱|🛏/) || [])[0]; if (em) setTimeout(() => coeurs(1, [em]), 1500);   // v7.3 : animation « le graphique parle »
   }
