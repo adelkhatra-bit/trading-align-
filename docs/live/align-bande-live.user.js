@@ -201,8 +201,7 @@
   });
   function parlerLive(item) {
     if (!voixActive || !item || !('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return;
-    const anglais = langueBande() === 'en';
-    if (!!item.en !== anglais) return; // un seul passage vocal, dans la langue choisie
+    const anglais = !!item.en; // chaque élément de la file garde sa propre langue, indépendamment de la bande affichée
     const maintenant = Date.now();
     if (maintenant - voixDerniere < 12000) return; // pas de mitraillette vocale
     let phrase = String(item.texte || '').replace(/^🇫🇷\s*|^🇬🇧\s*/, '')
