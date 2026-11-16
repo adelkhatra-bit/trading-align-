@@ -10227,7 +10227,7 @@ ECRAN_FEINTE = {
 }
 
 def ecran_lire():
-    """Événements envoyés par la bande du live (au plus toutes les 20 s, échec = ignoré)."""
+    """Lit les événements live sans avancer le curseur : le curseur n'avance qu'après traitement confirmé."""
     if not LIVE_SUJET or time.time() - _ECRAN_T[0] < 20:
         return []
     _ECRAN_T[0] = time.time()
@@ -10247,8 +10247,7 @@ def ecran_lire():
         except Exception:
             continue
         if j.get("event") == "message":
-            etat["ecran_id"] = j.get("id") or etat.get("ecran_id")
-            out.append(str(j.get("message") or ""))
+            out.append({"id": j.get("id"), "message": str(j.get("message") or "")})
     return out
 
 def texte_ecran(m, typ, d, minutes, r, cle, ligne=""):
@@ -10296,10 +10295,15 @@ def texte_ecran(m, typ, d, minutes, r, cle, ligne=""):
     return "\n".join(lignes)
 
 def ecran_vers_telegram(etat):
-    """Lit les événements de l'écran du live et les publie en détail dans la chaîne du marché (sans son)."""
-    for brut in ecran_lire():
+    """Publie les événements live ; un échec Telegram laisse l'événement en attente pour le prochain passage."""
+    for evenement in ecran_lire():
+        event_id, brut = evenement.get("id"), evenement.get("message", "")
+        def avancer():
+            if event_id:
+                etat["ecran_id"] = event_id
         p = brut.split("|")        # EVT|BTC|pression|-1|7
         if len(p) < 4 or p[0] != "EVT" or p[1] not in MARCHES:
+            avancer()
             continue
         m, typ = p[1], p[2]
         ligne = p[5] if len(p) > 5 else ""
@@ -10307,29 +10311,37 @@ def ecran_vers_telegram(etat):
             d = -1 if int(p[3]) < 0 else 1
             minutes = int(p[4]) if len(p) > 4 and p[4] else 0
         except ValueError:
+            avancer()
             continue
         r = DERNIERS.get(m)
         canal = (etat.get("canaux_marche") or {}).get(m)
-        if not r or not canal:
+        if not canal:
+            avancer()
             continue
+        if not r:
+            break                              # données de marché pas prêtes : on relira cet événement
         cle_vu = f"ecran{m}{typ}{d}{ligne}"
         if typ in ("pression", "manip", "annonce", "respire", "feinte"):
-            # une annonce = UNE fois par quart d'heure (même si l'écran du live est rechargé) : jamais 3 « distribution en vue » de suite
             cle_vu += str(int(time.time() // 900))
             if cle_vu in _LIVE_DERNIER:
+                avancer()
                 continue
-        elif time.time() - _LIVE_DERNIER.get(cle_vu, 0) < 300:      # au plus 1 fois / 5 min par type : pas de rafale
+        elif time.time() - _LIVE_DERNIER.get(cle_vu, 0) < 300:
+            avancer()
             continue
-        _LIVE_DERNIER[cle_vu] = time.time()
         txt = texte_ecran(m, typ, d, minutes, r, etat.get(m) or {}, ligne)
         if not txt:
+            avancer()
             continue
-        # Chaîne : l'info en 4 lignes + bouton « 🧠 En savoir plus » qui ouvre le détail complet (pourquoi, où regarder) dans le bot
         etat.setdefault("ecran_detail", {})[m] = txt
         court = "\n".join(txt.split("\n")[:3] + ["🧠 Pourquoi, où regarder : bouton En savoir plus 👇"])
         kb = json.loads(boutons_chaine_marche(etat) or '{"inline_keyboard": []}')
         kb.setdefault("inline_keyboard", []).insert(0, [{"text": "🧠 En savoir plus", "url": BOT_LIEN + "?start=ecran_" + m.lower()}])
-        _envoi_sur(canal, text=court, reply_markup=json.dumps(kb))     # AVEC son : l'écran intrigue, le téléphone donne la réponse
+        resultat = _envoi_sur(canal, text=court, reply_markup=json.dumps(kb))
+        if resultat is None or (isinstance(resultat, dict) and resultat.get("ok") is False):
+            break
+        _LIVE_DERNIER[cle_vu] = time.time()
+        avancer()
 
 def promo_apres_tp(etat, m, now=None):
     """Demande d'Adel (15/11) : quand on tape un TP, on remet en avant le parrainage (compte démo gratuit + codes prop firms)
