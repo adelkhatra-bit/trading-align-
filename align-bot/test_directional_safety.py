@@ -56,7 +56,16 @@ class DirectionSafety(unittest.TestCase):
         self.assertIn("ENTRÉE POSSIBLE SUR RETEST : LONG", ab.entree_retest("NASDAQ", retest_r(1), {}))
 
     def test_btc_retest_rule_is_unchanged(self):
-        self.assertIn("ENTRÉE SUR RETEST : LONG", ab.entree_retest("BTC", retest_r(0), {}))
+        with mock.patch.object(ab, "objectifs", side_effect=AssertionError("BTC must keep its historical retest path")):
+            message = ab.entree_retest("BTC", retest_r(0), {})
+        self.assertIn("ENTRÉE SUR RETEST : LONG", message)
+        self.assertNotIn("TP2", message)
+
+    def test_rejected_gold_risk_does_not_consume_retest_cooldown(self):
+        cle = {}
+        with mock.patch.object(ab, "objectifs", return_value=((99.0, "invalid"), (98.0, "invalid"))):
+            self.assertIsNone(ab.entree_retest("GOLD", retest_r(1), cle))
+        self.assertFalse(cle.get("retest_vu"))
 
     def test_sniper_requires_both_h1_and_h4_for_gold_nasdaq(self):
         for market in ("GOLD", "NASDAQ"):
