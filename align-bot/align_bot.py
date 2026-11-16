@@ -3342,6 +3342,16 @@ def analyse_marche(etat, pair):
     r = analyser(pair, (etat or {}).setdefault(m, {}).setdefault("pine", {}) if m else None, market=m)
     if m:
         r["market"] = m
+        try:
+            r["tv_indicator_mtf"] = fetch_tv_mtf(pair)
+        except Exception as ex:
+            print(m, "bridge TradingView indisponible", ex)
+            r["tv_indicator_mtf"] = {"available": False, "reason": "bridge_unavailable"}
+        r["require_tv_bridge"] = os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1" and m in ("GOLD", "NASDAQ")
+        fusionne_lectures_tradingview(r)
+        r["confirme"] = direction_confirmee_marche(
+            m, r.get("dirs_cloturees") or r.get("dirs"), r.get("confirme"), r
+        )
         r["sniper"] = entree_sniper(r)
         tendance_armee(r, (etat or {}).setdefault(m, {}))
     r["annonce"] = annonce_proche(etat or {}, int(time.time()))
@@ -12033,7 +12043,7 @@ def un_tour(etat, chats):
                 return
             r["market"] = nom_marche
             r["tv_indicator_mtf"] = fetch_tv_mtf(pair)
-            r["require_tv_bridge"] = nom_marche in ("GOLD", "NASDAQ")
+            r["require_tv_bridge"] = os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1" and nom_marche in ("GOLD", "NASDAQ")
             fusionne_lectures_tradingview(r)
             # Revalider après lecture du bridge : Gold/Nasdaq ne peuvent pas ouvrir de position sans ROBOT V12 M5/M15/H1 frais.
             r["confirme"] = direction_confirmee_marche(
