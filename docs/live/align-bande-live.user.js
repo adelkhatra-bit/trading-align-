@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      11.8
+// @version      11.9
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @updateURL    https://raw.githubusercontent.com/adelkhatra-bit/trading-auto/main/docs/live/align-bande-live.user.js
