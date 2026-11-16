@@ -30,6 +30,8 @@ jobs:
           python-version: "3.11"
       - name: Compile all Python files
         run: python -m compileall -q align-bot
+      - name: Validate TradingView coach popup JavaScript
+        run: node --check tradingview-analyzer/popup.js
       - name: Prepare Go for actionlint
         uses: actions/setup-go@v5
         with:
