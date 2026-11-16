@@ -38,7 +38,7 @@ class LiveTikTok(unittest.TestCase):
     def test_installer_menu_actualise_la_commande_live(self):
         etat = {"menu": 10}
         ab.installer_menu(etat)
-        self.assertEqual(etat.get("menu"), 12)
+        self.assertEqual(etat.get("menu"), 13)
         commandes = [kw for methode, kw in self.tg if methode == "setMyCommands"]
         self.assertEqual(len(commandes), 2)
         fr = json.loads(commandes[0]["commands"])
@@ -46,11 +46,11 @@ class LiveTikTok(unittest.TestCase):
         self.assertTrue(any(c["command"] == "live" for c in fr))
         self.assertTrue(any(c["command"] == "live" for c in en))
 
-    def test_installer_menu_force_migration_depuis_ancienne_version_11(self):
-        etat = {"menu": 11}
+    def test_installer_menu_force_migration_depuis_version_12(self):
+        etat = {"menu": 12}
         with mock.patch.object(ab, "telegram", return_value={"ok": True}) as tg:
             ab.installer_menu(etat)
-        self.assertEqual(etat.get("menu"), 12)
+        self.assertEqual(etat.get("menu"), 13)
         self.assertEqual(len([c for c in tg.call_args_list if c.args[0] == "setMyCommands"]), 2)
 
     def test_installer_menu_ne_marque_pas_installe_si_telegram_refuse_en(self):
