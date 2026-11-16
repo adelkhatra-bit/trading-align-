@@ -2448,7 +2448,7 @@ TRAD.update({
     "🗂 Historique": "🗂 History",
     "🔔 Suivre le prochain setup": "🔔 Follow the next setup",
     "Choisis une action ALIGN": "Choose an ALIGN action",
-    "7️⃣ ⚖️ Risque conseillé : 0,5 à 1 % du compte par position ; jamais sans SL": "7️⃣ ⚖️ Suggested risk: 0.5 to 1% of the account per position; never trade without an SL",
+    "7️⃣ ⚖️ Topstep : 1 micro-contrat unique. MT5/CFD : 0,01 lot comme petite base si le broker l'autorise ; le nombre d'entrées reste au choix du trader. ALIGN vérifie le risque total et le SL obligatoire.": "7️⃣ ⚖️ Topstep: one micro contract only. MT5/CFD: 0.01 lot as a small starting size if the broker allows it; the trader chooses the number of entries. ALIGN checks total risk and requires an SL.",
 
     "🧑‍🏫 Coach : préviens-moi": "🧑‍🏫 Coach: warn me", "🎙 Coach commentateur (en direct)": "🎙 Live commentator coach", "⏹ Arrêter le commentateur": "⏹ Stop commentator",
     "✅ Publier": "✅ Publish",
