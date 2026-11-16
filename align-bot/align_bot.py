@@ -4250,10 +4250,8 @@ def reprise_entree(m, r, cle):
             "⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
 
 def entree_retest(m, r, cle):
-    """ENTRÉE SUR RETEST (règle d'Adel 15/11) : une résistance cassée à la CLÔTURE devient support (et inversement) ;
-    quand le prix revient dessus, que le marché bloque (mèche de rejet + clôture 15 min du bon côté) et que les unités
-    5 min / 15 min / 1h sont d'accord ; GOLD/NASDAQ exigent aussi 4h dans le même sens (BTC conserve la règle historique), on propose l'entrée à la clôture, SL un tout petit peu
-    sous (sur) la mèche de la dernière bougie. Une alerte par niveau toutes les 2 h ; le bot ne la prend pas lui-même."""
+    """GOLD/NASDAQ : retest avec clôtures M5/M15/H1/H4, prix frais et TP1/TP2 validés.
+    BTC conserve exactement son ancien déclencheur et son ancien message."""
     b = (r.get("b15") or [])[:-1]
     dirs = (r.get("dirs_cloturees") or r.get("dirs") or []) if m in ("GOLD", "NASDAQ") else (r.get("dirs") or [])
     atr = r.get("atr") or 0
@@ -4277,8 +4275,17 @@ def entree_retest(m, r, cle):
         vu = cle.setdefault("retest_vu", {})
         if r.get("t", 0) - vu.get(k, -10 ** 9) < 7200:
             return None
-        vu[k] = r.get("t", 0)
         sl = (x["l"] - 0.1 * atr) if d == 1 else (x["h"] + 0.1 * atr)
+        ancien, nouveau = ("résistance", "support") if d == 1 else ("support", "résistance")
+        if m not in ("GOLD", "NASDAQ"):
+            # Chemin historique BTC : aucune nouvelle exigence TP2/RR, ni changement de texte.
+            vu[k] = r.get("t", 0)
+            return (f"🎯 ENTRÉE SUR RETEST : {'LONG' if d == 1 else 'SHORT'} — {ICONE.get(m, '')} {m}\n"
+                    f"🧱 L'ancienne {ancien} {px(niveau)} a été cassée à la clôture : elle devient {nouveau}\n"
+                    "🛑 Le prix est revenu dessus et le marché bloque (clôture 15 min du bon côté)\n"
+                    f"✅ 5 min + 15 min + 1h d'accord\n"
+                    f"📍 Entrée ≈ {px(x['c'])}\n🛑 SL {'juste sous' if d == 1 else 'juste au-dessus de'} la mèche : {px(sl)}\n"
+                    "🛡 BE dès que le gain = le risque\n🤖 Le bot ne la prend pas lui-même\n⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
         entree = x["c"]
         risque = abs(entree - sl)
         if risque <= 0:
@@ -4287,21 +4294,15 @@ def entree_retest(m, r, cle):
         rr = abs(tp1 - entree) / risque
         if d * (tp1 - entree) <= 0 or d * (tp2 - tp1) <= 0 or rr < GAIN_MIN:
             continue
-        ancien, nouveau = ("résistance", "support") if d == 1 else ("support", "résistance")
-        if m in ("GOLD", "NASDAQ"):
-            return (f"🎯 ENTRÉE POSSIBLE SUR RETEST : {'LONG' if d == 1 else 'SHORT'} — {ICONE.get(m, '')} {m}\n"
-                    f"🧱 L'ancienne {ancien} {px(niveau)} a été cassée à la clôture : elle devient {nouveau}\n"
-                    "🛑 Le prix est revenu dessus et le marché bloque (clôture 15 min du bon côté)\n"
-                    "✅ Clôtures M5 + M15 + H1 + H4 dans le même sens\n"
-                    f"📍 Entrée : {px(entree)}\n🛑 SL : {px(sl)}\n🎯 TP1 : {px(tp1)} ({n1})\n🏁 TP2 : {px(tp2)} ({n2})\n"
-                    f"⚖️ Gain/risque : 1:{rr:.1f}\n🛡 BE à +1R\n🤖 Signal à valider, le bot ne passe pas l'ordre\n"
-                    "⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
-        return (f"🎯 ENTRÉE SUR RETEST : {'LONG' if d == 1 else 'SHORT'} — {ICONE.get(m, '')} {m}\n"
+        # Ne consomme le cooldown que lorsqu'une alerte Gold/Nasdaq complète est réellement produite.
+        vu[k] = r.get("t", 0)
+        return (f"🎯 ENTRÉE POSSIBLE SUR RETEST : {'LONG' if d == 1 else 'SHORT'} — {ICONE.get(m, '')} {m}\n"
                 f"🧱 L'ancienne {ancien} {px(niveau)} a été cassée à la clôture : elle devient {nouveau}\n"
                 "🛑 Le prix est revenu dessus et le marché bloque (clôture 15 min du bon côté)\n"
-                "✅ 5 min + 15 min + 1h d'accord\n"
-                f"📍 Entrée ≈ {px(entree)}\n🛑 SL juste derrière la mèche : {px(sl)}\n"
-                "🛡 BE dès que le gain = le risque\n🤖 Le bot ne la prend pas lui-même\n⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
+                "✅ Clôtures M5 + M15 + H1 + H4 dans le même sens\n"
+                f"📍 Entrée : {px(entree)}\n🛑 SL : {px(sl)}\n🎯 TP1 : {px(tp1)} ({n1})\n🏁 TP2 : {px(tp2)} ({n2})\n"
+                f"⚖️ Gain/risque : 1:{rr:.1f}\n🛡 BE à +1R\n🤖 Signal à valider, le bot ne passe pas l'ordre\n"
+                "⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
     return None
 
 def radar_climax(m, r, cle):
