@@ -50,5 +50,20 @@ class ZoneConsumptionDirectionnelle(unittest.TestCase):
         self.assertIn("Zone mangée à 50 %", out[0])
 
 
+class PineZoneConsumption(unittest.TestCase):
+    def test_fvg_boxes_show_progressive_consumption(self):
+        from pathlib import Path
+        pine = (Path(__file__).parent / "pine" / "ALIGN_MTF_PRO_v24_3_PROPOSITION.pine").read_text(encoding="utf-8")
+        self.assertIn("f_zone_pct(top, bottom, sens) =>", pine)
+        self.assertIn('box.set_text(b, "FVG • " + str.tostring(pct) + "% consommée")', pine)
+        self.assertIn("box.set_bgcolor(b, color.new(base, 85 - int(pct * 0.45)))", pine)
+
+    def test_order_block_box_shows_its_consumption(self):
+        from pathlib import Path
+        pine = (Path(__file__).parent / "pine" / "ALIGN_MTF_PRO_v24_3_PROPOSITION.pine").read_text(encoding="utf-8")
+        self.assertIn('text="ORDER BLOCK • " + str.tostring(pctOB) + "% consommé"', pine)
+        self.assertIn("pctOB = f_zone_pct(obH_, obL_, sensOB)", pine)
+
+
 if __name__ == "__main__":
     unittest.main()
