@@ -1,4 +1,4 @@
-name: ALIGN MTF BOT (signaux BTC + Gold Telegram)
+name: ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)
 # Release trigger after verified cleanup of the previous production worker.
 
 on:
@@ -113,8 +113,10 @@ jobs:
                       report["telegram_offset_present"] = state.get("offset") is not None
                       report["btc_open_trade"] = bool((state.get("BTC") or {}).get("trade"))
                       report["gold_open_trade"] = bool((state.get("GOLD") or {}).get("trade"))
+                      report["nasdaq_open_trade"] = bool((state.get("NASDAQ") or {}).get("trade"))
                       report["btc_auto_follow_count"] = len((state.get("auto") or {}).get("BTC", []))
                       report["gold_auto_follow_count"] = len((state.get("auto") or {}).get("GOLD", []))
+                      report["nasdaq_auto_follow_count"] = len((state.get("auto") or {}).get("NASDAQ", []))
               except Exception as exc:
                   report["state_json_valid"] = False
                   report["parse_error"] = type(exc).__name__
@@ -209,7 +211,7 @@ jobs:
           ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
         run: python3 ai_healthcheck.py
 
-      - name: Vérifier le bridge TradingView ROBOT V12 (BTC + GOLD)
+      - name: Vérifier le bridge TradingView ROBOT V12 (BTC + GOLD + NASDAQ)
         # Enrichissement optionnel : si le bridge est indisponible, ALIGN conserve ses flux natifs BTC/Kraken et GOLD/XAUUSD spot; aucune donnée TradingView n'est simulée.
         continue-on-error: true
         env:
@@ -224,7 +226,7 @@ jobs:
               print("::warning title=Bridge TradingView non raccordé::Secrets ALIGN_TV_API_URL / ALIGN_TV_READ_TOKEN absents. Telegram n'est PAS relié à l'indicateur : le bot tourne sur Kraken/Yahoo (bridge optionnel).")
               print("BRIDGE_STATUS=NOT_CONNECTED reason=secrets_absents fallback=Kraken/Yahoo")
               raise SystemExit(0)
-          for symbol in ("BTCUSD", "XAUUSD"):
+          for symbol in ("BTCUSD", "XAUUSD", "NAS100"):
               url = base + "/bridge/robot-v12/mtf?symbol=" + urllib.parse.quote(symbol)
               req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token, "User-Agent": "ALIGN-bridge-preflight"})
               with urllib.request.urlopen(req, timeout=12) as response:
@@ -241,10 +243,18 @@ jobs:
               directions = [robot.get(k) for k in ("lecture_1m", "lecture_5m", "lecture_15m", "lecture_60m")]
               if not any(v not in (None, "") for v in directions):
                   raise SystemExit("ÉCHEC: aucune lecture MTF ROBOT V12 exploitable pour " + symbol)
-              print(f"BRIDGE_CONFIRMED symbol={symbol} active={active} age_ms={payload.get('activeTimeframeAgeMs')} received={','.join(payload.get('receivedTimeframes', []))} fresh_snapshot=true robot_v12=true")
+              # Les UT supérieures doivent être présentes et fraîches, sans assimiler une UT à une autre.
+              required = ("M5", "M15", "H1", "H4", "D1", "W1")
+              snapshots = payload["snapshots"]
+              def get_tf(tf):
+                  return snapshots.get(tf) or snapshots.get(tf.lower()) or {}
+              stale = [tf for tf in required if get_tf(tf).get("fresh") is not True]
+              if stale:
+                  raise SystemExit("ÉCHEC: snapshots TradingView absents/périmés pour " + symbol + " : " + ",".join(stale))
+              print(f"BRIDGE_CONFIRMED symbol={symbol} active={active} age_ms={payload.get('activeTimeframeAgeMs')} received={','.join(payload.get('receivedTimeframes', []))} required_fresh={','.join(required)} fresh_snapshot=true robot_v12=true")
           PY
 
-      - name: Analyse BTC + Gold et envoi Telegram
+      - name: Analyse BTC + Gold + NASDAQ et envoi Telegram
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

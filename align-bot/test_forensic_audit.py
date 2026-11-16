@@ -38,7 +38,8 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
         r = {"t": 1000, "m1": [{"c": 1.0}], "dirs": [], "rsis": []}
         align_bot.capturer_snapshot_audit(etat, "GOLD", r, {})
         self.assertEqual(len(etat["audit_mtf"]["GOLD"]), 600)
-        self.assertEqual(etat["audit_mtf"]["GOLD"][-1]["t"], 1000)
+        self.assertEqual(etat["audit_mtf"]["GOLD"][-1]["bar_t"], 1000)
+        self.assertIsNotNone(etat["audit_mtf"]["GOLD"][-1]["t"])
 
 
     def test_gold_and_nasdaq_reversal_watch_remains_available(self):
@@ -175,6 +176,121 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
         self.assertFalse(ok)
         save.assert_not_called()
         self.assertIn("Coche au moins un marché", send.call_args.kwargs["text"])
+
+
+
+    def test_snapshot_records_decision_reason_and_closed_market_bars(self):
+        etat = {}
+        r = {
+            "t": 1700000400, "decision_ts": 1700000500,
+            "m1": [{"t": 1700000460, "o": 100, "h": 101, "l": 99, "c": 100.5, "v": 10}],
+            "b5": [{"t": 1700000100, "o": 99, "h": 101, "l": 98, "c": 100, "v": 200,
+                    "volume_source": "Kraken BTC"}],
+            "b15": [{"t": 1700000100, "o": 99, "h": 101, "l": 98, "c": 100, "v": 500}],
+            "b1h": [{"t": 1699996800, "o": 98, "h": 102, "l": 97, "c": 100}],
+            "b4h": [{"t": 1699987200, "o": 95, "h": 103, "l": 94, "c": 100}],
+            "bd": [{"t": 1699920000, "o": 90, "h": 105, "l": 88, "c": 100}],
+            "bw": [{"t": 1699488000, "o": 85, "h": 110, "l": 80, "c": 100}],
+            "dirs": [1] * 11, "rsis": [55.0] * 11, "confirme": 1,
+            "sens": 1, "score": 0.5, "pctH": 75, "trendS": 0.5, "momS": 1,
+            "dirPlan": 1, "dirW": 1
+        }
+        cle = {"ordre": {"d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0, "src": "FVG"}}
+        with unittest.mock.patch.object(align_bot, "raison_attente", return_value="J'attends la clôture M5"), \
+             unittest.mock.patch.object(align_bot, "verdict", return_value=("PATIENCE", "Clôture M5 manquante")):
+            align_bot.capturer_snapshot_audit(etat, "BTC", r, cle)
+        snap = etat["audit_mtf"]["BTC"][0]
+        self.assertEqual(snap["t"], 1700000500)
+        self.assertEqual(snap["bar_t"], 1700000100)
+        self.assertEqual(snap["decision"]["reason"], "J'attends la clôture M5")
+        self.assertEqual(snap["decision"]["verdict"], "PATIENCE")
+        self.assertEqual(snap["data"]["5m"]["last"]["volume_source"], "Kraken BTC")
+        self.assertEqual(snap["data"]["5m"]["bar_close_t"], 1700000400)
+        self.assertTrue(snap["data"]["15m"]["closed"])
+        self.assertEqual(snap["trade"]["plan_source"], "ordre_en_preparation")
+
+    def test_snapshot_deduplicates_same_m5_bar_unless_decision_changes(self):
+        etat = {}
+        r = {"t": 1700000400, "decision_ts": 1700000500,
+             "b5": [{"t": 1700000100, "o": 1, "h": 2, "l": 0, "c": 1}],
+             "m1": [{"c": 1}], "dirs": [0] * 11, "rsis": [50] * 11}
+        cle = {}
+        with unittest.mock.patch.object(align_bot, "raison_attente", return_value="A"), \
+             unittest.mock.patch.object(align_bot, "verdict", return_value=("N", "D")):
+            align_bot.capturer_snapshot_audit(etat, "BTC", r, cle)
+            align_bot.capturer_snapshot_audit(etat, "BTC", r, cle)
+            self.assertEqual(len(etat["audit_mtf"]["BTC"]), 1)
+            r["confirme"] = 1
+            align_bot.capturer_snapshot_audit(etat, "BTC", r, cle)
+        self.assertEqual(len(etat["audit_mtf"]["BTC"]), 2)
+
+
+
+    def test_closed_trade_creates_a_linked_learning_case_from_pre_entry_and_entry_snapshots(self):
+        trade = {"d": 1, "e": 100.0, "sl": 98.0, "sl0": 98.0, "tp1": 104.0, "tp2": 108.0,
+                 "cree": 1700000200, "src": "FVG", "profil": {"m": "BTC", "type": "repli", "d": 1, "session": "Londres"}}
+        key = align_bot.cle_audit_trade("BTC", trade)
+        pre = {"t": 1700000100, "price": 99.8, "confirm": 1, "mtf": {"4h": {"direction": 1}},
+               "trade": {"plan_source": "ordre_en_preparation", "d": 1, "e": 100.0}}
+        entry = {"t": 1700000200, "price": 100.0, "confirm": 1, "strategy": "SWING",
+                 "mtf": {"4h": {"direction": 1}, "1h": {"direction": 1}},
+                 "decision": {"verdict": "ENTRÉE VALIDÉE"},
+                 "trade": {"plan_source": "position_ouverte", "audit_key": key}}
+        etat = {"audit_mtf": {"BTC": [pre, entry]}}
+        align_bot.journal_trade(etat, "BTC", trade, 104.0, "TP1 TOUCHÉ", 2.0)
+        case = etat["cas_apprentissage"][0]
+        self.assertEqual(case["audit_key"], key)
+        self.assertEqual(case["label"], "WIN")
+        self.assertEqual(case["result_r"], 2.0)
+        self.assertEqual(case["pre_entry_t"], 1700000100)
+        self.assertEqual(case["entry_snapshot_t"], 1700000200)
+        self.assertEqual(case["evidence"], "complete")
+        self.assertEqual(case["entry_features"]["mtf"]["4h"]["direction"], 1)
+        self.assertEqual(etat["journal_trades"][0]["learning_evidence"], "complete")
+
+    def test_learning_case_is_idempotent_for_a_replayed_trade_close(self):
+        trade = {"d": -1, "e": 200.0, "sl": 204.0, "cree": 1700000300}
+        etat = {"audit_mtf": {"GOLD": []}}
+        align_bot.enregistrer_cas_apprentissage(etat, "GOLD", trade, 204.0, "SL TOUCHÉ", -2.0)
+        align_bot.enregistrer_cas_apprentissage(etat, "GOLD", trade, 204.0, "SL TOUCHÉ", -2.0)
+        self.assertEqual(len(etat["cas_apprentissage"]), 1)
+        self.assertEqual(etat["cas_apprentissage"][0]["label"], "LOSS")
+
+    def test_telegram_push_only_reaches_active_subscribers_of_the_tagged_market(self):
+        class BitcoinMessage(align_bot.Msg):
+            marches = frozenset({"BTC"})
+        etat = {
+            "auto": {"BTC": ["btc-user", "paused-user"], "GOLD": ["gold-user"]},
+            "marches_par_chat": {"btc-user": ["BTC"], "paused-user": ["BTC"], "gold-user": ["GOLD"]},
+            "bot_off": ["paused-user"]
+        }
+        dest = align_bot.destinataires_message(etat, {"btc-user", "paused-user", "gold-user", "not-subscribed"},
+                                               BitcoinMessage("BTC — signal confirmé"))
+        self.assertEqual(dest, ["btc-user"])
+
+
+
+    def test_nasdaq_position_price_uses_fresh_adjusted_nq_quote_not_kraken(self):
+        now = align_bot.time.time()
+        with unittest.mock.patch.dict(align_bot._CACHE, {
+                 "nq_live": (now, 20000.0), "ecart_ndx": 35.5
+             }, clear=False), \
+             unittest.mock.patch.object(align_bot, "nasdaq_direct", return_value=20000.0), \
+             unittest.mock.patch.object(align_bot, "http_json") as http:
+            price = align_bot.prix_actuel("NASDAQ")
+        self.assertEqual(price, 20035.5)
+        http.assert_not_called()
+
+    def test_nasdaq_position_price_fails_closed_when_nq_quote_is_stale(self):
+        now = align_bot.time.time()
+        with unittest.mock.patch.dict(align_bot._CACHE, {
+                 "nq_live": (now - 30, 20000.0), "ecart_ndx": 35.5
+             }, clear=False), \
+             unittest.mock.patch.object(align_bot, "nasdaq_direct", return_value=20000.0), \
+             unittest.mock.patch.object(align_bot, "http_json") as http:
+            price = align_bot.prix_actuel("NASDAQ")
+        self.assertIsNone(price)
+        http.assert_not_called()
 
 
 
