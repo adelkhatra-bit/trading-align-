@@ -8440,6 +8440,7 @@ def fmt_trade(m, tr, p=None):
             + (f"4️⃣ 💰 TP1 : juste {'sous la' if d == 1 else 'au-dessus du'} {tr['n1']} (regarde en vue {vue(tr['n1'])})\n"
                if "projection" not in tr["n1"] else f"4️⃣ 💰 TP1 : environ {tr['rr']:.1f} fois ton risque\n")
             + (f"5️⃣ 🏁 TP2 : {tr['n2']} (vue {vue(tr['n2'])})\n" if "projection" not in tr["n2"] else "5️⃣ 🏁 TP2 : on laisse courir, je te guide\n")
+            + "🛡️ À TP1 : remonte le SL à BE, puis laisse courir jusqu'au TP2.\n"
             + duree_txt(tr) +
             f"📉 Distance entrée → SL : {risque_pct:.2f} % du prix (pas le % du capital risqué)\n"
             f"🛑 SL obligatoire : ne jamais l'élargir ni l'enlever. Respecte le niveau indiqué.\n"
