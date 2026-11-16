@@ -105,8 +105,12 @@ class DirectionSafety(unittest.TestCase):
 
     def test_manual_telegram_analysis_assigns_market_before_sniper(self):
         result = {"dirs": [0] * 11, "dirPlan": 0}
+        seen = {}
+        def capture_sniper(r):
+            seen["market"] = r.get("market")
+            return None
         with mock.patch.object(ab, "analyser", return_value=result) as analyser, \
-             mock.patch.object(ab, "entree_sniper", return_value=None) as sniper, \
+             mock.patch.object(ab, "entree_sniper", side_effect=capture_sniper) as sniper, \
              mock.patch.object(ab, "tendance_armee"), \
              mock.patch.object(ab, "annonce_proche", return_value=""), \
              mock.patch.object(ab, "news_txt", return_value=""), \
@@ -116,6 +120,7 @@ class DirectionSafety(unittest.TestCase):
         self.assertEqual(analyser.call_args.args[0], "XAUUSD")
         self.assertEqual(analyser.call_args.kwargs["market"], "GOLD")
         self.assertEqual(out["market"], "GOLD")
+        self.assertEqual(seen["market"], "GOLD")
         sniper.assert_called_once_with(out)
 
     def test_gold_nasdaq_confirmation_alert_requires_h1_and_h4(self):
