@@ -132,10 +132,10 @@ def prix_fiable(cotation, prix, prix_graphique, maintenant=None):
 
 
 def niveaux_mt5(signal, prix):
-    """Le prix MT5 (CFD) n'est pas exactement celui de TradingView : on garde les mêmes DISTANCES
-    (SL élargi et TP) mais on les pose à partir du vrai prix d'exécution → aucune confusion de niveaux."""
+    """SL et TP FINAL recalés sur la cotation MT5 ; TP1 reste un jalon, TP2 est la sortie broker."""
     d_sl = abs(signal["e"] - signal["sl"]) * SL_ELARGI
-    d_tp = abs(signal["tp"] - signal["e"])
+    tp_final = signal.get("tp2") or signal["tp"]
+    d_tp = abs(tp_final - signal["e"])
     if signal["sens"] == "LONG":
         return round(prix - d_sl, 2), round(prix + d_tp, 2)
     return round(prix + d_sl, 2), round(prix - d_tp, 2)
@@ -187,10 +187,22 @@ def executer(etat, signal, journal=print):
                 journal(f"AUTO_TRADE TEST {compte} {ordre}")
                 res.append({"compte": compte, "ok": True, "test": True, "ordre": ordre}); continue
             r = _api("POST", f"{compte}/trade", ordre)
-            res.append({"compte": compte, "ok": r.get("stringCode") in ("TRADE_RETCODE_DONE", "ERR_NO_ERROR"), "reponse": r, "ordre": ordre})
-            etat.setdefault("mt5_plan", {})[compte] = {"marche": m, "sens": signal["sens"], "sym": sym, "e": prix, "sl": sl_mt5,
-                                                      "tp": tp_mt5, "taille": float(spec.get("contractSize", 1)),
-                                                      "pas": float(spec.get("volumeStep", 0.01)), "be": False, "rachats": 0, "budget": budget}
+            code = str(r.get("stringCode") or "")
+            ok = code in ("TRADE_RETCODE_DONE", "TRADE_RETCODE_DONE_PARTIAL", "TRADE_RETCODE_PLACED", "ERR_NO_ERROR")
+            pending = code == "TRADE_RETCODE_PLACED"
+            tp1_mt5 = round(prix + (1 if signal["sens"] == "LONG" else -1) * abs(signal["tp"] - signal["e"]), 2)
+            item = {"compte": compte, "ok": ok, "pending": pending, "reponse": r, "ordre": ordre,
+                    "prix_entree": prix, "sl": sl_mt5, "tp1": tp1_mt5, "tp2": tp_mt5}
+            if ok:
+                etat.setdefault("mt5_plan", {})[compte] = {
+                    "marche": m, "sens": signal["sens"], "sym": sym, "e": prix, "sl": sl_mt5,
+                    "tp": tp_mt5, "tp1": tp1_mt5, "tp2": tp_mt5,
+                    "taille": float(spec.get("contractSize", 1)), "pas": float(spec.get("volumeStep", 0.01)),
+                    "be": False, "rachats": 0, "budget": budget, "pending": pending,
+                    "cree": time.time(), "order_id": r.get("orderId") or r.get("id")}
+            else:
+                item["raison"] = r.get("message") or r.get("errorMessage") or code or "ordre refusé par MetaApi"
+            res.append(item)
         except Exception as ex:
             res.append({"compte": compte, "ok": False, "raison": f"erreur {ex}"})
         time.sleep(0.5)
@@ -236,9 +248,18 @@ def gerer(etat, journal=print):
         try:
             pos = [p for p in (_api("GET", f"{compte}/positions") or []) if p.get("symbol") == plan["sym"] and "ALIGN" in str(p.get("comment", ""))]
             if not pos:
+                if plan.get("pending") and time.time() - float(plan.get("cree", time.time())) < 120:
+                    continue
                 etat["mt5_plan"].pop(compte, None)
-                msgs.append(f"🏁 FundedNext {plan['marche']} : plan terminé (TP, SL ou BE)")
+                msgs.append(f"⚠️ MetaApi {plan['marche']} : aucune position broker retrouvée — ordre non confirmé ou position terminée")
                 continue
+            if plan.get("pending"):
+                vol = sum(float(p.get("volume", 0) or 0) for p in pos)
+                if vol > 0:
+                    plan["e"] = sum(float(p.get("openPrice", plan["e"])) * float(p.get("volume", 0) or 0) for p in pos) / vol
+                plan["sl"] = next((float(p["stopLoss"]) for p in pos if p.get("stopLoss")), plan["sl"])
+                plan["tp"] = next((float(p["takeProfit"]) for p in pos if p.get("takeProfit")), plan["tp"])
+                plan["pending"] = False
             q = _api("GET", f"{compte}/symbols/{plan['sym']}/current-price")
             prix = float(q["bid"] if plan["sens"] == "LONG" else q["ask"])
             quoi, x = decision(plan, pos, prix)
@@ -251,12 +272,18 @@ def gerer(etat, journal=print):
                 plan["dernier_rachat"] = prix
                 msgs.append(f"➕ FundedNext {plan['marche']} : rachat {x} lot sur le repli (risque total ≤ {RISQUE_TOTAL_MAX:.0f} $) ({'réel' if REEL else 'test'})")
             elif quoi == "be":
+                modifs_ok = True
                 for p in pos:
                     if REEL:
-                        _api("POST", f"{compte}/trade", {"actionType": "POSITION_MODIFY", "positionId": p["id"],
-                                                          "stopLoss": round(x, 2), "takeProfit": p.get("takeProfit") or plan["tp"]})
-                plan["be"] = True
-                msgs.append(f"🔒 FundedNext {plan['marche']} : +1R atteint → tous les SL à l'entrée moyenne (BE) ({'réel' if REEL else 'test'})")
+                        rep_ = _api("POST", f"{compte}/trade", {"actionType": "POSITION_MODIFY", "positionId": p["id"],
+                                                                "stopLoss": round(x, 2), "takeProfit": p.get("takeProfit") or plan["tp"]})
+                        if str(rep_.get("stringCode") or "") not in ("TRADE_RETCODE_DONE", "ERR_NO_ERROR", "TRADE_RETCODE_NO_CHANGES"):
+                            modifs_ok = False
+                if modifs_ok:
+                    plan["be"] = True
+                    msgs.append(f"🔒 FundedNext {plan['marche']} : +1R atteint → SL à l'entrée moyenne (BE), TP2 conservé ({'réel' if REEL else 'test'})")
+                else:
+                    msgs.append(f"⚠️ FundedNext {plan['marche']} : +1R atteint mais modification du SL non confirmée — vérification nécessaire")
         except Exception as ex:
             journal(f"AUTO_TRADE gerer {compte} : {ex}")
     for x in msgs:
