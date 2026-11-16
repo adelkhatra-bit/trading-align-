@@ -12,14 +12,15 @@ def serie(retest=True):
         b[i].update(o=100.5, h=103, l=100.2, c=102)
     b[29] = dict(t=29 * 900, o=100.4, h=101.5, l=99.9 if retest else 101.0, c=101.2, v=1)   # retour sur 100 puis clôture au-dessus
     b.append(dict(t=30 * 900, o=101.2, h=101.3, l=101.1, c=101.2, v=1))                   # en formation
-    return dict(b15=b, dirs=UP, atr=2.0, t=30 * 900)
+    return dict(b15=b, dirs=UP, atr=2.0, grosses=[(105.0, "4h"), (110.0, "Daily")], t=30 * 900)
 
 
 class Retest(unittest.TestCase):
     def test_long_propose(self):
         cle = {}
         t = ab.entree_retest("GOLD", serie(), cle)
-        self.assertIn("ENTRÉE SUR RETEST : LONG", t); self.assertIn("devient support", t)
+        self.assertIn("ENTRÉE POSSIBLE SUR RETEST : LONG", t); self.assertIn("devient support", t)
+        self.assertIn("TP1 :", t); self.assertIn("TP2 :", t); self.assertIn("Gain/risque", t)
         self.assertIn("SL juste sous la mèche : 99,70", t); self.assertIn("DYOR", t)
         self.assertIsNone(ab.entree_retest("GOLD", serie(), cle))
 
