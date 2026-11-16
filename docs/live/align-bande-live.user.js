@@ -371,7 +371,7 @@
       if (!rep.ok) return;
       const data = await rep.json();
       const maj = Number(data && data.maj || 0) * 1000;
-      if (!maj || Date.now() - maj > 6 * 60 * 1000 || maj > Date.now() + 60000) return;
+      if (!maj || Date.now() - maj > 10 * 60 * 1000 || maj > Date.now() + 60000) return;
       for (const item of (Array.isArray(data.marches) ? data.marches : [])) {
         const k = cleMarche(item && item.m);
         if (!k) continue;
