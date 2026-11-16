@@ -72,7 +72,7 @@ class Sessions(unittest.TestCase):
 
     def test_free_gets_only_15min_notice_of_london_and_new_york_opens(self):
         envois = []
-        etat = {"prospects": ["900"]}
+        etat = {"prospects": ["900"], "auto": {"GOLD": ["900"], "BTC": ["900"], "NASDAQ": ["900"]}}
         with patch.object(ab, "TOKEN", "x"), patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append((str(c), k["text"]))), patch.object(ab, "destinataires_message", return_value=["canal"]):
             ab.alertes_courtes(etat, set(), {}, utc(2026, 11, 11, 14, 15))      # Wall Street 15 min
             ab.alertes_courtes(etat, set(), {}, utc(2026, 11, 11, 14, 26))      # palier 5 : VIP seulement
@@ -196,7 +196,7 @@ class EvenementsPine(unittest.TestCase):
 
     def test_pine_alerts_go_to_vip_only_and_free_gets_reduced_preparation_without_levels(self):
         envois = []
-        etat = {"prospects": ["900", "901"], "marches_par_chat": {"901": ["BTC"]}, "bot_off": []}
+        etat = {"prospects": ["900", "901"], "marches_par_chat": {"901": ["BTC"]}, "bot_off": [], "auto": {"GOLD": ["900"], "BTC": ["901"]}}
         with patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append((str(c), k["text"]))), patch.object(ab, "bot_on", return_value=True):
             ab.alerte_gratuite_preparation(etat, "🔔 JE PRÉPARE UNE POSITION — 🥇 GOLD\n🟩 LONG ⬆️ monte\n📌 Entrée : 4012,5")
             ab.alerte_gratuite_preparation(etat, "⚡⚡ PRÉPARE-TOI — 🥇 GOLD\n4012,5")
