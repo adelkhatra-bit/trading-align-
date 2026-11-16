@@ -5383,8 +5383,10 @@ def notifier_coach_live(etat, m, r, cle):
                 if _envoi_sur(cid, text=flash) is not None:
                     info["flash_t"] = time.time()
             continue
-        info["dernier_t"] = int(b["t"])          # marqué avant l'envoi : jamais de doublon
-        _envoi_sur(cid, text=texte_coach_live(m, b, r, cle, positions_bot(etat)), reply_markup=markup_analyse(etat, m, r, cid))
+        resultat = _envoi_sur(cid, text=texte_coach_live(m, b, r, cle, positions_bot(etat)),
+                              reply_markup=markup_analyse(etat, m, r, cid))
+        if isinstance(resultat, dict) and resultat.get("ok") is True:
+            info["dernier_t"] = int(b["t"])       # clôture consommée uniquement après acceptation Telegram
 
 
 def activer_coach_live(etat, cid, m, actif=True):
@@ -8048,9 +8050,11 @@ def destinataires_message(etat, chats, texte):
     La chaîne publique/VIP garde son flux ; les messages globaux sans marché ne sont jamais poussés en privé."""
     ens = marches_message(texte)
     canal = str(etat.get("canal") or "")
-    prives = [str(c) for c in chats if str(c) != canal and ens
-              and bool(ens & marches_choisis(etat, c))
-              and any(coach_actif(etat, c, m) for m in ens if m in MARCHES)]
+    # Un message global (session/news) ne part qu'aux utilisateurs qui ont activé
+    # le coach sur au moins un marché ; un message ciblé reste limité à ce marché.
+    marches_cibles = (ens & set(MARCHES)) if ens else set(MARCHES)
+    prives = [str(c) for c in chats if str(c) != canal
+              and any(m in marches_choisis(etat, c) and coach_actif(etat, c, m) for m in marches_cibles)]
     if canal:
         return sorted(set([canal] + prives))
     return sorted(set(prives))
