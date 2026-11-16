@@ -3826,11 +3826,10 @@ def markup_analyse(etat, m, r, cid=None):
     actions = [
         {"text": "🗂 Historique des messages", "callback_data": f"history:{m}"},
     ]
-    if not tr:
-        if cid is not None and coach_abonne(etat, cid, m):
-            actions.append({"text": "🔕 Désactiver le coach", "callback_data": f"coachoff:{m}"})
-        else:
-            actions.append({"text": "🧑‍🏫 Activer le coach", "callback_data": f"auto:{m}"})
+    if cid is not None and coach_abonne(etat, cid, m):
+        actions.append({"text": "🔕 Désactiver le coach", "callback_data": f"coachoff:{m}"})
+    elif not tr:
+        actions.append({"text": "🧑‍🏫 Activer le coach", "callback_data": f"auto:{m}"})
     lignes.append(actions)
     live_ = cid is not None and str(cid) in (etat.get("coach_live", {}).get(m) or {})
     lignes.append([{"text": ("⏹ Arrêter le commentateur" if live_ else "🎙 Coach commentateur (en direct)"),
