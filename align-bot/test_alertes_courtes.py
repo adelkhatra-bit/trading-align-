@@ -196,7 +196,7 @@ class EvenementsPine(unittest.TestCase):
 
     def test_pine_alerts_go_to_vip_only_and_free_gets_reduced_preparation_without_levels(self):
         envois = []
-        etat = {"prospects": ["900", "901"], "marches_par_chat": {"901": ["BTC"]}, "bot_off": []}
+        etat = {"prospects": ["900", "901"], "marches_par_chat": {"901": ["BTC"]}, "coach_optin": {"GOLD": ["900"], "BTC": ["901"]}, "bot_off": []}
         with patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append((str(c), k["text"]))), patch.object(ab, "bot_on", return_value=True):
             ab.alerte_gratuite_preparation(etat, "🔔 JE PRÉPARE UNE POSITION — 🥇 GOLD\n🟩 LONG ⬆️ monte\n📌 Entrée : 4012,5")
             ab.alerte_gratuite_preparation(etat, "⚡⚡ PRÉPARE-TOI — 🥇 GOLD\n4012,5")
