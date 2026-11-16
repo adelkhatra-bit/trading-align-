@@ -3165,6 +3165,34 @@ def marche_demande(txt):
         return "NASDAQ"
     return "GOLD"                   # demande générale = Gold uniquement
 
+def donnees_mtf_fraiches(m, r, now_ts=None):
+    """Refuse les entrées si une bougie source est trop ancienne (Yahoo peut retarder les futures d'environ 10 min)."""
+    if m not in ("GOLD", "NASDAQ"):
+        return True
+    now = float(time.time() if now_ts is None else now_ts)
+    specs = (("b5", 300, 450), ("b15", 900, 1350), ("b1h", 3600, 5400), ("b4h", 14400, 21600))
+    for cle_tf, secondes, age_max in specs:
+        bars = r.get(cle_tf) or []
+        if not bars:
+            continue
+        derniere = bars[-1]
+        source = str(derniere.get("volume_source") or "")
+        if not source:
+            continue
+        age = now - (int(derniere.get("t", 0)) + secondes)
+        if age > age_max:
+            return False
+    # Si M1 vient encore de Yahoo (aucun prix direct appendu), il doit lui aussi être récent.
+    m1 = r.get("m1") or []
+    if m1:
+        derniere = m1[-1]
+        if derniere.get("volume_source"):
+            age_m1 = time.time() - (int(derniere.get("t", 0)) + 60)
+            if age_m1 > 120:
+                return False
+    return True
+
+
 def tendance_armee(r, cle):
     """Conserve le biais pendant un repli seulement si H1/H4 restent conformes au marché."""
     d = r["confirme"]
@@ -4065,8 +4093,9 @@ def confluence_entree_mtf(m, r, d):
 
 
 def reprise_entree(m, r, cle):
-    """Suite de « COUPE ET REPRENDS » uniquement si la confluence actuelle est toujours valide.
-    Le suivi ponctuel ne réutilise jamais un ancien sens si les unités de temps ont changé."""
+    """Suite de « COUPE ET REPRENDS » uniquement si la confluence actuelle est toujours valide."""
+    if not donnees_mtf_fraiches(m, r):
+        return None
     rp = cle.get("reprise")
     if not rp:
         return None
@@ -4095,10 +4124,9 @@ def reprise_entree(m, r, cle):
             "⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
 
 def entree_retest(m, r, cle):
-    """ENTRÉE SUR RETEST (règle d'Adel 15/11) : une résistance cassée à la CLÔTURE devient support (et inversement) ;
-    quand le prix revient dessus, que le marché bloque (mèche de rejet + clôture 15 min du bon côté) et que les unités
-    5 min / 15 min / 1h sont d'accord ; GOLD/NASDAQ exigent aussi 4h dans le même sens (BTC conserve la règle historique), on propose l'entrée à la clôture, SL un tout petit peu
-    sous (sur) la mèche de la dernière bougie. Une alerte par niveau toutes les 2 h ; le bot ne la prend pas lui-même."""
+    """ENTRÉE SUR RETEST : la confluence et la fraîcheur MTF sont obligatoires."""
+    if not donnees_mtf_fraiches(m, r):
+        return None
     b = (r.get("b15") or [])[:-1]
     dirs = r.get("dirs") or []
     atr = r.get("atr") or 0
@@ -4132,6 +4160,8 @@ def entree_retest(m, r, cle):
     return None
 
 def radar_climax(m, r, cle):
+    if not donnees_mtf_fraiches(m, r):
+        return None
     """RADAR RETOURNEMENT (validé par Adel le 15/11, « oui radar ») — le LONG raté 62 → 65,5 k BTC :
     1) volume climax : une des 4 dernières bougies 15 min CLÔTURÉES a un volume ≥ 3 × la moyenne des 40 d'avant (épuisement) ;
     2) balayage : une de ces bougies est passée sous le plus bas (sur le plus haut) des 20 bougies d'avant, puis la clôture est revenue au-dessus ;
@@ -4199,6 +4229,8 @@ def radar_climax(m, r, cle):
     return None
 
 def retournement_marche(m, r, cle):
+    if not donnees_mtf_fraiches(m, r):
+        return None
     """v71 = Pine « RETOURNEMENT PAR MARCHÉ » (mesuré sur 60 jours de bougies 5 min) :
     GOLD/NASDAQ : M5/M15 contre H1/H4 = observation uniquement, jamais une position avant confirmation H1+H4.
     BTC conserve sa règle historique : M5 + M15 + H1 contre H4, avec les cibles et le SL existants.
@@ -9633,6 +9665,11 @@ def agent(m, r, cle, ferme):
                        "🛡 Pas de nouvelle position avant la fermeture\n🔔 Je reprends la recherche après la réouverture")
         return out
     if not tr:
+        if not donnees_mtf_fraiches(m, r):
+            if r["t"] - cle.get("data_stale_t", 0) >= 3600:
+                cle["data_stale_t"] = r["t"]
+                out.append(f"⛔ {ICONE.get(m, '')} {m} : données M5/M15/H1/H4 trop anciennes ou retardées. Aucune position autorisée jusqu'au retour de bougies fraîches.")
+            return out
         if not d:
             # Message conservé dans tous les cas où il partait avant ; seule l'oscillation 1h/4h est limitée (une fois par heure)
             if cle.get("aligne") and r["t"] - cle.get("perdue_t", 0) >= 3600:
