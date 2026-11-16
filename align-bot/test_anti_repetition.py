@@ -126,8 +126,8 @@ class RoutageParCompte(unittest.TestCase):
         avis = ab.taguer("🧠 L'avis de l'IA ALIGN\nLe cours monte, prudence.", "BTC")           # aucun marché dans le texte
         self.assertEqual(sorted(ab.destinataires_message(self.ETAT, {"adel", "btc", "tous"}, avis)), ["btc", "tous"])
 
-    def test_message_sans_tag_ni_marche_reste_global(self):
-        self.assertEqual(sorted(ab.destinataires_message(self.ETAT, {"adel", "btc"}, "📅 Aucune annonce majeure US aujourd'hui.")), ["adel", "btc"])
+    def test_message_sans_tag_ni_marche_n_est_pas_pousse_en_prive(self):
+        self.assertEqual(ab.destinataires_message(self.ETAT, {"adel", "btc"}, "📅 Aucune annonce majeure US aujourd'hui."), [])
 
     def test_tuple_avec_clavier_garde_son_tag(self):
         x = ab.taguer(("texte", "clavier"), "GOLD")
