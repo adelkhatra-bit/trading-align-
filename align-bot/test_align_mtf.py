@@ -2139,6 +2139,40 @@ class AlignAiChainTest(unittest.TestCase):
         r = align_bot.resumer_donnees({"a": list(range(100)), "b": "y" * 1000, "c": 1.23456789}, 300)
         self.assertLessEqual(len(r), 330); self.assertIn("1.2346", align_bot.resumer_donnees({"c": 1.23456789}, 300))
 
+class TestPlanIndicateurTradingViewTargets(unittest.TestCase):
+    def _plan(self, robot, direction="LONG"):
+        return align_bot.plan_indicateur({
+            "tv_indicator_mtf": {
+                "activeTimeframe": "M15",
+                "snapshots": {"M15": {"fresh": True, "confirmed": True, "robotV12": {
+                    "signal": direction, **robot
+                }}}
+            }
+        })
+
+    def test_tv_plan_exposes_tp1_and_tp2_when_bridge_provides_both(self):
+        plan = self._plan({"entry": 100, "sl": 98, "tp1": 104, "tp2": 108})
+        self.assertTrue(plan["available"])
+        self.assertEqual((plan["entry"], plan["sl"], plan["tp1"], plan["tp2"]), (100, 98, 104, 108))
+        self.assertEqual(plan["tp"], 104)  # compatibilité avec les consommateurs historiques
+
+    def test_tv_plan_maps_legacy_single_tp_to_tp1_without_inventing_tp2(self):
+        plan = self._plan({"entry": 100, "sl": 98, "tp": 104})
+        self.assertTrue(plan["available"])
+        self.assertEqual(plan["tp1"], 104)
+        self.assertIsNone(plan["tp2"])
+
+    def test_tv_short_plan_validates_targets_in_descending_order(self):
+        plan = self._plan({"entry": 100, "sl": 102, "tp1": 96, "tp2": 92}, "SHORT")
+        self.assertTrue(plan["available"])
+        self.assertEqual((plan["tp1"], plan["tp2"]), (96, 92))
+
+    def test_tv_plan_rejects_tp2_on_wrong_side_of_tp1(self):
+        plan = self._plan({"entry": 100, "sl": 98, "tp1": 104, "tp2": 102})
+        self.assertFalse(plan["available"])
+        self.assertIn("géométrie", plan["reason"])
+
+
 if __name__ == "__main__":
     unittest.main()
 
