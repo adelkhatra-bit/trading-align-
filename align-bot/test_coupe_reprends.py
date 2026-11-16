@@ -26,7 +26,7 @@ class Coupe(unittest.TestCase):
         self.assertIsNone(ab.coupe_et_reprends("GOLD", r_(CONTRE, 109), cle, tr, 109))   # une seule fois
         self.assertIsNone(ab.reprise_entree("GOLD", r_(CONTRE, 104), cle))              # pas encore revenu
         t = ab.reprise_entree("GOLD", r_([1] * 11, 100.5, t=2000), cle)
-        self.assertIn("REPRISE À L'ENTRÉE : LONG", t); self.assertIn("SL ≈ 95", t)
+        self.assertIn("REPRISE À L'ENTRÉE : LONG", t); self.assertIn("SL : 95", t)
         self.assertNotIn("reprise", cle)
 
     def test_pas_de_coupe_si_unites_ok(self):
