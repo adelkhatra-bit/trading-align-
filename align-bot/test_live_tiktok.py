@@ -35,6 +35,17 @@ class LiveTikTok(unittest.TestCase):
             textes = [b["text"] for ligne in json.loads(c)["keyboard"] for b in ligne]
             self.assertIn("🔴 Live", textes)
 
+    def test_installer_menu_actualise_la_commande_live(self):
+        etat = {"menu": 10}
+        ab.installer_menu(etat)
+        self.assertEqual(etat.get("menu"), 11)
+        commandes = [kw for methode, kw in self.tg if methode == "setMyCommands"]
+        self.assertEqual(len(commandes), 2)
+        fr = json.loads(commandes[0]["commands"])
+        en = json.loads(commandes[1]["commands"])
+        self.assertTrue(any(c["command"] == "live" for c in fr))
+        self.assertTrue(any(c["command"] == "live" for c in en))
+
     def test_live_24h_toujours_actif_par_defaut(self):
         self.assertTrue(ab.live_actif({}))
 
