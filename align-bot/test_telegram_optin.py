@@ -70,7 +70,8 @@ class TelegramOptIn(unittest.TestCase):
             ab.entrer_inscrits(etat, "GOLD", trade, set())
         self.assertIn("10", trade["qui"])
         self.assertEqual(send.call_count, 1)
-        self.assertEqual(etat["auto"]["GOLD"], [])
+        self.assertEqual(etat.get("auto", {}).get("GOLD", []), [])
+        self.assertTrue(ab.coach_abonne(etat, "10", "GOLD"))
 
     def test_prospects_et_rappels_gratuits_sont_silencieux_sans_optin(self):
         etat = {"prospects": ["10", "11"], "auto": {}, "coach_optin": {}, "bot_off": []}
@@ -81,8 +82,9 @@ class TelegramOptIn(unittest.TestCase):
         tg.assert_not_called()
 
     def test_veille_cloture_ancienne_est_retiree_si_plus_optin(self):
-        etat = {"auto": {}, "coach_optin": {}, "marches_par_chat": {"10": ["GOLD"]},
+        etat = {"auto": {}, "coach_optin": {"GOLD": ["10"]}, "marches_par_chat": {"10": ["GOLD"]},
                 "veille_cloture": {"GOLD": {"10": {"tf": "15 min", "dernier_t": 0}}}}
+        ab.selectionner_coach_optin(etat, "10", [])
         with mock.patch.object(ab, "_envoi_sur") as send:
             ab.notifier_clotures(etat, "GOLD", {}, {})
         self.assertEqual(etat["veille_cloture"]["GOLD"], {})
