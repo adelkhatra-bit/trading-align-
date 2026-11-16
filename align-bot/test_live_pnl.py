@@ -12,7 +12,7 @@ class Pnl(unittest.TestCase):
     def setUp(self):
         self.pub = []
         ab._LIVE_DERNIER.clear()
-        self.p = [unittest.mock.patch.object(ab, "live_publier", lambda t: self.pub.append(t))]
+        self.p = [unittest.mock.patch.object(ab, "live_publier", side_effect=lambda t: self.pub.append(t) or True)]
         for x in self.p:
             x.start()
 
@@ -23,11 +23,11 @@ class Pnl(unittest.TestCase):
     def cle(self):
         return {"trade": {"e": 100.0, "tp1": 110.0, "d": 1}}
 
-    def test_cache_avant_la_moitie(self):
-        robot = unittest.mock.Mock(profit_ouvert=lambda e, m: 42.0)
+    def test_affiche_le_vrai_pnl_des_l_ouverture_pas_apres_50_pourcent(self):
+        robot = unittest.mock.Mock(profit_ouvert=lambda e, m: 12.0)
         with unittest.mock.patch.object(ab, "auto_trade", robot), unittest.mock.patch.object(ab, "topstep_trade", None):
-            self.assertIsNone(ab.live_pnl({}, "BTC", self.cle(), r_(104), now=1000))
-        self.assertEqual(self.pub, [])
+            self.assertEqual(ab.live_pnl({}, "BTC", self.cle(), r_(101), now=1000), 12.0)
+        self.assertEqual(self.pub, ["CMD:pnl:+12.00:BTC"])
 
     def test_montre_le_vrai_gain_puis_s_eteint(self):
         etat = {}
