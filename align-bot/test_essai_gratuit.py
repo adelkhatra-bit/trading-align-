@@ -62,7 +62,7 @@ class ToutGratuit(EssaiGratuit):
 
 class Differe(unittest.TestCase):
     def test_position_envoyee_en_differe(self):
-        etat = {"lien": "https://t.me/+x", "differe": [{"t": 5, "c": "111", "txt": "🟠 BTC position"}, {"t": 10 ** 12, "c": "222", "txt": "plus tard"}]}
+        etat = {"lien": "https://t.me/+x", "auto": {"BTC": ["111"]}, "differe": [{"t": 5, "c": "111", "txt": "🟠 BTC position"}, {"t": 10 ** 12, "c": "222", "txt": "plus tard"}]}
         with patch.object(ab, "telegram", MagicMock(return_value={})) as tg:
             ab.envoyer_differes(etat, now=100, dodo=False)
         self.assertEqual(tg.call_count, 1)
