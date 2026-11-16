@@ -552,9 +552,6 @@ def direction_plan_autorisee(m, d, dirs, contexte=None):
     """Le plan affiché suit le même garde-fou que les entrées : clôtures M5/M15/H1/H4 + flux frais pour Gold/Nasdaq."""
     if m in ("GOLD", "NASDAQ"):
         return d if direction_confirmee_marche(m, dirs, d, contexte) == d else 0
-    if m == "BTC":
-        D = list(dirs or [])
-        return d if len(D) > 9 and D[7] == D[9] == d else 0
     return d
 
 
@@ -911,7 +908,7 @@ def calculer_analyse(S, stable=None, comp_prev=None, market=None):
         # Même règle que Pine v25 : aucun plan directionnel exploitable avant les quatre clôtures et un flux frais.
     # BTC garde son filtre H1/H4 historique, mais sur les dernières bougies terminées et dans le sens du plan.
     dirPlan = direction_plan_autorisee(market, dirPlan, dirs_cloturees, ctx_live)
-    dirs_strategie = dirs_cloturees
+    dirs_strategie = dirs_cloturees if market in ("GOLD", "NASDAQ") else dirs
     strat_plan = strategie_alignement(dirs_strategie, dirPlan, dW_signal, market)[0]
     nom = ("★ ACHAT FORT" if fortHaut else "EXPLOSION ▲" if explHaut else "ZONE DE REBOND ▲") if sigHaut else \
           ("★ VENTE FORTE" if fortBas else "EXPLOSION ▼" if explBas else "ZONE DE RETOURNEMENT ▼") if sigBas else ""
@@ -1500,7 +1497,7 @@ def retournement_confirme(cle, d, r):
 
 def strategie_trade(r, d):
     """Fige sur la position le type (SWING / DAY / SCALPING) lu au moment de l'entrée."""
-    dirs_strat = r.get("dirs_cloturees") or r.get("dirs")
+    dirs_strat = r.get("dirs_cloturees") if r.get("market") in ("GOLD", "NASDAQ") else r.get("dirs")
     strat, etat_, motif = strategie_alignement(dirs_strat, d, r.get("dirW") or 0, r.get("market"))
     return {"strat": strat, "strat_etat": etat_, "strat_motif": motif} if strat else {}
 
