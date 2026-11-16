@@ -2583,7 +2583,7 @@ class TestFollowPositionMarketChoice(unittest.TestCase):
         )
         self.assertEqual(
             set(align_bot.destinataires_message(state, {"101", "202"}, "🥇 GOLD — SIGNAL NON CONFIRMÉ")),
-            {"101", "202"}
+            {"101"}
         )
 
     def test_followmarket_both_registers_btc_and_gold(self):
