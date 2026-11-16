@@ -4081,9 +4081,9 @@ def radar_climax(m, r, cle):
             if m in ("GOLD", "NASDAQ") and (len(dirs) < 10 or dirs[7] != sens or dirs[9] != sens):
                 h1_txt = "haussier" if len(dirs) > 7 and dirs[7] == 1 else "baissier" if len(dirs) > 7 and dirs[7] == -1 else "neutre"
                 h4_txt = "haussier" if len(dirs) > 9 and dirs[9] == 1 else "baissier" if len(dirs) > 9 and dirs[9] == -1 else "neutre"
-                return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\\n"
-                        f"Balayage et volume détectés, mais H1 est {h1_txt} et H4 {h4_txt}.\\n"
-                        "⛔ Pas de position contre le biais H1/H4 : aucune entrée ni aucun SL/TP à prendre.\\n"
+                return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\n"
+                        f"Balayage et volume détectés, mais H1 est {h1_txt} et H4 {h4_txt}.\n"
+                        "⛔ Pas de position contre le biais H1/H4 : aucune entrée ni aucun SL/TP à prendre.\n"
                         "⏳ J'attends que H1 et H4 confirment le même sens.")
             e = cl[-1]
             mot = "plus bas" if sens == 1 else "plus haut"
@@ -4130,10 +4130,10 @@ def retournement_marche(m, r, cle):
         sens_txt = "à la hausse" if sens_watch == 1 else "à la baisse"
         h1_txt = "haussier" if d60 == 1 else "baissier" if d60 == -1 else "neutre"
         h4_txt = "haussier" if d240 == 1 else "baissier" if d240 == -1 else "neutre"
-        return (f"👀 RETOURNEMENT EN OBSERVATION — {ICONE.get(m, '')} {m}\\n"
-                f"Les M5 et M15 se retournent {sens_txt}, mais H1 reste {h1_txt} et H4 {h4_txt}.\\n"
-                "⛔ PAS DE POSITION dans ce nouveau sens : aucune entrée, aucun SL/TP à prendre.\\n"
-                "⏳ J'attends la confirmation des clôtures H1 ET H4 dans le même sens, puis le déclencheur M5.\\n"
+        return (f"👀 RETOURNEMENT EN OBSERVATION — {ICONE.get(m, '')} {m}\n"
+                f"Les M5 et M15 se retournent {sens_txt}, mais H1 reste {h1_txt} et H4 {h4_txt}.\n"
+                "⛔ PAS DE POSITION dans ce nouveau sens : aucune entrée, aucun SL/TP à prendre.\n"
+                "⏳ J'attends la confirmation des clôtures H1 ET H4 dans le même sens, puis le déclencheur M5.\n"
                 "ℹ️ Alerte de surveillance uniquement.")
     def ok(s):
         casc = d5 == s and d15 == s
