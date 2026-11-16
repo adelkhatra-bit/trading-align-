@@ -8260,7 +8260,9 @@ def menu_marches(etat, cid, message_id=None):
     tout = set(MARCHES) <= set(choisis)
     lignes = [[{"text": ("✅ " if m in choisis else "⬜ ") + NOMS_MARCHES[m], "callback_data": f"markets:{m}"}] for m in MARCHES]
     lignes.append([{"text": ("✅ " if tout else "⬜ ") + ("Everything" if anglais else "Tout recevoir"), "callback_data": "markets:ALL"}])
-    lignes.append([{"text": ("✅ Confirm & follow" if anglais else "✅ Valider et suivre"), "callback_data": "markets:OK"}])
+    nouveau = cid in {str(x) for x in etat.get("coach_pending", [])}
+    lignes.append([{"text": ("✅ Confirm my markets" if anglais else "✅ Valider mes marchés") if nouveau else
+                    ("✅ Confirm & follow" if anglais else "✅ Valider et suivre"), "callback_data": "markets:OK"}])
     coches = " + ".join(NOMS_MARCHES[m] for m in MARCHES if m in choisis)
     texte = ("📡 MY MARKETS\n━━━━━━━━━━━━━━━\n👆 Tap to tick / untick\n"
              f"☑️ Ticked now: {coches}\n🔔 You only get alerts for ticked markets\n"
