@@ -178,5 +178,29 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
 
 
 
+    def test_nasdaq_position_price_uses_fresh_adjusted_nq_quote_not_kraken(self):
+        now = align_bot.time.time()
+        with unittest.mock.patch.dict(align_bot._CACHE, {
+                 "nq_live": (now, 20000.0), "ecart_ndx": 35.5
+             }, clear=False), \
+             unittest.mock.patch.object(align_bot, "nasdaq_direct", return_value=20000.0), \
+             unittest.mock.patch.object(align_bot, "http_json") as http:
+            price = align_bot.prix_actuel("NASDAQ")
+        self.assertEqual(price, 20035.5)
+        http.assert_not_called()
+
+    def test_nasdaq_position_price_fails_closed_when_nq_quote_is_stale(self):
+        now = align_bot.time.time()
+        with unittest.mock.patch.dict(align_bot._CACHE, {
+                 "nq_live": (now - 30, 20000.0), "ecart_ndx": 35.5
+             }, clear=False), \
+             unittest.mock.patch.object(align_bot, "nasdaq_direct", return_value=20000.0), \
+             unittest.mock.patch.object(align_bot, "http_json") as http:
+            price = align_bot.prix_actuel("NASDAQ")
+        self.assertIsNone(price)
+        http.assert_not_called()
+
+
+
 if __name__ == "__main__":
     unittest.main()
