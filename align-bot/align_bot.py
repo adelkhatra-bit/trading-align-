@@ -100,6 +100,22 @@ def _direction_tv(value):
     return None
 
 
+def directions_tv_mtf(contexte):
+    """Lectures ROBOT V12 fraîches du bridge TradingView : M5, M15 et H1."""
+    bridge = (contexte or {}).get("tv_indicator_mtf") or {}
+    if bridge.get("available") is not True:
+        return None
+    active = bridge.get("activeTimeframe")
+    snap = (bridge.get("snapshots") or {}).get(active) or {}
+    robot = snap.get("robotV12") or {}
+    if snap.get("fresh") is not True or not robot:
+        return None
+    out = {tf: _direction_tv(robot.get(key)) for tf, key in (
+        ("M5", "lecture_5m"), ("M15", "lecture_15m"), ("H1", "lecture_60m")
+    )}
+    return out if all(v in (-1, 1) for v in out.values()) else None
+
+
 def fusionne_lectures_tradingview(r):
     """Conserve le snapshot ROBOT V12 séparé : il ne doit pas modifier une analyse ALIGN déjà calculée."""
     bridge = r.get("tv_indicator_mtf") or {}
@@ -486,15 +502,11 @@ def direction_confirmee_marche(m, dirs, d, contexte=None):
                 return 0
             # Si le bridge TradingView est disponible, ses lectures ROBOT V12 M5/M15/H1 doivent aussi confirmer.
             bridge = contexte.get("tv_indicator_mtf") or {}
-            if bridge.get("available") is True:
-                active = bridge.get("activeTimeframe")
-                snap = (bridge.get("snapshots") or {}).get(active) or {}
-                robot = snap.get("robotV12") or {}
-                if snap.get("fresh") is not True or not robot:
-                    return 0
-                for key in ("lecture_5m", "lecture_15m", "lecture_60m"):
-                    if _direction_tv(robot.get(key)) != d:
-                        return 0
+            tv_dirs = directions_tv_mtf(contexte)
+            if contexte.get("require_tv_bridge") and tv_dirs is None:
+                return 0
+            if bridge.get("available") is True and (tv_dirs is None or any(v != d for v in tv_dirs.values())):
+                return 0
     return d
 
 def pivots(b, g=5):
