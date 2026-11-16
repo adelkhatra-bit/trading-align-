@@ -131,6 +131,13 @@ class LiveTikTok(unittest.TestCase):
         bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
         self.assertNotIn("sur Telegram", bande)
 
+    def test_masquage_ne_depend_pas_de_conteneurs_dialogue_caches(self):
+        bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
+        self.assertIn("const overlayVisible = el =>", bande)
+        self.assertIn("const overlayOuvert = Array.from(document.querySelectorAll", bande)
+        self.assertIn(".some(overlayVisible)", bande)
+        self.assertNotIn("classList.toggle('align-cache', !!document.querySelector", bande)
+
     def test_position_confirmee_declenche_spectacle_visuel(self):
         bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
         self.assertIn("if (/POSITION ALIGN CONFIRMÉE|ENTRE EN POSITION/i.test(txt)) { feuArtifice(", bande)
