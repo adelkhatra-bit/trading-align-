@@ -1131,7 +1131,24 @@
     const pos = (B[B.length - 1][4] - ll) / Math.max(hh - ll, 1e-9);
     const volume = B[B.length - 1][5] || 0;
     const volumeFort = moyV > 0 && volume >= 1.8 * moyV;
+    // Détecte un balayage de liquidité uniquement sur une bougie terminée :
+    // mèche sous un ancien creux puis clôture au-dessus (ou inversement).
+    // C'est un indice de rejet, jamais une confirmation d'entrée à lui seul.
+    const terminee = B[B.length - 2], avant = B.slice(-22, -2);
+    const ancienBas = Math.min(...avant.map(x => Number(x[3])));
+    const ancienHaut = Math.max(...avant.map(x => Number(x[2])));
+    const corps = Math.abs(Number(terminee[4]) - Number(terminee[1]));
+    const mecheBasse = Math.min(Number(terminee[1]), Number(terminee[4])) - Number(terminee[3]);
+    const mecheHaute = Number(terminee[2]) - Math.max(Number(terminee[1]), Number(terminee[4]));
+    const balayageBas = Number(terminee[3]) < ancienBas - seuil * 0.08 &&
+      Number(terminee[4]) > ancienBas && Number(terminee[4]) >= Number(terminee[1]) &&
+      mecheBasse >= Math.max(corps * 1.1, seuil * 0.12);
+    const balayageHaut = Number(terminee[2]) > ancienHaut + seuil * 0.08 &&
+      Number(terminee[4]) < ancienHaut && Number(terminee[4]) <= Number(terminee[1]) &&
+      mecheHaute >= Math.max(corps * 1.1, seuil * 0.12);
     let lecture;
+    if (balayageBas) lecture = 'La dernière bougie clôturée est passée sous un ancien creux puis a réintégré la zone avec un rejet acheteur. Possible chasse de liquidité vendeuse ; ce n’est pas encore un signal LONG, on attend la confirmation M5, M15, H1 et H4.';
+    else if (balayageHaut) lecture = 'La dernière bougie clôturée est passée au-dessus d’un ancien sommet puis a réintégré la zone avec un rejet vendeur. Possible chasse de liquidité acheteuse ; ce n’est pas encore un signal SHORT, on attend la confirmation M5, M15, H1 et H4.';
     if (dFond > 0 && dRecent < 0) lecture = 'La tendance récente reste orientée à la hausse, mais les dernières bougies corrigent. Les acheteurs doivent défendre leur mouvement ; on attend une clôture avant de conclure.';
     else if (dFond < 0 && dRecent > 0) lecture = 'Le mouvement de fond reste orienté à la baisse, mais le marché tente un rebond. Les vendeurs doivent encore montrer s’ils gardent la main ; aucune anticipation.';
     else if (dFond > 0 && dRecent >= 0) lecture = 'Les acheteurs gardent l’avantage sur les dernières bougies. Je surveille si l’impulsion se prolonge ou si le marché commence à souffler.';
