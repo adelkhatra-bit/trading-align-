@@ -84,6 +84,26 @@ class GoldNasdaqPlanDisplay(unittest.TestCase):
         self.assertIn("TP1 : 95", txt)
         self.assertIn("TP2 : 90", txt)
 
+    def test_tradingview_chart_draws_both_tp1_and_tp2_from_plan_fields(self):
+        root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        dashboard = open(os.path.join(root, "dashboard.html"), encoding="utf-8").read()
+        self.assertIn("positionLike.tp1", dashboard)
+        self.assertIn("positionLike.tp2", dashboard)
+        self.assertIn("title: 'TP1'", dashboard)
+        self.assertIn("title: 'TP2'", dashboard)
+        self.assertIn("'TP1: ' + formatPrice(livePosition.tp1", dashboard)
+        self.assertIn("'TP2: ' + formatPrice(livePosition.tp2)", dashboard)
+
+    def test_tradingview_popup_show_is_one_shot_and_needs_executable_signal(self):
+        root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        popup_html = open(os.path.join(root, "tradingview-analyzer", "popup.html"), encoding="utf-8").read()
+        popup_js = open(os.path.join(root, "tradingview-analyzer", "popup.js"), encoding="utf-8").read()
+        self.assertIn('id="signalShowOverlay"', popup_html)
+        self.assertIn("function showConfirmedSignal(", popup_js)
+        self.assertIn("canEnter && _sigExecutable && !_sigConflict && !_sigDirConflict", popup_js)
+        self.assertIn("state._lastSignalShowKey === key", popup_js)
+        self.assertIn("setTimeout(closeConfirmedSignal, 5200)", popup_js)
+
     def test_no_directional_tp_is_published_when_h1_h4_conflict(self):
         dirs = [0] * 11
         dirs[7], dirs[9] = -1, 1
