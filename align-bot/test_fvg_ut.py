@@ -32,7 +32,8 @@ class PlanFVG(unittest.TestCase):
         self.assertAlmostEqual(fv["sl"], max(110 + max(0.3 * a, 0.03), 105.8 + 1.0 * a))   # un peu au-dessus de la mèche du dernier plus haut
         self.assertLess(fv["tp1"], fv["e"])
         self.assertGreaterEqual(fv["e"] - fv["tp1"], 1.5 * (fv["sl"] - fv["e"]) - 1e-9)    # TP1 ≥ 1,5 x le risque
-        self.assertLessEqual(fv["tp2"], fv["tp1"])                               # TP2 = plus loin (continuation)
+        self.assertEqual(fv["tp2"], 80)                                         # TP2 d’origine réutilisé, plus loin que TP1
+        self.assertLess(fv["tp2"], fv["tp1"])
         self.assertEqual((fv["za"], fv["zb"]), (105.8, fv["sl"] - 0.25 * (fv["sl"] - 105.8)))   # bande verte du graphique
         self.assertIn("Order block + FVG rouge 5 min", fv["src"])
 
@@ -43,6 +44,8 @@ class PlanFVG(unittest.TestCase):
         self.assertAlmostEqual(fv["e"], -105.8)
         self.assertLess(fv["sl"], -110)
         self.assertIn("FVG verte 5 min", fv["src"])
+        self.assertEqual(fv["tp2"], -80)
+        self.assertGreater(fv["tp2"], fv["tp1"])
 
     def test_sans_fvg_plan_origine(self):
         calme = [bougie(100, 100.5, 99.5, 100, i) for i in range(40)]
