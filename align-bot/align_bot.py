@@ -8660,10 +8660,13 @@ def _mediane(valeurs):
     return v[n // 2] if n % 2 else (v[n // 2 - 1] + v[n // 2]) / 2.0
 
 
-def _stabilisation_m5_apres(r, reference_ts):
+def _stabilisation_m5_apres(r, reference_ts, maintenant=None):
     """Exige 3 clôtures M5 après l'évènement et un retour des amplitudes vers leur base pré-évènement."""
-    bougies = [b for b in (r.get("b5") or []) if isinstance(b, dict) and b.get("t") is not None
-               and b.get("h") is not None and b.get("l") is not None]
+    maintenant = time.time() if maintenant is None else float(maintenant)
+    bougies = sorted([b for b in (r.get("b5") or []) if isinstance(b, dict) and b.get("t") is not None
+                      and b.get("h") is not None and b.get("l") is not None], key=lambda b: int(b["t"]))
+    if not bougies or maintenant - (int(bougies[-1]["t"]) + 300) > 600 or int(bougies[-1]["t"]) + 300 > maintenant + 60:
+        return False
     avant = [b for b in bougies if int(b["t"]) < int(reference_ts)][-12:]
     apres = [b for b in bougies if int(b["t"]) >= int(reference_ts)]
     if len(avant) < 6 or len(apres) < 3:
@@ -8710,7 +8713,7 @@ def pause_entree_marche(m, r, etat, maintenant=None):
         for ts, attente, libelle in _ouvertures_recentes(m, maintenant):
             if maintenant < ts + attente:
                 return f"{libelle} : délai de sécurité de {attente // 60} min"
-            if not _stabilisation_m5_apres(r, ts):
+            if not _stabilisation_m5_apres(r, ts, maintenant):
                 return f"{libelle} : les 3 clôtures M5 ne sont pas encore stabilisées"
     evenements = (etat.get("cal") or {}).get("ev") or []
     for ev in evenements:
@@ -8720,7 +8723,7 @@ def pause_entree_marche(m, r, etat, maintenant=None):
             continue
         if ts - 15 * 60 <= maintenant <= ts + 20 * 60:
             return f"actualité économique ({ev.get('titre', 'USD')}) : fenêtre de sécurité"
-        if ts + 20 * 60 < maintenant <= ts + 60 * 60 and not _stabilisation_m5_apres(r, ts):
+        if ts + 20 * 60 < maintenant <= ts + 60 * 60 and not _stabilisation_m5_apres(r, ts, maintenant):
             return f"actualité économique ({ev.get('titre', 'USD')}) : réaction M5 encore instable"
     return None
 
@@ -9910,7 +9913,7 @@ def agent(m, r, cle, ferme):
             return out
         # Ouverture / news : invalider toute préparation et attendre une vraie stabilisation M5.
         # La règle s'applique aux cassures ET aux replis, avant tout déclenchement d'entrée.
-        pause_ = pause_entree_marche(m, r, _ETAT_COURANT.get("etat") or {}, r.get("t", time.time()))
+        pause_ = pause_entree_marche(m, r, _ETAT_COURANT.get("etat") or {}, time.time())
         if pause_:
             cle["prep"] = False
             cle.pop("ordre", None)
