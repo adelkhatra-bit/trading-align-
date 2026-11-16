@@ -945,7 +945,11 @@ def _sniper(r):
     b5, b15 = (r.get("b5") or [])[:-1], (r.get("b15") or [])[:-1]          # la dernière bougie M5 / M15 est en formation
     if d not in (1, -1) or len(dirs) < 11 or not a3 or not a15 or not zp or len(m1) < 40 or len(b3) < 12 or len(b5) < 8 or len(b15) < 5:
         return None, f"DONNEES/PLAN absents (dirPlan={d}, zone={'oui' if zp else 'non'}, b3={len(b3)}, b5={len(b5)}, b15={len(b15)})"
-    if (r["bull"] if d == 1 else r["bear"]) < MIN_ALIGN or r.get("sens") != d or dirs[9] == -d or dirs[7] == -d:
+    if r.get("market") in ("GOLD", "NASDAQ"):
+        htf_ok = dirs[9] == d and dirs[7] == d
+    else:
+        htf_ok = dirs[9] != -d and dirs[7] != -d
+    if (r["bull"] if d == 1 else r["bear"]) < MIN_ALIGN or r.get("sens") != d or not htf_ok:
         return None, f"CONTEXTE_HTF refusé (UT alignées {(r['bull'] if d == 1 else r['bear'])}/11, sens={r.get('sens')}, 4h={dirs[9]}, 1h={dirs[7]})"
     prix = m1[-1]["c"]
     if not (zp["za"] - 0.5 * a15 <= prix <= zp["zb"] + 0.5 * a15):
@@ -3119,6 +3123,7 @@ def analyse_marche(etat, pair):
     m = next((k for k, v in MARCHES.items() if v == pair), None)
     r = analyser(pair, (etat or {}).setdefault(m, {}).setdefault("pine", {}) if m else None)
     if m:
+        r["market"] = m
         tendance_armee(r, (etat or {}).setdefault(m, {}))
     r["annonce"] = annonce_proche(etat or {}, int(time.time()))
     r["news"] = news_txt(etat or {})
@@ -4012,7 +4017,8 @@ def entree_retest(m, r, cle):
         return None
     x = b[-1]
     for d in (1, -1):
-        if not (dirs[2] == d and dirs[4] == d and dirs[7] == d and dirs[9] != -d):
+        h4_ok = dirs[9] == d if m in ("GOLD", "NASDAQ") else dirs[9] != -d
+        if not (dirs[2] == d and dirs[4] == d and dirs[7] == d and h4_ok):
             continue
         avant = b[-26:-6]
         niveau = max(y["h"] for y in avant) if d == 1 else min(y["l"] for y in avant)
@@ -4043,7 +4049,8 @@ def radar_climax(m, r, cle):
     3) confirmation : la dernière clôture 15 min repasse au-dessus (au-dessous) de l'EMA9.
     → position CONTRE-TENDANCE « prenable, risquée », SL sous la mèche du balayage ; le bot ne la prend pas lui-même.
     Une alerte par sens toutes les 2 h ; mémorise l'heure (radar_t) pour ne pas envoyer « FEINTE » juste après."""
-    # 16/11 : le radar lisait « b15 » coupé à 30 bougies alors qu'il en faut 66 → il ne se déclenchait JAMAIS en réel (LONG raté).
+    # 16/11 : le radar lit une fenêtre longue de bougies 15 min déjà chargées.
+    dirs = r.get("dirs") or []
     b = (r.get("b15_long") or r.get("b15") or [])[:-1]  # la dernière est en formation
     if len(b) < 66:
         return None
@@ -4074,6 +4081,13 @@ def radar_climax(m, r, cle):
                 return None
             cle["radar_t"][str(sens)] = t
             cle["radar_dernier"] = t
+            if m in ("GOLD", "NASDAQ") and (len(dirs) < 10 or dirs[7] != sens or dirs[9] != sens):
+                h1_txt = "haussier" if len(dirs) > 7 and dirs[7] == 1 else "baissier" if len(dirs) > 7 and dirs[7] == -1 else "neutre"
+                h4_txt = "haussier" if len(dirs) > 9 and dirs[9] == 1 else "baissier" if len(dirs) > 9 and dirs[9] == -1 else "neutre"
+                return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\\n"
+                        f"Balayage et volume détectés ; H1 {h1_txt}, H4 {h4_txt}.\\n"
+                        "⛔ Observation uniquement : aucune entrée, aucun SL/TP à exécuter.\\n"
+                        "⏳ J'attends la confirmation H1 + H4 dans le même sens.")
             e = cl[-1]
             mot = "plus bas" if sens == 1 else "plus haut"
             return (f"🔄 RETOURNEMENT : {'LONG' if sens == 1 else 'SHORT'} prenable — {ICONE.get(m, '')} {m}\n"
@@ -4086,12 +4100,9 @@ def radar_climax(m, r, cle):
     return None
 
 def retournement_marche(m, r, cle):
-    """v71 = Pine « RETOURNEMENT PAR MARCHÉ » (mesuré sur 60 jours de bougies 5 min) :
-    GOLD : 5m + 15m retournés contre le 1h • NASDAQ : idem + gros volume 15 min • BTC : 5m + 15m + 1h retournés contre le 4h.
-    Cibles : haut/bas des 6 dernières bougies 1h puis 4h ; SL : dernier creux/sommet 5 min ; BE dès que le gain = le risque.
-    Une alerte par nouveau sens (comme alert() du Pine), jamais deux fois de suite."""
+    """BTC conserve strictement son signal historique. GOLD/NASDAQ : retournement M5/M15 contre H1/H4 = veille seulement."""
     dirs = r.get("dirs") or []
-    b5, b15 = (r.get("b5") or [])[:-1], (r.get("b15_long") or r.get("b15") or [])[:-1]   # 16/11 : 41 bougies 15 min nécessaires (b15 = 30 → muet)
+    b5, b15 = (r.get("b5") or [])[:-1], (r.get("b15_long") or r.get("b15") or [])[:-1]
     b1, b4 = r.get("b1h") or [], r.get("b4h") or []
     if len(dirs) < 10 or len(b5) < 6 or len(b15) < 41 or len(b1) < 6 or len(b4) < 6:
         return None
@@ -4102,13 +4113,35 @@ def retournement_marche(m, r, cle):
     p = r["m1"][-1]["c"] if r.get("m1") else b15[-1]["c"]
     h1, l1 = max(x["h"] for x in b1[-6:]), min(x["l"] for x in b1[-6:])
     h4, l4 = max(x["h"] for x in b4[-6:]), min(x["l"] for x in b4[-6:])
+
+    if m in ("GOLD", "NASDAQ"):
+        sens = 1 if d5 == 1 and d15 == 1 else -1 if d5 == -1 and d15 == -1 else 0
+        if not sens or (m == "NASDAQ" and not vol_fort):
+            cle["rv_watch_sens"] = 0
+            return None
+        if (sens == 1 and p >= h1) or (sens == -1 and p <= l1):
+            cle["rv_watch_sens"] = 0
+            return None
+        if d60 == sens and d240 == sens:
+            cle["rv_watch_sens"] = 0
+            return None
+        if cle.get("rv_watch_sens") == sens:
+            return None
+        cle["rv_watch_sens"] = sens
+        sens_txt = "à la hausse" if sens == 1 else "à la baisse"
+        h1_txt = "haussier" if d60 == 1 else "baissier" if d60 == -1 else "neutre"
+        h4_txt = "haussier" if d240 == 1 else "baissier" if d240 == -1 else "neutre"
+        vol_txt = f" Volume M15 ×{vols[-1] / vma:.1f}." if m == "NASDAQ" and vma > 0 else ""
+        return (f"👀 RETOURNEMENT EN OBSERVATION — {ICONE.get(m, '')} {m}\\n"
+                f"Les M5 et M15 se retournent {sens_txt}, mais H1 est {h1_txt} et H4 {h4_txt}.{vol_txt}\\n"
+                "⛔ PAS DE POSITION : ce retournement n'est pas confirmé par les grandes unités.\\n"
+                "Aucune entrée, aucun SL ni TP à prendre sur cette alerte.\\n"
+                "⏳ J'attends les clôtures H1 ET H4 dans le même sens, puis le déclencheur M5.")
+
+    # BTC : logique historique conservée, sans changement de seuil ni de formulation.
     def ok(s):
         casc = d5 == s and d15 == s
-        if m == "BTC":
-            return casc and d60 == s and d240 == -s
-        if m == "NASDAQ":
-            return casc and d60 == -s and vol_fort
-        return casc and d60 == -s
+        return casc and d60 == s and d240 == -s
     sens = 1 if ok(1) and p < h1 else -1 if ok(-1) and p > l1 else 0
     avant = cle.get("rv_sens", 0)
     cle["rv_sens"] = sens
@@ -4119,22 +4152,17 @@ def retournement_marche(m, r, cle):
     be = p + sens * abs(p - sl)
     haut = "haut" if sens == 1 else "bas"
     camp, autre = ("acheteurs", "vendeurs") if sens == 1 else ("vendeurs", "acheteurs")
-    if m == "BTC":
-        vu = f"le 5 min, le 15 min et même le 1h ont tourné {'à la hausse' if sens == 1 else 'à la baisse'}, alors que le 4h va encore dans l'autre sens"
-        pq = "Sur le BTC je n'entre jamais sur le 5 min seul : c'est souvent un piège. Là, le 1h a suivi, donc c'est sérieux"
-    else:
-        vu = f"le 5 min et le 15 min ont tourné {'à la hausse' if sens == 1 else 'à la baisse'}, alors que le 1h va encore dans l'autre sens"
-        pq = ("Et la bougie 15 min a un gros volume : les " + camp + " sont vraiment là") if m == "NASDAQ" else \
-             f"Sur le Gold, quand les petites unités tournent comme ça, les {autre} s'essoufflent"
-    st = {"GOLD": (47, 24), "NASDAQ": (70, 30), "BTC": (62, 38)}.get(m, (0, 0))
-    return (f"↩️ RETOURNEMENT {'LONG ⬆️' if sens == 1 else 'SHORT ⬇️'} — {ICONE.get(m, '')} {m}\n"
-            f"👀 Regarde ton graphique : {vu}.\n"
-            f"💡 {pq}. Le prix peut aller chercher le {haut} de la 1h, voire de la 4h.\n"
-            f"📊 Sur mes 60 derniers jours, ce signal a atteint le {haut} 1h {st[0]} % du temps, le {haut} 4h {st[1]} %.\n"
-            f"🎯 Cible 1 : {px(h1 if sens == 1 else l1)} ({haut} 1h)\n"
-            f"🚀 Cible 2 : {px(h4 if sens == 1 else l4)} ({haut} 4h)\n"
-            f"🛑 SL : {px(sl)}, juste {'sous le dernier creux' if sens == 1 else 'au-dessus du dernier sommet'} 5 min. S'il casse, je me suis trompé et on sort.\n"
-            f"🛡 Dès que le prix touche {px(be)}, mets-toi à BE : il ne doit plus revenir à ton entrée. Là, on encaisse sans risque 💰\n"
+    vu = f"le 5 min, le 15 min et même le 1h ont tourné {'à la hausse' if sens == 1 else 'à la baisse'}, alors que le 4h va encore dans l'autre sens"
+    pq = "Sur le BTC je n'entre jamais sur le 5 min seul : c'est souvent un piège. Là, le 1h a suivi, donc c'est sérieux"
+    st = (62, 38)
+    return (f"↩️ RETOURNEMENT {'LONG ⬆️' if sens == 1 else 'SHORT ⬇️'} — {ICONE.get(m, '')} {m}\\n"
+            f"👀 Regarde ton graphique : {vu}.\\n"
+            f"💡 {pq}. Le prix peut aller chercher le {haut} de la 1h, voire de la 4h.\\n"
+            f"📊 Sur mes 60 derniers jours, ce signal a atteint le {haut} 1h {st[0]} % du temps, le {haut} 4h {st[1]} %.\\n"
+            f"🎯 Cible 1 : {px(h1 if sens == 1 else l1)} ({haut} 1h)\\n"
+            f"🚀 Cible 2 : {px(h4 if sens == 1 else l4)} ({haut} 4h)\\n"
+            f"🛑 SL : {px(sl)}, juste {'sous le dernier creux' if sens == 1 else 'au-dessus du dernier sommet'} 5 min. S'il casse, je me suis trompé et on sort.\\n"
+            f"🛡 Dès que le prix touche {px(be)}, mets-toi à BE : il ne doit plus revenir à ton entrée. Là, on encaisse sans risque 💰\\n"
             "📺 Tu retrouves la même explication sur le graphique (infobulle ↩️)")
 
 
@@ -4240,12 +4268,39 @@ def texte_apercu(m, r, cle, vip=True):
         if r.get("ferme_txt") else "⚠️ Le biais n'est pas une autorisation d'entrée." if not tr else "📍 Position ouverte : suis les alertes du coach.",
         "",
     ] + voyants_unites(r) + [""]
-    # Position ouverte : les niveaux du trade font foi (pas de cible différente du TP).
-    obj = ([f"🟨 Entrée : {px(tr['e'])} (étiquette ENTRÉE)",
-            (f"🔒 SL protégé : {px(tr['sl'])} (plus de perte possible)" if tr.get("d") and tr["d"] * (tr["e"] - tr["sl"]) <= 0
-             else f"🛑 SL : {px(tr['sl'])} (ligne rouge)"),
-            f"🎯 TP1 : {px(tr['tp1'])} (ligne bleue)"]
-           + ([f"🏁 TP2 : {px(tr['tp2'])}"] if tr.get("tp2") else [])) if tr else objectifs_marche(r, sens)
+    # Position ouverte : les niveaux du trade font foi. Sans position, Gold/NASDAQ affichent le plan réel calculé
+    # uniquement si H1 et H4 confirment le même sens ; sinon aucun TP directionnel n'est présenté comme validé.
+    if tr:
+        obj = ([f"🟨 Entrée : {px(tr['e'])} (étiquette ENTRÉE)",
+                (f"🔒 SL protégé : {px(tr['sl'])} (plus de perte possible)" if tr.get("d") and tr["d"] * (tr["e"] - tr["sl"]) <= 0
+                 else f"🛑 SL : {px(tr['sl'])} (ligne rouge)"),
+                f"🎯 TP1 : {px(tr['tp1'])} (ligne bleue)"]
+               + ([f"🏁 TP2 : {px(tr['tp2'])}"] if tr.get("tp2") else []))
+    else:
+        obj = objectifs_marche(r, sens)
+        if m in ("GOLD", "NASDAQ"):
+            pl = r.get("plan_fige") or r.get("plan") or {}
+            dpl = pl.get("d") or r.get("dirPlan") or 0
+            dirs = r.get("dirs") or []
+            if (dpl in (1, -1) and dpl == sens and len(dirs) >= 10
+                    and dirs[7] == dpl and dirs[9] == dpl):
+                try:
+                    e_pl, sl_pl, tp1_pl = float(pl["e"]), float(pl["sl"]), float(pl["tp1"])
+                    tp2_pl = float(pl["tp2"]) if pl.get("tp2") is not None else None
+                    if dpl * (e_pl - sl_pl) <= 0 or dpl * (tp1_pl - e_pl) <= 0:
+                        raise ValueError("géométrie entrée/SL/TP1 incohérente")
+                    obj = ["🧾 PLAN INDICATIF — H1 + H4 CONFIRMÉS",
+                           f"📍 Entrée calculée : {px(e_pl)}",
+                           f"🛑 SL calculé : {px(sl_pl)}",
+                           f"🎯 TP1 : {px(tp1_pl)}" + (f" ({pl.get('n1')})" if pl.get("n1") else "")]
+                    if tp2_pl is not None and tp2_affichable(dpl, tp1_pl, tp2_pl):
+                        obj.append(f"🏁 TP2 : {px(tp2_pl)}" + (f" ({pl.get('n2')})" if pl.get("n2") else ""))
+                    obj.append("⚠️ Plan de référence uniquement : attends « ENTRÉE AUTORISÉE » avant toute prise de position.")
+                except (KeyError, TypeError, ValueError):
+                    obj = ["⏸ TP non publiés : le plan calculé ne possède pas une géométrie entrée / SL / TP cohérente."]
+            elif len(dirs) >= 10 and (dirs[7] != dirs[9] or dirs[7] != dpl or dirs[9] != dpl):
+                obj = ["⏸ TP directionnels non validés : H1 et H4 doivent confirmer le même sens."]
+
     if obj:
         lignes += obj + [""]
     if not tr:
@@ -4566,7 +4621,11 @@ def inscrire_auto(etat, cid, m, notifier=True):
     lancer_chrono(etat, cid, m, r)
 
 def bot_on(etat, cid):
-    return cid not in etat.get("bot_off", [])
+    """Opt-in explicite obligatoire : les anciens comptes ne reçoivent plus d'alertes par défaut."""
+    ident = str(cid)
+    actifs = {str(x) for x in etat.get("bot_on_chats", [])}
+    arretes = {str(x) for x in etat.get("bot_off", [])}
+    return ident in actifs and ident not in arretes
 
 def stats_bot(etat, cid):
     return etat.setdefault("stats_bot", {}).setdefault(cid, {"arrets": 0, "auto": 0})
@@ -4641,11 +4700,21 @@ def menu_bot(etat, cid):
                                            [{"text": "👁 Tester la version gratuite", "callback_data": "vuegratuit:on"}]] if str(cid) in {str(x) for x in proprio(etat)} else [])}))
 
 def regler_bot(etat, cid, on):
+    ident = str(cid)
     off = etat.setdefault("bot_off", [])
-    if on and cid in off:
-        off.remove(cid)
-    elif not on and cid not in off:
-        off.append(cid); stats_bot(etat, cid)["arrets"] += 1
+    actifs = etat.setdefault("bot_on_chats", [])
+    if on and not marches_choisis(etat, ident):
+        _envoi_sur(cid, text="📡 Choisis d'abord le marché que tu veux suivre. Aucun marché n'est activé par défaut.", reply_markup=json.dumps({"inline_keyboard": [[{"text": "📡 Choisir mes marchés", "callback_data": "marketsmenu:x"}]]}))
+        return False
+    if on:
+        if ident not in {str(x) for x in actifs}:
+            actifs.append(ident)
+        off[:] = [x for x in off if str(x) != ident]
+    else:
+        actifs[:] = [x for x in actifs if str(x) != ident]
+        if ident not in {str(x) for x in off}:
+            off.append(ident)
+            stats_bot(etat, cid)["arrets"] += 1
     if vue_gratuite(etat, cid):
         dedans = en_position(etat, cid)
         txt = (("✅ C'est noté : je te propose la prochaine position" if str(cid) not in etat.get("bienvenue", {})
@@ -5453,15 +5522,14 @@ def envoyer_analyse_a(etat, cid, m, r, cle):
     vu = etat.setdefault("vu_analyse", {}).setdefault(m, {})
     sig = signature_analyse(m, r, cle); der = vu.get(str(cid))
     if der and der["sig"] == sig and time.time() - der["t"] < 1200:
-        armer_cloture(etat, cid, m, r, cle)
         lignes = chrono_txt(m, r, cle, time.time()).split("\n")
         utile = [l for l in lignes if l.startswith(("1️⃣", "2️⃣", "3️⃣", "4️⃣", "⏸", "⏳", "↩️", "⚡", "🕯 Prochaine"))]
         _envoi_sur(cid, reply_markup=bouton_rappel(m), text="\n".join(
             [f"😎 RIEN N'A BOUGÉ — {ICONE.get(m, '')} {m}   {px(r['m1'][-1]['c'])}",
-             f"🕒 Analyse de référence : {heure(der['t'])}"] + voyants_unites(r) + utile + [(statut_position(cle["trade"], r["m1"][-1]["c"]) if cle.get("trade") else statut_txt(0, cle.get("ordre")).strip()), "🔔 Je te préviens dès que ça change"]))
+             f"🕒 Analyse de référence : {heure(der['t'])}"] + voyants_unites(r) + utile + [(statut_position(cle["trade"], r["m1"][-1]["c"]) if cle.get("trade") else statut_txt(0, cle.get("ordre")).strip()), "🔔 Active le coach si tu veux recevoir un suivi"]))
         # Un seul message (voyants inclus) ; l'avis IA complet reste derrière « 🧠 En savoir plus ».
         return
-    armer_cloture(etat, cid, m, r, cle)
+    # Une analyse demandée reste ponctuelle. Le suivi automatique n'est armé qu'après le bouton « Coach : préviens-moi ».
     # Toutes les analyses passent par le même garde-fou 429 que les autres messages.
     # Une analyse refusée par Telegram n'est pas marquée comme livrée et pourra être retentée.
     res = _envoi_sur(cid, text=texte_apercu(m, r, cle, vip=bool(autorise(etat, str(cid), str(cid)))),
@@ -6297,6 +6365,11 @@ def traiter(etat, chats, updates):
                 _envoi_sur(qui, text=f"🎙 COMMENTATEUR {ICONE.get(mk, '')} {mk}\n✅ Tu es déjà dans la chaîne\n👀 Il commente là-bas\n🙅 Pas de doublon ici")
                 continue
             if choix in ("coachlive", "coachstop") and mk in MARCHES:
+                if choix == "coachlive":
+                    if etat.get("marches_par_chat", {}).get(str(qui)) is None:
+                        selectionner_marches_suivi(etat, qui, [mk])
+                    elif mk not in marches_choisis(etat, qui):
+                        basculer_marche(etat, qui, mk)
                 activer_coach_live(etat, qui, mk, choix == "coachlive")
                 r_now = DERNIERS.get(mk)
                 if choix == "coachlive" and r_now and len(r_now.get("b15") or []) > 1:
@@ -6853,7 +6926,7 @@ def evenements_pine(etat, m, r, cle, now):
             f = lambda v: px(v)
             ev.append(dict(kind="sniper", **base, ordre="vente" if sn["d"] == -1 else "achat", za=f(sn["za"]), zb=f(sn["zb"]), sl=f(sn["sl"]), tp1=f(sn["tp1"]),
                            tp=f(sn["tp2"]), ut=sn["ut"], rejets="+".join(sn["rejets"]), rr=str(round(sn["rr"], 1)).replace(".", ","), rrp=str(round(sn["rr_plan"], 1)).replace(".", ",")))
-    if d and not cle.get("trade"):                       # ↩ SCALP INVERSE : une fois par niveau, 30 min mini (même règle que le sniper)
+    if d and not cle.get("trade") and m == "BTC":        # BTC seul : Gold/NASDAQ restent sans scalp en sens inverse
         try:
             si = scalp_inverse(r, d)
         except Exception:
@@ -7634,7 +7707,7 @@ def envoyer_prospects(etat, texte, signal, clavier=None):
     vus = etat.setdefault("masque_vu", {})
     ref = f"{m}:{(tr or {}).get('cree') or int(time.time() // 1800)}"
     for cid in destinataires_gratuits(etat):
-        if not marche_autorise(etat, cid, m):
+        if not bot_on(etat, cid) or not marche_autorise(etat, cid, m):
             continue
         if TOUT_GRATUIT:                   # v7.4 (décision d'Adel) : tout gratuit pour le moment → chaque position en temps réel, une fois
             if not bot_on(etat, cid) or vus.get(cid) == ref:
@@ -7802,9 +7875,9 @@ def basculer_marche(etat, cid, marche):
     selectionner_marches_suivi(etat, cid, sorted(actuels))
 
 def marches_choisis(etat, cid):
-    """Marchés cochés par la personne ; sans choix : tous les marchés."""
+    """Marchés cochés explicitement par la personne ; sans choix : aucun marché suivi."""
     brut = etat.setdefault("marches_par_chat", {}).get(str(cid))
-    return _vers_ensemble(brut) or set(MARCHES)
+    return _vers_ensemble(brut)
 
 def marche_selection(etat, cid):
     """Compatibilité : « BTC », « GOLD », « BOTH » (BTC + GOLD) ou la liste des marchés cochés."""
@@ -7817,7 +7890,7 @@ def marche_selection(etat, cid):
 def marche_autorise(etat, cid, marche):
     brut = etat.get("marches_par_chat", {}).get(str(cid))
     if brut is None:
-        return True                     # pas encore de choix : tous les marchés
+        return False                    # aucun envoi tant que le marché n'a pas été choisi
     return marche in _vers_ensemble(brut)
 
 NOMS_MARCHES = {"BTC": "🟠 BTC", "GOLD": "🥇 GOLD", "NASDAQ": "💠 NASDAQ"}
