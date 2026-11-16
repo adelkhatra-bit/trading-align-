@@ -190,6 +190,21 @@ class LiveTikTok(unittest.TestCase):
         ab.menu_live(self.etat, "1")
         self.assertIn("Écran TradingView connecté", self.envoye[-1][1]["text"])
 
+    def test_menu_live_admin_affiche_bridge_non_configure_sans_secrets(self):
+        with mock.patch.object(ab, "ALIGN_TV_API_URL", ""), \
+             mock.patch.object(ab, "ALIGN_TV_READ_TOKEN", ""):
+            ab.menu_live(self.etat, "1")
+        self.assertIn("Bridge ROBOT V12 non configuré", self.envoye[-1][1]["text"])
+        self.assertIn("Kraken/Yahoo", self.envoye[-1][1]["text"])
+
+    def test_menu_live_admin_ne_confond_pas_configuration_et_connexion_bridge(self):
+        with mock.patch.object(ab, "ALIGN_TV_API_URL", "https://bridge.example"), \
+             mock.patch.object(ab, "ALIGN_TV_READ_TOKEN", "test-token"):
+            ab.menu_live(self.etat, "1")
+        self.assertIn("paramètres présents", self.envoye[-1][1]["text"])
+        self.assertNotIn("Bridge ROBOT V12 connecté", self.envoye[-1][1]["text"])
+
+
     def test_paiement_recu_envoie_l_ordre_au_graphique(self):
         self.etat["live_on"] = True
         ab.live_paiement_recu(self.etat, "2", {"invoice_payload": "livemain:GOLD", "total_amount": 25, "telegram_payment_charge_id": "c1"})
