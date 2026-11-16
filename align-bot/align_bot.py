@@ -7498,7 +7498,7 @@ def alertes_courtes(etat, chats, derniers, now=None):
                     en = filtrer_texte_par_marches(en, abonnes)
                     choisi = en if str(cid) in LANG_EN else fr
                     if choisi:
-                        _envoi_sur(cid, text="\\n".join(regrouper_alertes([choisi])))
+                        _envoi_sur(cid, text="\n".join(regrouper_alertes([choisi])))
 
 def alerte_gratuite_preparation(etat, texte, now=None):
     """Gratuit : version réduite d'une alerte de préparation VIP (« JE PRÉPARE UNE POSITION », « PRÉPARE-TOI », « POINT D'ENTRÉE À VENIR ») :
@@ -10832,8 +10832,8 @@ def live_annoncer_debut(etat, chats):
         vus.add(cid)
         anglais = cid in LANG_EN
         try:
-            _envoi_sur(cid, text=("🔴 ADEL IS LIVE\\n📺 The ALIGN chart, live (YouTube • TikTok)\\n🎮 You can take control of the chart"
-                                  if anglais else "🔴 ADEL EST EN LIVE\\n📺 Le graphique ALIGN en direct (YouTube • TikTok)\\n🎮 Tu peux prendre la main sur le graphique"),
+            _envoi_sur(cid, text=("🔴 ADEL IS LIVE\n📺 The ALIGN chart, live (YouTube • TikTok)\n🎮 You can take control of the chart"
+                                  if anglais else "🔴 ADEL EST EN LIVE\n📺 Le graphique ALIGN en direct (YouTube • TikTok)\n🎮 Tu peux prendre la main sur le graphique"),
                        reply_markup=clavier_live(etat, cid, anglais))
         except Exception as ex:
             print("live annonce", cid, ex)
