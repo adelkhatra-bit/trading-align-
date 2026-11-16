@@ -9,7 +9,8 @@ CONTRE = [-1, -1, -1, -1, 1, 1, 1, 1, 1, 1, 1]
 def r_(dirs, p, bougie15=-1, bougie5=1, t=1000):
     b15 = [dict(t=0, o=110, h=111, l=105, c=110 + 2 * bougie15, v=1), dict(t=900, o=1, h=1, l=1, c=1, v=1)]
     b5 = [dict(t=0, o=100, h=101, l=99, c=100 + bougie5, v=1), dict(t=300, o=1, h=1, l=1, c=1, v=1)]
-    return dict(dirs=dirs, b15=b15, b5=b5, atr=4.0, t=t, m1=[dict(c=p)])
+    return dict(dirs=dirs, dirs_cloturees=dirs, b15=b15, b5=b5, atr=4.0, atr5=4.0, t=t,
+                m1=[dict(t=int(__import__("time").time()), c=p)])
 
 
 class Coupe(unittest.TestCase):
