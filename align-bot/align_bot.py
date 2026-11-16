@@ -2581,6 +2581,7 @@ def carte_coach(m, r, cle, genre, tr=None, raison=None, declencheur=None, signal
                 l.append(f"⏳ Durée estimée : {duree} • le prix peut revenir vers l'entrée avant de partir, garde ton SL")
         except Exception:
             pass
+        if m in ("GOLD", "NASDAQ"):
         l.append("🛡️ À TP1 : remonte le SL à BE, puis laisse courir jusqu'au TP2.")
         if validite:
             l.append(f"⏱ Valide : {validite}")
@@ -6859,9 +6860,9 @@ _PINE_TEXTES = {   # type -> variantes (FR, EN) ; {ic} {m} {n} {c} {seuil} {sens
                  ("🏁 {ic} {m} : retournement confirmé, direction {sens}", "🧭 {strat}")),
     "ret_cancel": (("⛔ {ic} {m} : SL cassé à la clôture", "↩ Retournement en cours, j'attends 15 min / 1h"), ("🛑 {ic} {m} : le stop du plan est franchi", "🔄 Je guette la confirmation 15 min / 1h"),
                    ("🚧 {ic} {m} : plan annulé (stop cassé)", "👀 Retournement possible, rien n'est validé")),
-    "sniper": (("🎯 ZONE D'ENTRÉE POSSIBLE {ic} {m} : {ordre} {za}–{zb} ({ut})", "🛑 SL {sl} • 💰 TP1 {tp1} • 🏁 TP2 {tp}", "⚖️ R/R {rr} (plan {rrp}) • rejet {rejets}"),
-               ("🔫 {ic} {m} : zone d'entrée {ordre} {za}–{zb} sur {ut}", "🛑 Stop {sl} • 💰 TP1 {tp1} • 🏁 TP2 {tp}", "⚖️ x{rr} le risque (plan x{rrp})"),
-               ("🎯 {ic} {m} : rejet confirmé {rejets}, zone {ordre} {za}–{zb}", "🛑 SL {sl} • 💰 TP1 {tp1} • 🏁 TP2 {tp}", "⏳ Attends la clôture {ut} avant d'agir")),
+    "sniper": (("🎯 Entrée sniper {ic} {m} : {ordre} {za}–{zb} ({ut})", "🛑 SL {sl} • TP1 {tp1} • TP plan {tp}", "📐 R/R {rr} (plan {rrp}) • rejet {rejets}"),
+               ("🔫 {ic} {m} : {ordre} sniper {za}–{zb} sur {ut}", "🛑 Stop {sl} • 🎯 TP1 {tp1}, puis {tp}", "📐 x{rr} le risque (plan x{rrp})"),
+               ("🎯 Sniper {ic} {m} : rejet confirmé {rejets}, {ordre} {za}–{zb}", "🛑 SL {sl} • TP1 {tp1}", "🗺 Plan {tp} conservé, R/R plan {rrp}")),
     "confirmation": (("✅ {ic} {m} : CONFIRMATION {sens}", "🕯 Clôture {u} {pos} {niv}"), ("🔔 {ic} {m} : confirmation {sens} validée", "🕯 {u} clôturée {pos} {niv}"),
                      ("🎯 {ic} {m} : {sens} confirmé à la clôture {u}", "📍 Ligne de décision {niv}")),
 }
@@ -6880,9 +6881,9 @@ _PINE_TEXTES_EN = {
                  ("🏁 {ic} {m}: reversal confirmed, direction {sens}", "🧭 {strat}")),
     "ret_cancel": (("⛔ {ic} {m}: SL broken at the close", "↩ Reversal in progress, waiting for 15 min / 1h"), ("🛑 {ic} {m}: the plan's stop is crossed", "🔄 Watching for the 15 min / 1h confirmation"),
                    ("🚧 {ic} {m}: plan cancelled (stop broken)", "👀 Reversal possible, nothing validated")),
-    "sniper": (("🎯 POSSIBLE ENTRY ZONE {ic} {m}: {ordre} {za}–{zb} ({ut})", "🛑 SL {sl} • 💰 TP1 {tp1} • 🏁 TP2 {tp}", "⚖️ R/R {rr} (plan {rrp}) • rejection {rejets}"),
-               ("🔫 {ic} {m}: {ordre} entry zone {za}–{zb} on {ut}", "🛑 Stop {sl} • 💰 TP1 {tp1} • 🏁 TP2 {tp}", "⚖️ x{rr} risk (plan x{rrp})"),
-               ("🎯 {ic} {m}: rejection confirmed {rejets}, {ordre} zone {za}–{zb}", "🛑 SL {sl} • 💰 TP1 {tp1} • 🏁 TP2 {tp}", "⏳ Wait for the {ut} close before acting")),
+    "sniper": (("🎯 Sniper entry {ic} {m}: {ordre} {za}–{zb} ({ut})", "🛑 SL {sl} • TP1 {tp1} • plan TP {tp}", "📐 R/R {rr} (plan {rrp}) • rejection {rejets}"),
+               ("🔫 {ic} {m}: sniper {ordre} {za}–{zb} on {ut}", "🛑 Stop {sl} • 🎯 TP1 {tp1}, then {tp}", "📐 x{rr} the risk (plan x{rrp})"),
+               ("🎯 Sniper {ic} {m}: rejection confirmed {rejets}, {ordre} {za}–{zb}", "🛑 SL {sl} • TP1 {tp1}", "🗺 Plan {tp} kept, plan R/R {rrp}")),
     "confirmation": (("✅ {ic} {m}: CONFIRMATION {sens}", "🕯 {u} close {pos} {niv}"), ("🔔 {ic} {m}: {sens} confirmation validated", "🕯 {u} closed {pos} {niv}"),
                      ("🎯 {ic} {m}: {sens} confirmed at the {u} close", "📍 Decision line {niv}")),
 }
@@ -6932,7 +6933,7 @@ def evenements_pine(etat, m, r, cle, now):
         if mem.get("sn_cle") != cle_sn and now - mem.get("sn_t", 0) >= 1800:
             mem["sn_cle"], mem["sn_t"] = cle_sn, now
             f = lambda v: px(v)
-            ev.append(dict(kind="sniper", **base, ordre="SHORT" if sn["d"] == -1 else "LONG", za=f(sn["za"]), zb=f(sn["zb"]), sl=f(sn["sl"]), tp1=f(sn["tp1"]),
+            ev.append(dict(kind="sniper", **base, ordre=(("SHORT" if sn["d"] == -1 else "LONG") if m in ("GOLD", "NASDAQ") else ("vente" if sn["d"] == -1 else "achat")), za=f(sn["za"]), zb=f(sn["zb"]), sl=f(sn["sl"]), tp1=f(sn["tp1"]),
                            tp=f(sn["tp2"]), ut=sn["ut"], rejets="+".join(sn["rejets"]), rr=str(round(sn["rr"], 1)).replace(".", ","), rrp=str(round(sn["rr_plan"], 1)).replace(".", ",")))
     if d and not cle.get("trade") and m == "BTC":        # BTC seul : Gold/NASDAQ ne publient pas de position inverse
         try:
@@ -6962,8 +6963,22 @@ def evenements_pine(etat, m, r, cle, now):
                                pos="au-dessus de" if d == 1 else "sous", niv=px(zp["zmil"])))
     return ev
 
+_PINE_TEXTES_GN = {
+    "sniper": (("🎯 ZONE D'ENTRÉE POSSIBLE {ic} {m} : {ordre} {za}–{zb} ({ut})", "🛑 SL {sl} • 💰 TP1 {tp1} • 🏁 TP2 {tp}", "⚖️ R/R {rr} (plan {rrp}) • rejet {rejets}"),
+               ("🔫 {ic} {m} : zone d'entrée {ordre} {za}–{zb} sur {ut}", "🛑 Stop {sl} • 💰 TP1 {tp1} • 🏁 TP2 {tp}", "⚖️ x{rr} le risque (plan x{rrp})"),
+               ("🎯 {ic} {m} : rejet confirmé {rejets}, zone {ordre} {za}–{zb}", "🛑 SL {sl} • 💰 TP1 {tp1} • 🏁 TP2 {tp}", "⏳ Attends la clôture {ut} avant d'agir"))
+}
+_PINE_TEXTES_GN_EN = {
+    "sniper": (("🎯 POSSIBLE ENTRY ZONE {ic} {m}: {ordre} {za}–{zb} ({ut})", "🛑 SL {sl} • 💰 TP1 {tp1} • 🏁 TP2 {tp}", "⚖️ R/R {rr} (plan {rrp}) • rejection {rejets}"),
+               ("🔫 {ic} {m}: {ordre} entry zone {za}–{zb} on {ut}", "🛑 Stop {sl} • 💰 TP1 {tp1} • 🏁 TP2 {tp}", "⚖️ x{rr} risk (plan x{rrp})"),
+               ("🎯 {ic} {m}: rejection confirmed {rejets}, {ordre} zone {za}–{zb}", "🛑 SL {sl} • 💰 TP1 {tp1} • 🏁 TP2 {tp}", "⏳ Wait for the {ut} close before acting"))
+}
+
 def texte_pine(etat, ev, anglais=False):
-    var = (_PINE_TEXTES_EN if anglais else _PINE_TEXTES)[ev["kind"]]
+    if ev["kind"] == "sniper" and ev.get("m") in ("GOLD", "NASDAQ"):
+        var = (_PINE_TEXTES_GN_EN if anglais else _PINE_TEXTES_GN)["sniper"]
+    else:
+        var = (_PINE_TEXTES_EN if anglais else _PINE_TEXTES)[ev["kind"]]
     lignes = var[_tournante(etat, f"p:{ev['kind']}:{ev['m']}", len(var))]
     ev = dict(ev)
     if anglais:
@@ -8461,7 +8476,7 @@ def fmt_trade(m, tr, p=None):
             + (f"4️⃣ 💰 TP1 : juste {'sous la' if d == 1 else 'au-dessus du'} {tr['n1']} (regarde en vue {vue(tr['n1'])})\n"
                if "projection" not in tr["n1"] else f"4️⃣ 💰 TP1 : environ {tr['rr']:.1f} fois ton risque\n")
             + (f"5️⃣ 🏁 TP2 : {tr['n2']} (vue {vue(tr['n2'])})\n" if "projection" not in tr["n2"] else "5️⃣ 🏁 TP2 : on laisse courir, je te guide\n")
-            + "🛡️ À TP1 : remonte le SL à BE, puis laisse courir jusqu'au TP2.\n"
+            + ("🛡️ À TP1 : remonte le SL à BE, puis laisse courir jusqu'au TP2.\n" if m in ("GOLD", "NASDAQ") else "")
             + duree_txt(tr) +
             f"📉 Distance entrée → SL : {risque_pct:.2f} % du prix (pas le % du capital risqué)\n"
             f"🛑 SL obligatoire : ne jamais l'élargir ni l'enlever. Respecte le niveau indiqué.\n"
