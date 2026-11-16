@@ -5545,11 +5545,22 @@ def envoyer_analyse(cid, etat=None, mq=None):
             print("analyse", ex)
 
 def prix_actuel(m):
-    """Dernier prix du marché (pour figer l'entrée ou la sortie d'un abonné) : XAUUSD spot pour le Gold, Kraken pour le BTC."""
+    """Dernier prix utilisable pour figer une entrée/sortie, dans la même échelle que les bougies du marché."""
     try:
-        if MARCHES[m] == "XAUUSD":
+        symbole = MARCHES[m]
+        if symbole == "XAUUSD":
             return or_spot()
-        j = http_json(f"https://api.kraken.com/0/public/Ticker?pair={MARCHES[m]}")
+        if symbole == "NAS100":
+            # NQ futures + écart NQ/NDX lissé pendant la séance : même échelle que yahoo_nasdaq().
+            # Refuser une cotation périmée plutôt que clôturer une position au dernier prix connu.
+            live = nasdaq_direct()
+            cache = _CACHE.get("nq_live")
+            if live is None or not isinstance(cache, tuple) or len(cache) < 2:
+                return None
+            if time.time() - float(cache[0]) > 15:
+                return None
+            return float(live) + float(_CACHE.get("ecart_ndx", 0.0) or 0.0)
+        j = http_json(f"https://api.kraken.com/0/public/Ticker?pair={symbole}")
         return float(next(iter(j["result"].values()))["c"][0])
     except Exception as ex:
         print("prix", ex); return None
