@@ -11090,7 +11090,9 @@ def question_quotidienne(etat, chats, now=None):
         if any(coach_actif(etat, cid, m) for m in MARCHES):
             continue
         # Un commentateur live explicitement actif compte aussi comme un suivi en cours.
-        if any(str(cid) in (etat.get("coach_live", {}).get(m) or {}) for m in MARCHES):
+        if any(str(cid) in (etat.get("coach_live", {}).get(m) or {})
+               and float((etat.get("coach_live", {}).get(m) or {}).get(str(cid), {}).get("expire", 0)) > now
+               for m in MARCHES):
             continue
         clavier = json.dumps({"inline_keyboard": [
             [{"text": "✅ Oui, je trade", "callback_data": "trade:yes"}],
