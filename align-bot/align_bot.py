@@ -5511,6 +5511,8 @@ def notifier_coach_live(etat, m, r, cle):
         return
     b = bars[-1]
     for cid, info in list(abonnes.items()):
+        if not bot_on(etat, cid):
+            continue
         if dans_chaine(etat, cid, m):
             abonnes.pop(cid, None)
             _envoi_sur(cid, text=f"🎙 Ton commentateur {ICONE.get(m, '')} {m}\n👉 Il est dans ta chaîne\n🔕 Ici, plus de doublon",
