@@ -2,6 +2,7 @@ import datetime
 import os
 import sys
 import unittest
+import unittest.mock
 from zoneinfo import ZoneInfo
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -19,7 +20,7 @@ class MarketEntryStabilisationTests(unittest.TestCase):
 
     def stable_market(self, reference):
         before = self.bars(reference - 12 * 300, [1.0] * 12)
-        after = self.bars(reference, [1.1, 1.2, 1.0])
+        after = self.bars(reference, [1.1, 1.2, 1.0, 1.1, 1.0])
         return {"b5": before + after, "atr5": 1.0, "atr": 1.0}
 
     def test_gold_reopen_has_a_minimum_wait_before_any_new_entry(self):
@@ -64,7 +65,7 @@ class MarketEntryStabilisationTests(unittest.TestCase):
     def test_stabilisation_requires_six_pre_event_and_three_post_event_bars(self):
         event = datetime.datetime(2026, 11, 16, 10, 0, tzinfo=ZoneInfo("America/New_York")).timestamp()
         r = {"b5": self.bars(event, [1.0, 1.0, 1.0]), "atr5": 1.0}
-        self.assertFalse(align_bot._stabilisation_m5_apres(r, event))
+        self.assertFalse(align_bot._stabilisation_m5_apres(r, event, event + 25 * 60))
 
 
     def test_agent_cancels_pending_entry_during_news_blackout(self):
@@ -76,6 +77,7 @@ class MarketEntryStabilisationTests(unittest.TestCase):
         cle = {"prep": True, "ordre": {"e": 100.0, "sl": 99.0}}
         patches = [
             unittest.mock.patch.dict(align_bot._ETAT_COURANT, {"etat": state}, clear=False),
+            unittest.mock.patch.object(align_bot.time, "time", return_value=now),
             unittest.mock.patch.object(align_bot, "manipulation"),
             unittest.mock.patch.object(align_bot, "meche_suspecte"),
             unittest.mock.patch.object(align_bot, "niveaux_cles"),
