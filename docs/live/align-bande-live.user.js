@@ -306,8 +306,28 @@
   function cleMarche(t) { const x = String(t || '').match(/BTC|GOLD|XAU|NASDAQ|NAS/i); return x ? x[0].toUpperCase().replace('XAU', 'GOLD').replace(/^NAS$/, 'NASDAQ') : ''; }
   function botSuivi(t) {
     const k = cleMarche(t); if (!k) return;
-    if (/ENTRE EN POSITION/i.test(t)) botPos[k] = Date.now();
+    if (/J'ENTRE MAINTENANT|ENTRE EN POSITION|ENTRÉE CONFIRMÉE|POSITION OUVERTE/i.test(t)) botPos[k] = Date.now();
     else if (/TP2 TOUCH|OBJECTIF FINAL|SL TOUCH|STOP TOUCH|POSITION (FERMÉE|CLÔTURÉE)/i.test(t)) delete botPos[k];
+  }
+  function afficherShowEntree(t) {
+    const head = String(t || '').split(/\\r?\\n/)[0];
+    const market = cleMarche(head) || codeMarche();
+    const side = /SHORT|VENTE/i.test(head) ? 'SHORT' : /LONG|ACHAT/i.test(head) ? 'LONG' : 'POSITION';
+    const signature = market + '|' + side + '|' + head;
+    if (signature === lastEntryShow) return;
+    lastEntryShow = signature;
+    const short = side === 'SHORT';
+    showPopup.className = short ? 'bas' : 'haut';
+    showPopup.innerHTML = '<span class="emo">' + (short ? '🔴' : '🟢') + '</span><span class="copy"><strong>ENTRÉE VALIDÉE</strong><small>' +
+      esc(market) + ' · ' + side + '</small><small>SL · TP1 · TP2 suivis par le coach</small></span>';
+    const r = zoneGraphique();
+    showPopup.style.left = (r.left + r.width / 2) + 'px';
+    showPopup.style.top = (r.top + Math.max(36, r.height * 0.22)) + 'px';
+    showPopup.style.maxWidth = Math.max(280, Math.min(720, r.width - 32)) + 'px';
+    showPopup.classList.remove('go'); void showPopup.offsetWidth; showPopup.classList.add('go');
+    lueur(short ? -1 : 1);
+    clearTimeout(showTimer);
+    showTimer = setTimeout(() => { showPopup.classList.remove('go'); showPopup.style.display = 'none'; }, 2900);
   }
   EN.push([' a touché l\'objectif du graphique • pas de position du coach cette fois ⏳ • attends le prochain cycle : lien en bio', ' touched the chart target • no coach trade this time ⏳ • wait for the next cycle: link in bio']);
   function botDedans(m) { const t = botPos[cleMarche(m)]; return !!t && Date.now() - t < 12 * 3600 * 1000; }
@@ -580,6 +600,7 @@
     }
     const bulle = txt.startsWith('BULLE:');
     if (bulle) txt = txt.slice(6).trim();
+    if (/J'ENTRE MAINTENANT|ENTRE EN POSITION|ENTRÉE CONFIRMÉE|POSITION OUVERTE/i.test(txt)) afficherShowEntree(txt);
     // v8.0 (demande d'Adel) : un abonné booste le live depuis le bot → son prénom passe TOUT DE SUITE, avec feu d'artifice et merci
     if (/BOOSTE LE LIVE/i.test(txt)) { const pr = ((txt.match(/MERCI\s+([^!]+)!/i) || [])[1] || '').trim(); montrer(txt, false, 1, 'membre', true); feuArtifice('🚀 MERCI ' + pr.toUpperCase() + ' !'); setTimeout(() => coeurs(1, ['🙏']), 2500); return; }
     if (/TP\d? TOUCH|OBJECTIF FINAL|TP2 TOUCH/i.test(txt)) { feuArtifice(/TP2|FINAL/i.test(txt) ? '🏆 ÇA ENCAISSE !' : '💰 ÇA ENCAISSE !'); pluieBillets(45);
@@ -639,6 +660,9 @@
   #align-show.bas{background:linear-gradient(90deg,#ff1744,#ff6d00)} #align-show.haut{background:linear-gradient(90deg,#00c853,#00e5ff);color:#000;text-shadow:none}
   #align-show.neutre{background:linear-gradient(90deg,#8a2be2,#ff2d95)}
   #align-show .emo{font-size:54px;animation:showBat .5s ease-in-out infinite alternate}
+  #align-show .copy{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+  #align-show strong{font-size:28px;letter-spacing:.7px}
+  #align-show small{font-size:16px;font-weight:800;opacity:.95}
   @keyframes showPop{0%{opacity:0;transform:translateX(-50%) scale(.3)}15%{opacity:1;transform:translateX(-50%) scale(1.12)}
     25%{transform:translateX(-50%) scale(1)}85%{opacity:1}100%{opacity:0;transform:translateX(-50%) scale(.9) translateY(-14px)}}
   @keyframes showBat{from{transform:scale(1)}to{transform:scale(1.25)}}
@@ -657,6 +681,8 @@
   document.head.appendChild(cssShow);
   const cadre = document.createElement('div'); cadre.id = 'align-cadre'; document.body.appendChild(cadre);
   const chrono = document.createElement('div'); chrono.id = 'align-chrono'; document.body.appendChild(chrono);
+  const showPopup = document.createElement('div'); showPopup.id = 'align-show'; document.body.appendChild(showPopup);
+  let showTimer = 0, lastEntryShow = '';
 
   function nomMarche() {
     const s = String((chart() && chart().symbol()) || '');
