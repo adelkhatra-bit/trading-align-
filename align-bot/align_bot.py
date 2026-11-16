@@ -4635,7 +4635,8 @@ def inscrire_auto(etat, cid, m, notifier=True):
     lancer_chrono(etat, cid, m, r)
 
 def bot_on(etat, cid):
-    return cid not in etat.get("bot_off", [])
+    cid = str(cid)
+    return cid not in {str(x) for x in etat.get("bot_off", [])}
 
 def stats_bot(etat, cid):
     return etat.setdefault("stats_bot", {}).setdefault(cid, {"arrets": 0, "auto": 0})
@@ -4730,8 +4731,14 @@ def regler_bot(etat, cid, on):
 def entrer_inscrits(etat, m, tr, chats=()):
     """Le bot vient d'entrer : il fait entrer automatiquement tous les membres dont le bot est ON,
     plus ceux qui ont appuyé sur 🎯, au prix d'entrée du bot (coach + résultats comptés)."""
-    auto = [c for c in chats if bot_on(etat, c) and marche_autorise(etat, c, m) and not vue_gratuite(etat, c) and c != etat.get("canal")]
-    for cid in list(dict.fromkeys(etat.get("auto", {}).pop(m, []) + auto)):
+    # Un utilisateur privé n'est inclus automatiquement que s'il a activé le coach pour CE marché.
+    # La file auto[m] reste une autorisation ponctuelle issue d'un clic explicite ; chats seul ne vaut jamais consentement.
+    auto = [str(c) for c in chats if coach_abonne(etat, c, m) and marche_autorise(etat, c, m)
+            and not vue_gratuite(etat, c) and str(c) != str(etat.get("canal") or "")]
+    ponctuels = [str(c) for c in etat.get("auto", {}).pop(m, [])]
+    for cid in list(dict.fromkeys(ponctuels + auto)):
+        if not bot_on(etat, cid) or not marche_autorise(etat, cid, m):
+            continue
         if isinstance(tr.setdefault("qui", {}).get(cid), dict):
             continue
         if vue_gratuite(etat, cid):
