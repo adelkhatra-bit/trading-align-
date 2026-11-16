@@ -6898,7 +6898,11 @@ def evenements_pine(etat, m, r, cle, now):
                 ev.append(dict(kind="scalp_inv", **base, si=si, dp=d))
     zp, strat = r.get("zone_pine"), r.get("strat") or ""
     zp = trait_indicateur(r, d) or zp                  # v24.3 : trait blanc « Clôture … ce trait » de l'indicateur sur la vue de validation
-    if d and zp and strat and not cle.get("trade") and strategie_alignement(r.get("dirs"), d, r.get("dirW") or 0)[1] == "CONFIRMÉ":
+    alignement_ok = strategie_alignement(r.get("dirs"), d, r.get("dirW") or 0)[1] == "CONFIRMÉ"
+    if m in ("GOLD", "NASDAQ"):
+        dirs_confirmation = r.get("dirs") or []
+        alignement_ok = alignement_ok and len(dirs_confirmation) > 9 and dirs_confirmation[7] == d and dirs_confirmation[9] == d
+    if d and zp and strat and not cle.get("trade") and alignement_ok:
         barres = (r.get("m1") if strat == "SCALPING" else r.get("b5")) or []           # même bougie que le trait de l'indicateur (vue du plan)
         if len(barres) >= 3:
             c1, c0, t1 = barres[-2]["c"], barres[-3]["c"], barres[-2]["t"]
