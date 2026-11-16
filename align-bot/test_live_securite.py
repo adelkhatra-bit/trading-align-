@@ -86,7 +86,9 @@ class DonneesLive(unittest.TestCase):
         txt = json.dumps(d)
         self.assertEqual(set(d), {"v", "maj", "bot", "marches"})
         for m in d["marches"]:
-            self.assertEqual(set(m), {"m", "etat", "biais", "ut", "seuil", "profil"})
+            self.assertEqual(set(m), {"m", "etat", "biais", "ut", "seuil", "profil", "mouvement5m_pct", "bougie5m", "volume_ratio", "volume_source", "atr5_pct"})
+            self.assertNotIn("prix", m)
+            self.assertNotIn("token", json.dumps(m).lower())
         for interdit in ("3983", "3990", "4000", "4001", "4010", "3950", "sl", "tp", "entree_prix", "token", "ghp_", "prix"):
             self.assertNotIn(interdit, txt.replace('"entree"', ""))
         etats = {m["m"]: m["etat"] for m in d["marches"]}
