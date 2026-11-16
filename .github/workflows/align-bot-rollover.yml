@@ -59,7 +59,10 @@ jobs:
               active = {"queued", "in_progress", "waiting", "pending", "requested"}
               return [
                   run for run in runs
-                  if run.get("name") == "ALIGN MTF BOT (signaux BTC + Gold Telegram)"
+                  if run.get("name") in {
+                    "ALIGN MTF BOT (signaux BTC + Gold Telegram)",
+                    "ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)",
+                }
                   and run.get("id", 0) < validation_run_id
                   and run.get("status") in active
               ]
