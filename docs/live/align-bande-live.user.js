@@ -267,7 +267,7 @@
     const urgent = g && g !== 'proche' ? 1 : 0;
     if (!/risque/i.test(texte)) texte += ' • ⚠️ Ceci n\'est pas un conseil en investissement, fais tes propres recherches (DYOR) • risque de perte';
     // Langue unique du live : français. Les messages ne basculent plus en anglais en fin de défilement.
-    const nPass = Math.max(1, fois || 1), items = [];
+    const nPass = Math.max(4, 2 * (fois || 1)), items = [];
     for (let i = 0; i < nPass; i++) items.push({ texte: '🇫🇷 ' + plateforme(texte), bulle, g, en: false });
     if (devant) { file.splice(0, file.length, ...items, ...file.filter(m => m.g && m.g !== 'proche')); couper(); }   // v7.5 : clic sur une zone = la bande en parle TOUT DE SUITE
     else if (urgent) { let k = 0; while (k < file.length && file[k].g && file[k].g !== 'proche') k++; file.splice(k, 0, ...items); }
