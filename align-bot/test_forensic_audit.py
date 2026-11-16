@@ -50,8 +50,8 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
         b15 = [{"t": i * 900, "o": 99.0, "h": 101.0, "l": 98.0, "c": 100.0, "v": 10.0}
                for i in range(42)]
         b15[-2]["v"] = 20.0
-        b1 = [{"h": 105.0, "l": 95.0} for _ in range(6)]
-        b4 = [{"h": 110.0, "l": 90.0} for _ in range(6)]
+        b1 = [{"h": 105.0, "l": 95.0} for _ in range(7)]
+        b4 = [{"h": 110.0, "l": 90.0} for _ in range(7)]
         r = {"dirs": dirs, "b5": [{"h": 101.0, "l": 98.0} for _ in range(7)],
              "b15": b15, "b1h": b1, "b4h": b4, "m1": [{"c": 100.0}], "t": 999999}
         for market in ("GOLD", "NASDAQ"):
