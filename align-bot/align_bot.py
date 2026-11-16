@@ -101,27 +101,19 @@ def _direction_tv(value):
 
 
 def fusionne_lectures_tradingview(r):
-    """Fusionne uniquement les lectures MTF explicitement envoyées par ROBOT V12."""
+    """Conserve le snapshot ROBOT V12 séparé : il ne doit pas modifier une analyse ALIGN déjà calculée."""
     bridge = r.get("tv_indicator_mtf") or {}
     snap = (bridge.get("snapshots") or {}).get(bridge.get("activeTimeframe")) or {}
     robot = snap.get("robotV12") or {}
     if not robot or not snap.get("fresh"):
         return r
-    for field, index in (("lecture_1m", 0), ("lecture_5m", 2), ("lecture_15m", 4), ("lecture_60m", 7)):
-        direction = _direction_tv(robot.get(field))
-        if direction is not None:
-            r["dirs"][index] = direction
-    for field, index in (("rsi_1m", 0), ("rsi_5m", 2), ("rsi_15m", 4), ("rsi_60m", 7)):
-        try:
-            value = float(robot.get(field))
-            if 0 <= value <= 100:
-                r["rsis"][index] = value
-        except (TypeError, ValueError):
-            pass
-    # Recompute the existing ALIGN bias/profile from the merged real MTF readings.
-    d1h, d4h = r["dirs"][7], r["dirs"][9]
-    r["confirme"] = d4h if d4h and d1h == d4h else 0
+    # Sécurité de cohérence : analyser() a déjà calculé dirs, RSI, dirPlan, stratégie et
+    # niveaux depuis un même jeu de bougies. Remplacer seulement M1/M5/M15/H1 ici
+    # fabriquait un mélange TradingView + flux local sans recalculer les champs dérivés.
+    # Le plan ROBOT V12 reste consultable séparément via plan_indicateur().
     r["tv_robot_v12"] = robot
+    r["tv_robot_v12_timeframe"] = bridge.get("activeTimeframe")
+    r["tv_robot_v12_fresh"] = True
     return r
 
 
