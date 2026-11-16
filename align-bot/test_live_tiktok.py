@@ -87,7 +87,7 @@ class LiveTikTok(unittest.TestCase):
     def test_reinjection_arrete_tous_les_animateurs_periodiques(self):
         bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
         stop = bande[bande.index("stop() { vivant = false;"):]
-        for timer in ("coachT", "iaT", "astuceT", "regardT", "chronoT", "coeurT", "posT", "masqueT", "etiqT"):
+        for timer in ("coachT", "iaT", "astuceT", "regardT", "chronoT", "coeurT", "posT", "masqueT", "etiqT", "heartbeatT"):
             self.assertIn(f"clearInterval({timer})", stop, f"timer non arrêté lors de la réinjection : {timer}")
 
     def test_jamais_le_mot_telegram_a_l_ecran(self):
@@ -98,11 +98,28 @@ class LiveTikTok(unittest.TestCase):
         bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
         self.assertNotIn("sur Telegram", bande)
 
-    def test_boost_limite_par_personne(self):
+    def test_boost_refuse_si_ecran_live_deconnecte(self):
         self.etat["live_on"] = True
+        self.etat["live_screen_seen_t"] = __import__("time").time() - 120
+        ab.live_callback(self.etat, set(), {"id": "x"}, "liveboost", "x", "2")
+        self.assertEqual(self.publie, [])
+        self.assertIn("n'est pas connecté", self.envoye[-1][1]["text"])
+
+    def test_boost_limite_par_personne_et_prenom_apres_heartbeat(self):
+        self.etat["live_on"] = True
+        self.etat["live_screen_seen_t"] = __import__("time").time()
         ab.live_callback(self.etat, set(), {"id": "x"}, "liveboost", "x", "2")
         ab.live_callback(self.etat, set(), {"id": "y"}, "liveboost", "x", "2")
         self.assertEqual(self.publie, ["🙏 MERCI KARIM ! Karim BOOSTE LE LIVE 🚀 ABONNE-TOI • PARTAGE"])
+        self.assertIn("Ton prénom doit apparaître", self.envoye[0][1]["text"])
+        self.assertIn("2 min", self.envoye[1][1]["text"])
+
+    def test_heartbeat_ecran_est_enregistre_sans_annonce_publique(self):
+        self.etat["live_screen_seen_t"] = 0
+        with mock.patch.object(ab, "ecran_lire", return_value=["PING|LIVE_SCREEN|123456"]):
+            ab.ecran_vers_telegram(self.etat)
+        self.assertGreater(self.etat["live_screen_seen_t"], 0)
+        self.assertEqual(self.publie, [])
 
     def test_facture_en_stars(self):
         self.etat["live_on"] = True
@@ -172,6 +189,9 @@ class LiveTikTok(unittest.TestCase):
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")
         source = open(path, encoding="utf-8").read()
         self.assertIn("speechSynthesis.speak(utterance)", source)
+        self.assertIn("PING|LIVE_SCREEN|", source)
+        self.assertIn("setInterval(pingEcran, 25000)", source)
+        self.assertIn("clearInterval(heartbeatT)", source)
         self.assertIn("🔇 Voix OFF", source)
         self.assertIn("🔊 Voix ON", source)
         self.assertIn("voixBtn.remove()", source)
