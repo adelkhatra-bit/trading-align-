@@ -830,6 +830,7 @@ def calculer_analyse(S, stable=None, comp_prev=None):
     atr5 = atr(m5, 14)[-1] if len(m5) >= 15 else a
     return dict(fvg=fvg, niv_cles=niv_cles, asie=asie, distrib=distrib, accum=accum, div4h=div4h,
                 b5=m5[-30:], b15=m15[-30:], b15_long=m15[-90:], b1h=h1[-30:], b4h=h4[-30:], bd=d1[-30:], bw=w1[-30:],
+                b15_fibo=m15[-48:], b1h_fibo=h1[-48:], b4h_fibo=h4[-30:],
                 atr5=atr5, ema5=ema([x["c"] for x in m5], 20)[-1], m1=m1, confirme=confirme, atr=a, r5=r5[-3:], r15=rC, posD=posD, posW=posW, hautD=hautD, basD=basD, hautW=hautW, basW=basW,
                 grosses=grosses, ema15=ema(c, 20)[-1], niveaux=[(v, n) for v, n in zip(niv, noms) if v is not None], t=b[-1]["t"], prix=cl, dirs=dirs, sqzs=sqzs, rsis=rsis, bull=bull, bear=bear, comp=comp, rsiOB=rsiOB, rsiOS=rsiOS,
                 pctH=pctH, sens=sens, retHaut=retHaut, retBas=retBas, sigHaut=sigHaut, sigBas=sigBas, nom=nom,
@@ -4038,38 +4039,63 @@ def entree_retest(m, r, cle):
     return None
 
 FIBO_UT = (("15 min", "b15", 48), ("1h", "b1h", 48), ("4h", "b4h", 30))
+FIBO_UT_GOLD_NASDAQ = (("15 min", "b15_fibo", 48), ("1h", "b1h_fibo", 48), ("4h", "b4h_fibo", 30))
 
 def fibo_zones(m, r, cle):
-    """FIBONACCI EN TEMPS RÉEL (demande d'Adel 15/11) : pour chaque unité (15 min, 1h, 4h), dernier mouvement = plus haut /
-    plus bas des N dernières bougies ; le bot dit à quel % du retracement on est. Annonce quand le prix entre dans la zone
-    clé 61,8 – 78,6 % (zone de retournement probable), une fois par mouvement et par unité."""
+    """Commentaire Telegram à l'entrée de la zone Fibonacci 61,8–78,6 %, sans répétition à chaque nouvelle mèche.
+    Gold/NASDAQ : fenêtres complètes de bougies clôturées (48 M15, 48 H1, 30 H4), une annonce par entrée de zone.
+    BTC : comportement historique conservé."""
     p = r["m1"][-1]["c"] if r.get("m1") else None
     if p is None:
         return None
     lignes = []
-    for nom, k, n in FIBO_UT:
-        b = (r.get(k) or [])[-n:]
-        if len(b) < 10:
-            continue
-        ih = max(range(len(b)), key=lambda i: b[i]["h"]); il = min(range(len(b)), key=lambda i: b[i]["l"])
-        hi, lo = b[ih]["h"], b[il]["l"]
-        if hi <= lo:
-            continue
-        hausse = il < ih                                  # le plus bas est venu avant le plus haut : mouvement de hausse
-        pct = (hi - p) / (hi - lo) * 100 if hausse else (p - lo) / (hi - lo) * 100
-        if not 61.8 <= pct <= 78.6:
-            continue
-        cle_mvt = f"{nom}|{round(hi, 2)}|{round(lo, 2)}"
-        deja = cle.setdefault("fibo_dit", {})
-        if deja.get(nom) == cle_mvt:
-            continue
-        deja[nom] = cle_mvt
-        lignes.append(f"📐 Fibo {nom} : on est à {pct:.0f} % du dernier mouvement de {'hausse' if hausse else 'baisse'}")
-    if not lignes:
-        return None
-    return (f"📐 ZONE FIBONACCI — {ICONE.get(m, '')} {m}\n" + "\n".join(lignes) +
-            "\n🎯 Zone clé 61,8 – 78,6 % : c'est là que le prix se retourne souvent\n"
-            "⏳ On attend la clôture de bougie pour savoir s'il rebondit ou s'il casse\n"
+    if m in ("GOLD", "NASDAQ"):
+        active = cle.setdefault("fibo_zone_active", {})
+        legacy = cle.get("fibo_dit", {}) or {}
+        for nom, k, n in FIBO_UT_GOLD_NASDAQ:
+            b = (r.get(k) or [])[-n:]
+            if len(b) < n:
+                continue
+            ih = max(range(len(b)), key=lambda i: (b[i]["h"], i))
+            il = min(range(len(b)), key=lambda i: (b[i]["l"], -i))
+            hi, lo = b[ih]["h"], b[il]["l"]
+            if hi <= lo or ih == il or not lo <= p <= hi:
+                active[nom] = False
+                continue
+            hausse = il < ih
+            pct = (hi - p) / (hi - lo) * 100 if hausse else (p - lo) / (hi - lo) * 100
+            dedans = 61.8 <= pct <= 78.6
+            deja = active.get(nom, bool(legacy.get(nom)))
+            if dedans and not deja:
+                lignes.append(f"📐 Fibo {nom} : on est à {pct:.0f} % du dernier mouvement de {'hausse' if hausse else 'baisse'}")
+            active[nom] = dedans
+        if not lignes:
+            return None
+    else:
+        # BTC : comportement historique inchangé.
+        for nom, k, n in FIBO_UT:
+            b = (r.get(k) or [])[-n:]
+            if len(b) < 10:
+                continue
+            ih = max(range(len(b)), key=lambda i: b[i]["h"]); il = min(range(len(b)), key=lambda i: b[i]["l"])
+            hi, lo = b[ih]["h"], b[il]["l"]
+            if hi <= lo:
+                continue
+            hausse = il < ih
+            pct = (hi - p) / (hi - lo) * 100 if hausse else (p - lo) / (hi - lo) * 100
+            if not 61.8 <= pct <= 78.6:
+                continue
+            cle_mvt = f"{nom}|{round(hi, 2)}|{round(lo, 2)}"
+            deja = cle.setdefault("fibo_dit", {})
+            if deja.get(nom) == cle_mvt:
+                continue
+            deja[nom] = cle_mvt
+            lignes.append(f"📐 Fibo {nom} : on est à {pct:.0f} % du dernier mouvement de {'hausse' if hausse else 'baisse'}")
+        if not lignes:
+            return None
+    return (f"📐 ZONE FIBONACCI — {ICONE.get(m, ' ')} {m}\n" + "\n".join(lignes) +
+            "\n🎯 Zone clé 61,8 – 78,6 % : zone de retracement à surveiller\n"
+            "⏳ J'attends la clôture pour confirmer le rebond ou la cassure\n"
             "⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
 
 def radar_climax(m, r, cle):
@@ -4080,6 +4106,7 @@ def radar_climax(m, r, cle):
     → position CONTRE-TENDANCE « prenable, risquée », SL sous la mèche du balayage ; le bot ne la prend pas lui-même.
     Une alerte par sens toutes les 2 h ; mémorise l'heure (radar_t) pour ne pas envoyer « FEINTE » juste après."""
     # 16/11 : le radar lisait « b15 » coupé à 30 bougies alors qu'il en faut 66 → il ne se déclenchait JAMAIS en réel (LONG raté).
+    dirs = r.get("dirs") or []
     b = (r.get("b15_long") or r.get("b15") or [])[:-1]  # la dernière est en formation
     if len(b) < 66:
         return None
@@ -4110,6 +4137,13 @@ def radar_climax(m, r, cle):
                 return None
             cle["radar_t"][str(sens)] = t
             cle["radar_dernier"] = t
+            if m in ("GOLD", "NASDAQ") and (len(dirs) < 10 or dirs[7] != sens or dirs[9] != sens):
+                h1_txt = "haussier" if len(dirs) > 7 and dirs[7] == 1 else "baissier" if len(dirs) > 7 and dirs[7] == -1 else "neutre"
+                h4_txt = "haussier" if len(dirs) > 9 and dirs[9] == 1 else "baissier" if len(dirs) > 9 and dirs[9] == -1 else "neutre"
+                return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, ' ')} {m}\\n"
+                        f"Balayage et volume détectés, mais H1 est {h1_txt} et H4 {h4_txt}.\\n"
+                        "⛔ Pas de position contre le biais H1/H4 : aucune entrée ni aucun SL/TP à prendre.\\n"
+                        "⏳ J'attends que H1 et H4 confirment le même sens.")
             e = cl[-1]
             mot = "plus bas" if sens == 1 else "plus haut"
             return (f"🔄 RETOURNEMENT : {'LONG' if sens == 1 else 'SHORT'} prenable — {ICONE.get(m, '')} {m}\n"
@@ -4122,12 +4156,9 @@ def radar_climax(m, r, cle):
     return None
 
 def retournement_marche(m, r, cle):
-    """v71 = Pine « RETOURNEMENT PAR MARCHÉ » (mesuré sur 60 jours de bougies 5 min) :
-    GOLD : 5m + 15m retournés contre le 1h • NASDAQ : idem + gros volume 15 min • BTC : 5m + 15m + 1h retournés contre le 4h.
-    Cibles : haut/bas des 6 dernières bougies 1h puis 4h ; SL : dernier creux/sommet 5 min ; BE dès que le gain = le risque.
-    Une alerte par nouveau sens (comme alert() du Pine), jamais deux fois de suite."""
+    """BTC : règle historique inchangée. GOLD/NASDAQ : les M5/M15 contre H1/H4 déclenchent seulement une veille, jamais une position."""
     dirs = r.get("dirs") or []
-    b5, b15 = (r.get("b5") or [])[:-1], (r.get("b15_long") or r.get("b15") or [])[:-1]   # 16/11 : 41 bougies 15 min nécessaires (b15 = 30 → muet)
+    b5, b15 = (r.get("b5") or [])[:-1], (r.get("b15_long") or r.get("b15") or [])[:-1]
     b1, b4 = r.get("b1h") or [], r.get("b4h") or []
     if len(dirs) < 10 or len(b5) < 6 or len(b15) < 41 or len(b1) < 6 or len(b4) < 6:
         return None
@@ -4138,13 +4169,32 @@ def retournement_marche(m, r, cle):
     p = r["m1"][-1]["c"] if r.get("m1") else b15[-1]["c"]
     h1, l1 = max(x["h"] for x in b1[-6:]), min(x["l"] for x in b1[-6:])
     h4, l4 = max(x["h"] for x in b4[-6:]), min(x["l"] for x in b4[-6:])
+
+    if m in ("GOLD", "NASDAQ"):
+        sens = 1 if d5 == 1 and d15 == 1 else -1 if d5 == -1 and d15 == -1 else 0
+        if not sens or (m == "NASDAQ" and not vol_fort):
+            return None
+        if (sens == 1 and p >= h1) or (sens == -1 and p <= l1):
+            return None
+        if d60 == sens and d240 == sens:
+            return None
+        t = r.get("t", 0)
+        vus = cle.setdefault("rv_watch_t", {})
+        if t - vus.get(str(sens), -10**9) < 3600:
+            return None
+        vus[str(sens)] = t
+        sens_txt = "à la hausse" if sens == 1 else "à la baisse"
+        h1_txt = "haussier" if d60 == 1 else "baissier" if d60 == -1 else "neutre"
+        h4_txt = "haussier" if d240 == 1 else "baissier" if d240 == -1 else "neutre"
+        return (f"👀 RETOURNEMENT EN OBSERVATION — {ICONE.get(m, ' ')} {m}\\n"
+                f"Les M5 et M15 se retournent {sens_txt}, mais H1 reste {h1_txt} et H4 {h4_txt}.\\n"
+                "⛔ PAS DE POSITION dans ce nouveau sens : aucune entrée, aucun SL/TP à prendre.\\n"
+                "⏳ J'attends la confirmation des clôtures H1 ET H4 dans le même sens, puis le déclencheur M5.\\n"
+                "ℹ️ Alerte de surveillance uniquement.")
+
+    # BTC : logique et seuils historiques conservés.
     def ok(s):
-        casc = d5 == s and d15 == s
-        if m == "BTC":
-            return casc and d60 == s and d240 == -s
-        if m == "NASDAQ":
-            return casc and d60 == -s and vol_fort
-        return casc and d60 == -s
+        return d5 == s and d15 == s and d60 == s and d240 == -s
     sens = 1 if ok(1) and p < h1 else -1 if ok(-1) and p > l1 else 0
     avant = cle.get("rv_sens", 0)
     cle["rv_sens"] = sens
@@ -4154,23 +4204,17 @@ def retournement_marche(m, r, cle):
     sl = min(x["l"] for x in b5[-6:]) if sens == 1 else max(x["h"] for x in b5[-6:])
     be = p + sens * abs(p - sl)
     haut = "haut" if sens == 1 else "bas"
-    camp, autre = ("acheteurs", "vendeurs") if sens == 1 else ("vendeurs", "acheteurs")
-    if m == "BTC":
-        vu = f"le 5 min, le 15 min et même le 1h ont tourné {'à la hausse' if sens == 1 else 'à la baisse'}, alors que le 4h va encore dans l'autre sens"
-        pq = "Sur le BTC je n'entre jamais sur le 5 min seul : c'est souvent un piège. Là, le 1h a suivi, donc c'est sérieux"
-    else:
-        vu = f"le 5 min et le 15 min ont tourné {'à la hausse' if sens == 1 else 'à la baisse'}, alors que le 1h va encore dans l'autre sens"
-        pq = ("Et la bougie 15 min a un gros volume : les " + camp + " sont vraiment là") if m == "NASDAQ" else \
-             f"Sur le Gold, quand les petites unités tournent comme ça, les {autre} s'essoufflent"
-    st = {"GOLD": (47, 24), "NASDAQ": (70, 30), "BTC": (62, 38)}.get(m, (0, 0))
-    return (f"↩️ RETOURNEMENT {'LONG ⬆️' if sens == 1 else 'SHORT ⬇️'} — {ICONE.get(m, '')} {m}\n"
-            f"👀 Regarde ton graphique : {vu}.\n"
-            f"💡 {pq}. Le prix peut aller chercher le {haut} de la 1h, voire de la 4h.\n"
-            f"📊 Sur mes 60 derniers jours, ce signal a atteint le {haut} 1h {st[0]} % du temps, le {haut} 4h {st[1]} %.\n"
-            f"🎯 Cible 1 : {px(h1 if sens == 1 else l1)} ({haut} 1h)\n"
-            f"🚀 Cible 2 : {px(h4 if sens == 1 else l4)} ({haut} 4h)\n"
-            f"🛑 SL : {px(sl)}, juste {'sous le dernier creux' if sens == 1 else 'au-dessus du dernier sommet'} 5 min. S'il casse, je me suis trompé et on sort.\n"
-            f"🛡 Dès que le prix touche {px(be)}, mets-toi à BE : il ne doit plus revenir à ton entrée. Là, on encaisse sans risque 💰\n"
+    st = (62, 38)
+    vu = f"le 5 min, le 15 min et même le 1h ont tourné {'à la hausse' if sens == 1 else 'à la baisse'}, alors que le 4h va encore dans l'autre sens"
+    pq = "Sur le BTC je n'entre jamais sur le 5 min seul : c'est souvent un piège. Là, le 1h a suivi, donc c'est sérieux"
+    return (f"↩️ RETOURNEMENT {'LONG ⬆️' if sens == 1 else 'SHORT ⬇️'} — {ICONE.get(m, ' ')} {m}\\n"
+            f"👀 Regarde ton graphique : {vu}.\\n"
+            f"💡 {pq}. Le prix peut aller chercher le {haut} de la 1h, voire de la 4h.\\n"
+            f"📊 Sur mes 60 derniers jours, ce signal a atteint le {haut} 1h {st[0]} % du temps, le {haut} 4h {st[1]} %.\\n"
+            f"🎯 Cible 1 : {px(h1 if sens == 1 else l1)} ({haut} 1h)\\n"
+            f"🚀 Cible 2 : {px(h4 if sens == 1 else l4)} ({haut} 4h)\\n"
+            f"🛑 SL : {px(sl)}, juste {'sous le dernier creux' if sens == 1 else 'au-dessus du dernier sommet'} 5 min. S'il casse, je me suis trompé et on sort.\\n"
+            f"🛡 Dès que le prix touche {px(be)}, mets-toi à BE : il ne doit plus revenir à ton entrée. Là, on encaisse sans risque 💰\\n"
             "📺 Tu retrouves la même explication sur le graphique (infobulle ↩️)")
 
 
