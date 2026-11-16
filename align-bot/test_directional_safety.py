@@ -2,6 +2,7 @@
 import os
 import sys
 import unittest
+import time
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -13,15 +14,23 @@ def candle(t, o=100.0, h=101.0, l=99.0, c=100.0, v=100):
 
 
 def retest_r(h4):
-    bars = [candle(i * 900) for i in range(40)]
-    bars[20]["h"] = 102.0
-    for i in range(34, 38):
-        bars[i] = candle(i * 900, o=102.5, h=104.0, l=102.2, c=103.0)
-    bars[38] = candle(38 * 900, o=102.2, h=103.0, l=101.9, c=102.5)
+    # Reutilise la géométrie du fixture de test_entree_retest : un retest LONG
+    # frais, avec SL/TP mesurables et bougie M15 de formation séparée.
+    now = int(time.time())
+    bars = [candle(now - (30 - i) * 900, o=99, h=100.0, l=98, c=99) for i in range(30)]
+    for i in range(25, 29):
+        bars[i] = candle(now - (30 - i) * 900, o=100.5, h=103.0, l=100.2, c=102.0)
+    bars[29] = candle(now - 900, o=100.4, h=101.5, l=99.9, c=101.2)
+    bars.append(candle(now, o=101.2, h=101.3, l=101.1, c=101.2))
     dirs = [0] * 11
     dirs[2], dirs[4], dirs[7], dirs[9] = 1, 1, 1, h4
-    return dict(b15=bars, dirs=dirs, atr=1.0, t=40000)
-
+    return dict(
+        b15=bars, b5=[candle(now - 600, c=101.2), candle(now - 300, c=101.2)],
+        b1h=[candle(now - 7200), candle(now - 3600)],
+        b4h=[candle(now - 28800), candle(now - 14400)],
+        m1=[candle(now - 30, c=101.2)], r5=[50, 50, 50],
+        grosses=[(110.0, "4h"), (120.0, "Daily")], atr=2.0, atr5=1.0, t=now
+    )
 
 def reversal_r(dirs, volume_last=100, price=100.0):
     b5 = [candle(i * 300, 100 - (i % 3)) for i in range(20)]
@@ -40,11 +49,11 @@ LONG_BTC = [1, 1, 1, 0, 1, 1, 1, 1, -1, -1, -1]
 class DirectionSafety(unittest.TestCase):
     def test_gold_retest_requires_h4_confirmation(self):
         self.assertIsNone(ab.entree_retest("GOLD", retest_r(0), {}))
-        self.assertIn("ENTRÉE SUR RETEST : LONG", ab.entree_retest("GOLD", retest_r(1), {}))
+        self.assertIn("ENTRÉE POSSIBLE SUR RETEST : LONG", ab.entree_retest("GOLD", retest_r(1), {}))
 
     def test_nasdaq_retest_requires_h4_confirmation(self):
         self.assertIsNone(ab.entree_retest("NASDAQ", retest_r(0), {}))
-        self.assertIn("ENTRÉE SUR RETEST : LONG", ab.entree_retest("NASDAQ", retest_r(1), {}))
+        self.assertIn("ENTRÉE POSSIBLE SUR RETEST : LONG", ab.entree_retest("NASDAQ", retest_r(1), {}))
 
     def test_btc_retest_rule_is_unchanged(self):
         self.assertIn("ENTRÉE SUR RETEST : LONG", ab.entree_retest("BTC", retest_r(0), {}))
@@ -124,17 +133,23 @@ class DirectionSafety(unittest.TestCase):
         sniper.assert_called_once_with(out)
 
     def test_gold_nasdaq_confirmation_alert_requires_h1_and_h4(self):
-        bars = [candle(0, c=98), candle(300, c=99), candle(600, c=101), candle(900, c=102)]
+        now = int(time.time())
+        bars = [candle(now - 900, c=98), candle(now - 600, c=99),
+                candle(now - 300, c=101), candle(now, c=102)]
         for market in ("GOLD", "NASDAQ"):
             for h4, expected in ((0, False), (1, True)):
-                r = dict(comp=0, dirs=[0, 0, 1, 0, 1, 0, 0, 1, 0, h4, 1],
+                dirs = [0, 0, 1, 0, 1, 0, 0, 1, 0, h4, 1]
+                r = dict(comp=0, dirs=dirs, dirs_cloturees=dirs,
                          sniper=None, dirPlan=1, strat="DAY", zone_pine={"zmil": 100},
-                         b5=bars, t=10000)
+                         b5=bars, b15=[candle(now - 1800), candle(now - 900)],
+                         b1h=[candle(now - 7200), candle(now - 3600)],
+                         b4h=[candle(now - 28800), candle(now - 14400)],
+                         m1=[candle(now - 30, c=102)], atr5=1.0, atr=1.0, t=now)
                 with mock.patch.object(ab, "etat_marche_hb", return_value=("ouvert", None)), \
                      mock.patch.object(ab, "hb_etat_surveille", return_value={"d": 1, "n": 9}), \
                      mock.patch.object(ab, "strategie_alignement", return_value=("DAY", "CONFIRMÉ")), \
                      mock.patch.object(ab, "trait_indicateur", return_value=None):
-                    events = ab.evenements_pine({}, market, r, {}, 50000)
+                    events = ab.evenements_pine({}, market, r, {}, now)
                 has_confirmation = "confirmation" in [e["kind"] for e in events]
                 self.assertEqual(has_confirmation, expected, (market, h4, events))
 
