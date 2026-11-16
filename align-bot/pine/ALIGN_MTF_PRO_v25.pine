@@ -33,6 +33,14 @@ f_etat() =>
     sqz = (basis + dev) < (kc + rng) and (basis - dev) > (kc - rng)
     [d, sqz ? 1 : 0, ta.rsi(close, lenRsi)]
 
+// Sens confirmé : la valeur est décalée d'une bougie HTF et publiée avec lookahead_on.
+// Cela évite d'utiliser une H1/H4/M15/M5 encore en formation pour autoriser une entrée.
+f_dir_confirme() =>
+    ef = ta.ema(close, lenFast)
+    es = ta.ema(close, lenSlow)
+    d = close > ef and ef > es ? 1 : close < ef and ef < es ? -1 : 0
+    d[1]
+
 [d1, s1, r1]       = request.security(syminfo.tickerid, "1",   f_etat())
 [d2, s2, r2]       = request.security(syminfo.tickerid, "3",   f_etat())
 [d5, s5, r5]       = request.security(syminfo.tickerid, "5",   f_etat())
@@ -45,6 +53,10 @@ f_etat() =>
 [d240, s240, r240] = request.security(syminfo.tickerid, "240", f_etat())
 [dD, sD, rD]       = request.security(syminfo.tickerid, "D",   f_etat())
 [dW, sW, rW]       = request.security(syminfo.tickerid, "W",   f_etat())
+d5Fermee   = request.security(syminfo.tickerid, "5",   f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d15Fermee  = request.security(syminfo.tickerid, "15",  f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d60Fermee  = request.security(syminfo.tickerid, "60",  f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d240Fermee = request.security(syminfo.tickerid, "240", f_dir_confirme(), lookahead=barmerge.lookahead_on)
 
 noms  = array.from("1", "3", "5", "10", "15", "30", "45", "1h", "2h", "4h", "D")
 nomsL = array.from("1 min", "3 min", "5 min", "10 min", "15 min", "30 min", "45 min", "1 heure", "2 heures", "4 heures", "Daily")
@@ -225,7 +237,14 @@ if barstate.isconfirmed
         dirStable := dirBrut
     else if dirBrut == 0 and nz(d15) != dirStable and nz(d60) != dirStable
         dirStable := 0
-dirPlan = dirStable
+// GOLD/NASDAQ : aucune direction de trade tant que les clôtures M5, M15, H1 et H4 ne concordent pas.
+tickerUpper = str.upper(syminfo.ticker)
+isGoldNasdaq = str.contains(tickerUpper, "XAU") or str.contains(tickerUpper, "GOLD") or
+               str.contains(tickerUpper, "NAS") or str.contains(tickerUpper, "NQ") or
+               str.contains(tickerUpper, "US100") or str.contains(tickerUpper, "USTEC")
+gnConfluence = dirStable != 0 and nz(d5Fermee) == dirStable and nz(d15Fermee) == dirStable and
+               nz(d60Fermee) == dirStable and nz(d240Fermee) == dirStable
+dirPlan = isGoldNasdaq and not gnConfluence ? 0 : dirStable
 // ═════════ STRATÉGIES SCALPING / DAY / SWING : règles d'alignement multi-UT ═════════
 // SWING : W1/D1 contexte • H4 retracement (ou aligné) • H1 confirmation de reprise
 // DAY : H4 contexte • H1 direction • M15 retracement • M5 déclenchement
@@ -233,14 +252,18 @@ dirPlan = dirStable
 dP  = dirPlan
 uW  = nz(dW) == dP
 uD  = nz(dD) == dP
-u4  = nz(d240) == dP
-u1h = nz(d60) == dP
-u15 = nz(d15) == dP
-u5  = nz(d5) == dP
+d4Strat = isGoldNasdaq ? nz(d240Fermee) : nz(d240)
+d1hStrat = isGoldNasdaq ? nz(d60Fermee) : nz(d60)
+d15Strat = isGoldNasdaq ? nz(d15Fermee) : nz(d15)
+d5Strat = isGoldNasdaq ? nz(d5Fermee) : nz(d5)
+u4  = d4Strat == dP
+u1h = d1hStrat == dP
+u15 = d15Strat == dP
+u5  = d5Strat == dP
 u1  = nz(d1) == dP
 oW  = nz(dW) == -dP
-o4  = nz(d240) == -dP
-o1h = nz(d60) == -dP
+o4  = d4Strat == -dP
+o1h = d1hStrat == -dP
 swOk  = dP != 0 and uD and not oW and u1h and not o4
 swAtt = dP != 0 and uD and not oW and not u4 and not u1h
 dyOk  = dP != 0 and not o4 and u1h and u5
@@ -338,8 +361,8 @@ var int dernierB = -100
 // Entrées uniquement dans le sens des grosses UT (2h, 4h, Daily)
 sigHaut0 = ((fortHaut or explHaut) and longT >= 1) or (zoneHaut and longT >= 0)
 sigBas0  = ((fortBas or explBas) and longT <= -1) or (zoneBas and longT <= 0)
-sigHaut = sigHaut0 and bar_index - dernierH > 12
-sigBas  = sigBas0 and bar_index - dernierB > 12
+sigHaut = sigHaut0 and bar_index - dernierH > 12 and (not isGoldNasdaq or (gnConfluence and dirStable == 1))
+sigBas  = sigBas0 and bar_index - dernierB > 12 and (not isGoldNasdaq or (gnConfluence and dirStable == -1))
 if sigHaut
     dernierH := bar_index
 if sigBas
