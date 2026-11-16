@@ -416,7 +416,7 @@ class AlignMtfRulesTest(unittest.TestCase):
 
     def test_multi_timeframe_watcher_only_notifies_the_blocking_timeframe(self):
         from unittest.mock import patch
-        state = {"veille_cloture": {"GOLD": {"123": {
+        state = {"auto": {"GOLD": ["123"]}, "veille_cloture": {"GOLD": {"123": {
             "multi": True, "derniers_t": {"5m": 300, "15m": 900, "1h": 3600, "4h": 14400},
             "expire": 999999
         }}}}
@@ -442,7 +442,7 @@ class AlignMtfRulesTest(unittest.TestCase):
 
     def test_multi_timeframe_watcher_retries_when_telegram_send_fails(self):
         from unittest.mock import patch
-        state = {"veille_cloture": {"GOLD": {"123": {
+        state = {"auto": {"GOLD": ["123"]}, "veille_cloture": {"GOLD": {"123": {
             "multi": True, "derniers_t": {"5m": 300, "15m": 900, "1h": 3600, "4h": 14400},
             "expire": 999999
         }}}}
@@ -692,7 +692,7 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertIn("📌 Revoir l'analyse GOLD", labels)
 
     def test_requested_analysis_arms_the_next_relevant_closed_candle(self):
-        state = {}
+        state = {"auto": {"GOLD": ["123"]}}
         r = {"confirme": 0, "dirs": [0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
              "b1h": [candle(3600)]}
         align_bot.armer_cloture(state, "123", "GOLD", r, {})
@@ -701,7 +701,7 @@ class AlignMtfRulesTest(unittest.TestCase):
 
     def test_closed_candle_notifier_sends_once_per_new_candle(self):
         from unittest.mock import patch
-        state = {"veille_cloture": {"BTC": {"123": {"tf": "5m", "dernier_t": 300, "restants": 1}}}}
+        state = {"auto": {"BTC": ["123"]}, "veille_cloture": {"BTC": {"123": {"tf": "5m", "dernier_t": 300, "restants": 1}}}}
         r = {"b5": [candle(300), candle(600, o=100, h=103, l=99, c=102)],
              "confirme": 0, "dirs": [0] * 11, "rsis": [50] * 11}
         with patch.object(align_bot, "verdict", return_value=("ATTENDRE", "pas de confirmation")), \
@@ -2544,8 +2544,10 @@ class TestFollowPositionMarketChoice(unittest.TestCase):
             "id": "follow-btc", "data": "followmarket:BTC",
             "message": {"chat": {"id": 101, "type": "private"}}, "from": {"id": 101}
         }}
+        def subscribe_side_effect(etat, cid, marche, notifier=False):
+            etat.setdefault("auto", {}).setdefault(marche, []).append(str(cid))
         with patch.object(align_bot, "autorise", return_value=True), \
-             patch.object(align_bot, "inscrire_auto") as subscribe, \
+             patch.object(align_bot, "inscrire_auto", side_effect=subscribe_side_effect) as subscribe, \
              patch.object(align_bot, "_envoi_sur"), patch.object(align_bot, "telegram"):
             align_bot.traiter(state, set(), [update])
         subscribe.assert_called_once_with(unittest.mock.ANY, "101", "BTC", notifier=False)
@@ -2564,8 +2566,10 @@ class TestFollowPositionMarketChoice(unittest.TestCase):
             "id": "follow-gold", "data": "followmarket:GOLD",
             "message": {"chat": {"id": 101, "type": "private"}}, "from": {"id": 101}
         }}
+        def subscribe_side_effect(etat, cid, marche, notifier=False):
+            etat.setdefault("auto", {}).setdefault(marche, []).append(str(cid))
         with patch.object(align_bot, "autorise", return_value=True), \
-             patch.object(align_bot, "inscrire_auto") as subscribe, \
+             patch.object(align_bot, "inscrire_auto", side_effect=subscribe_side_effect) as subscribe, \
              patch.object(align_bot, "_envoi_sur"), patch.object(align_bot, "telegram"):
             align_bot.traiter(state, set(), [update])
         subscribe.assert_called_once_with(unittest.mock.ANY, "101", "GOLD", notifier=False)
@@ -2589,8 +2593,10 @@ class TestFollowPositionMarketChoice(unittest.TestCase):
             "id": "follow-both", "data": "followmarket:BOTH",
             "message": {"chat": {"id": 102, "type": "private"}}, "from": {"id": 102}
         }}
+        def subscribe_side_effect(etat, cid, marche, notifier=False):
+            etat.setdefault("auto", {}).setdefault(marche, []).append(str(cid))
         with patch.object(align_bot, "autorise", return_value=True), \
-             patch.object(align_bot, "inscrire_auto") as subscribe, \
+             patch.object(align_bot, "inscrire_auto", side_effect=subscribe_side_effect) as subscribe, \
              patch.object(align_bot, "_envoi_sur"), patch.object(align_bot, "telegram"):
             align_bot.traiter(state, set(), [update])
         self.assertEqual([call.args[2] for call in subscribe.call_args_list], ["BTC", "GOLD"])
