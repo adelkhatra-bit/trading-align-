@@ -60,5 +60,18 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
 
 
 
+    def test_pre_entry_order_is_recorded_without_fake_trade_identity(self):
+        etat = {}
+        cle = {"ordre": {"d": -1, "e": 200.0, "sl": 204.0, "tp1": 192.0,
+                         "tp2": 188.0, "src": "FVG", "za": 199.0, "zb": 201.0}}
+        r = {"t": 1700000400, "m1": [{"c": 200.5}], "dirs": [], "rsis": []}
+        align_bot.capturer_snapshot_audit(etat, "NASDAQ", r, cle)
+        plan = etat["audit_mtf"]["NASDAQ"][0]["trade"]
+        self.assertEqual(plan["plan_source"], "ordre_en_preparation")
+        self.assertEqual(plan["src"], "FVG")
+        self.assertNotIn("audit_key", plan)
+
+
+
 if __name__ == "__main__":
     unittest.main()
