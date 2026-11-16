@@ -50,6 +50,15 @@
   ];
   // v6.4 : traduction anglaise des messages de la bande (chaque info passe en FR puis en EN)
   const EN = [
+    ['La tendance récente reste orientée à la hausse, mais les dernières bougies corrigent. Les acheteurs doivent défendre leur mouvement ; on attend une clôture avant de conclure.', 'The recent trend still points higher, but the latest candles are pulling back. Buyers need to defend the move; we wait for a candle close before drawing conclusions.'],
+    ['Le mouvement de fond reste orienté à la baisse, mais le marché tente un rebond. Les vendeurs doivent encore montrer s’ils gardent la main ; aucune anticipation.', 'The broader move remains lower, but the market is attempting a rebound. Sellers still need to show whether they remain in control; no guessing ahead.'],
+    ['Les acheteurs gardent l’avantage sur les dernières bougies. Je surveille si l’impulsion se prolonge ou si le marché commence à souffler.', 'Buyers have the edge in the latest candles. I’m watching whether momentum continues or the market starts to cool off.'],
+    ['Les vendeurs gardent la pression sur les dernières bougies. Je surveille si la baisse continue ou si les acheteurs commencent à réagir.', 'Sellers are applying pressure in the latest candles. I’m watching whether the decline continues or buyers begin to respond.'],
+    ['Le marché se resserre : les bougies perdent de l’amplitude et les deux camps attendent. La prochaine clôture aidera à départager acheteurs et vendeurs.', 'The market is tightening: candle ranges are shrinking and both sides are waiting. The next close should help show whether buyers or sellers take control.'],
+    ['Le marché évolue en range : acheteurs et vendeurs se neutralisent pour le moment. Je surveille une sortie confirmée plutôt que de deviner le prochain mouvement.', 'The market is ranging: buyers and sellers are balanced for now. I’m watching for a confirmed breakout instead of guessing the next move.'],
+    ['Le prix travaille le haut de sa zone récente : attention à une réaction ou à une cassure confirmée.', 'Price is testing the top of its recent range: watch for a reaction or a confirmed breakout.'],
+    ['Le prix travaille le bas de sa zone récente : attention à une réaction ou à une cassure confirmée.', 'Price is testing the bottom of its recent range: watch for a reaction or a confirmed breakdown.'],
+    ['Le volume est nettement supérieur à sa moyenne récente.', 'Volume is clearly above its recent average.'],
     ['pas de panique • le marché respire, il est comme vous 😅 • patience, la suite en temps réel', 'don\'t panic • the market is breathing, just like you 😅 • patience, what\'s next live'],
     ['le marché prépare quelque chose', 'the market is preparing something'], ['la suite en temps réel', 'what\'s next, live'],
     ['infos en temps réel', 'live info'], ['plus d\'infos en temps réel', 'more live info'], ['plus d\'infos', 'more info'],
