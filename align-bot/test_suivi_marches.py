@@ -45,7 +45,7 @@ class SuiviMarchesTest(unittest.TestCase):
         ab.selectionner_marches_suivi(self.e, "42", ["GOLD", "NASDAQ"])
         self.assertTrue(ab.valider_et_suivre_marches(self.e, "42", 42))
         txt = [kw.get("text", "") for m, kw in self.envois if m == "sendMessage"][-1]
-        self.assertIn("Suivi activé : GOLD + NASDAQ", txt)
+        self.assertIn("Coach privé activé pour : GOLD + NASDAQ", txt)
         self.assertIn("JE SURVEILLE POUR TOI", txt)
 
     def test_case_cochee_edite_le_meme_message(self):
