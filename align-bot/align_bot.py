@@ -809,8 +809,12 @@ def calculer_analyse(S, stable=None, comp_prev=None, market=None):
     fortBas = rsiVente and rsiOS < 3 and bear > bull and bear >= MIN_ALIGN - 2 and (comp >= MIN_SQZ or bear >= MIN_ALIGN)
     explHaut = sqzC1 == 1 and sqzC == 0 and mom > 0 and bull > bear
     explBas = sqzC1 == 1 and sqzC == 0 and mom < 0 and bear > bull
-    sigHaut = ((fortHaut or explHaut) and longT >= 1) or (zoneHaut and longT >= 0)
-    sigBas = ((fortBas or explBas) and longT <= -1) or (zoneBas and longT <= 0)
+    sigHaut = (((fortHaut or explHaut) and longT >= 1) or (zoneHaut and longT >= 0))
+    sigBas = (((fortBas or explBas) and longT <= -1) or (zoneBas and longT <= 0))
+    if market in ("GOLD", "NASDAQ"):
+        # Pas d’étiquette « explosion » si les quatre clôtures ne valident pas ce sens.
+        sigHaut = sigHaut and direction_confirmee_marche(market, dirs_cloturees, 1) == 1
+        sigBas = sigBas and direction_confirmee_marche(market, dirs_cloturees, -1) == -1
     # Parité Pine v24 : une zone de retournement valide est prioritaire ; sinon les grosses UT décident.
     dirBrut = 1 if zoneHaut else -1 if zoneBas else 1 if longT >= 2 else -1 if longT <= -2 else 1 if retHaut else -1 if retBas else sens
     dirPlan = dirBrut if stable is None else stable
@@ -4201,7 +4205,7 @@ def radar_climax(m, r, cle):
 
 def retournement_marche(m, r, cle):
     """v71 = Pine « RETOURNEMENT PAR MARCHÉ » (mesuré sur 60 jours de bougies 5 min) :
-    GOLD/NASDAQ : M5/M15 contre H1/H4 = observation uniquement, jamais une position avant confirmation H1+H4.
+    GOLD/NASDAQ : M5/M15 contre H1/H4 = observation uniquement, jamais une position avant confirmation des quatre clôtures.
     BTC conserve sa règle historique : M5 + M15 + H1 contre H4, avec les cibles et le SL existants.
     Une alerte par nouveau sens, jamais deux fois de suite."""
     dirs = (r.get("dirs_cloturees") or r.get("dirs") or []) if m in ("GOLD", "NASDAQ") else (r.get("dirs") or [])
@@ -9541,7 +9545,7 @@ def suivre_apres_sl(out, m, r, cle, hi, lo):
 
 
 def agent(m, r, cle, ferme):
-    """Agent : tendance 4h + confirmation 1h → déclenchement sur bougie 5m clôturée."""
+    """BTC conserve H4/H1 + déclencheur M5 ; GOLD/NASDAQ exigent M5/M15/H1/H4 clôturés concordants."""
     out = []
     tr = cle.get("trade")
     depuis = cle.get("t1m", 0)
