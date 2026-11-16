@@ -136,6 +136,13 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("items.push({ texte: '🇫🇷 ' + plateforme(texte)", src)
         self.assertNotIn("i >= nPass / 2 ? '🇬🇧 '", src)
 
+    def test_bande_live_javascript_syntax(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js non disponible")
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")
+        subprocess.run([node, "--check", path], check=True, capture_output=True, text=True)
+
     def test_paiement_refuse_si_live_eteint(self):
         p24 = mock.patch.object(ab, "LIVE_24H", False)
         p24.start()
