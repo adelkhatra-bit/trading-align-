@@ -11099,7 +11099,7 @@ def live_bande(etat, texte, cle=None, pause=60, toujours=False):
     return live_publier(texte)
 
 # ───── v8.5 « SPECTACLE » (demande d'Adel 15/11) : IA gratuite + agenda (discours, annonces, ouvertures) sur la bande ─────
-LIVE_IA_INTERVALLE = int(os.environ.get("LIVE_IA_INTERVALLE", "1800"))      # 1 lot de phrases IA / 30 min (quota gratuit)
+LIVE_IA_INTERVALLE = max(120, min(300, int(os.environ.get("LIVE_IA_INTERVALLE", "180"))))  # commentaires IA toutes les 2 à 5 minutes
 _INTERDIT_BANDE = re.compile(r"\d|telegram|entr[ée]e|\bSL\b|\bTP\d?\b|\bstop\b|€|\$|%", re.I)
 SESSIONS_LIVE = (("🇯🇵 TOKYO", 1, 0), ("🇬🇧 LONDRES", 9, 0), ("🇺🇸 NEW YORK", 15, 30))
 MOTS_DISCOURS = ("Speaks", "Speech", "Powell", "Testifies", "Press Conference", "FOMC")
@@ -11262,6 +11262,60 @@ def phrases_bande_par_marche(brut):
     return {m: p for m, p in resultat.items() if p}
 
 
+def commentaires_live_de_secours(donnees):
+    """Commentaires de marché factuels si le fournisseur IA est indisponible ou renvoie une réponse invalide."""
+    lignes = []
+    for marche, c in (donnees or {}).get("marches", {}).items():
+        biais = c.get("biais_plan", "neutre")
+        if biais == "haussier":
+            direction, direction_en = "Le biais reste haussier", "The bias remains bullish"
+        elif biais == "baissier":
+            direction, direction_en = "Le biais reste baissier", "The bias remains bearish"
+        else:
+            direction, direction_en = "Le biais reste neutre", "The bias remains neutral"
+        confirmation = c.get("confirmation_4h_1h", "non alignées")
+        if confirmation == "alignées à la hausse":
+            accord, accord_en = "les unités longues confirment la hausse", "the higher timeframes confirm the rise"
+        elif confirmation == "alignées à la baisse":
+            accord, accord_en = "les unités longues confirment la baisse", "the higher timeframes confirm the decline"
+        else:
+            accord, accord_en = "les unités longues ne confirment pas encore le mouvement", "the higher timeframes do not confirm the move yet"
+        fr1, en1 = f"{direction}, mais {accord}.", f"{direction_en}, but {accord}."
+        rsi = c.get("rsi_15m")
+        if isinstance(rsi, (int, float)):
+            if rsi >= 68:
+                momentum, momentum_en = "Le momentum est déjà tendu", "Momentum is already stretched"
+            elif rsi <= 32:
+                momentum, momentum_en = "Le momentum reste faible", "Momentum remains weak"
+            else:
+                momentum, momentum_en = "Le momentum reste équilibré", "Momentum remains balanced"
+        else:
+            momentum, momentum_en = "Le momentum demande encore confirmation", "Momentum still needs confirmation"
+        volume = c.get("volume_15m_vs_moyenne")
+        if isinstance(volume, (int, float)) and volume >= 1.5:
+            flux, flux_en = "le volume accélère", "volume is picking up"
+        elif isinstance(volume, (int, float)) and volume <= 0.7:
+            flux, flux_en = "le volume reste discret", "volume remains quiet"
+        else:
+            flux, flux_en = "le volume accompagne le mouvement", "volume is accompanying the move"
+        fib = c.get("fibonacci") or {}
+        unite = next((u for u in ("H1", "M15", "H4") if isinstance(fib.get(u), dict)), None)
+        lecture = fib.get(unite, {}).get("lecture") if unite else None
+        if lecture == "zone clé de retracement profond":
+            suite, suite_en = "Le retracement teste une zone profonde : attendons la réaction.", "The pullback is testing a deep zone: let's wait for the reaction."
+        elif lecture in ("retracement léger", "retracement modéré", "retracement intermédiaire", "retracement très profond"):
+            suite, suite_en = "Le retracement évolue : la clôture doit confirmer la reprise.", "The pullback is developing: the close must confirm a resumption."
+        elif lecture and "extension" in lecture:
+            suite, suite_en = "Le mouvement s'étend : attention à une respiration du marché.", "The move is extended: watch for a market pause."
+        elif c.get("resistance_proche") or c.get("support_proche"):
+            suite, suite_en = "Le prix approche une zone technique : observons sa réaction.", "Price is approaching a technical zone: let's watch its reaction."
+        else:
+            suite, suite_en = "Attendons une clôture claire avant de conclure.", "Let's wait for a clear close before drawing a conclusion."
+        fr2, en2 = f"{momentum} et {flux} ; {suite}", f"{momentum_en} and {flux_en}; {suite_en}"
+        lignes.extend((f"{marche} | {fr1} | {en1}", f"{marche} | {fr2} | {en2}"))
+    return "\n".join(lignes)
+
+
 def live_phrases_ia(etat, maintenant, derniers=None):
     """Génère des commentaires IA par marché depuis les analyses en mémoire, sans nouvel appel de données."""
     if not live_actif(etat) or maintenant - etat.get("live_ia_t", 0) < LIVE_IA_INTERVALLE:
@@ -11294,6 +11348,11 @@ def live_phrases_ia(etat, maintenant, derniers=None):
     )
     brut = ia(etat, consigne, donnees)
     paires = phrases_bande_par_marche(brut)
+    if not paires:
+        secours = commentaires_live_de_secours(donnees)
+        paires = phrases_bande_par_marche(secours)
+        if paires:
+            print("LIVE_IA_FALLBACK=TECHNICAL_CONTEXT", flush=True)
     nb = sum(len(v) for v in paires.values())
     print(f"LIVE_IA {nb} commentaires marché via {etat.get('ia_dernier_fournisseur')} {etat.get('ia_dernier_statut')} : {str(brut)[:160]!r}")
     if not paires:
