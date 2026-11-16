@@ -10752,7 +10752,7 @@ def live_bande(etat, texte, cle=None, pause=60, toujours=False):
     return live_publier(texte)
 
 # ───── v8.5 « SPECTACLE » (demande d'Adel 15/11) : IA gratuite + agenda (discours, annonces, ouvertures) sur la bande ─────
-LIVE_IA_INTERVALLE = int(os.environ.get("LIVE_IA_INTERVALLE", "1800"))      # 1 lot de phrases IA / 30 min (quota gratuit)
+LIVE_IA_INTERVALLE = int(os.environ.get("LIVE_IA_INTERVALLE", "600"))       # 1 lot de commentaires techniques / 10 min ; la narration locale reste active entre deux lots
 _INTERDIT_BANDE = re.compile(r"\d|telegram|entr[ée]e|\bSL\b|\bTP\d?\b|\bstop\b|€|\$|%", re.I)
 SESSIONS_LIVE = (("🇯🇵 TOKYO", 1, 0), ("🇬🇧 LONDRES", 9, 0), ("🇺🇸 NEW YORK", 15, 30))
 MOTS_DISCOURS = ("Speaks", "Speech", "Powell", "Testifies", "Press Conference", "FOMC")
