@@ -327,7 +327,8 @@ def nasdaq_direct():
         v = float(http_json("https://scanner.tradingview.com/symbol?symbol=CME_MINI:NQ1%21&fields=close")["close"])
     except Exception as ex:
         print("nasdaq direct", ex)
-        return c[1] if c else None
+        # Ne jamais recycler un ancien prix NQ comme s'il était temps réel.
+        return c[1] if c and time.time() - c[0] <= 30 else None
     _CACHE["nq_live"] = (time.time(), v)
     return v
 
@@ -3169,7 +3170,7 @@ def donnees_mtf_fraiches(m, r, now_ts=None):
     """Refuse les entrées si une bougie source est trop ancienne (Yahoo peut retarder les futures d'environ 10 min)."""
     if m not in ("GOLD", "NASDAQ"):
         return True
-    now = float(time.time() if now_ts is None else now_ts)
+    now = float((r.get("t") or time.time()) if now_ts is None else now_ts)
     specs = (("b5", 300, 450), ("b15", 900, 1350), ("b1h", 3600, 5400), ("b4h", 14400, 21600))
     for cle_tf, secondes, age_max in specs:
         bars = r.get(cle_tf) or []
