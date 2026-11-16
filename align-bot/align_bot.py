@@ -2959,7 +2959,10 @@ def telegram(methode, **params):
             CALLBACKS_ACKNOWLEDGED.discard(callback_id)
             return {"ok": True, "result": True}
     if not _telegram_sortant_autorise(methode, params):
-        return {"ok": True, "result": None, "blocked_by_pull_mode": True}
+        # Un envoi bloqué n'est PAS une livraison : les appelants ne doivent jamais
+        # marquer le signal comme envoyé ni retirer la recherche de l'utilisateur.
+        return {"ok": False, "result": None, "blocked_by_pull_mode": True,
+                "description": "Envoi bloqué par le mode Telegram sur demande"}
     if methode in ("sendMessage", "editMessageText") and "%%AGENT:" in str(params.get("text", "")):
         t_ = str(params["text"]); mk_ = re.search(r"📍 (\w+) - ", t_)
         params["text"] = re.sub(r"%%AGENT:(\w+)%%", lambda g: agent_pour(DERNIER_ETAT or {}, params.get("chat_id"), mk_.group(1) if mk_ else "", g.group(1)), t_)
