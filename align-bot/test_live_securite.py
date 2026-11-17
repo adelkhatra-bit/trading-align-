@@ -160,6 +160,10 @@ class PageLive(unittest.TestCase):
         self.assertIn("ALIGN_TV_READ_TOKEN", bridge)
         self.assertIn("BRIDGE_CONFIRMED", bridge)
         self.assertNotIn("Kraken/Yahoo", bridge)
+        self.assertIn('ALIGN_REQUIRE_TV_BRIDGE: "1"', workflow)
+        bot = (RACINE / "align-bot" / "align_bot.py").read_text(encoding="utf-8")
+        self.assertIn('os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1" and m in MARCHES', bot)
+        self.assertIn('os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1" and nom_marche in MARCHES', bot)
 
     def test_no_forbidden_words_or_promises(self):
         mots = re.findall(r"(?i)\b(like|likes|follow|followers?|cadeau|gagn\w*|garanti\w*|profit certain|abonne\w*)\b", self.PAGE)
