@@ -3421,7 +3421,7 @@ def analyse_marche(etat, pair):
         except Exception as ex:
             print(m, "bridge TradingView indisponible", ex)
             r["tv_indicator_mtf"] = {"available": False, "reason": "bridge_unavailable"}
-        r["require_tv_bridge"] = os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1" and m in ("GOLD", "NASDAQ")
+        r["require_tv_bridge"] = os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1" and m in MARCHES
         fusionne_lectures_tradingview(r)
         directions = r.get("dirs_cloturees") or r.get("dirs")
         d_plan = r.get("dirPlan") or 0
@@ -12422,7 +12422,7 @@ def un_tour(etat, chats):
                 return
             r["market"] = nom_marche
             r["tv_indicator_mtf"] = fetch_tv_mtf(pair)
-            r["require_tv_bridge"] = os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1" and nom_marche in ("GOLD", "NASDAQ")
+            r["require_tv_bridge"] = os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1" and nom_marche in MARCHES
             fusionne_lectures_tradingview(r)
             # Revalider après lecture du bridge : Gold/Nasdaq ne peuvent pas ouvrir de position sans ROBOT V12 M5/M15/H1 frais.
             r["confirme"] = direction_confirmee_marche(
