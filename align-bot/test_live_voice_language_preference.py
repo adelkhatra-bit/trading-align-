@@ -1,4 +1,4 @@
-"""Regression tests for an independent ALIGN live voice language preference."""
+"""Regression tests for persistent visual animation control and coach button."""
 from pathlib import Path
 import unittest
 
@@ -7,26 +7,19 @@ LIVE_JS = ROOT.parent / "docs" / "live" / "align-bande-live.user.js"
 
 
 class LiveVoiceLanguagePreference(unittest.TestCase):
-    def test_voice_defaults_to_french_and_uses_its_own_language_setting(self):
+    def test_language_selector_is_removed_but_coach_button_remains(self):
         source = LIVE_JS.read_text(encoding="utf-8")
-        self.assertIn("let voixLangue = 'fr';", source)
-        start = source.index("function parlerLive(item)")
-        end = source.index("let extra = [];", start)
-        speech = source[start:end]
-        self.assertIn("const anglais = voixLangue === 'en';", speech)
-        self.assertIn("if (!!item.en !== anglais) return;", speech)
-        self.assertNotIn("langueBande()", speech)
+        self.assertIn("align-live-voice", source)
+        self.assertNotIn("voixLangueBtn", source)
+        self.assertNotIn("Voix FR", source)
+        self.assertNotIn("Voix EN", source)
 
-    def test_voice_language_can_be_switched_and_persisted(self):
+    def test_animation_toggle_remains_independent_and_persisted(self):
         source = LIVE_JS.read_text(encoding="utf-8")
-        self.assertIn("voixLangue = voixLangue === 'fr' ? 'en' : 'fr';", source)
-        self.assertIn("localStorage.setItem('alignVoixLangue', voixLangue)", source)
-        self.assertIn("🇫🇷 Voix FR", source)
-        self.assertIn("🇬🇧 Voix EN", source)
-
-    def test_language_button_is_removed_when_userscript_stops(self):
-        source = LIVE_JS.read_text(encoding="utf-8")
-        self.assertIn("voixLangueBtn.remove()", source)
+        self.assertIn("align-live-animations", source)
+        self.assertIn("localStorage.getItem('alignAnimationsEnabled')", source)
+        self.assertIn("localStorage.setItem('alignAnimationsEnabled'", source)
+        self.assertIn("document.documentElement.classList.toggle('align-animations-off', !animationsActives)", source)
 
 
 if __name__ == "__main__":
