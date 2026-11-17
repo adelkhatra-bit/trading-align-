@@ -30,6 +30,11 @@ jobs:
     uses: ./.github/workflows/align-bot-validation.yml
 
   signaux:
+    if: github.repository == 'adelkhatra-bit/trading-align-' && (
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main')
+    )
     needs: validate
     if: >-
       always() &&
