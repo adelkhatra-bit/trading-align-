@@ -125,6 +125,8 @@ nomsNiv = array.from("15m", "15m", "15m", "15m", "1h", "1h", "1h", "1h", "4h", "
 atrC = ta.atr(14)
 // ATR de la vue 15 min (la référence du bot) : le SL ne dépend plus de la petite unité de temps affichée
 atr15 = request.security(syminfo.tickerid, "15", ta.atr(14)[1])
+// Référence unique du plan : dernière bougie 15 min clôturée, quel que soit le graphique affiché.
+[planClose15, planAtr15, planLow15, planHigh15] = request.security(syminfo.tickerid, "15", [close[1], ta.atr(14)[1], ta.lowest(low, 10)[1], ta.highest(high, 10)[1]], lookahead=barmerge.lookahead_on)
 
 // Niveau le plus proche au-dessus / en dessous (1er et 2e)
 f_dessus() =>
@@ -179,20 +181,20 @@ zoneHaut = zHaut0 and not zoneBas
 // ═════════ PLAN : direction, TP, SL ═════════
 px(v) => str.tostring(v, format.mintick)
 // Stop toujours DERRIÈRE une résistance / un support de grosse UT (1h ou 4h)
-f_stopH(kmin, kmax) =>
+f_stopH(kmin, kmax, refClose, refAtr) =>
     float r = na
     for k = kmin to kmax
         v = array.get(niveaux, k)
-        if not na(v) and v > close + atrC * 0.3 and (na(r) or v < r)
+        if not na(v) and v > refClose + refAtr * 0.3 and (na(r) or v < r)
             r := v
-    nz(r, nz(hau1, close + 1.5 * atrC))
-f_stopB(kmin, kmax) =>
+    nz(r, refClose + 1.5 * refAtr)
+f_stopB(kmin, kmax, refClose, refAtr) =>
     float r = na
     for k = kmin to kmax
         v = array.get(niveaux, k)
-        if not na(v) and v < close - atrC * 0.3 and (na(r) or v > r)
+        if not na(v) and v < refClose - refAtr * 0.3 and (na(r) or v > r)
             r := v
-    nz(r, nz(bas1, close - 1.5 * atrC))
+    nz(r, refClose - 1.5 * refAtr)
 // Cible de grosse UT (1h, 4h, Daily) au-delà d'une distance minimale depuis l'entrée
 f_cible(d, ref, distMin, kmin, kmax) =>
     float v1 = na
@@ -203,25 +205,22 @@ f_cible(d, ref, distMin, kmin, kmax) =>
             v1 := v
             n1 := array.get(nomsNiv, k)
     [v1, n1]
-f_plan(d, sMin, sMax, cMin, cMax) =>
-    sb = d == 1 ? f_stopB(sMin, sMax) : f_stopH(sMin, sMax)
-    // SL un peu PLUS loin derrière la mèche (0,35 ATR) : la mèche peut être retouchée au même prix
-    swing = d == 1 ? ta.lowest(low, 10) - atrC * 0.35 : ta.highest(high, 10) + atrC * 0.35
-    s = d == 1 ? math.min(sb - atrC * 0.3, swing) : math.max(sb + atrC * 0.3, swing)
-    // Point d'entrée : juste devant la zone de grosse UT (ordre limite), sinon au marché
-    eLim = d == 1 ? sb + atrC * 0.3 : sb - atrC * 0.3
-    e = d == 1 ? math.min(close, math.max(eLim, s + atrC * 0.5)) : math.max(close, math.min(eLim, s - atrC * 0.5))
-    // Comme le bot Telegram : jamais un SL de plus de 1,5 bougie moyenne -> si trop loin, on attend un repli plus profond
-    aP = math.max(atrC, nz(atr15, atrC))
+f_plan(d, sMin, sMax, cMin, cMax, refClose, refAtr, refLow10, refHigh10) =>
+    // Tous les prix de référence viennent de la dernière clôture 15 min, pas de l'UT du graphique.
+    sb = d == 1 ? f_stopB(sMin, sMax, refClose, refAtr) : f_stopH(sMin, sMax, refClose, refAtr)
+    // SL derrière la mèche 15 min clôturée.
+    swing = d == 1 ? refLow10 - refAtr * 0.35 : refHigh10 + refAtr * 0.35
+    s = d == 1 ? math.min(sb - refAtr * 0.3, swing) : math.max(sb + refAtr * 0.3, swing)
+    eLim = d == 1 ? sb + refAtr * 0.3 : sb - refAtr * 0.3
+    e = d == 1 ? math.min(refClose, math.max(eLim, s + refAtr * 0.5)) : math.max(refClose, math.min(eLim, s - refAtr * 0.5))
+    aP = math.max(refAtr, nz(atr15, refAtr))
     e := d == 1 ? math.min(e, s + aP * 1.5) : math.max(e, s - aP * 1.5)
-    // SL jamais plus serré qu'1 bougie moyenne 15 min (même en vue 1 / 3 / 5 min) : fini les SL pour rien
-    // SL jamais plus serré que 1,4 bougie moyenne ou 0,12 % du prix (SL BTC du 11/11 pris par une mèche)
-    s := d == 1 ? math.min(s, e - math.max(1.4 * aP, close * 0.0012)) : math.max(s, e + math.max(1.4 * aP, close * 0.0012))
+    s := d == 1 ? math.min(s, e - math.max(1.4 * aP, refClose * 0.0012)) : math.max(s, e + math.max(1.4 * aP, refClose * 0.0012))
     risque = math.max(math.abs(e - s), syminfo.mintick)
     [c1, nc1] = f_cible(d, e, risque * gainMin, cMin, cMax)
     t1 = na(c1) ? e + d * risque * gainMin : c1
     n1 = na(c1) ? "projection " + str.tostring(gainMin) + " x le risque" : (d == 1 ? "résistance " : "support ") + nc1
-    [c2, nc2] = f_cible(d, e, math.abs(t1 - e) + atrC, cMin, cMax)
+    [c2, nc2] = f_cible(d, e, math.abs(t1 - e) + refAtr, cMin, cMax)
     t2 = na(c2) ? e + d * risque * (gainMin + 2) : c2
     n2 = na(c2) ? "projection " + str.tostring(gainMin + 2) + " x le risque" : (d == 1 ? "résistance " : "support ") + nc2
     [e, t1, t2, s, n1, n2]
@@ -280,7 +279,7 @@ sMaxP = profNiv == 3 ? 11 : profNiv == 2 ? 7 : profNiv == 1 ? 3 : 11
 cMinP = profNiv == 3 ? 8 : profNiv == 2 ? 4 : profNiv == 1 ? 0 : 4
 cMaxP = profNiv == 3 ? 15 : profNiv == 2 ? 11 : profNiv == 1 ? 7 : 15
 calePlan = profNiv == 3 ? "SL derrière la zone 1h / 4h • TP 4h / Daily • validation clôture 1h" : profNiv == 2 ? "SL derrière la zone 1h • TP 1h / 4h • validation clôture 5 min" : profNiv == 1 ? "SL derrière la zone 15 min • TP 15 min / 1h • validation clôture 1 min" : "plan standard 1h / 4h"
-[entC, tp1C, tp2C, slC, tTP1, tTP2] = f_plan(dirPlan == 0 ? 1 : dirPlan, sMinP, sMaxP, cMinP, cMaxP)
+[entC, tp1C, tp2C, slC, tTP1, tTP2] = f_plan(dirPlan == 0 ? 1 : dirPlan, sMinP, sMaxP, cMinP, cMaxP, planClose15, planAtr15, planLow15, planHigh15)
 // ═════════ PLAN FIGÉ (anti-parasites en vue 1 / 3 / 5 min) ═════════
 // Entrée, SL et TP ne bougent qu'à la clôture d'une bougie 15 min, ou tout de suite si le sens / la stratégie change
 // ou si le SL est franchi. Entre-temps, les niveaux affichés restent fixes pour pouvoir entrer sans confusion.
@@ -372,10 +371,10 @@ nomSigH = fortHaut ? "★ ACHAT FORT" : explHaut ? "EXPLOSION ▲" : "ZONE DE RE
 nomSigB = fortBas ? "★ VENTE FORTE" : explBas ? "EXPLOSION ▼" : "ZONE DE RETOURNEMENT ▼"
 pqH = str.tostring(bull) + "/11 UT haussières • " + str.tostring(comp) + "/11 comprimées • RSI " + str.tostring(rC, "#") + (zoneHaut ? " • sur support " + tB1 : "")
 pqB = str.tostring(bear) + "/11 UT baissières • " + str.tostring(comp) + "/11 comprimées • RSI " + str.tostring(rC, "#") + (zoneBas ? " • sur résistance " + tH1 : "")
-[hE, hT1, hT2, hSL, hN1, hN2] = f_plan(1, 4, 11, 4, 15)
-[bE, bT1, bT2, bSL, bN1, bN2] = f_plan(-1, 4, 11, 4, 15)
-planH = "Entrée : " + px(hE) + (hE == close ? " (au marché)" : " (ordre limite)") + "\nTP1 : " + px(hT1) + " (" + hN1 + ")\nTP2 : " + px(hT2) + " (" + hN2 + ")" + "\nStop : " + px(hSL)
-planB = "Entrée : " + px(bE) + (bE == close ? " (au marché)" : " (ordre limite)") + "\nTP1 : " + px(bT1) + " (" + bN1 + ")\nTP2 : " + px(bT2) + " (" + bN2 + ")" + "\nStop : " + px(bSL)
+[hE, hT1, hT2, hSL, hN1, hN2] = f_plan(1, 4, 11, 4, 15, planClose15, planAtr15, planLow15, planHigh15)
+[bE, bT1, bT2, bSL, bN1, bN2] = f_plan(-1, 4, 11, 4, 15, planClose15, planAtr15, planLow15, planHigh15)
+planH = "Entrée : " + px(hE) + (hE == planClose15 ? " (au marché)" : " (ordre limite)") + "\nTP1 : " + px(hT1) + " (" + hN1 + ")\nTP2 : " + px(hT2) + " (" + hN2 + ")" + "\nStop : " + px(hSL)
+planB = "Entrée : " + px(bE) + (bE == planClose15 ? " (au marché)" : " (ordre limite)") + "\nTP1 : " + px(bT1) + " (" + bN1 + ")\nTP2 : " + px(bT2) + " (" + bN2 + ")" + "\nStop : " + px(bSL)
 
 // Flèches propres : survole ou clique la flèche pour lire l'explication complète
 if sigHaut
