@@ -1,5 +1,6 @@
 import unittest.mock
 """LIVE TikTok : bande qui défile, bulles, boost, télécommande payante (Stars) — jamais de niveaux sur l'écran."""
+import datetime
 import json
 import os
 import re
@@ -733,6 +734,26 @@ class LiveOutbox(unittest.TestCase):
             self.assertTrue(ab.live_phrases_ia(state, 1600, {}))
         self.assertEqual(len(sent), 2)
         self.assertTrue(all(message.startswith("IA:") for message in sent))
+
+
+    def test_live_agenda_uses_local_market_timezones_during_dst_weeks(self):
+        cases = (
+            # Tokyo is 09:00 JST; in July this is 02:00 Paris, not 01:00.
+            (datetime.datetime(2026, 7, 16, 23, 45, tzinfo=datetime.timezone.utc).timestamp(), "TOKYO"),
+            # US DST starts before Paris DST in March: NY 09:30 EDT = 13:30 UTC.
+            (datetime.datetime(2026, 3, 9, 13, 15, tzinfo=datetime.timezone.utc).timestamp(), "NEW YORK"),
+            # US DST ends after Paris DST in October: NY 09:30 EDT = 13:30 UTC.
+            (datetime.datetime(2026, 10, 26, 13, 15, tzinfo=datetime.timezone.utc).timestamp(), "NEW YORK"),
+        )
+        for now, market in cases:
+            self.publie.clear()
+            with mock.patch.object(ab, "live_actif", return_value=True), \
+                 mock.patch.object(ab, "calendrier", return_value=[]):
+                ab.live_agenda(self.etat, now)
+            self.assertTrue(
+                any(f"OUVERTURE {market} DANS 15 MIN" in str(message) for message in self.publie),
+                f"opening announcement missing for {market} at {datetime.datetime.fromtimestamp(now, datetime.timezone.utc)}",
+            )
 
 
 if __name__ == "__main__":
