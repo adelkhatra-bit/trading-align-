@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only Copilot relay for ALIGN issue #431.
-
-The workflow supplies a separate GitHub token for issue comments and a
-Copilot Requests token for model inference. Copilot receives read-only
-repository tools; it cannot edit files, run shell commands, access URLs,
-write memory, commit, push, or deploy.
-"""
+"""Read-only Copilot relay for ALIGN issue #431."""
 from __future__ import annotations
 
 import json
@@ -22,14 +16,13 @@ ALLOWED_AUTHOR = os.environ.get("ALIGN_ALLOWED_AUTHOR", "adelkhatra-bit")
 REPO = os.environ["GITHUB_REPOSITORY"]
 GH_TOKEN = os.environ["GITHUB_TOKEN"]
 COPILOT_TOKEN = os.environ.get("COPILOT_GITHUB_TOKEN", "")
-TASK_RE = re.compile(r"^\\[CHATGPT → COPILOT\\]\\[([A-Z0-9][A-Z0-9-]{2,80})\\]", re.MULTILINE)
-REPLY_RE = re.compile(r"\\[COPILOT → CHATGPT\\]\\[([A-Z0-9][A-Z0-9-]{2,80})\\]")
+TASK_RE = re.compile(r"^\[CHATGPT → COPILOT\]\[([A-Z0-9][A-Z0-9-]{2,80})\]", re.MULTILINE)
+REPLY_RE = re.compile(r"\[COPILOT → CHATGPT\]\[([A-Z0-9][A-Z0-9-]{2,80})\]")
 
 def request_json(path: str, method: str = "GET", payload: dict | None = None):
-    url = API + path
     data = None if payload is None else json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
-        url,
+        API + path,
         data=data,
         method=method,
         headers={
@@ -53,11 +46,11 @@ def main() -> int:
     if not isinstance(comments, list):
         raise RuntimeError("GitHub returned an unexpected issue-comments payload")
 
-    replied = set()
-    for comment in comments:
-        body = comment.get("body") or ""
-        for match in REPLY_RE.finditer(body):
-            replied.add(match.group(1))
+    replied = {
+        match.group(1)
+        for item in comments
+        for match in REPLY_RE.finditer(item.get("body") or "")
+    }
 
     pending = []
     for comment in comments:
@@ -65,26 +58,22 @@ def main() -> int:
             continue
         body = comment.get("body") or ""
         match = TASK_RE.search(body)
-        if not match:
-            continue
-        task_id = match.group(1)
-        if task_id not in replied:
-            pending.append((comment, task_id, body))
+        if match and match.group(1) not in replied:
+            pending.append((comment, match.group(1), body))
 
     if not pending:
         print("No pending [CHATGPT → COPILOT] task in ALIGN issue #431.")
         return 0
 
-    # Process the oldest pending task first. Workflow concurrency prevents
-    # two scheduled/event runs from processing the same task simultaneously.
+    # Oldest pending task first; workflow concurrency serializes all runs.
     comment, task_id, task_body = pending[0]
     thread = []
     for item in comments[-30:]:
         author = (item.get("user") or {}).get("login", "unknown")
         body = (item.get("body") or "").strip()
         if body:
-            thread.append(f"--- comment by {author} ---\\n{body[:12000]}")
-    thread_text = "\\n\\n".join(thread)[-60000:]
+            thread.append(f"--- comment by {author} ---\n{body[:12000]}")
+    thread_text = "\n\n".join(thread)[-60000:]
 
     prompt = f"""You are the read-only GitHub Copilot coordination agent for ALIGN TRADING.
 
@@ -136,7 +125,7 @@ Instructions:
         print("Copilot returned an empty response; no reply was posted.", file=sys.stderr)
         return 1
     if f"[COPILOT → CHATGPT][{task_id}]" not in answer:
-        answer += f"\\n\\n[COPILOT → CHATGPT][{task_id}]"
+        answer += f"\n\n[COPILOT → CHATGPT][{task_id}]"
     answer = answer[:55000]
 
     request_json(
