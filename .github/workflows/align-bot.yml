@@ -282,6 +282,7 @@ jobs:
 
       - name: Analyse BTC + Gold + NASDAQ et envoi Telegram
         env:
+          ALIGN_AI_HEALTHY_PROVIDER: ${{ steps.ia_preflight.outputs.provider }}
           ALIGN_REQUIRE_TV_BRIDGE: "1"
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
