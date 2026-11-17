@@ -215,6 +215,7 @@ jobs:
           PY
 
       - name: Vérifier une connexion IA réelle (même chaîne que le bot)
+        id: ia_preflight
         # Contrôle bloquant : au moins un fournisseur IA externe doit répondre avant toute analyse de production.
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
