@@ -225,6 +225,48 @@
     try { localStorage.setItem('alignAnimationsEnabled', animationsActives ? '1' : '0'); } catch (e) {}
     appliquerAnimations();
   });
+  // Dock unique des commandes ALIGN : ancré en bas, repliable et toujours accessible.
+  const controlsDock = document.createElement('div');
+  controlsDock.id = 'align-live-controls-dock';
+  controlsDock.setAttribute('role', 'group');
+  controlsDock.setAttribute('aria-label', 'Commandes ALIGN');
+  controlsDock.style.cssText = 'position:fixed!important;inset:auto 12px 12px auto!important;z-index:2147483000!important;display:flex!important;flex-direction:row!important;align-items:flex-end!important;justify-content:flex-end!important;gap:8px!important;max-width:calc(100vw - 24px)!important;pointer-events:auto!important;';
+  const controlsDockItems = document.createElement('div');
+  controlsDockItems.id = 'align-live-controls-items';
+  controlsDockItems.style.cssText = 'display:flex;flex-direction:row;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;max-width:calc(100vw - 76px);pointer-events:auto;';
+  [voixBtn, voixLangueBtn, animationsBtn].forEach(button => {
+    button.style.setProperty('position', 'relative', 'important');
+    button.style.setProperty('inset', 'auto', 'important');
+    button.style.setProperty('left', 'auto', 'important');
+    button.style.setProperty('right', 'auto', 'important');
+    button.style.setProperty('top', 'auto', 'important');
+    button.style.setProperty('bottom', 'auto', 'important');
+    button.style.setProperty('z-index', 'auto', 'important');
+    button.style.setProperty('margin', '0', 'important');
+    button.style.setProperty('max-width', 'calc(100vw - 90px)', 'important');
+    controlsDockItems.appendChild(button);
+  });
+  const controlsDockToggle = document.createElement('button');
+  controlsDockToggle.id = 'align-live-controls-toggle';
+  controlsDockToggle.type = 'button';
+  controlsDockToggle.setAttribute('aria-label', 'Réduire ou afficher les commandes ALIGN');
+  controlsDockToggle.style.cssText = 'position:relative!important;min-width:42px;min-height:38px;padding:8px 11px;border:1px solid rgba(255,255,255,.65);border-radius:18px;background:#18212b;color:#fff;font:800 13px system-ui;cursor:pointer;pointer-events:auto;box-shadow:0 2px 12px rgba(0,0,0,.35);';
+  let controlsDockCollapsed = false;
+  try { controlsDockCollapsed = localStorage.getItem('alignControlsDockCollapsed') === '1'; } catch (e) {}
+  function appliquerDockCommandes() {
+    controlsDockItems.style.display = controlsDockCollapsed ? 'none' : 'flex';
+    controlsDockToggle.textContent = controlsDockCollapsed ? 'ALIGN +' : '−';
+    controlsDockToggle.title = controlsDockCollapsed ? 'Afficher les commandes ALIGN' : 'Réduire les commandes ALIGN';
+    controlsDockToggle.setAttribute('aria-expanded', String(!controlsDockCollapsed));
+  }
+  controlsDockToggle.addEventListener('click', () => {
+    controlsDockCollapsed = !controlsDockCollapsed;
+    try { localStorage.setItem('alignControlsDockCollapsed', controlsDockCollapsed ? '1' : '0'); } catch (e) {}
+    appliquerDockCommandes();
+  });
+  controlsDock.append(controlsDockItems, controlsDockToggle);
+  document.body.appendChild(controlsDock);
+  appliquerDockCommandes();
   const cssAnimationsToggle = document.createElement('style');
   cssAnimationsToggle.textContent = 'html.align-animations-off #align-bande,html.align-animations-off #align-pnl,html.align-animations-off .align-punch,html.align-animations-off .align-ping,html.align-animations-off .align-coeur,html.align-animations-off .align-billet,html.align-animations-off .align-argent,html.align-animations-off #align-feu,html.align-animations-off #align-flash-or,html.align-animations-off #align-show,html.align-animations-off #align-cadre,html.align-animations-off #align-ennui,html.align-animations-off #align-chrono,html.align-animations-off #align-etiq,html.align-animations-off #align-masque{visibility:hidden!important;opacity:0!important;pointer-events:none!important}';
   document.head.appendChild(cssAnimationsToggle);
@@ -1543,7 +1585,7 @@
   const masqueT = setInterval(poserMasque, 300); poserMasque();
   window.__ALIGN_BANDE__ = {
     version: VERSION, recu, punch: c => coeurs(1, [c]), plateforme: v => choisirPlateforme(v),
-    stop() { vivant = false; clearTimeout(survolT); cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(coachT); clearInterval(iaT); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); clearInterval(botEtatSyncT); clearInterval(heartbeatT); clearInterval(masqueT); try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {} try { voixBtn.remove(); } catch (e) {} try { voixLangueBtn.remove(); } catch (e) {} try { animationsBtn.remove(); cssAnimationsToggle.remove(); document.documentElement.classList.remove('align-animations-off'); } catch (e) {} masque.remove(); try { cssPunch.remove(); } catch (e) {}   /* v8.4 : plus de vieux styles qui restent après une réinjection */ clearInterval(etiqT); etiqBox.remove(); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
+    stop() { vivant = false; clearTimeout(survolT); cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(coachT); clearInterval(iaT); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); clearInterval(botEtatSyncT); clearInterval(heartbeatT); clearInterval(masqueT); try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {} try { controlsDock.remove(); } catch (e) {} try { voixBtn.remove(); } catch (e) {} try { voixLangueBtn.remove(); } catch (e) {} try { animationsBtn.remove(); cssAnimationsToggle.remove(); document.documentElement.classList.remove('align-animations-off'); } catch (e) {} masque.remove(); try { cssPunch.remove(); } catch (e) {}   /* v8.4 : plus de vieux styles qui restent après une réinjection */ clearInterval(etiqT); etiqBox.remove(); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
       [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur,.align-billet,.align-argent,.align-punch,.align-ping').forEach(x => x.remove()); try { cssBillet.remove(); } catch (e) {} obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
   };
 })();
