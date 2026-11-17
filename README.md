@@ -1,4 +1,4 @@
-# Trading Auto - Plateforme d'Analyse et Trading Autonome
+# ALIGN TRADING — Serveur de données TradingView et orchestration
 
 ## Vision & Objectif
 
@@ -26,8 +26,8 @@ Plateforme Node.js pour l'analyse de marchés, l'exécution de positions trading
 
 ```bash
 # 1. Cloner le repo
-git clone <URL_GITHUB> trading-auto
-cd trading-auto
+git clone <URL_GITHUB> trading-align-
+cd trading-align-
 
 # 2. Copier .env.example en .env
 cp .env.example .env
@@ -133,7 +133,7 @@ Response: `{ok:true, path:"/tmp/trading-auto-files/..."}`
 ## Architecture
 
 ```
-trading-auto/
+trading-align-/
 ├── server.js                          # Express main + routes API
 ├── studio/                            # Dashboard frontend
 │   ├── index.html                     # UI avec boutons
