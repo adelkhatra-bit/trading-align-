@@ -16,7 +16,7 @@ ALLOWED_AUTHOR = os.environ.get("ALIGN_ALLOWED_AUTHOR", "adelkhatra-bit")
 REPO = os.environ["GITHUB_REPOSITORY"]
 GH_TOKEN = os.environ["GITHUB_TOKEN"]
 COPILOT_TOKEN = os.environ.get("COPILOT_GITHUB_TOKEN", "")
-TASK_RE = re.compile(r"^\[CHATGPT → COPILOT\]\[([A-Z0-9][A-Z0-9-]{2,80})\]", re.MULTILINE)
+TASK_RE = re.compile(r"^\s*#{0,6}\s*\[CHATGPT → COPILOT\]\[([A-Z0-9][A-Z0-9-]{2,80})\]", re.MULTILINE)
 REPLY_RE = re.compile(r"\[COPILOT → CHATGPT\]\[([A-Z0-9][A-Z0-9-]{2,80})\]")
 
 def request_json(path: str, method: str = "GET", payload: dict | None = None):
