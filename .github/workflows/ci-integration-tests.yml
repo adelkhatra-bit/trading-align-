@@ -39,6 +39,20 @@ jobs:
           node-version: "18"
           cache: "npm"
 
+      - name: Vérifier l'identité canonique du projet ALIGN
+        run: |
+          node - <<'NODE'
+          const pkg = require('./package.json');
+          const lock = require('./package-lock.json');
+          if (process.env.GITHUB_REPOSITORY !== 'adelkhatra-bit/trading-align-') {
+            throw new Error('Workflow ALIGN exécuté depuis un dépôt non canonique');
+          }
+          if (pkg.name !== 'align-trading' || lock.name !== 'align-trading' || lock.packages?.['']?.name !== 'align-trading') {
+            throw new Error('Identité package ALIGN incohérente');
+          }
+          console.log('ALIGN_PROJECT_IDENTITY=OK repository=' + process.env.GITHUB_REPOSITORY);
+          NODE
+
       - name: Install dependencies
         run: npm ci
 
@@ -56,16 +70,16 @@ jobs:
           SAFE_MODE: "1"
           BROKER_MODE: "paper"
         run: |
-          npm start > /tmp/trading-auto-server.log 2>&1 &
-          echo $! > /tmp/trading-auto-server.pid
+          npm start > /tmp/align-server.log 2>&1 &
+          echo $! > /tmp/align-server.pid
           for i in $(seq 1 30); do
-            if curl --silent --fail http://127.0.0.1:4400/health > /tmp/trading-auto-health.json; then
-              cat /tmp/trading-auto-health.json
+            if curl --silent --fail http://127.0.0.1:4400/health > /tmp/align-health.json; then
+              cat /tmp/align-health.json
               exit 0
             fi
             sleep 2
           done
-          cat /tmp/trading-auto-server.log
+          cat /tmp/align-server.log
           exit 1
 
       - name: Run backend smoke tests
@@ -74,6 +88,6 @@ jobs:
       - name: Stop backend
         if: always()
         run: |
-          if [ -f /tmp/trading-auto-server.pid ]; then
-            kill "$(cat /tmp/trading-auto-server.pid)" 2>/dev/null || true
+          if [ -f /tmp/align-server.pid ]; then
+            kill "$(cat /tmp/align-server.pid)" 2>/dev/null || true
           fi
