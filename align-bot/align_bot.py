@@ -4989,6 +4989,8 @@ def boucle_chronos(etat):
 def inscrire_auto(etat, cid, m, notifier=True):
     """Active explicitement le coach pour le prochain setup, sans envoyer d'ordre broker."""
     cid = str(cid)
+    # Une inscription explicite réactive le suivi après un refus « Pas aujourd'hui ».
+    etat["quiet"] = [x for x in (etat.get("quiet") or []) if str(x) != cid]
     etat["bot_off"] = [x for x in etat.get("bot_off", []) if str(x) != cid]
     liste = etat.setdefault("auto", {}).setdefault(m, [])
     if cid not in liste:
@@ -5817,8 +5819,9 @@ def notifier_coach_live(etat, m, r, cle):
         return
     bars = (r.get("b15") or [])[:-1]                 # la dernière bougie est en formation
     b = bars[-1] if bars else None
+    silencieux = {str(x) for x in (etat.get("quiet") or [])}
     for cid, info in list(abonnes.items()):
-        if not bot_on(etat, cid):
+        if not bot_on(etat, cid) or str(cid) in silencieux:
             continue
         if dans_chaine(etat, cid, m):
             abonnes.pop(cid, None)
@@ -5883,7 +5886,8 @@ def initialiser_debut_coach_live(etat, maintenant=None):
 def activer_coach_live(etat, cid, m, actif=True):
     abonnes = etat.setdefault("coach_live", {}).setdefault(m, {})
     if actif:
-        # Cliquer explicitement sur le coach le réactive même si le bot avait été mis en pause.
+        # Cliquer explicitement sur le coach le réactive même si le bot avait été mis en pause ou réduit au silence.
+        etat["quiet"] = [x for x in (etat.get("quiet") or []) if str(x) != str(cid)]
         etat["bot_off"] = [x for x in etat.get("bot_off", []) if str(x) != str(cid)]
         actifs = etat.setdefault("recherche_positions_active", [])
         if str(cid) not in {str(x) for x in actifs}:
@@ -6805,6 +6809,12 @@ def traiter(etat, chats, updates):
                         off.append(qui)       # stoppe les nouveaux signaux ; le suivi d'une position déjà ouverte reste actif
                     purger_messages_en_attente(etat, qui)
                     etat["coach_pending"] = [x for x in etat.get("coach_pending", []) if str(x) != qui]
+                    # Le refus quotidien doit aussi retirer l'autorisation de push différé et les recherches live actives.
+                    for abonnements in etat.setdefault("auto", {}).values():
+                        if isinstance(abonnements, list):
+                            abonnements[:] = [x for x in abonnements if str(x) != qui]
+                    for marche in MARCHES:
+                        activer_coach_live(etat, qui, marche, False)
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="Bien noté")
                     continue
                 if mk == "yes":
@@ -6845,6 +6855,23 @@ def traiter(etat, chats, updates):
             if live_callback(etat, chats, cb, choix, mk, qui):
                 continue
             if choix == "quiet":
+                # Refus persistant : aucun nouveau signal, rappel ou nouveau suivi coach ; les positions déjà ouvertes restent suivies.
+                silencieux = etat.get("quiet")
+                if not isinstance(silencieux, list):
+                    silencieux = []
+                    etat["quiet"] = silencieux
+                if qui not in {str(x) for x in silencieux}:
+                    silencieux.append(qui)
+                off = etat.setdefault("bot_off", [])
+                if qui not in {str(x) for x in off}:
+                    off.append(qui)
+                purger_messages_en_attente(etat, qui)
+                etat["coach_pending"] = [x for x in etat.get("coach_pending", []) if str(x) != qui]
+                for abonnements in etat.setdefault("auto", {}).values():
+                    if isinstance(abonnements, list):
+                        abonnements[:] = [x for x in abonnements if str(x) != qui]
+                for marche in MARCHES:
+                    activer_coach_live(etat, qui, marche, False)
                 try:
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="Bien noté")
                 except Exception:
@@ -8936,7 +8963,8 @@ def marche_du_message(texte):
 def coach_actif(etat, cid, marche):
     """Autorisation explicite : le coach doit être activé pour ce marché, et le bot doit être ON."""
     cid = str(cid)
-    return bot_on(etat, cid) and cid in {str(x) for x in (etat.get("auto", {}).get(marche) or [])}
+    silencieux = {str(x) for x in (etat.get("quiet") or [])}
+    return bot_on(etat, cid) and cid not in silencieux and cid in {str(x) for x in (etat.get("auto", {}).get(marche) or [])}
 
 
 def destinataires_message(etat, chats, texte):
@@ -12378,7 +12406,10 @@ def question_quotidienne(etat, chats, now=None):
     # Aucun rappel pendant un suivi coach actif ou tant qu'une position est ouverte.
     cibles = {str(c) for c in chats}
     canal = str(etat.get("canal") or "")
+    silencieux = {str(x) for x in (etat.get("quiet") or [])}
     for cid in sorted(cibles - {canal, ""}):
+        if cid in silencieux:
+            continue
         if deja.get(cid) == jour or en_position(etat, cid):
             continue
         if any(coach_actif(etat, cid, m) for m in MARCHES):
