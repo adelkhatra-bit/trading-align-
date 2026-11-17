@@ -77,6 +77,43 @@ class ClosedMtfSafety(unittest.TestCase):
             self.assertEqual(profile["mode"], "ATTENTE")
             self.assertEqual(profile["direction"], 0)
 
+    def test_gold_nasdaq_dashboard_uses_closed_directions_without_forming_fallback(self):
+        for market in ("GOLD", "NASDAQ"):
+            r = {
+                "market": market,
+                "dirs": [1] * 11,
+                "dirs_cloturees": [0] * 11,
+                "dirPlan": 0,
+                "confirme": 0,
+                "dirW": 0,
+            }
+            message = "\\n".join(ab.strategie_mtf(r))
+            self.assertIn("Tendance principale 4 h : 🟠➖", message)
+            self.assertIn("Confirmation 1 h : 🟠➖", message)
+            self.assertIn("Préparation 15 min : 🟠➖", message)
+            self.assertIn("Timing 5 min : 🟠➖", message)
+            self.assertIn("PROFIL RETENU : ATTENTE", message)
+
+    def test_gold_nasdaq_daily_weekly_block_cannot_be_bypassed_by_forming_trend(self):
+        for market in ("GOLD", "NASDAQ"):
+            r = {
+                "market": market,
+                "posD": 0.90,
+                "posW": 0.50,
+                "dirs": [1] * 11,
+                "dirs_cloturees": [-1] * 11,
+            }
+            self.assertTrue(ab.bloque_dw(r, 1))
+        # BTC conserve son comportement historique.
+        btc = {
+            "market": "BTC",
+            "posD": 0.90,
+            "posW": 0.50,
+            "dirs": [1] * 11,
+            "dirs_cloturees": [-1] * 11,
+        }
+        self.assertFalse(ab.bloque_dw(btc, 1))
+
     def test_mtf_confirmation_rejects_stale_m5_and_stale_m1(self):
         now = int(time.time())
         ctx = fresh_context(now)

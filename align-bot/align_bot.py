@@ -1286,11 +1286,20 @@ def alignement(r):
     return maj, (2 if maj else 0)
 
 
+def directions_pour_strategie(r):
+    """Source MTF de décision : clôtures pour GOLD/NASDAQ, série historique pour BTC."""
+    if r.get("market") in ("GOLD", "NASDAQ"):
+        directions = list(r.get("dirs_cloturees") or [])
+    else:
+        directions = list(r.get("dirs") or [])
+    return directions + [0] * max(0, 11 - len(directions))
+
+
 def profil_strategie(r):
     """Classe le setup ; GOLD/NASDAQ utilisent exclusivement les quatre dernières clôtures MTF."""
     market = r.get("market")
+    D = directions_pour_strategie(r)
     if market in ("GOLD", "NASDAQ"):
-        D = list(r.get("dirs_cloturees") or [])
         indices_mtf = (2, 4, 7, 9)  # M5, M15, H1, H4
         if (
             len(D) <= max(indices_mtf)
@@ -1306,9 +1315,6 @@ def profil_strategie(r):
                 "contre_tendance": False,
                 "statut": "ATTENTE — quatre clôtures M5/M15/H1/H4 requises",
             }
-    else:
-        D = list(r.get("dirs") or [])
-    D = D + [0] * max(0, 11 - len(D))
     d5, d15, d1h, d4h = D[2], D[4], D[7], D[9]
     if d4h and d1h == d4h and d15 == -d4h and d5 == d15:
         direction = d15
@@ -1630,7 +1636,7 @@ def ligne_retournement(r):
 def ligne_strategie(r):
     """Même lecture que la barre TradingView v24 : stratégie, état, score /100, motif."""
     d = r.get("dirPlan") or 0
-    dirs_strategie = (r.get("dirs_cloturees") or r.get("dirs") or []) if r.get("market") in ("GOLD", "NASDAQ") else (r.get("dirs") or [])
+    dirs_strategie = directions_pour_strategie(r)
     strat, etat, motif = strategie_alignement(dirs_strategie, d, r.get("dirW") or 0, r.get("market"))
     if not strat:
         return ligne_retournement(r) + [f"🏷 Stratégie : aucune — {motif}"]
@@ -1665,7 +1671,7 @@ def lecture_unite_active(r):
 def strategie_mtf(r):
     """H4/H1 = fond, M15 = préparation, M5 = timing ; profil scalp/intraday/swing explicite."""
     fl = lambda x: "🟢⬆️" if x == 1 else "🔴⬇️" if x == -1 else "🟠➖"
-    D = r.get("dirs_cloturees") or r["dirs"] if r.get("market") in ("GOLD", "NASDAQ") else r["dirs"]
+    D = directions_pour_strategie(r)
     d5, d15, d1h, d4h, dD = D[2], D[4], D[7], D[9], D[10]
     profil = profil_strategie(r)
     l = ["🧭 STRATÉGIE MULTI-UT",
@@ -1712,7 +1718,7 @@ def bloque_dw(r, d, prix=None):
         return False
     # Jour de TENDANCE (Daily, 4 h, 1 h et 15 min dans le même sens, aucun voyant de retournement sur les petites UT) :
     # le prix est forcément « en bas » (baisse) ou « en haut » (hausse) du Daily — ce n'est pas une raison de rater le mouvement.
-    dirs = r.get("dirs") or []
+    dirs = directions_pour_strategie(r)
     if len(dirs) >= 11 and dirs[10] == d and dirs[9] == d and dirs[7] == d and dirs[4] == d \
             and sum(1 for x in dirs[:5] if x == -d) == 0:
         return False
