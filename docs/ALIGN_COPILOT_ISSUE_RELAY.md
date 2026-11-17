@@ -40,6 +40,7 @@ Copilot CLI est limité aux outils de lecture `view`, `grep`, `glob` et au droit
 - Identifiant de tâche obligatoire et unique.
 - Réponse marquée : `[COPILOT → CHATGPT][TASK-ID]`.
 - Une seule exécution à la fois ; une tâche traitée par exécution.
+- Les commentaires antérieurs au marqueur d’activation `6962101708` sont ignorés : aucun ancien ticket n’est rejoué automatiquement.
 - Déclencheur planifié toutes les cinq minutes comme filet de sécurité.
 - Le workflow ne traite pas les commentaires de réponse Copilot comme de nouvelles demandes.
 
