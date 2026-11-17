@@ -2043,6 +2043,18 @@ class AlignAiChainTest(unittest.TestCase):
         self.assertNotIn("Anthropic", [a[0] for a in appels2])
         self.assertTrue(align_bot.erreur_sans_credit("HTTP 400 invalid_request_error Your credit balance is too low"))
 
+    def test_preflight_success_clears_only_the_confirmed_provider_cooldown(self):
+        import time
+        from unittest.mock import patch
+        etat = {"ia_pause": {"Groq": time.time() + 3600}, "ia_echecs": {"Groq": 3}}
+        with patch.dict(os.environ, {"ALIGN_AI_HEALTHY_PROVIDER": "Groq", "GITHUB_RUN_ID": "run-test"}):
+            txt, appels = self._ia(etat, echecs=("Gemini", "Gemini 3.8"))
+        self.assertEqual([a[0] for a in appels], ["Gemini", "Gemini 3.8", "Groq"])
+        self.assertIn("Groq", txt)
+        self.assertNotIn("Groq", etat["ia_pause"])
+        self.assertNotIn("Groq", etat["ia_echecs"])
+        self.assertEqual(etat["ia_preflight_marker"], "run-test:Groq")
+
     def test_claude_cap_per_day_and_10_minute_cache_per_moment(self):
         from unittest.mock import patch
         etat = {}
