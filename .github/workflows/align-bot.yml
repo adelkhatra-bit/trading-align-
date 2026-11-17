@@ -33,6 +33,7 @@ jobs:
     needs: validate
     if: >-
       always() &&
+      github.repository == 'adelkhatra-bit/trading-align-' &&
       (
         (github.event_name == 'workflow_run' &&
          github.event.workflow_run.conclusion == 'success' &&
