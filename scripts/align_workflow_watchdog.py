@@ -186,9 +186,8 @@ def main() -> int:
         with open(EVENT_PATH, encoding="utf-8") as handle:
             event = json.load(handle)
         run = event.get("workflow_run") or {}
-        if run.get("head_branch") not in {"main", "live-data"}:
-            print("WATCHDOG_SKIP branch outside production/publication scope")
-            return 0
+        # Les échecs de PR et de branches de correction sont aussi diagnostiqués.
+        # Le watchdog lui-même reste exclu dans handle_completed().
         handle_completed(run)
     else:
         inspect_stale_runs()
