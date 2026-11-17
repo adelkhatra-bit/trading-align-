@@ -447,7 +447,7 @@
   }
   // Le flux ntfy annonce les nouvelles entrées, mais un live ouvert après le bot peut manquer l'événement.
   // Le JSON public expose seulement l'état (entree/preparation), jamais la direction ni les niveaux.
-  const BOT_STATE_URL = 'https://raw.githubusercontent.com/adelkhatra-bit/trading-auto/live-data/live.json';
+  const BOT_STATE_URL = 'https://raw.githubusercontent.com/adelkhatra-bit/trading-align-/live-data/live.json';
     let botEtatSyncT = null;
   async function synchroniserEtatBot() {
     try {
