@@ -343,7 +343,6 @@
     flash.innerHTML = '<span>' + esc(m.texte) + '</span>';   // le message défile vite (lisible sur téléphone, même si TikTok coupe les bords)
     flash.className = 'flash' + (m.g ? ' ' + m.g : m.bulle ? ' bulle' : '') + (m.en ? ' en' : '');
     bande.classList.add('on');
-    parlerLive(m); // lit la langue du message qui vient réellement d'être affiché, sans changer la langue choisie
     const sp = flash.firstChild, W = bande.clientWidth, w = sp.offsetWidth;
     const dur = Math.max(4000, (W + w) / 0.38);      // v5.4 : plus rapide (info en temps réel), toujours lisible
     animCur = sp.animate([{ transform: 'translateX(' + W + 'px)' }, { transform: 'translateX(' + (-w) + 'px)' }], { duration: dur, easing: 'linear' });
