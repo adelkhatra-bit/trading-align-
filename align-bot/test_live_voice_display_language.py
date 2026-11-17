@@ -10,9 +10,22 @@ class LiveVoiceDisplayLanguage(unittest.TestCase):
     def test_voice_and_animation_controls_are_positioned_at_chart_bottom(self):
         source = LIVE_JS.read_text(encoding="utf-8")
         self.assertIn("id = 'align-live-voice'", source)
-        self.assertIn("left:18px;bottom:64px", source)
+        self.assertIn("left:18px;bottom:20px", source)
         self.assertIn("id = 'align-live-animations'", source)
-        self.assertIn("left:18px;bottom:112px", source)
+        self.assertIn("left:18px;bottom:72px", source)
+
+    def test_animation_off_hides_visuals_without_pausing_or_disabling_them(self):
+        source = LIVE_JS.read_text(encoding="utf-8")
+        start = source.index("const cssAnimationsToggle = document.createElement('style');")
+        end = source.index("document.head.appendChild(cssAnimationsToggle);", start)
+        toggle_css = source[start:end]
+        self.assertIn("visibility:hidden!important", toggle_css)
+        self.assertIn("#align-chrono", toggle_css)
+        self.assertIn("#align-etiq", toggle_css)
+        self.assertNotIn("animation:none", toggle_css)
+        self.assertNotIn("transition:none", toggle_css)
+        self.assertNotIn(".pause()", source)
+        self.assertIn("localStorage.setItem('alignAnimationsEnabled'", source)
 
     def test_voice_is_optional_and_reads_french_live_comments(self):
         source = LIVE_JS.read_text(encoding="utf-8")
@@ -20,6 +33,15 @@ class LiveVoiceDisplayLanguage(unittest.TestCase):
         self.assertIn("if (!voixActive || !item", source)
         self.assertIn("parlerLive(m);", source)
         self.assertIn("window.speechSynthesis.speak(utterance)", source)
+
+    def test_animation_off_hides_visuals_without_pausing_runtime(self):
+        source = LIVE_JS.read_text(encoding="utf-8")
+        self.assertIn("visibility:hidden!important", source)
+        self.assertIn("align-animations-off #align-bande", source)
+        self.assertNotIn("a.pause()", source)
+        self.assertNotIn("animCur.pause()", source)
+        self.assertIn("timerCur = setTimeout", source)
+        self.assertIn("function appliquerAnimations()", source)
 
 
 if __name__ == "__main__":
