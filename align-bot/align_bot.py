@@ -11625,7 +11625,14 @@ def ecran_lire():
         return []
     _ECRAN_T[0] = time.time()
     etat = _ETAT_COURANT.get("etat") or {}
-    depuis = etat.get("ecran_id") or "10m"
+    # Un heartbeat expiré ne doit pas conserver un curseur ntfy ancien :
+    # il pourrait masquer les nouveaux pings après une coupure/reconnexion.
+    try:
+        dernier_ping = float(etat.get("live_screen_seen_t", 0) or 0)
+    except (TypeError, ValueError):
+        dernier_ping = 0
+    heartbeat_perime = time.time() - dernier_ping > 75
+    depuis = "10m" if heartbeat_perime else (etat.get("ecran_id") or "10m")
     try:
         url = "https://ntfy.sh/" + urllib.parse.quote(LIVE_SUJET + "-ecran") + "/json?poll=1&since=" + urllib.parse.quote(str(depuis))
         with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "align-bot"}), timeout=8) as rep:
@@ -11692,8 +11699,19 @@ def ecran_vers_telegram(etat):
     """Lit les événements de l'écran du live et les publie en détail dans la chaîne du marché (sans son)."""
     for brut in ecran_lire():
         p = brut.split("|")        # EVT|BTC|pression|-1|7 ou PING|LIVE_SCREEN|timestamp
-        if len(p) >= 2 and p[0] == "PING" and p[1] == "LIVE_SCREEN":
-            etat["live_screen_seen_t"] = time.time()
+        if len(p) >= 3 and p[0] == "PING" and p[1] == "LIVE_SCREEN":
+            # Le timestamp vient du navigateur (Date.now en millisecondes).
+            # Un ancien message ntfy rejoué ne doit jamais signaler un écran actif.
+            try:
+                emis = float(p[2])
+                if emis > 10 ** 12:
+                    emis /= 1000.0
+            except (TypeError, ValueError):
+                continue
+            maintenant = time.time()
+            if emis <= 0 or maintenant - emis > 90 or emis - maintenant > 30:
+                continue
+            etat["live_screen_seen_t"] = emis
             continue
         if len(p) < 4 or p[0] != "EVT" or p[1] not in MARCHES:
             continue
