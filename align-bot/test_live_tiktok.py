@@ -30,6 +30,12 @@ class LiveTikTok(unittest.TestCase):
         for x in self.p:
             x.stop()
 
+    def test_bot_and_tradingview_userscript_share_one_live_channel(self):
+        bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
+        match = re.search(r"const SUJET = ['"]([^'"]+)['"];", bande)
+        self.assertIsNotNone(match, "sujet canonique absent du userscript")
+        self.assertEqual(ab.LIVE_SUJET, match.group(1))
+
     def test_bouton_live_dans_les_deux_claviers(self):
         for c in (ab.CLAVIER, ab.CLAVIER_VISITEUR):
             textes = [b["text"] for ligne in json.loads(c)["keyboard"] for b in ligne]
