@@ -2049,7 +2049,7 @@ class AlignAiChainTest(unittest.TestCase):
         etat = {"ia_pause": {"Groq": time.time() + 3600}, "ia_echecs": {"Groq": 3}}
         with patch.dict(os.environ, {"ALIGN_AI_HEALTHY_PROVIDER": "Groq", "GITHUB_RUN_ID": "run-test"}):
             txt, appels = self._ia(etat, echecs=("Gemini", "Gemini 3.8"))
-        self.assertEqual([a[0] for a in appels], ["Gemini", "Gemini 3.8", "Groq"])
+        self.assertEqual([a[0] for a in appels], ["Groq"])
         self.assertIn("Groq", txt)
         self.assertNotIn("Groq", etat["ia_pause"])
         self.assertNotIn("Groq", etat["ia_echecs"])
