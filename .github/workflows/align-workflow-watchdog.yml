@@ -1,20 +1,9 @@
 name: ALIGN Workflow Watchdog
 
 on:
+  # Surveille toutes les exécutions du dépôt, y compris les PR et branches de correction.
   workflow_run:
-    workflows:
-      - "ALIGN MTF validation"
-      - "ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)"
-      - "pages build and deployment"
-      - "ALIGN worker rollover"
-      - "CI Integration Tests"
-      - "ALIGN contrôle IA (manuel)"
-      - "ALIGN audit des messages envoyés (manuel)"
-      - "ALIGN MetaApi vérification"
-      - "ALIGN Topstep vérification"
-      - "ALIGN rejeu entrée sniper (manuel)"
     types: [completed]
-    branches: [main, live-data]
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
