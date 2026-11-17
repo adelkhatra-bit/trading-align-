@@ -168,11 +168,22 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("Ton prénom doit apparaître", self.envoye[0][1]["text"])
         self.assertIn("2 min", self.envoye[1][1]["text"])
 
-    def test_heartbeat_ecran_est_enregistre_sans_annonce_publique(self):
+    def test_heartbeat_ecran_frais_est_enregistre_sans_annonce_publique(self):
         self.etat["live_screen_seen_t"] = 0
-        with mock.patch.object(ab, "ecran_lire", return_value=["PING|LIVE_SCREEN|123456"]):
+        maintenant = __import__("time").time()
+        with mock.patch.object(ab, "time") as horloge:
+            horloge.time.return_value = maintenant
+            with mock.patch.object(ab, "ecran_lire", return_value=[f"PING|LIVE_SCREEN|{int(maintenant * 1000)}"]):
+                ab.ecran_vers_telegram(self.etat)
+        self.assertAlmostEqual(self.etat["live_screen_seen_t"], maintenant, delta=0.01)
+        self.assertEqual(self.publie, [])
+
+    def test_heartbeat_ancien_ne_reconnecte_pas_un_ecran_deconnecte(self):
+        self.etat["live_screen_seen_t"] = 0
+        ancien = int((__import__("time").time() - 600) * 1000)
+        with mock.patch.object(ab, "ecran_lire", return_value=[f"PING|LIVE_SCREEN|{ancien}"]):
             ab.ecran_vers_telegram(self.etat)
-        self.assertGreater(self.etat["live_screen_seen_t"], 0)
+        self.assertEqual(self.etat["live_screen_seen_t"], 0)
         self.assertEqual(self.publie, [])
 
     def test_facture_en_stars(self):
