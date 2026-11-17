@@ -98,17 +98,18 @@ class RadarIaTest(unittest.TestCase):
         def tg(methode, **kw):
             envois.append((methode, kw)); return {"ok": True, "result": {"message_id": len(envois)}}
         props = props_test()
+        derniers = {**DERNIERS, "GOLD": {**DERNIERS["GOLD"], "m1": [{"c": 3995.0}]}}
         with mock.patch.object(ab, "ia", faux_ia), mock.patch.object(ab, "donnees_ia", lambda *a, **k: {}), \
              mock.patch.object(ab, "telegram", tg), mock.patch.object(ab, "_envoi_sur", lambda cid, **kw: tg("sendMessage", chat_id=cid, **kw)), \
              mock.patch.object(ab, "autorise", lambda *a: True), mock.patch.object(ab, "marches_choisis", lambda e, c: {"GOLD", "BTC", "NASDAQ"}), \
              mock.patch.object(ab, "classer_marches", lambda d, e, c, n=None: props):
             etat = {"auto": {"GOLD": ["42"]}}
-            ab.radar_tick(etat, {"42"}, DERNIERS, now=1_000_000.0)            # GOLD prêt : alerte → 1 appel IA
+            ab.radar_tick(etat, {"42"}, derniers, now=1_000_000.0)            # GOLD prêt : alerte → 1 appel IA
             self.assertEqual(len(appels), 1)
             self.assertIn("GOLD se réveille", envois[0][1]["text"])
             self.assertIn("Zone d'entrée", envois[0][1]["text"])               # les niveaux calculés restent affichés
             props[0] = dict(props[0], atr_n=0.5, dist=2.0)
-            ab.radar_tick(etat, {"42"}, DERNIERS, now=1_000_000.0 + 300)      # simple édition : aucune nouvelle IA, phrases gardées
+            ab.radar_tick(etat, {"42"}, derniers, now=1_000_000.0 + 300)      # simple édition : aucune nouvelle IA, phrases gardées
             self.assertEqual(len(appels), 1)
 
     def test_ia_qui_contredit_le_sens_est_jetee(self):
@@ -222,3 +223,29 @@ class TestSensEnTete(unittest.TestCase):
         self.assertIn("redescend", ab.ligne_vers_zone(1))
         self.assertIn("rejection", ab.ligne_vers_zone(-1, True))
         self.assertEqual(ab.traduire(ab.ligne_vers_zone(-1)), ab.ligne_vers_zone(-1, True))
+
+class VerdictRobustnessTest(unittest.TestCase):
+    def test_partial_market_context_waits_for_closed_mtf_data(self):
+        self.assertIn("attente de donn\u00e9es MTF cl\u00f4tur\u00e9es", ab.prochaine({}, {}))
+
+    def test_gold_without_confirmed_direction_waits_safely(self):
+        r = {"market": "GOLD", "m1": [{"c": 100.0}]}
+        with mock.patch.object(ab, "prochaine", return_value="\u23f3 En attente de confirmation"):
+            title, reason = ab.verdict(r, {})
+        self.assertIn("N'ENTRE PAS", title)
+        self.assertIn("En attente de confirmation", reason)
+
+    def test_ai_radar_skips_incomplete_market_summary_without_m1_price(self):
+        self.assertIsNone(ab.intro_ia_radar({}, "GOLD", {}, {}, props_test()[0], None))
+
+    def test_ai_radar_data_accepts_missing_confirmed_direction(self):
+        r = {"m1": [{"c": 100.0}], "dirs": [0] * 11, "rsis": [50] * 11}
+        with mock.patch.object(ab, "verdict", return_value=("N'ENTRE PAS", "En attente")), \
+             mock.patch.object(ab, "profil_strategie", return_value=""), \
+             mock.patch.object(ab, "plan_indicateur", return_value={"available": False}), \
+             mock.patch.object(ab, "resume_volume", return_value={}), \
+             mock.patch.object(ab, "timeframe_attendu", return_value="M5"), \
+             mock.patch.object(ab, "prochaine_cloture_bougie", return_value=time.time() + 60), \
+             mock.patch.object(ab, "lecons_pour", return_value=[]):
+            data = ab.donnees_ia("GOLD", r, {})
+        self.assertIsNone(data["niveau de cassure 5 min"])
