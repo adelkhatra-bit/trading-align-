@@ -14,6 +14,19 @@ class LiveVoiceDisplayLanguage(unittest.TestCase):
         self.assertIn("id = 'align-live-animations'", source)
         self.assertIn("left:18px;bottom:72px", source)
 
+    def test_all_live_controls_share_a_collapsible_bottom_dock(self):
+        source = LIVE_JS.read_text(encoding="utf-8")
+        self.assertIn("align-live-controls-dock", source)
+        self.assertIn("align-live-controls-items", source)
+        self.assertIn("align-live-controls-toggle", source)
+        self.assertIn("right:16px!important", source)
+        self.assertIn("bottom:16px!important", source)
+        self.assertIn("top:auto!important", source)
+        self.assertIn("controlsDockItems.appendChild(button)", source)
+        self.assertIn("localStorage.setItem('alignControlsDockCollapsed'", source)
+        self.assertIn("Afficher les commandes ALIGN", source)
+        self.assertIn("controlsDock.remove()", source)
+
     def test_animation_off_hides_visuals_without_pausing_or_disabling_them(self):
         source = LIVE_JS.read_text(encoding="utf-8")
         start = source.index("const cssAnimationsToggle = document.createElement('style');")

@@ -225,6 +225,46 @@
     try { localStorage.setItem('alignAnimationsEnabled', animationsActives ? '1' : '0'); } catch (e) {}
     appliquerAnimations();
   });
+  // Dock unique des commandes ALIGN : toujours en bas, repliable, sans recouvrir l'en-tête TradingView.
+  document.getElementById('align-live-controls-dock')?.remove();
+  const controlsDock = document.createElement('div');
+  controlsDock.id = 'align-live-controls-dock';
+  controlsDock.setAttribute('role', 'group');
+  controlsDock.setAttribute('aria-label', 'Commandes ALIGN');
+  controlsDock.style.cssText = 'position:fixed!important;left:auto!important;right:16px!important;top:auto!important;bottom:16px!important;z-index:2147483000!important;display:flex!important;align-items:flex-end!important;justify-content:flex-end!important;gap:8px!important;max-width:calc(100vw - 32px)!important;pointer-events:auto!important;';
+  const controlsDockItems = document.createElement('div');
+  controlsDockItems.id = 'align-live-controls-items';
+  controlsDockItems.style.cssText = 'display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;max-width:calc(100vw - 90px);pointer-events:auto;';
+  [voixBtn, voixLangueBtn, animationsBtn].forEach(button => {
+    button.style.setProperty('position', 'relative', 'important');
+    button.style.setProperty('left', 'auto', 'important');
+    button.style.setProperty('right', 'auto', 'important');
+    button.style.setProperty('top', 'auto', 'important');
+    button.style.setProperty('bottom', 'auto', 'important');
+    button.style.setProperty('z-index', 'auto', 'important');
+    button.style.setProperty('margin', '0', 'important');
+    controlsDockItems.appendChild(button);
+  });
+  const controlsDockToggle = document.createElement('button');
+  controlsDockToggle.id = 'align-live-controls-toggle';
+  controlsDockToggle.type = 'button';
+  controlsDockToggle.style.cssText = 'position:relative!important;min-width:42px;padding:9px 12px;border:1px solid rgba(255,255,255,.55);border-radius:18px;background:#18212b;color:#fff;font:800 13px system-ui;cursor:pointer;pointer-events:auto;box-shadow:0 2px 12px rgba(0,0,0,.35);';
+  let controlsDockCollapsed = false;
+  try { controlsDockCollapsed = localStorage.getItem('alignControlsDockCollapsed') === '1'; } catch (e) {}
+  function appliquerDockCommandes() {
+    controlsDockItems.style.display = controlsDockCollapsed ? 'none' : 'flex';
+    controlsDockToggle.textContent = controlsDockCollapsed ? 'ALIGN +' : '−';
+    controlsDockToggle.title = controlsDockCollapsed ? 'Afficher les commandes ALIGN' : 'Réduire les commandes ALIGN';
+    controlsDockToggle.setAttribute('aria-expanded', String(!controlsDockCollapsed));
+  }
+  controlsDockToggle.addEventListener('click', () => {
+    controlsDockCollapsed = !controlsDockCollapsed;
+    try { localStorage.setItem('alignControlsDockCollapsed', controlsDockCollapsed ? '1' : '0'); } catch (e) {}
+    appliquerDockCommandes();
+  });
+  controlsDock.append(controlsDockItems, controlsDockToggle);
+  document.body.appendChild(controlsDock);
+  appliquerDockCommandes();
   const cssAnimationsToggle = document.createElement('style');
   cssAnimationsToggle.textContent = 'html.align-animations-off #align-bande,html.align-animations-off #align-pnl,html.align-animations-off .align-punch,html.align-animations-off .align-ping,html.align-animations-off .align-coeur,html.align-animations-off .align-billet,html.align-animations-off .align-argent,html.align-animations-off #align-feu,html.align-animations-off #align-flash-or,html.align-animations-off #align-show,html.align-animations-off #align-cadre,html.align-animations-off #align-ennui,html.align-animations-off #align-chrono,html.align-animations-off #align-etiq,html.align-animations-off #align-masque{visibility:hidden!important;opacity:0!important;pointer-events:none!important}';
   document.head.appendChild(cssAnimationsToggle);
@@ -1543,7 +1583,7 @@
   const masqueT = setInterval(poserMasque, 300); poserMasque();
   window.__ALIGN_BANDE__ = {
     version: VERSION, recu, punch: c => coeurs(1, [c]), plateforme: v => choisirPlateforme(v),
-    stop() { vivant = false; clearTimeout(survolT); cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(coachT); clearInterval(iaT); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); clearInterval(botEtatSyncT); clearInterval(heartbeatT); clearInterval(masqueT); try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {} try { voixBtn.remove(); } catch (e) {} try { voixLangueBtn.remove(); } catch (e) {} try { animationsBtn.remove(); cssAnimationsToggle.remove(); document.documentElement.classList.remove('align-animations-off'); } catch (e) {} masque.remove(); try { cssPunch.remove(); } catch (e) {}   /* v8.4 : plus de vieux styles qui restent après une réinjection */ clearInterval(etiqT); etiqBox.remove(); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
+    stop() { vivant = false; clearTimeout(survolT); cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(coachT); clearInterval(iaT); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); clearInterval(botEtatSyncT); clearInterval(heartbeatT); clearInterval(masqueT); try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {} try { controlsDock.remove(); } catch (e) {} try { voixBtn.remove(); } catch (e) {} try { voixLangueBtn.remove(); } catch (e) {} try { animationsBtn.remove(); cssAnimationsToggle.remove(); document.documentElement.classList.remove('align-animations-off'); } catch (e) {} masque.remove(); try { cssPunch.remove(); } catch (e) {}   /* v8.4 : plus de vieux styles qui restent après une réinjection */ clearInterval(etiqT); etiqBox.remove(); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
       [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur,.align-billet,.align-argent,.align-punch,.align-ping').forEach(x => x.remove()); try { cssBillet.remove(); } catch (e) {} obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
   };
 })();
