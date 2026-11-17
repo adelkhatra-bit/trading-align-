@@ -25,7 +25,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: align-workflow-watchdog
+  group: align-workflow-watchdog-${{ github.event.workflow_run.id || github.run_id }}
   cancel-in-progress: false
 
 jobs:
