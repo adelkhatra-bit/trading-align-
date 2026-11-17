@@ -136,6 +136,11 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn("@updateURL    https://raw.githubusercontent.com/adelkhatra-bit/trading-auto/main/docs/live/align-bande-live.user.js", self.js)
         self.assertIn("@downloadURL  https://raw.githubusercontent.com/adelkhatra-bit/trading-auto/main/docs/live/align-bande-live.user.js", self.js)
         self.assertIn("const VERSION = '12.1'", self.js)
+        vue_start = self.js.index("function vueTxt()")
+        vue_txt = self.js[vue_start:self.js.index("let vueVue", vue_start)]
+        self.assertIn("try {", vue_txt)
+        self.assertIn("catch (e) {", vue_txt)
+        self.assertIn("if (!c || typeof c.symbol !== 'function' || typeof c.resolution !== 'function') return '';", vue_txt)
         self.assertIn("live-data/live.json", self.js)
         self.assertIn("10 * 60 * 1000", self.js)
         self.assertIn("synchroniserEtatBot()", self.js)
