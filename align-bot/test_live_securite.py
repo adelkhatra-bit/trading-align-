@@ -140,11 +140,16 @@ class PageLive(unittest.TestCase):
     def test_page_format_transparency_sources(self):
         self.assertIn("width: 1080px; height: 1920px", self.PAGE)
         self.assertIn("background: transparent", self.PAGE)
-        self.assertIn("raw.githubusercontent.com/adelkhatra-bit/trading-auto/live-data/live.json", self.PAGE)
+        self.assertIn("raw.githubusercontent.com/adelkhatra-bit/trading-align-/live-data/live.json", self.PAGE)
         self.assertIn("Thomas", self.PAGE); self.assertIn("Leïla", self.PAGE)
         self.assertIn("Pas un conseil financier", self.PAGE)
         self.assertIn("@align_mtf_adel_bot", self.PAGE)
         self.assertIn("Position en préparation sur", self.PAGE)
+
+    def test_favorite_loader_uses_canonical_align_pages_domain(self):
+        favori = (RACINE / "docs" / "live" / "favori.html").read_text(encoding="utf-8")
+        self.assertIn("https://adelkhatra-bit.github.io/trading-align-/live/align-bande-live.user.js", favori)
+        self.assertNotIn("trading-auto", favori)
 
     def test_no_forbidden_words_or_promises(self):
         mots = re.findall(r"(?i)\b(like|likes|follow|followers?|cadeau|gagn\w*|garanti\w*|profit certain|abonne\w*)\b", self.PAGE)
