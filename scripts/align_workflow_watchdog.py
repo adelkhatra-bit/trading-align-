@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import io
 import os
 import re
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 
 API = "https://api.github.com"
 REPO = os.environ["GITHUB_REPOSITORY"]
@@ -121,14 +123,23 @@ def transient_failure(jobs: list[dict]) -> bool:
                 },
             )
             with urllib.request.urlopen(req, timeout=25) as response:
-                log = response.read(2_000_000).decode("utf-8", errors="replace")
+                raw = response.read(8_000_000)
+            # GitHub redirects job-log downloads to a ZIP archive.
+            try:
+                with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+                    log = "\n".join(
+                        archive.read(name).decode("utf-8", errors="replace")
+                        for name in archive.namelist()
+                        if not name.endswith("/")
+                    )
+            except zipfile.BadZipFile:
+                log = raw.decode("utf-8", errors="replace")
         except Exception as exc:
             print(f"WATCHDOG_LOG_UNAVAILABLE job={job.get('id')} error={type(exc).__name__}")
             continue
         if any(pattern.search(log) for pattern in patterns):
             return True
     return False
-
 
 def handle_completed(run: dict) -> None:
     name = run.get("name", "")
