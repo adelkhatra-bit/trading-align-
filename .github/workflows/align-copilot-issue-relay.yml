@@ -56,4 +56,5 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           ALIGN_ISSUE_NUMBER: "431"
           ALIGN_ALLOWED_AUTHOR: "adelkhatra-bit"
+          ALIGN_RELAY_START_COMMENT_ID: "6962101708"
         run: python3 scripts/align_copilot_issue_relay.py
