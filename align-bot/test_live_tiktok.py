@@ -243,8 +243,10 @@ class LiveTikTok(unittest.TestCase):
         with mock.patch.object(ab, "ALIGN_TV_API_URL", ""), \
              mock.patch.object(ab, "ALIGN_TV_READ_TOKEN", ""):
             ab.menu_live(self.etat, "1")
-        self.assertIn("Bridge ROBOT V12 non configuré", self.envoye[-1][1]["text"])
-        self.assertIn("Kraken/Yahoo", self.envoye[-1][1]["text"])
+        self.assertIn("Bridge ROBOT V12 non connecté", self.envoye[-1][1]["text"])
+        self.assertIn("analyses et signaux suspendus", self.envoye[-1][1]["text"])
+        self.assertIn("données TradingView", self.envoye[-1][1]["text"])
+        self.assertNotIn("Yahoo", self.envoye[-1][1]["text"])
 
     def test_menu_live_admin_ne_confond_pas_configuration_et_connexion_bridge(self):
         with mock.patch.object(ab, "ALIGN_TV_API_URL", "https://bridge.example"), \
