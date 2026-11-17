@@ -219,11 +219,11 @@
     if (!voixActive || !item || item.en || !('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return;
     const maintenant = Date.now();
     if (maintenant - voixDerniere < 12000) return;
-    let phrase = String(item.texte || '').replace(/^🇫🇷\\s*/, '')
+    let phrase = String(item.texte || '').replace(/^🇫🇷\s*/, '')
       .replace(/⚠️ Ceci n'est pas un conseil en investissement[^•]*/gi, '')
-      .replace(/https?:\\/\\/\\S+/g, '')
-      .replace(/[\\p{Extended_Pictographic}\\uFE0F]/gu, ' ')
-      .replace(/\\s+/g, ' ').trim();
+      .replace(/https?:\/\/\\S+/g, '')
+      .replace(/[\p{Extended_Pictographic}\uFE0F]/gu, ' ')
+      .replace(/\s+/g, ' ').trim();
     if (phrase.length < 12 || phrase === voixTexte) return;
     phrase = phrase.slice(0, 220);
     try {
