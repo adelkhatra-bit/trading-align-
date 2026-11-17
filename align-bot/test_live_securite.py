@@ -151,6 +151,16 @@ class PageLive(unittest.TestCase):
         self.assertIn("https://adelkhatra-bit.github.io/trading-align-/live/align-bande-live.user.js", favori)
         self.assertNotIn("trading-auto", favori)
 
+    def test_production_workflow_requires_live_tradingview_bridge(self):
+        workflow = (RACINE / ".github" / "workflows" / "align-bot.yml").read_text(encoding="utf-8")
+        bridge = workflow.split("      - name: Vérifier le bridge TradingView ROBOT V12", 1)[1].split("      - name: Analyse BTC + Gold + NASDAQ", 1)[0]
+        self.assertNotIn("continue-on-error: true", bridge)
+        self.assertIn("raise SystemExit", bridge)
+        self.assertIn("ALIGN_TV_API_URL", bridge)
+        self.assertIn("ALIGN_TV_READ_TOKEN", bridge)
+        self.assertIn("BRIDGE_CONFIRMED", bridge)
+        self.assertNotIn("Kraken/Yahoo", bridge)
+
     def test_no_forbidden_words_or_promises(self):
         mots = re.findall(r"(?i)\b(like|likes|follow|followers?|cadeau|gagn\w*|garanti\w*|profit certain|abonne\w*)\b", self.PAGE)
         self.assertEqual(mots, [])
