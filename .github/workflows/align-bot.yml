@@ -232,7 +232,7 @@ jobs:
           ALIGN_TV_READ_TOKEN: ${{ secrets.ALIGN_TV_READ_TOKEN }}
         run: |
           python3 - <<'PY'
-          import json, os, urllib.parse, urllib.request
+          import json, math, os, time, urllib.parse, urllib.request
           base = os.environ.get("ALIGN_TV_API_URL", "").strip().rstrip("/")
           token = os.environ.get("ALIGN_TV_READ_TOKEN", "").strip()
           if not base or not token:
@@ -248,6 +248,18 @@ jobs:
               if payload.get("activeTimeframeFresh") is not True or active not in {"M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"}:
                   raise SystemExit("ÉCHEC: aucune unité TradingView active et fraîche pour " + symbol)
               snap = payload["snapshots"].get(active) or {}
+              # Le prix affiché sur TradingView doit être présent, positif et reçu depuis moins de 30 secondes.
+              try:
+                  price = float(snap.get("price"))
+                  price_updated_at = snap.get("updatedAt")
+                  price_updated_ms = float(price_updated_at)
+                  if price_updated_ms < 100000000000:
+                      price_updated_ms *= 1000
+                  price_age_ms = time.time() * 1000 - price_updated_ms
+              except (TypeError, ValueError):
+                  raise SystemExit("ÉCHEC: prix TradingView ou horodatage absent pour " + symbol)
+              if not math.isfinite(price) or price <= 0 or price_age_ms < 0 or price_age_ms > 30000:
+                  raise SystemExit("ÉCHEC: prix TradingView invalide ou périmé pour " + symbol)
               robot = snap.get("robotV12") or {}
               if snap.get("fresh") is not True or not isinstance(robot, dict) or not robot:
                   raise SystemExit("ÉCHEC: snapshot actif frais ou données ROBOT V12 absents pour " + symbol)
