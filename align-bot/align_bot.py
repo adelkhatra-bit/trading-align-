@@ -3707,6 +3707,14 @@ def ia(etat, consigne, donnees, cle_cache=None, duree=600, premium=False, recher
     txt, erreurs = "", []
     par_jour = etat.setdefault("ia_fournisseur_jour", {})
     claude_t = etat.setdefault("ia_claude_t", {})
+    # Le préflight du même run a prouvé qu'un fournisseur répond réellement.
+    # On retire uniquement son ancien cooldown ; les plafonds journaliers restent strictement appliqués.
+    sain = os.environ.get("ALIGN_AI_HEALTHY_PROVIDER", "").strip()
+    marque_saine = f"{os.environ.get('GITHUB_RUN_ID', 'local')}:{sain}"
+    if sain and any(f[0] == sain for f in IA_FOURNISSEURS) and etat.get("ia_preflight_marker") != marque_saine:
+        etat.setdefault("ia_pause", {}).pop(sain, None)
+        etat.setdefault("ia_echecs", {}).pop(sain, None)
+        etat["ia_preflight_marker"] = marque_saine
     ordre = list(IA_FOURNISSEURS)
     if recherche:                                       # la recherche Google gratuite n'existe que sur Gemini 3.8 : on l'essaie d'abord
         ordre.sort(key=lambda f: 0 if f[0] == "Gemini 3.8" else 1)
