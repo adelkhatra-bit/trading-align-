@@ -1,4 +1,5 @@
 """Regression checks for configured external AI provider model identifiers."""
+import os
 import unittest
 
 import align_bot as ab
