@@ -51,6 +51,71 @@ class ClosedMtfSafety(unittest.TestCase):
                     conflicting[idx] = -direction
                     self.assertEqual(ab.direction_confirmee_marche(market, conflicting, direction), 0)
 
+    def test_mtf_profile_uses_only_four_closed_directions_for_gold_nasdaq(self):
+        for market in ("GOLD", "NASDAQ"):
+            # Les lectures en formation sont toutes LONG, mais la dernière clôture M5 contredit le plan.
+            forming = [1] * 11
+            closed = [1] * 11
+            closed[2] = -1
+            profile = ab.profil_strategie({
+                "market": market, "dirs": forming, "dirs_cloturees": closed
+            })
+            self.assertEqual(profile["mode"], "ATTENTE")
+            self.assertEqual(profile["direction"], 0)
+            self.assertFalse(profile["m5_aligne"])
+            self.assertIn("M5", profile["contexte"])
+
+            # Les clôtures sont toutes LONG : les bougies en formation SHORT ne doivent pas les écraser.
+            profile = ab.profil_strategie({
+                "market": market, "dirs": [-1] * 11, "dirs_cloturees": [1] * 11
+            })
+            self.assertEqual(profile["direction"], 1)
+            self.assertTrue(profile["m5_aligne"])
+
+            # Sans historique de clôtures, ne jamais retomber sur les directions en formation.
+            profile = ab.profil_strategie({"market": market, "dirs": forming})
+            self.assertEqual(profile["mode"], "ATTENTE")
+            self.assertEqual(profile["direction"], 0)
+
+    def test_gold_nasdaq_dashboard_uses_closed_directions_without_forming_fallback(self):
+        for market in ("GOLD", "NASDAQ"):
+            r = {
+                "market": market,
+                "dirs": [1] * 11,
+                "dirs_cloturees": [0] * 11,
+                "dirPlan": 0,
+                "confirme": 0,
+                "dirW": 0,
+            }
+            message = "\n".join(ab.strategie_mtf(r))
+            self.assertIn("Tendance principale 4 h : 🟠➖", message)
+            self.assertIn("Confirmation 1 h : 🟠➖", message)
+            self.assertIn("Préparation 15 min : 🟠➖", message)
+            self.assertIn("Timing 5 min : 🟠➖", message)
+            self.assertIn("PROFIL RETENU : ATTENTE", message)
+            self.assertIn("Stratégie : aucune", message)
+            self.assertIn("aucune position avant la confluence des quatre clôtures", message)
+
+    def test_gold_nasdaq_daily_weekly_block_cannot_be_bypassed_by_forming_trend(self):
+        for market in ("GOLD", "NASDAQ"):
+            r = {
+                "market": market,
+                "posD": 0.90,
+                "posW": 0.50,
+                "dirs": [1] * 11,
+                "dirs_cloturees": [-1] * 11,
+            }
+            self.assertTrue(ab.bloque_dw(r, 1))
+        # BTC conserve son comportement historique.
+        btc = {
+            "market": "BTC",
+            "posD": 0.90,
+            "posW": 0.50,
+            "dirs": [1] * 11,
+            "dirs_cloturees": [-1] * 11,
+        }
+        self.assertFalse(ab.bloque_dw(btc, 1))
+
     def test_mtf_confirmation_rejects_stale_m5_and_stale_m1(self):
         now = int(time.time())
         ctx = fresh_context(now)

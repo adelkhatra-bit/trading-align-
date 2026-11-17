@@ -1286,9 +1286,34 @@ def alignement(r):
     return maj, (2 if maj else 0)
 
 
+def directions_pour_strategie(r):
+    """Source MTF de décision : clôtures pour GOLD/NASDAQ, série historique pour BTC."""
+    if r.get("market") in ("GOLD", "NASDAQ"):
+        directions = list(r.get("dirs_cloturees") or [])
+    else:
+        directions = list(r.get("dirs") or [])
+    return directions + [0] * max(0, 11 - len(directions))
+
+
 def profil_strategie(r):
-    """Classe le setup sans confondre alignement directionnel et autorisation d’entrée."""
-    D = r["dirs"]
+    """Classe le setup ; GOLD/NASDAQ utilisent exclusivement les quatre dernières clôtures MTF."""
+    market = r.get("market")
+    D = directions_pour_strategie(r)
+    if market in ("GOLD", "NASDAQ"):
+        indices_mtf = (2, 4, 7, 9)  # M5, M15, H1, H4
+        if (
+            any(D[i] not in (-1, 1) for i in indices_mtf)
+            or len({D[i] for i in indices_mtf}) != 1
+        ):
+            return {
+                "mode": "ATTENTE",
+                "direction": 0,
+                "horizon": "aucune position avant quatre clôtures concordantes",
+                "contexte": f"{market} : M5, M15, H1 et H4 doivent clôturer dans le même sens",
+                "m5_aligne": False,
+                "contre_tendance": False,
+                "statut": "ATTENTE — quatre clôtures M5/M15/H1/H4 requises",
+            }
     d5, d15, d1h, d4h = D[2], D[4], D[7], D[9]
     if d4h and d1h == d4h and d15 == -d4h and d5 == d15:
         direction = d15
@@ -1610,7 +1635,7 @@ def ligne_retournement(r):
 def ligne_strategie(r):
     """Même lecture que la barre TradingView v24 : stratégie, état, score /100, motif."""
     d = r.get("dirPlan") or 0
-    dirs_strategie = (r.get("dirs_cloturees") or r.get("dirs") or []) if r.get("market") in ("GOLD", "NASDAQ") else (r.get("dirs") or [])
+    dirs_strategie = directions_pour_strategie(r)
     strat, etat, motif = strategie_alignement(dirs_strategie, d, r.get("dirW") or 0, r.get("market"))
     if not strat:
         return ligne_retournement(r) + [f"🏷 Stratégie : aucune — {motif}"]
@@ -1645,7 +1670,7 @@ def lecture_unite_active(r):
 def strategie_mtf(r):
     """H4/H1 = fond, M15 = préparation, M5 = timing ; profil scalp/intraday/swing explicite."""
     fl = lambda x: "🟢⬆️" if x == 1 else "🔴⬇️" if x == -1 else "🟠➖"
-    D = r.get("dirs_cloturees") or r["dirs"] if r.get("market") in ("GOLD", "NASDAQ") else r["dirs"]
+    D = directions_pour_strategie(r)
     d5, d15, d1h, d4h, dD = D[2], D[4], D[7], D[9], D[10]
     profil = profil_strategie(r)
     l = ["🧭 STRATÉGIE MULTI-UT",
@@ -1668,6 +1693,8 @@ def strategie_mtf(r):
         l.append(f"✅ Biais H4/H1 validé   {SENS[r['confirme']]}\n⏳ Le 15 min retrace : attendre le retour du M5 dans le sens du biais")
     elif r.get("confirme"):
         l.append(f"✅ Biais de fond H4/H1 validé   {SENS[r['confirme']]}")
+    elif r.get("market") in ("GOLD", "NASDAQ"):
+        l.append("⛔ GOLD/NASDAQ : aucune position avant la confluence des quatre clôtures M5/M15/H1/H4 dans le même sens.")
     elif profil["mode"].startswith("SCALPING"):
         l.append(f"🟡 Setup court terme détecté   {SENS[profil['direction']]}\n⛔ Ce setup n’est pas un swing et reste soumis au déclencheur clôturé.")
     elif not d4h:
@@ -1692,7 +1719,7 @@ def bloque_dw(r, d, prix=None):
         return False
     # Jour de TENDANCE (Daily, 4 h, 1 h et 15 min dans le même sens, aucun voyant de retournement sur les petites UT) :
     # le prix est forcément « en bas » (baisse) ou « en haut » (hausse) du Daily — ce n'est pas une raison de rater le mouvement.
-    dirs = r.get("dirs") or []
+    dirs = directions_pour_strategie(r)
     if len(dirs) >= 11 and dirs[10] == d and dirs[9] == d and dirs[7] == d and dirs[4] == d \
             and sum(1 for x in dirs[:5] if x == -d) == 0:
         return False
