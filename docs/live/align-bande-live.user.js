@@ -480,11 +480,21 @@
   }, 15000);
   let iaPool = [], iaPools = {}, iaN = 0;
   EN.push(['⚡ UNE POSITION SE PRÉPARE • attends la confirmation, ne cours pas après le prix • lien en bio', '⚡ A TRADE IS GETTING READY • wait for confirmation, never chase price • link in bio']);
+  // Une analyse IA doit être visible ET animée sur le graphique, sans recouvrir une annonce prioritaire.
+  // La bulle, le ping sur le prix et la lueur neutre signalent un commentaire du coach, pas un signal d'entrée.
+  function afficherIA(texte) {
+    const phrase = String(texte || '').trim();
+    if (!phrase || occupe || file.length) return false;
+    montrer('🧠 ' + phrase, false, 2, 'membre');
+    coeurs(1, ['🧠', '📡']);
+    lueur(0);
+    return true;
+  }
   function recuIA(json) {
     try {
       const donnees = JSON.parse(json);
       const propres = paires => (Array.isArray(paires) ? paires : [])
-        .filter(p => Array.isArray(p) && p.length === 2 && typeof p[0] === 'string' && typeof p[1] === 'string' && !/\d|telegram/i.test(p[0] + p[1]))
+        .filter(p => Array.isArray(p) && p.length === 2 && typeof p[0] === 'string' && typeof p[1] === 'string' && !/\\d|telegram/i.test(p[0] + p[1]))
         .map(([fr, en]) => { const f = sansPrix(fr); if (!EN.some(e => e[0] === f)) EN.push([f, en]); return f; });
       if (Array.isArray(donnees)) {
         iaPools = {};
@@ -495,6 +505,10 @@
         iaPool = iaPools[codeMarche()] || [];
       } else return;
       iaN = 0;
+      // Affichage immédiat du premier commentaire pour le marché ouvert ; la suite reste espacée.
+      const marche = codeMarche();
+      const pool = Object.keys(iaPools).length ? (iaPools[marche] || []) : iaPool;
+      if (pool.length && afficherIA(pool[0])) iaN = 1;
     } catch (e) {}
   }
   const iaT = setInterval(() => {
@@ -502,7 +516,7 @@
     const m = codeMarche();
     const pool = Object.keys(iaPools).length ? (iaPools[m] || []) : iaPool;  // commentaires du marché affiché uniquement
     if (!pool.length) return;
-    montrer(pool[iaN++ % pool.length], false, 1);
+    afficherIA(pool[iaN++ % pool.length]);
   }, 75 * 1000);
   let astuceN = 0;
   const astuceT = setInterval(() => {
