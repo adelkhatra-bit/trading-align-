@@ -93,6 +93,7 @@ class ClosedMtfSafety(unittest.TestCase):
             self.assertIn("Préparation 15 min : 🟠➖", message)
             self.assertIn("Timing 5 min : 🟠➖", message)
             self.assertIn("PROFIL RETENU : ATTENTE", message)
+            self.assertIn("aucune position avant la confluence des quatre clôtures", message)
 
     def test_gold_nasdaq_daily_weekly_block_cannot_be_bypassed_by_forming_trend(self):
         for market in ("GOLD", "NASDAQ"):

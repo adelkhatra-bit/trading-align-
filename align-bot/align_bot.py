@@ -1694,6 +1694,8 @@ def strategie_mtf(r):
         l.append(f"✅ Biais H4/H1 validé   {SENS[r['confirme']]}\n⏳ Le 15 min retrace : attendre le retour du M5 dans le sens du biais")
     elif r.get("confirme"):
         l.append(f"✅ Biais de fond H4/H1 validé   {SENS[r['confirme']]}")
+    elif r.get("market") in ("GOLD", "NASDAQ"):
+        l.append("⛔ GOLD/NASDAQ : aucune position avant la confluence des quatre clôtures M5/M15/H1/H4 dans le même sens.")
     elif profil["mode"].startswith("SCALPING"):
         l.append(f"🟡 Setup court terme détecté   {SENS[profil['direction']]}\n⛔ Ce setup n’est pas un swing et reste soumis au déclencheur clôturé.")
     elif not d4h:
