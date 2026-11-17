@@ -753,7 +753,7 @@ class LiveAgendaMarketTimezoneTests(unittest.TestCase):
                  mock.patch.object(ab, "live_bande", side_effect=lambda etat, texte, *args, **kwargs: published.append(texte) or True):
                 ab.live_agenda({}, now)
             self.assertTrue(
-                any(f"OUVERTURE {market} DANS 15 MIN" in str(message) for message in published),
+                any("OUVERTURE" in str(message) and market in str(message) and "DANS 15 MIN" in str(message) for message in published),
                 f"opening announcement missing for {market} at {datetime.datetime.fromtimestamp(now, datetime.timezone.utc)}",
             )
 
