@@ -10986,9 +10986,12 @@ def _ack_callback_rapide(cb, text):
 # Le bot publie sur un canal privé (ntfy, gratuit). Le script Tampermonkey de l'onglet TradingView du live
 # l'écoute : texte → bande qui défile ; « CMD:… » → change l'unité de temps / le marché 15 s puis revient.
 # Jamais le sens, l'entrée, le SL ni le TP sur la bande (règle du live).
-# Canal privé bot → graphique : secret GitHub ALIGN_LIVE_SUJET, sinon dérivé du jeton Telegram (jamais écrit dans le dépôt public)
-LIVE_SUJET = (os.environ.get("ALIGN_LIVE_SUJET", "").strip() or
-              ("align-live-" + hashlib.sha256(("align-live:" + TOKEN).encode()).hexdigest()[:16] if TOKEN else ""))
+# Canal partagé bot ↔ userscript TradingView. Le userscript est public et fixe ce sujet :
+# il est donc l'unique valeur canonique. Un secret GitHub différent désynchroniserait silencieusement les deux côtés.
+LIVE_SUJET = "align-live-2a4bccafd9548d93"
+_live_sujet_configure = os.environ.get("ALIGN_LIVE_SUJET", "").strip()
+if _live_sujet_configure and _live_sujet_configure != LIVE_SUJET:
+    print("LIVE_CHANNEL_CONFIG_MISMATCH: ALIGN_LIVE_SUJET ignoré; sujet canonique du userscript appliqué.", flush=True)
 LIVE_LIEN = os.environ.get("ALIGN_LIVE_LIEN", "https://www.tiktok.com/@adelkhatra/live").strip()
 PRIX_MAIN_STARS = int(os.environ.get("PRIX_MAIN_STARS", "25"))         # ≈ 0,50 € pour l'abonné
 LIVE_DUREE_MAIN = 15
