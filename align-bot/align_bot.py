@@ -11565,13 +11565,13 @@ def live_agenda(etat, maintenant):
             continue
         t = int(heure_locale.replace(hour=hh, minute=mm, second=0, microsecond=0).timestamp())
         reste = t - maintenant
-            if 14 * 60 < reste <= 16 * 60:
-                texte = f"🔔 OUVERTURE {nom} DANS 15 MIN • ça peut secouer BTC • GOLD • NASDAQ • prépare-toi 👉 lien en bio"
-            elif 0 <= -reste <= 3 * 60:
-                texte = f"🔔 {nom} EST OUVERT ! le volume arrive sur BTC • GOLD • NASDAQ • ça monte ou ça descend ? dis-le en commentaire 👇"
-            else:
-                continue
-            n += bool(live_bande(etat, texte, f"ses{nom}{t}{reste > 0}", 3600))
+        if 14 * 60 < reste <= 16 * 60:
+            texte = f"🔔 OUVERTURE {nom} DANS 15 MIN • ça peut secouer BTC • GOLD • NASDAQ • prépare-toi 👉 lien en bio"
+        elif 0 <= -reste <= 3 * 60:
+            texte = f"🔔 {nom} EST OUVERT ! le volume arrive sur BTC • GOLD • NASDAQ • ça monte ou ça descend ? dis-le en commentaire 👇"
+        else:
+            continue
+        n += bool(live_bande(etat, texte, f"ses{nom}{t}{reste > 0}", 3600))
     try:
         evts = calendrier(etat, maintenant) or []
     except Exception as ex:
