@@ -132,10 +132,10 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn("if (!voixActive", self.js)
         self.assertIn("speechSynthesis.speak(utterance)", self.js)
         self.assertNotIn("voirFiboProgression", self.js)
-        self.assertIn("// @version      12.1", self.js)
+        self.assertIn("// @version      12.2", self.js)
         self.assertIn("@updateURL    https://raw.githubusercontent.com/adelkhatra-bit/trading-auto/main/docs/live/align-bande-live.user.js", self.js)
         self.assertIn("@downloadURL  https://raw.githubusercontent.com/adelkhatra-bit/trading-auto/main/docs/live/align-bande-live.user.js", self.js)
-        self.assertIn("const VERSION = '12.1'", self.js)
+        self.assertIn("const VERSION = '12.2'", self.js)
         vue_start = self.js.index("function vueTxt()")
         vue_txt = self.js[vue_start:self.js.index("let vueVue", vue_start)]
         self.assertIn("try {", vue_txt)
