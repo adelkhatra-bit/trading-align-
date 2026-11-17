@@ -1999,7 +1999,11 @@ def prochaine(r, cle):
             return f"🔜 Prochaine entrée : attente H1 clôturée — H4 {SENS[d4]}, H1 pas encore alignée"
         if r.get("dirPlan") != d4:
             return f"🔜 Prochaine entrée : H1/H4 {SENS[d4]} alignées, mais pas de setup confirmé dans ce sens"
-    d = r["confirme"]; R = dict(zip(UT, r["rsis"]))
+    dirs = r.get("dirs_cloturees") or r.get("dirs") or []
+    if len(dirs) < 10:
+        return "\u23f3 Prochaine entr\u00e9e : attente de donn\u00e9es MTF cl\u00f4tur\u00e9es"
+    d = r.get("confirme") or 0
+    R = dict(zip(UT, r.get("rsis") or [50] * 11))
     if d and etire(r, d):
         # Grosses UT en excès : le retournement est possible
         if (d == 1 and R["1h"] >= 70 and R["4h"] >= 65) or (d == -1 and R["1h"] <= 30 and R["4h"] <= 35):
@@ -2026,7 +2030,7 @@ def verdict(r, cle):
         return ("🔴🔴 N'ENTRE PAS", f"⏰ Trop tard : la position {sens} est déjà partie\n⏳ J'attends le prochain setup")
     if r.get("annonce"):
         return ("🔴🔴 N'ENTRE PAS", "📰 News dans moins de 15 min\n💥 Le prix peut bouger très fort")
-    al = r["confirme"]
+    al = r.get("confirme") or 0
     if not al:
         if r.get("market") in ("GOLD", "NASDAQ"):
             attente = prochaine(r, cle).replace("🔜 Prochaine entrée", "⏳ En attente")
@@ -3922,7 +3926,7 @@ def donnees_ia(m, r, cle):
             "position Daily (0 bas, 1 haut)": round(r.get("posD", 0.5), 2), "position Weekly": round(r.get("posW", 0.5), 2),
             "verdict du bot": titre + " / " + raison.replace("\n", " "),
             "zone d'entrée": [round(o["za"], 2), round(o["zb"], 2)] if o.get("za") else None,
-            "niveau de cassure 5 min": round(niveau_cassure(r, r["confirme"]), 2) if r["confirme"] and len(r["b5"]) >= 22 else None,
+            "niveau de cassure 5 min": round(niveau_cassure(r, r.get("confirme")), 2) if r.get("confirme") and len(r.get("b5") or []) >= 22 else None,
             "contexte_macro_dollar": r.get("macro_data") or {},
             "volume": {
                 "M5": resume_volume(r.get("b5"), {"BTC": "Kraken BTC spot", "NASDAQ": "CME NQ futures (proxy)"}.get(m, "Volume proxy GOLD (PAXG ou COMEX selon la source active)"), 300),
@@ -8028,6 +8032,9 @@ RADAR_IA_CACHE_SEC = 900      # une seule rédaction IA par marché et par nivea
 def intro_ia_radar(etat, m, r, cle, p, es):
     """L'IA rédige l'annonce « prépare-toi » (3 lignes, formulation toujours différente) UNIQUEMENT au moment où un marché devient prêt.
     Les chiffres viennent du bot (ia() refuse tout prix absent des données) ; sens contraire à l'indicateur = commentaire jeté."""
+    # Incomplete radar summaries have no verified M1 price; do not request numeric AI commentary.
+    if not isinstance(r, dict) or not (r.get("m1") or []):
+        return None
     try:
         unite = HB_UNITE_VALIDATION.get(r.get("strat") or "", "15 min")
         data = dict(donnees_ia(m, r, cle), radar={
