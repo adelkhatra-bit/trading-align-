@@ -6849,7 +6849,7 @@ def traiter(etat, chats, updates):
             if live_callback(etat, chats, cb, choix, mk, qui):
                 continue
             if choix == "quiet":
-                # Refus persistant : aucun nouveau signal, aucune relance quotidienne et aucun suivi live.
+                # Refus persistant : aucun nouveau signal, rappel ou nouveau suivi coach ; les positions déjà ouvertes restent suivies.
                 silencieux = etat.get("quiet")
                 if not isinstance(silencieux, list):
                     silencieux = []
