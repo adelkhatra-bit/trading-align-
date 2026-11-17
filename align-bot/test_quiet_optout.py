@@ -119,9 +119,11 @@ class QuietOptOutTest(unittest.TestCase):
             },
         }
 
-        with patch.object(ab, "telegram", return_value={"ok": True}), \\
-             patch.object(ab, "DERNIER_ETAT", state), \\
-             patch.object(ab, "TELEGRAM_PULL_MODE", True):
+        with (
+            patch.object(ab, "telegram", return_value={"ok": True}),
+            patch.object(ab, "DERNIER_ETAT", state),
+            patch.object(ab, "TELEGRAM_PULL_MODE", True),
+        ):
             ab.traiter(state, {"11", "22"}, [update])
             # Simule le tour automatique suivant, sans action privée entrante.
             ab.TELEGRAM_PULL_CONTEXT.chat_id = None
