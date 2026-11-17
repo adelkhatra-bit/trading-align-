@@ -253,12 +253,14 @@ jobs:
                   price = float(snap.get("price"))
                   price_updated_at = snap.get("updatedAt")
                   price_updated_ms = float(price_updated_at)
+                  if not math.isfinite(price_updated_ms):
+                      raise SystemExit("ÉCHEC: horodatage TradingView invalide pour " + symbol)
                   if price_updated_ms < 100000000000:
                       price_updated_ms *= 1000
                   price_age_ms = time.time() * 1000 - price_updated_ms
               except (TypeError, ValueError):
                   raise SystemExit("ÉCHEC: prix TradingView ou horodatage absent pour " + symbol)
-              if not math.isfinite(price) or price <= 0 or price_age_ms < 0 or price_age_ms > 30000:
+              if not math.isfinite(price) or price <= 0 or not math.isfinite(price_age_ms) or price_age_ms < 0 or price_age_ms > 30000:
                   raise SystemExit("ÉCHEC: prix TradingView invalide ou périmé pour " + symbol)
               robot = snap.get("robotV12") or {}
               if snap.get("fresh") is not True or not isinstance(robot, dict) or not robot:
