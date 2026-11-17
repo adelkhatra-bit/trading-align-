@@ -13,6 +13,7 @@ class LiveAiCommentaryConfiguration(unittest.TestCase):
         end = source.index("run: exec python3 align_bot.py", start)
         worker = source[start:end]
         self.assertIn('IA_AUTO: "1"', worker)
+        self.assertIn('LIVE_IA_INTERVALLE: "120"', worker)
         self.assertIn('ALIGN_REQUIRE_TV_BRIDGE: "1"', worker)
 
     def test_real_broker_execution_remains_disabled(self):
