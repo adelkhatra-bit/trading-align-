@@ -233,7 +233,7 @@ jobs:
           ALIGN_TV_READ_TOKEN: ${{ secrets.ALIGN_TV_READ_TOKEN }}
         run: |
           python3 - <<'PY'
-          import json, os, urllib.parse, urllib.request
+          import json, math, os, time, urllib.parse, urllib.request
           base = os.environ.get("ALIGN_TV_API_URL", "").strip().rstrip("/")
           token = os.environ.get("ALIGN_TV_READ_TOKEN", "").strip()
           if not base or not token:
@@ -249,6 +249,14 @@ jobs:
               if payload.get("activeTimeframeFresh") is not True or active not in {"M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"}:
                   raise SystemExit("ÉCHEC: aucune unité TradingView active et fraîche pour " + symbol)
               snap = payload["snapshots"].get(active) or {}
+              # Le prix doit lui aussi être réel, positif et mis à jour depuis moins de 30 secondes.
+              try:
+                  price = float(snap.get("price"))
+                  price_age_ms = time.time() * 1000 - float(snap.get("updatedAt") or 0)
+              except (TypeError, ValueError):
+                  raise SystemExit("ÉCHEC: prix TradingView ou horodatage absent pour " + symbol)
+              if not math.isfinite(price) or price <= 0 or price_age_ms < 0 or price_age_ms > 30000:
+                  raise SystemExit("ÉCHEC: prix TradingView invalide ou périmé pour " + symbol)
               robot = snap.get("robotV12") or {}
               if snap.get("fresh") is not True or not isinstance(robot, dict) or not robot:
                   raise SystemExit("ÉCHEC: snapshot actif frais ou données ROBOT V12 absents pour " + symbol)
@@ -263,7 +271,7 @@ jobs:
               stale = [tf for tf in required if get_tf(tf).get("fresh") is not True]
               if stale:
                   raise SystemExit("ÉCHEC: snapshots TradingView absents/périmés pour " + symbol + " : " + ",".join(stale))
-              print(f"BRIDGE_CONFIRMED symbol={symbol} active={active} age_ms={payload.get('activeTimeframeAgeMs')} received={','.join(payload.get('receivedTimeframes', []))} required_fresh={','.join(required)} fresh_snapshot=true robot_v12=true")
+              print(f"BRIDGE_CONFIRMED symbol={symbol} price={price} price_age_ms={int(price_age_ms)} active={active} age_ms={payload.get('activeTimeframeAgeMs')} received={','.join(payload.get('receivedTimeframes', []))} required_fresh={','.join(required)} fresh_snapshot=true robot_v12=true")
           PY
 
       - name: Analyse BTC + Gold + NASDAQ et envoi Telegram
