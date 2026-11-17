@@ -752,6 +752,7 @@ class LiveAgendaMarketTimezoneTests(unittest.TestCase):
                  mock.patch.object(ab, "calendrier", return_value=[]), \
                  mock.patch.object(ab, "live_bande", side_effect=lambda etat, texte, *args, **kwargs: published.append(texte) or True):
                 ab.live_agenda({}, now)
+            # Session labels include their market emoji (for example, "🇯🇵 TOKYO").
             self.assertTrue(
                 any("OUVERTURE" in str(message) and market in str(message) and "DANS 15 MIN" in str(message) for message in published),
                 f"opening announcement missing for {market} at {datetime.datetime.fromtimestamp(now, datetime.timezone.utc)}",
