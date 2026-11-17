@@ -12045,8 +12045,8 @@ def menu_live(etat, cid):
         statut_ecran = ("🟢 Écran TradingView connecté (signal reçu)" if ecran_ok else
                         "🔴 Écran TradingView non connecté — actualise l'onglet du live")
         bridge_configure = bool(ALIGN_TV_API_URL and ALIGN_TV_READ_TOKEN)
-        statut_bridge = ("🟡 Bridge ROBOT V12 : paramètres présents (disponibilité contrôlée par Actions)" if bridge_configure else
-                         "🔴 Bridge ROBOT V12 non configuré — données de repli Kraken/Yahoo")
+        statut_bridge = ("🟡 Bridge ROBOT V12 : paramètres présents (fraîcheur contrôlée avant analyse)" if bridge_configure else
+                         "🔴 Bridge ROBOT V12 non connecté — analyses et signaux suspendus jusqu'au retour des données TradingView")
         texte += f"\n━━━━━━━━━━━━━━━\n{statut_ecran}\n{statut_bridge}\n🔐 Code écran (admin) : {LIVE_SUJET or 'absent'}"
     _envoi_sur(cid, text=texte, **({"reply_markup": kb} if kb else {}))
 
