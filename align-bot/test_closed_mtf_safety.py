@@ -87,12 +87,13 @@ class ClosedMtfSafety(unittest.TestCase):
                 "confirme": 0,
                 "dirW": 0,
             }
-            message = "\\n".join(ab.strategie_mtf(r))
+            message = "\n".join(ab.strategie_mtf(r))
             self.assertIn("Tendance principale 4 h : 🟠➖", message)
             self.assertIn("Confirmation 1 h : 🟠➖", message)
             self.assertIn("Préparation 15 min : 🟠➖", message)
             self.assertIn("Timing 5 min : 🟠➖", message)
             self.assertIn("PROFIL RETENU : ATTENTE", message)
+            self.assertIn("Stratégie : aucune", message)
             self.assertIn("aucune position avant la confluence des quatre clôtures", message)
 
     def test_gold_nasdaq_daily_weekly_block_cannot_be_bypassed_by_forming_trend(self):

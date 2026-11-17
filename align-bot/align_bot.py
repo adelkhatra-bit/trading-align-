@@ -1302,8 +1302,7 @@ def profil_strategie(r):
     if market in ("GOLD", "NASDAQ"):
         indices_mtf = (2, 4, 7, 9)  # M5, M15, H1, H4
         if (
-            len(D) <= max(indices_mtf)
-            or any(D[i] not in (-1, 1) for i in indices_mtf)
+            any(D[i] not in (-1, 1) for i in indices_mtf)
             or len({D[i] for i in indices_mtf}) != 1
         ):
             return {
