@@ -19,6 +19,7 @@ class QuietOptOutTest(unittest.TestCase):
                 "GOLD": {"11": {"dernier_t": 1}},
             },
             "recherche_positions_active": ["11", "22"],
+            "BTC": {"trade": {"qui": {"11": {"e": 100.0, "sl": 95.0, "tp1": 110.0}}}},
             "telegram_outbox": [
                 {"chat_id": "11", "params": {"text": "old alert"}},
                 {"chat_id": "22", "params": {"text": "other user's alert"}},
@@ -43,6 +44,7 @@ class QuietOptOutTest(unittest.TestCase):
         self.assertTrue(all("11" not in {str(x) for x in users} for users in state["auto"].values()))
         self.assertTrue(all("11" not in {str(x) for x in users} for users in state["coach_live"].values()))
         self.assertNotIn("11", {str(x) for x in state["recherche_positions_active"]})
+        self.assertIn("11", state["BTC"]["trade"]["qui"])  # suivi d'une position déjà ouverte conservé
         self.assertEqual([x["chat_id"] for x in state["telegram_outbox"]], ["22"])
         self.assertFalse(ab.coach_actif(state, "11", "BTC"))
         self.assertTrue(ab.coach_actif(state, "22", "BTC"))
@@ -69,6 +71,10 @@ class QuietOptOutTest(unittest.TestCase):
             ab.notifier_coach_live(state, "BTC", r, {})
 
         send.assert_not_called()
+
+    def test_quiet_state_alone_blocks_new_market_alerts(self):
+        state = {"quiet": ["11"], "auto": {"BTC": ["11"]}}
+        self.assertFalse(ab.coach_actif(state, "11", "BTC"))
 
     def test_explicit_coach_activation_clears_quiet_state(self):
         state = {"quiet": ["11"], "bot_off": ["11"], "auto": {}}
