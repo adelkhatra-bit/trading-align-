@@ -3662,7 +3662,8 @@ def _appel_ia(url, modele, cle, messages, recherche=False):
         corps = json.dumps({"model": modele, "temperature": 0.4, "max_tokens": 1000, "messages": messages}).encode()
         if cle:
             h["Authorization"] = f"Bearer {cle}"
-    with urllib.request.urlopen(urllib.request.Request(url, data=corps, headers=h), timeout=25) as rep_:
+    # Chaque fournisseur dispose de 10 s maximum ; un timeout déclenche immédiatement le fournisseur suivant.
+    with urllib.request.urlopen(urllib.request.Request(url, data=corps, headers=h), timeout=10) as rep_:
         j = json.loads(rep_.read().decode())
     if gemini:
         cand = (j.get("candidates") or [{}])[0]
