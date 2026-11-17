@@ -226,7 +226,7 @@
     appliquerAnimations();
   });
   const cssAnimationsToggle = document.createElement('style');
-  cssAnimationsToggle.textContent = 'html.align-animations-off #align-bande,html.align-animations-off .align-punch,html.align-animations-off .align-ping,html.align-animations-off .align-coeur,html.align-animations-off .align-billet,html.align-animations-off .align-argent,html.align-animations-off #align-feu,html.align-animations-off #align-flash-or,html.align-animations-off #align-show,html.align-animations-off #align-cadre,html.align-animations-off #align-ennui{visibility:hidden!important;opacity:0!important;pointer-events:none!important}html.align-animations-off #align-chrono *,html.align-animations-off #align-etiq *{animation:none!important;transition:none!important}';
+  cssAnimationsToggle.textContent = 'html.align-animations-off #align-bande,html.align-animations-off .align-punch,html.align-animations-off .align-ping,html.align-animations-off .align-coeur,html.align-animations-off .align-billet,html.align-animations-off .align-argent,html.align-animations-off #align-feu,html.align-animations-off #align-flash-or,html.align-animations-off #align-show,html.align-animations-off #align-cadre,html.align-animations-off #align-ennui,html.align-animations-off #align-chrono,html.align-animations-off #align-etiq,html.align-animations-off #align-masque{visibility:hidden!important;opacity:0!important;pointer-events:none!important}';
   document.head.appendChild(cssAnimationsToggle);
   appliquerAnimations();
   voixLangueBtn.addEventListener('click', () => {
