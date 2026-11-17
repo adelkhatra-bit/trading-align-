@@ -736,6 +736,7 @@ class LiveOutbox(unittest.TestCase):
         self.assertTrue(all(message.startswith("IA:") for message in sent))
 
 
+class LiveAgendaMarketTimezoneTests(unittest.TestCase):
     def test_live_agenda_uses_local_market_timezones_during_dst_weeks(self):
         cases = (
             # Tokyo is 09:00 JST; in July this is 02:00 Paris, not 01:00.
@@ -746,12 +747,13 @@ class LiveOutbox(unittest.TestCase):
             (datetime.datetime(2026, 10, 26, 13, 15, tzinfo=datetime.timezone.utc).timestamp(), "NEW YORK"),
         )
         for now, market in cases:
-            self.publie.clear()
+            published = []
             with mock.patch.object(ab, "live_actif", return_value=True), \
-                 mock.patch.object(ab, "calendrier", return_value=[]):
-                ab.live_agenda(self.etat, now)
+                 mock.patch.object(ab, "calendrier", return_value=[]), \
+                 mock.patch.object(ab, "live_bande", side_effect=lambda etat, texte, *args, **kwargs: published.append(texte) or True):
+                ab.live_agenda({}, now)
             self.assertTrue(
-                any(f"OUVERTURE {market} DANS 15 MIN" in str(message) for message in self.publie),
+                any(f"OUVERTURE {market} DANS 15 MIN" in str(message) for message in published),
                 f"opening announcement missing for {market} at {datetime.datetime.fromtimestamp(now, datetime.timezone.utc)}",
             )
 
