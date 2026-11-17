@@ -10,6 +10,9 @@ from unittest import mock
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import align_bot as ab
 
+# Capture the production constant before setUp deliberately patches it for isolated tests.
+_LIVE_SUJET_PRODUCTION = ab.LIVE_SUJET
+
 
 class LiveTikTok(unittest.TestCase):
     def setUp(self):
@@ -34,7 +37,7 @@ class LiveTikTok(unittest.TestCase):
         bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
         match = re.search(r"""const SUJET = [\'"]([^\'"]+)[\'"];""", bande)
         self.assertIsNotNone(match, "sujet canonique absent du userscript")
-        self.assertEqual(ab.LIVE_SUJET, match.group(1))
+        self.assertEqual(_LIVE_SUJET_PRODUCTION, match.group(1))
 
     def test_bouton_live_dans_les_deux_claviers(self):
         for c in (ab.CLAVIER, ab.CLAVIER_VISITEUR):
