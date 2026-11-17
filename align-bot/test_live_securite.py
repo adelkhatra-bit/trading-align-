@@ -163,6 +163,8 @@ class PageLive(unittest.TestCase):
         self.assertIn("snap.get(\"updatedAt\")", bridge)
         self.assertIn("math.isfinite(price)", bridge)
         self.assertIn("price_age_ms > 30000", bridge)
+        self.assertIn("prix TradingView invalide ou périmé", bridge)
+        self.assertIn("price={price}", bridge)
         self.assertNotIn("Kraken/Yahoo", bridge)
         self.assertIn('ALIGN_REQUIRE_TV_BRIDGE: "1"', workflow)
         bot = (RACINE / "align-bot" / "align_bot.py").read_text(encoding="utf-8")
