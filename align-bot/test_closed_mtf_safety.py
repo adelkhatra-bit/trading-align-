@@ -51,6 +51,32 @@ class ClosedMtfSafety(unittest.TestCase):
                     conflicting[idx] = -direction
                     self.assertEqual(ab.direction_confirmee_marche(market, conflicting, direction), 0)
 
+    def test_mtf_profile_uses_only_four_closed_directions_for_gold_nasdaq(self):
+        for market in ("GOLD", "NASDAQ"):
+            # Les lectures en formation sont toutes LONG, mais la dernière clôture M5 contredit le plan.
+            forming = [1] * 11
+            closed = [1] * 11
+            closed[2] = -1
+            profile = ab.profil_strategie({
+                "market": market, "dirs": forming, "dirs_cloturees": closed
+            })
+            self.assertEqual(profile["mode"], "ATTENTE")
+            self.assertEqual(profile["direction"], 0)
+            self.assertFalse(profile["m5_aligne"])
+            self.assertIn("M5", profile["contexte"])
+
+            # Les clôtures sont toutes LONG : les bougies en formation SHORT ne doivent pas les écraser.
+            profile = ab.profil_strategie({
+                "market": market, "dirs": [-1] * 11, "dirs_cloturees": [1] * 11
+            })
+            self.assertEqual(profile["direction"], 1)
+            self.assertTrue(profile["m5_aligne"])
+
+            # Sans historique de clôtures, ne jamais retomber sur les directions en formation.
+            profile = ab.profil_strategie({"market": market, "dirs": forming})
+            self.assertEqual(profile["mode"], "ATTENTE")
+            self.assertEqual(profile["direction"], 0)
+
     def test_mtf_confirmation_rejects_stale_m5_and_stale_m1(self):
         now = int(time.time())
         ctx = fresh_context(now)

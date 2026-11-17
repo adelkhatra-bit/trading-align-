@@ -1287,8 +1287,28 @@ def alignement(r):
 
 
 def profil_strategie(r):
-    """Classe le setup sans confondre alignement directionnel et autorisation d’entrée."""
-    D = r["dirs"]
+    """Classe le setup ; GOLD/NASDAQ utilisent exclusivement les quatre dernières clôtures MTF."""
+    market = r.get("market")
+    if market in ("GOLD", "NASDAQ"):
+        D = list(r.get("dirs_cloturees") or [])
+        indices_mtf = (2, 4, 7, 9)  # M5, M15, H1, H4
+        if (
+            len(D) <= max(indices_mtf)
+            or any(D[i] not in (-1, 1) for i in indices_mtf)
+            or len({D[i] for i in indices_mtf}) != 1
+        ):
+            return {
+                "mode": "ATTENTE",
+                "direction": 0,
+                "horizon": "aucune position avant quatre clôtures concordantes",
+                "contexte": f"{market} : M5, M15, H1 et H4 doivent clôturer dans le même sens",
+                "m5_aligne": False,
+                "contre_tendance": False,
+                "statut": "ATTENTE — quatre clôtures M5/M15/H1/H4 requises",
+            }
+    else:
+        D = list(r.get("dirs") or [])
+    D = D + [0] * max(0, 11 - len(D))
     d5, d15, d1h, d4h = D[2], D[4], D[7], D[9]
     if d4h and d1h == d4h and d15 == -d4h and d5 == d15:
         direction = d15
