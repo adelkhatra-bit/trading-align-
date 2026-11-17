@@ -151,6 +151,16 @@ class PageLive(unittest.TestCase):
         self.assertIn("https://adelkhatra-bit.github.io/trading-align-/live/align-bande-live.user.js", favori)
         self.assertNotIn("trading-auto", favori)
 
+    def test_production_bridge_requires_fresh_real_tradingview_price(self):
+        workflow = (RACINE / ".github" / "workflows" / "align-bot.yml").read_text(encoding="utf-8")
+        bridge = workflow.split("      - name: Vérifier le bridge TradingView ROBOT V12", 1)[1].split("      - name: Analyse BTC + Gold + NASDAQ", 1)[0]
+        self.assertIn('price = float(snap.get("price"))', bridge)
+        self.assertIn('price_updated_at = snap.get("updatedAt")', bridge)
+        self.assertIn("math.isfinite(price)", bridge)
+        self.assertIn("price_age_ms > 30000", bridge)
+        self.assertIn("prix TradingView invalide ou périmé", bridge)
+        self.assertNotIn("continue-on-error: true", bridge)
+
     def test_no_forbidden_words_or_promises(self):
         mots = re.findall(r"(?i)\b(like|likes|follow|followers?|cadeau|gagn\w*|garanti\w*|profit certain|abonne\w*)\b", self.PAGE)
         self.assertEqual(mots, [])
