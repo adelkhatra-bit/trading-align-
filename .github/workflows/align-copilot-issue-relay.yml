@@ -43,6 +43,9 @@ jobs:
           test -n "$GITHUB_TOKEN" || { echo "::error::GITHUB_TOKEN unavailable"; exit 1; }
           test -n "$COPILOT_GITHUB_TOKEN" || { echo "::error::Missing repository secret COPILOT_GITHUB_TOKEN. Add a fine-grained token with Copilot Requests permission in ALIGN repository Actions secrets."; exit 1; }
 
+      - name: Validate relay Python syntax
+        run: python3 -m py_compile scripts/align_copilot_issue_relay.py
+
       - name: Install GitHub Copilot CLI
         run: npm install --global @github/copilot
 
