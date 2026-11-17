@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Contrôle IA externe avec EXACTEMENT la chaîne et le parseur utilisés par le bot ALIGN.
 
-Ce contrôle est informatif : les commentaires spécifiques IA peuvent être omis
-si les fournisseurs externes sont indisponibles ; le bot garde son analyse MTF interne.
+Le premier fournisseur qui répond correctement valide le contrôle ; un fournisseur lent
+est abandonné après le timeout court de _appel_ia(), puis le suivant est essayé.
 """
 import os
 import sys
@@ -49,6 +49,7 @@ for name, url, model, key, needs_key in align_bot.IA_FOURNISSEURS:
         if not connecte:
             connecte = name
             print("AI_EXTERNAL_REPLY=" + " ".join(reply.split())[:220], flush=True)
+            break  # Même comportement que avis_ia() : dès qu'une IA répond, ne pas attendre les suivantes.
     except Exception as exc:
         detail_ = align_bot.detail_erreur_ia(exc, key)
         etat_ = "NO_CREDIT" if name == "Anthropic" and align_bot.erreur_sans_credit(detail_) else "ERROR"
@@ -64,6 +65,6 @@ if connecte:
     write_summary("CONNECTED", connecte, ", ".join(attempts))
     sys.exit(0)
 write_summary("UNAVAILABLE", "", ", ".join(attempts))
-# Code non nul pour signaler l'indisponibilité ; le workflow est non bloquant.
-# avis_ia() utilise alors le verdict et la stratégie MTF internes, sans simuler une IA.
+# Code non nul : le workflow de production bloque les signaux si aucun fournisseur externe ne répond.
+# Aucun commentaire IA n'est simulé.
 sys.exit(1)
