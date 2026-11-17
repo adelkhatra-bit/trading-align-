@@ -7,12 +7,12 @@ on:
       - "ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)"
       - "pages build and deployment"
       - "ALIGN worker rollover"
-      - "CI integration tests"
-      - "AI Check"
-      - "audit-messages"
-      - "MetaApi check"
-      - "Topstep check"
-      - "Sniper replay"
+      - "CI Integration Tests"
+      - "ALIGN contrôle IA (manuel)"
+      - "ALIGN audit des messages envoyés (manuel)"
+      - "ALIGN MetaApi vérification"
+      - "ALIGN Topstep vérification"
+      - "ALIGN rejeu entrée sniper (manuel)"
     types: [completed]
     branches: [main, live-data]
   schedule:
