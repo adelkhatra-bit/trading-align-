@@ -20,6 +20,10 @@ def write_summary(status, provider, attempts):
             f.write(f"- **Fournisseur utilisable :** {provider or 'aucun'}\n")
             f.write(f"- **Fournisseurs testés :** {attempts or 'aucun'}\n")
             f.write("- **Commentaire interne :** disponible dans align_bot.avis_ia()\n")
+    output = os.environ.get("GITHUB_OUTPUT")
+    if output:
+        with open(output, "a", encoding="utf-8") as f:
+            f.write(f"provider={provider or ''}\\n")
 
 
 messages = [
