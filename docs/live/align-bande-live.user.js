@@ -292,11 +292,19 @@
   let extra = [];
   // v4.8 : la bande dit toujours ce qu'on regarde (marché + unité), mise à jour dès que la vue change
   function vueTxt() {
-    const c = chart(); if (!c) return '';
-    const s = String(c.symbol() || ''), r = String(c.resolution() || '');
-    const m = /BTC/i.test(s) ? '🟠 BTC' : /XAU|GOLD/i.test(s) ? '🥇 GOLD' : /NAS|NQ|US100/i.test(s) ? '🟣 NASDAQ' : s.split(':').pop();
-    const u = /^\d+$/.test(r) ? (+r >= 60 ? (+r / 60) + 'H' : r + ' MIN') : r === 'D' || r === '1D' ? '1 JOUR' : r;
-    return '📺 VUE : ' + m + ' • ' + u;
+    // TradingView peut exposer activeChart() avant que son modèle interne soit prêt.
+    // Ne jamais laisser cette lecture interrompre l'initialisation de la bande live.
+    try {
+      const c = chart();
+      if (!c || typeof c.symbol !== 'function' || typeof c.resolution !== 'function') return '';
+      const s = String(c.symbol() || ''), r = String(c.resolution() || '');
+      if (!s || !r) return '';
+      const m = /BTC/i.test(s) ? '🟠 BTC' : /XAU|GOLD/i.test(s) ? '🥇 GOLD' : /NAS|NQ|US100/i.test(s) ? '🟣 NASDAQ' : s.split(':').pop();
+      const u = /^\d+$/.test(r) ? (+r >= 60 ? (+r / 60) + 'H' : r + ' MIN') : r === 'D' || r === '1D' ? '1 JOUR' : r;
+      return '📺 VUE : ' + m + ' • ' + u;
+    } catch (e) {
+      return '';
+    }
   }
   let vueVue = '';
   setInterval(() => { const v = vueTxt(); if (v !== vueVue) { vueVue = v; remplir(); } }, 2000);
