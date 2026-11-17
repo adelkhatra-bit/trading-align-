@@ -6809,6 +6809,12 @@ def traiter(etat, chats, updates):
                         off.append(qui)       # stoppe les nouveaux signaux ; le suivi d'une position déjà ouverte reste actif
                     purger_messages_en_attente(etat, qui)
                     etat["coach_pending"] = [x for x in etat.get("coach_pending", []) if str(x) != qui]
+                    # Le refus quotidien doit aussi retirer l'autorisation de push différé et les recherches live actives.
+                    for abonnements in etat.setdefault("auto", {}).values():
+                        if isinstance(abonnements, list):
+                            abonnements[:] = [x for x in abonnements if str(x) != qui]
+                    for marche in MARCHES:
+                        activer_coach_live(etat, qui, marche, False)
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="Bien noté")
                     continue
                 if mk == "yes":
