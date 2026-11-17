@@ -221,7 +221,7 @@
     if (maintenant - voixDerniere < 12000) return;
     let phrase = String(item.texte || '').replace(/^🇫🇷\s*/, '')
       .replace(/⚠️ Ceci n'est pas un conseil en investissement[^•]*/gi, '')
-      .replace(/https?:\/\/\\S+/g, '')
+      .replace(/https?:\/\/\S+/g, '')
       .replace(/[\p{Extended_Pictographic}\uFE0F]/gu, ' ')
       .replace(/\s+/g, ' ').trim();
     if (phrase.length < 12 || phrase === voixTexte) return;
