@@ -9,7 +9,7 @@ class AIProviderModelConfig(unittest.TestCase):
         from pathlib import Path
         source = (Path(__file__).parent / "ai_healthcheck.py").read_text(encoding="utf-8")
         self.assertIn('output = os.environ.get("GITHUB_OUTPUT")', source)
-        self.assertIn('f.write(f"provider={provider or \'\'}\\\\n")', source)
+        self.assertIn(r"provider={provider or ''}\n", source)
 
     def test_ovh_mistral_uses_current_published_model_id(self):
         provider = next((p for p in ab.IA_FOURNISSEURS if p[0] == "OVH Mistral"), None)
