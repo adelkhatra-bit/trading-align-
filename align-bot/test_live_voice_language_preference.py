@@ -7,12 +7,16 @@ LIVE_JS = ROOT.parent / "docs" / "live" / "align-bande-live.user.js"
 
 
 class LiveVoiceLanguagePreference(unittest.TestCase):
-    def test_language_selector_is_removed_but_coach_button_remains(self):
+    def test_language_selector_remains_separate_and_coach_button_remains(self):
         source = LIVE_JS.read_text(encoding="utf-8")
         self.assertIn("align-live-voice", source)
-        self.assertNotIn("voixLangueBtn", source)
-        self.assertNotIn("Voix FR", source)
-        self.assertNotIn("Voix EN", source)
+        self.assertIn("voixLangueBtn", source)
+        self.assertIn("localStorage.getItem('alignVoixLangue')", source)
+        self.assertIn("localStorage.setItem('alignVoixLangue'", source)
+        self.assertIn("if (!!item.en !== anglais) return;", source)
+        self.assertIn("utterance.lang = anglais ? 'en-US' : 'fr-FR';", source)
+        self.assertIn("Voix FR", source)
+        self.assertIn("Voix EN", source)
 
     def test_animation_toggle_remains_independent_and_persisted(self):
         source = LIVE_JS.read_text(encoding="utf-8")
