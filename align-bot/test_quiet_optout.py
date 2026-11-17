@@ -97,5 +97,48 @@ class QuietOptOutTest(unittest.TestCase):
         self.assertIn("11", state["recherche_positions_active"])
 
 
+    def test_daily_trade_no_removes_pending_push_authorization(self):
+        state = {
+            "auto": {"BTC": ["11", "22"], "GOLD": ["11"]},
+            "coach_pending": ["11", "22"],
+            "coach_live": {"BTC": {"11": {"dernier_t": 1}, "22": {"dernier_t": 1}}},
+            "recherche_positions_active": ["11", "22"],
+            "telegram_outbox": [
+                {"chat_id": "11", "params": {"text": "queued alert"}},
+                {"chat_id": "22", "params": {"text": "other user's alert"}},
+            ],
+            "BTC": {"trade": {"qui": {"11": {"e": 100.0, "sl": 95.0, "tp1": 110.0}}}},
+        }
+        update = {
+            "update_id": 902,
+            "callback_query": {
+                "id": "trade-no-callback",
+                "data": "trade:no",
+                "from": {"id": 11, "first_name": "Test"},
+                "message": {"chat": {"id": 11, "type": "private"}},
+            },
+        }
+
+        with patch.object(ab, "telegram", return_value={"ok": True}), \\
+             patch.object(ab, "DERNIER_ETAT", state), \\
+             patch.object(ab, "TELEGRAM_PULL_MODE", True):
+            ab.traiter(state, {"11", "22"}, [update])
+            # Simule le tour automatique suivant, sans action privée entrante.
+            ab.TELEGRAM_PULL_CONTEXT.chat_id = None
+            ab.TELEGRAM_PULL_CONTEXT.private = False
+            self.assertFalse(ab._telegram_sortant_autorise(
+                "sendMessage", {"chat_id": "11", "text": "🎯 POSITION ALIGN DÉTECTÉE"}
+            ))
+
+        self.assertIn("11", {str(x) for x in state["bot_off"]})
+        self.assertNotIn("11", {str(x) for x in state["recherche_positions_active"]})
+        self.assertTrue(all("11" not in {str(x) for x in users} for users in state["auto"].values()))
+        self.assertTrue(all("11" not in {str(x) for x in users} for users in state["coach_live"].values()))
+        self.assertNotIn("11", [str(x) for x in state["coach_pending"]])
+        self.assertEqual([x["chat_id"] for x in state["telegram_outbox"]], ["22"])
+        self.assertIn("11", state["BTC"]["trade"]["qui"])  # le suivi d'une position déjà ouverte reste conservé
+        self.assertFalse(ab.coach_actif(state, "11", "BTC"))
+
+
 if __name__ == "__main__":
     unittest.main()
