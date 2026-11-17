@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      12.2
+// @version      12.3
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @updateURL    https://raw.githubusercontent.com/adelkhatra-bit/trading-auto/main/docs/live/align-bande-live.user.js
@@ -12,7 +12,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '12.2';  // v12.0 : les commentaires IA du live déclenchent immédiatement bulle, ping prix et lueur neutre  // v11.8 : narration marché calée à 55 s, au plus près du cooldown d'affichage de 52 s  // v11.7 : narration technique factuelle toutes les ~75 s, horloges séparées et activation vocale explicite  // v10.8 : commentaires IA ancrés sur les données réelles du marché affiché  // v10.7 : « ÇA PLONGE 🌊 » quand ça coule (en plus de la fusée) ; v10.6 : NEWS DE DERNIÈRE MINUTE prioritaire (coupe la bande) ; v10.5 : fusée 🚀 + sourire quand le bot entre / quand ça accélère ; v10.4 : bot en position = blagues taquines (je suis dedans avec vous, qui est rentré ? tapote, partage) ; v10.3 : blagues quand le marché dort (petit film, café, ouvertures, tapote MDR) ; v10.2 : « prépare-toi ≠ vas-y 😝 » ; v10.1 : l'animateur remet gentiment les petits malins à leur place (feu vert, discipline 😝) ; v10.0 : après un TP → « une rose ou un like » + « crée ton compte démo » ; v9.9 : fenêtre « 💰 ALIGN EN DIRECT » (gain réel en cours, après la moitié du chemin vers le TP1) ; v9.8 : « active ton coach en temps réel » + « un clic sur Mon bot pour arrêter » ; v9.7 : texte de la ligne du bas plus gros (taille des %) ; v9.6 : ligne du bas qui clignote vert ▲ LONG ? / rouge ▼ SHORT ? (plus vite quand une entrée approche) ; v9.5 : ligne du bas du tableau rouge ↔ vert en boucle + « LONG OU SHORT ? » (le sens ne se voit plus) ; v9.4 : « crée ton compte démo, teste gratuitement » + codes prop firms (lien en bio) ; v9.3 : titres de bulle drôles liés au marché (fin de « LE GRAPH BALANCE ») ; v9.2 : plus de spectacle quand le marché hésite (l'animateur parle toutes les ~40 s, discussion avis → merci → lien en bio), bulle « 🤫 PSST… LE GRAPH BALANCE » ; v9.1 : plus aucune flèche ni sens (monter / baisser) sur la bande ; v9.0 : « tu préfères BTC, Gold ou NASDAQ ? une autre unité de temps ? lien en bio » ; v8.9 : « ALIGN est dedans depuis le début… trop tard pour rentrer, on ne court jamais après le prix » ; v8.8  // v8.8 : l'animateur parle toutes les ~90 s (humour, nouveaux arrivants, commentaires), feu d'artifice « objectif de likes atteint » ; v8.7  // v8.7 : « je t'avais prévenu » après le chrono de grosse distribution / accumulation ; v8.6  // v8.6 : marché calme → l'animateur (vrai trader) parle aux spectateurs : questions rebond / cassure, pression pour taper et commenter ; v8.5  // v8.5 : phrases IA gratuites toujours nouvelles (FR/EN), chrono « une position arrive » + agenda (discours, annonces, ouvertures) venant du bot, chrono posé AU-DESSUS des colonnes 1 min / 3 min / 5 min ; v8.4   // v8.4 : ligne du bas du tableau revenue à sa couleur d'origine (v8.2), texte 13 px ; v8.3  // v8.3 : (étiquettes posées par-dessus désactivées, à faire dans le Pine), ligne du bas du tableau en couleur neutre, plus grosse, « tu peux rentrer ? 👍 » ; v8.2  // v8.2 : prix cachés dans la ligne du bas du tableau (❓ + lien en bio) ; v8.1  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
+  const VERSION = '12.3';  // v12.0 : les commentaires IA du live déclenchent immédiatement bulle, ping prix et lueur neutre  // v11.8 : narration marché calée à 55 s, au plus près du cooldown d'affichage de 52 s  // v11.7 : narration technique factuelle toutes les ~75 s, horloges séparées et activation vocale explicite  // v10.8 : commentaires IA ancrés sur les données réelles du marché affiché  // v10.7 : « ÇA PLONGE 🌊 » quand ça coule (en plus de la fusée) ; v10.6 : NEWS DE DERNIÈRE MINUTE prioritaire (coupe la bande) ; v10.5 : fusée 🚀 + sourire quand le bot entre / quand ça accélère ; v10.4 : bot en position = blagues taquines (je suis dedans avec vous, qui est rentré ? tapote, partage) ; v10.3 : blagues quand le marché dort (petit film, café, ouvertures, tapote MDR) ; v10.2 : « prépare-toi ≠ vas-y 😝 » ; v10.1 : l'animateur remet gentiment les petits malins à leur place (feu vert, discipline 😝) ; v10.0 : après un TP → « une rose ou un like » + « crée ton compte démo » ; v9.9 : fenêtre « 💰 ALIGN EN DIRECT » (gain réel en cours, après la moitié du chemin vers le TP1) ; v9.8 : « active ton coach en temps réel » + « un clic sur Mon bot pour arrêter » ; v9.7 : texte de la ligne du bas plus gros (taille des %) ; v9.6 : ligne du bas qui clignote vert ▲ LONG ? / rouge ▼ SHORT ? (plus vite quand une entrée approche) ; v9.5 : ligne du bas du tableau rouge ↔ vert en boucle + « LONG OU SHORT ? » (le sens ne se voit plus) ; v9.4 : « crée ton compte démo, teste gratuitement » + codes prop firms (lien en bio) ; v9.3 : titres de bulle drôles liés au marché (fin de « LE GRAPH BALANCE ») ; v9.2 : plus de spectacle quand le marché hésite (l'animateur parle toutes les ~40 s, discussion avis → merci → lien en bio), bulle « 🤫 PSST… LE GRAPH BALANCE » ; v9.1 : plus aucune flèche ni sens (monter / baisser) sur la bande ; v9.0 : « tu préfères BTC, Gold ou NASDAQ ? une autre unité de temps ? lien en bio » ; v8.9 : « ALIGN est dedans depuis le début… trop tard pour rentrer, on ne court jamais après le prix » ; v8.8  // v8.8 : l'animateur parle toutes les ~90 s (humour, nouveaux arrivants, commentaires), feu d'artifice « objectif de likes atteint » ; v8.7  // v8.7 : « je t'avais prévenu » après le chrono de grosse distribution / accumulation ; v8.6  // v8.6 : marché calme → l'animateur (vrai trader) parle aux spectateurs : questions rebond / cassure, pression pour taper et commenter ; v8.5  // v8.5 : phrases IA gratuites toujours nouvelles (FR/EN), chrono « une position arrive » + agenda (discours, annonces, ouvertures) venant du bot, chrono posé AU-DESSUS des colonnes 1 min / 3 min / 5 min ; v8.4   // v8.4 : ligne du bas du tableau revenue à sa couleur d'origine (v8.2), texte 13 px ; v8.3  // v8.3 : (étiquettes posées par-dessus désactivées, à faire dans le Pine), ligne du bas du tableau en couleur neutre, plus grosse, « tu peux rentrer ? 👍 » ; v8.2  // v8.2 : prix cachés dans la ligne du bas du tableau (❓ + lien en bio) ; v8.1  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
   // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
@@ -185,33 +185,18 @@
   bande.innerHTML = '<div class="piste"></div><div class="flash"></div>';
   document.body.appendChild(bande);
   const piste = bande.querySelector('.piste'), flash = bande.querySelector('.flash');
-  // Voix optionnelle : activation explicite par clic pour respecter le blocage audio automatique des navigateurs.
-  const voixBtn = document.createElement('button');
-  voixBtn.id = 'align-live-voice';
-  voixBtn.type = 'button';
-  voixBtn.textContent = '🔊 ACTIVER LE COMMENTATEUR';
-  voixBtn.setAttribute('aria-pressed', 'false');
-  voixBtn.title = 'Activer le commentateur vocal du live';
-  voixBtn.style.cssText = 'position:fixed;right:18px;top:104px;z-index:10001;padding:11px 15px;border:2px solid #35d07f;border-radius:22px;background:linear-gradient(135deg,#123b2b,#10251f);color:#fff;font:800 13px system-ui;cursor:pointer;pointer-events:auto;box-shadow:0 0 18px rgba(53,208,127,.35)';
-  document.body.appendChild(voixBtn);
-  const voixLangueBtn = document.createElement('button');
-  voixLangueBtn.type = 'button';
-  let voixLangue = 'fr';
-  try { voixLangue = localStorage.getItem('alignVoixLangue') === 'en' ? 'en' : 'fr'; } catch (e) {}
-  voixLangueBtn.textContent = voixLangue === 'fr' ? '🇫🇷 Voix FR' : '🇬🇧 Voix EN';
-  voixLangueBtn.title = 'Choisir la langue de la voix du live';
-  voixLangueBtn.style.cssText = 'position:fixed;right:18px;top:145px;z-index:10001;padding:7px 10px;border:1px solid rgba(255,255,255,.55);border-radius:18px;background:rgba(18,18,28,.82);color:#fff;font:700 12px system-ui;cursor:pointer;pointer-events:auto';
-  document.body.appendChild(voixLangueBtn);
+  // Le live est visuel : aucune commande de commentaire vocal n'est affichée ni activée.
+  const voixActive = false;
 
   // Commande VISUELLE indépendante de la synthèse vocale : active/coupe les animations du live.
   let animationsActives = true;
-  try { animationsActives = localStorage.getItem('alignAnimationsEnabled') !== '0'; } catch (e) {}
+  try { animationsActives = localStorage.getItem('alignAnimationsEnabledV12') !== '0'; } catch (e) {}
   const animationsBtn = document.createElement('button');
   animationsBtn.id = 'align-live-animations';
   animationsBtn.type = 'button';
   animationsBtn.setAttribute('aria-pressed', String(animationsActives));
   animationsBtn.title = 'Activer ou désactiver les animations visuelles ALIGN (sans modifier les voix)';
-  animationsBtn.style.cssText = 'position:fixed;right:18px;top:18px;z-index:10002;padding:11px 15px;border:2px solid #ffd400;border-radius:22px;background:linear-gradient(135deg,#28200a,#171717);color:#fff;font:900 13px system-ui;cursor:pointer;pointer-events:auto;box-shadow:0 0 18px rgba(255,212,0,.28)';
+  animationsBtn.style.cssText = 'position:fixed;left:140px;right:auto;top:auto;bottom:82px;z-index:10002;padding:11px 15px;border:2px solid #ffd400;border-radius:22px;background:linear-gradient(135deg,#28200a,#171717);color:#fff;font:900 13px system-ui;cursor:pointer;pointer-events:auto;box-shadow:0 0 18px rgba(255,212,0,.28)';
   function appliquerAnimations() {
     document.documentElement.classList.toggle('align-animations-off', !animationsActives);
     animationsBtn.textContent = animationsActives ? '✨ ANIMATIONS ON' : '⏸ ANIMATIONS OFF';
@@ -228,69 +213,13 @@
   document.body.appendChild(animationsBtn);
   animationsBtn.addEventListener('click', () => {
     animationsActives = !animationsActives;
-    try { localStorage.setItem('alignAnimationsEnabled', animationsActives ? '1' : '0'); } catch (e) {}
+    try { localStorage.setItem('alignAnimationsEnabledV12', animationsActives ? '1' : '0'); } catch (e) {}
     appliquerAnimations();
   });
   const cssAnimationsToggle = document.createElement('style');
   cssAnimationsToggle.textContent = 'html.align-animations-off #align-bande *,html.align-animations-off .align-punch,html.align-animations-off .align-ping,html.align-animations-off .align-coeur,html.align-animations-off .align-billet,html.align-animations-off .align-argent,html.align-animations-off #align-feu *,html.align-animations-off #align-flash-or,html.align-animations-off #align-pnl,html.align-animations-off #align-show *,html.align-animations-off #align-cadre *,html.align-animations-off #align-chrono *,html.align-animations-off #align-ennui,html.align-animations-off #align-etiq *,html.align-animations-off #align-masque *{animation:none!important;transition:none!important}';
   document.head.appendChild(cssAnimationsToggle);
   appliquerAnimations();
-  voixLangueBtn.addEventListener('click', () => {
-    voixLangue = voixLangue === 'fr' ? 'en' : 'fr';
-    voixLangueBtn.textContent = voixLangue === 'fr' ? '🇫🇷 Voix FR' : '🇬🇧 Voix EN';
-    try { localStorage.setItem('alignVoixLangue', voixLangue); } catch (e) {}
-    try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
-  });
-  let voixActive = false, voixDerniere = 0, voixTexte = '';
-  voixBtn.addEventListener('click', () => {
-    if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
-      voixBtn.textContent = '⚠️ Voix indisponible'; return;
-    }
-    voixActive = !voixActive;
-    if (voixActive) {
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.resume();
-      voixBtn.textContent = '🔊 COACH VOCAL ON';
-      voixBtn.setAttribute('aria-pressed', 'true');
-      // Le clic explicite déverrouille la synthèse vocale du navigateur pour le direct.
-      const accueil = new SpeechSynthesisUtterance(voixLangue === 'fr' ? 'Le coach ALIGN est en direct. Je commente maintenant ce que fait le marché.' : 'The ALIGN coach is live. I am now commenting on market action.');
-      accueil.lang = voixLangue === 'fr' ? 'fr-FR' : 'en-US';
-      accueil.rate = 1.02;
-      window.speechSynthesis.speak(accueil);
-      voixTexte = accueil.text;
-      voixDerniere = Date.now();
-    } else {
-      window.speechSynthesis.cancel();
-      voixBtn.textContent = '🔇 ACTIVER LE COMMENTATEUR';
-      voixBtn.setAttribute('aria-pressed', 'false');
-    }
-  });
-  function parlerLive(item) {
-    if (!voixActive || !item || !('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return;
-    const anglais = voixLangue === 'en';
-    if (!!item.en !== anglais) return; // un seul passage vocal, dans la langue choisie
-    const maintenant = Date.now();
-    if (maintenant - voixDerniere < 12000) return; // pas de mitraillette vocale
-    let phrase = String(item.texte || '').replace(/^🇫🇷\s*|^🇬🇧\s*/, '')
-      .replace(/⚠️ Ceci n'est pas un conseil en investissement[^•]*/gi, '')
-      .replace(/https?:\/\/\S+/g, '')
-      .replace(/[\p{Extended_Pictographic}\uFE0F]/gu, ' ')
-      .replace(/\s+/g, ' ').trim();
-    if (phrase.length < 12 || phrase === voixTexte) return;
-    phrase = phrase.slice(0, 220);
-    try {
-      const utterance = new SpeechSynthesisUtterance(phrase);
-      utterance.lang = anglais ? 'en-US' : 'fr-FR';
-      utterance.rate = 1.02;
-      utterance.pitch = 1.0;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
-      voixTexte = phrase;
-      voixDerniere = maintenant;
-    } catch (e) {}
-  }
-  let extra = [];
-  // v4.8 : la bande dit toujours ce qu'on regarde (marché + unité), mise à jour dès que la vue change
   function vueTxt() {
     // TradingView peut exposer activeChart() avant que son modèle interne soit prêt.
     // Ne jamais laisser cette lecture interrompre l'initialisation de la bande live.
@@ -415,7 +344,6 @@
     flash.innerHTML = '<span>' + esc(m.texte) + '</span>';   // le message défile vite (lisible sur téléphone, même si TikTok coupe les bords)
     flash.className = 'flash' + (m.g ? ' ' + m.g : m.bulle ? ' bulle' : '') + (m.en ? ' en' : '');
     bande.classList.add('on');
-    parlerLive(m); // lit la langue du message qui vient réellement d'être affiché, sans changer la langue choisie
     const sp = flash.firstChild, W = bande.clientWidth, w = sp.offsetWidth;
     const dur = Math.max(4000, (W + w) / 0.38);      // v5.4 : plus rapide (info en temps réel), toujours lisible
     animCur = sp.animate([{ transform: 'translateX(' + W + 'px)' }, { transform: 'translateX(' + (-w) + 'px)' }], { duration: dur, easing: 'linear' });
@@ -1550,7 +1478,7 @@
   const masqueT = setInterval(poserMasque, 300); poserMasque();
   window.__ALIGN_BANDE__ = {
     version: VERSION, recu, punch: c => coeurs(1, [c]), plateforme: v => choisirPlateforme(v),
-    stop() { vivant = false; clearTimeout(survolT); cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(coachT); clearInterval(iaT); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); clearInterval(botEtatSyncT); clearInterval(heartbeatT); clearInterval(masqueT); try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {} try { voixBtn.remove(); } catch (e) {} try { voixLangueBtn.remove(); } catch (e) {} try { animationsBtn.remove(); cssAnimationsToggle.remove(); document.documentElement.classList.remove('align-animations-off'); } catch (e) {} masque.remove(); try { cssPunch.remove(); } catch (e) {}   /* v8.4 : plus de vieux styles qui restent après une réinjection */ clearInterval(etiqT); etiqBox.remove(); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
+    stop() { vivant = false; clearTimeout(survolT); cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(coachT); clearInterval(iaT); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); clearInterval(botEtatSyncT); clearInterval(heartbeatT); clearInterval(masqueT); try { animationsBtn.remove(); cssAnimationsToggle.remove(); document.documentElement.classList.remove('align-animations-off'); } catch (e) {} masque.remove(); try { cssPunch.remove(); } catch (e) {}   /* v8.4 : plus de vieux styles qui restent après une réinjection */ clearInterval(etiqT); etiqBox.remove(); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
       [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur,.align-billet,.align-argent,.align-punch,.align-ping').forEach(x => x.remove()); try { cssBillet.remove(); } catch (e) {} obs.disconnect(); try { es.close(); } catch (e) {} bande.remove(); css.remove(); }
   };
 })();
