@@ -13,6 +13,7 @@ import urllib.request
 API = "https://api.github.com"
 ISSUE = int(os.environ.get("ALIGN_ISSUE_NUMBER", "431"))
 ALLOWED_AUTHOR = os.environ.get("ALIGN_ALLOWED_AUTHOR", "adelkhatra-bit")
+START_COMMENT_ID = int(os.environ.get("ALIGN_RELAY_START_COMMENT_ID", "6962101708"))
 REPO = os.environ["GITHUB_REPOSITORY"]
 GH_TOKEN = os.environ["GITHUB_TOKEN"]
 COPILOT_TOKEN = os.environ.get("COPILOT_GITHUB_TOKEN", "")
@@ -54,6 +55,8 @@ def main() -> int:
 
     pending = []
     for comment in comments:
+        if int(comment.get("id", 0)) < START_COMMENT_ID:
+            continue
         if (comment.get("user") or {}).get("login") != ALLOWED_AUTHOR:
             continue
         body = comment.get("body") or ""
