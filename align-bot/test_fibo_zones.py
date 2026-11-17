@@ -1,5 +1,6 @@
 """Régression : Fibonacci réservé à l'intelligence du commentateur live, sans nouvel indicateur graphique ni message Telegram."""
 from pathlib import Path
+import re
 import unittest
 from unittest import mock
 
@@ -132,10 +133,13 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn("if (!voixActive", self.js)
         self.assertIn("speechSynthesis.speak(utterance)", self.js)
         self.assertNotIn("voirFiboProgression", self.js)
-        self.assertIn("// @version      12.2.4", self.js)
         self.assertIn("@updateURL    https://raw.githubusercontent.com/adelkhatra-bit/trading-align-/main/docs/live/align-bande-live.user.js", self.js)
         self.assertIn("@downloadURL  https://raw.githubusercontent.com/adelkhatra-bit/trading-align-/main/docs/live/align-bande-live.user.js", self.js)
-        self.assertIn("const VERSION = '12.2.4'", self.js)
+        header_version = re.search(r"^// @version\s+(\d+\.\d+\.\d+)$", self.js, re.MULTILINE)
+        runtime_version = re.search(r"""const VERSION = [\'"](\d+\.\d+\.\d+)[\'"]""", self.js)
+        self.assertIsNotNone(header_version, "Userscript metadata version must exist")
+        self.assertIsNotNone(runtime_version, "Runtime version must exist")
+        self.assertEqual(header_version.group(1), runtime_version.group(1))
         self.assertIn("live-data/live.json", self.js)
         self.assertIn("10 * 60 * 1000", self.js)
         self.assertIn("synchroniserEtatBot()", self.js)
