@@ -1760,8 +1760,19 @@ def en_pause(etat, m, now=None):
     return (now or time.time()) < float((etat.get("pause_auto") or {}).get(m, 0))
 
 def session_de(ts):
-    h = datetime.datetime.fromtimestamp(ts, PARIS).hour
-    return "Asie" if h < 8 else "Londres" if h < 14 else "New York" if h < 22 else "Asie"
+    """Classe la mémoire par session avec les fuseaux IANA et leurs changements DST.
+
+    New York prend priorité pendant le chevauchement Londres / New York.
+    Cette étiquette sert aux statistiques de mémoire, pas au déclenchement des signaux.
+    """
+    instant = datetime.datetime.fromtimestamp(float(ts), datetime.timezone.utc)
+    new_york = instant.astimezone(ZoneInfo("America/New_York"))
+    if new_york.weekday() < 5 and (9, 30) <= (new_york.hour, new_york.minute) < (16, 0):
+        return "New York"
+    london = instant.astimezone(ZoneInfo("Europe/London"))
+    if london.weekday() < 5 and (8, 0) <= (london.hour, london.minute) < (16, 30):
+        return "Londres"
+    return "Asie"
 
 def profil_trade(m, tr, r):
     return {"m": m, "type": "cassure" if tr.get("src") == "cassure 5 min" else "repli",
