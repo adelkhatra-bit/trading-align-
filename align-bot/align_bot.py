@@ -3718,6 +3718,8 @@ def ia(etat, consigne, donnees, cle_cache=None, duree=600, premium=False, recher
     ordre = list(IA_FOURNISSEURS)
     if recherche:                                       # la recherche Google gratuite n'existe que sur Gemini 3.8 : on l'essaie d'abord
         ordre.sort(key=lambda f: 0 if f[0] == "Gemini 3.8" else 1)
+    elif sain and any(f[0] == sain for f in IA_FOURNISSEURS):
+        ordre.sort(key=lambda f: 0 if f[0] == sain else 1)  # fournisseur confirmé par le préflight en premier : pas de timeout inutile
     for nom, url, modele, cle, besoin_cle in ordre:
         if besoin_cle and not cle:
             continue
