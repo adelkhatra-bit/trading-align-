@@ -21,6 +21,7 @@ class LiveVoiceDisplayLanguage(unittest.TestCase):
         toggle_css = source[start:end]
         self.assertIn("visibility:hidden!important", toggle_css)
         self.assertIn("#align-chrono", toggle_css)
+        self.assertIn("#align-pnl", toggle_css)
         self.assertIn("#align-etiq", toggle_css)
         self.assertNotIn("animation:none", toggle_css)
         self.assertNotIn("transition:none", toggle_css)
