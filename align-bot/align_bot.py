@@ -546,6 +546,16 @@ def direction_confirmee_marche(m, dirs, d, contexte=None, now_ts=None):
                 return 0
             if bridge.get("available") is True and (tv_dirs is None or any(v != d for v in tv_dirs.values())):
                 return 0
+    elif m == "BTC" and contexte is not None and contexte.get("require_tv_bridge"):
+        # BTC garde sa règle locale H1/H4 clôturées, mais le H1 ROBOT V12 TradingView doit aussi confirmer.
+        bridge = contexte.get("tv_indicator_mtf") or {}
+        active = bridge.get("activeTimeframe")
+        snap = (bridge.get("snapshots") or {}).get(active) or {}
+        robot = snap.get("robotV12") or {}
+        if bridge.get("available") is not True or snap.get("fresh") is not True or not robot:
+            return 0
+        if _direction_tv(robot.get("lecture_60m")) != d:
+            return 0
     return d
 
 
