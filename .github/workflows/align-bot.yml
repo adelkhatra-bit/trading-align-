@@ -215,8 +215,7 @@ jobs:
           PY
 
       - name: Vérifier une connexion IA réelle (même chaîne que le bot)
-        # Contrôle informatif : si l'IA externe est indisponible, le moteur ALIGN interne continue sans simuler d'avis IA.
-        continue-on-error: true
+        # Contrôle bloquant : au moins un fournisseur IA externe doit répondre avant toute analyse de production.
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
@@ -227,8 +226,7 @@ jobs:
         run: python3 ai_healthcheck.py
 
       - name: Vérifier le bridge TradingView ROBOT V12 (BTC + GOLD + NASDAQ)
-        # Enrichissement optionnel : si le bridge est indisponible, ALIGN conserve ses flux natifs BTC/Kraken et GOLD/XAUUSD spot; aucune donnée TradingView n'est simulée.
-        continue-on-error: true
+        # Contrôle bloquant : aucune analyse de production sans les données TradingView/ROBOT V12 fraîches des trois marchés.
         env:
           ALIGN_TV_API_URL: ${{ secrets.ALIGN_TV_API_URL }}
           ALIGN_TV_READ_TOKEN: ${{ secrets.ALIGN_TV_READ_TOKEN }}
@@ -238,9 +236,7 @@ jobs:
           base = os.environ.get("ALIGN_TV_API_URL", "").strip().rstrip("/")
           token = os.environ.get("ALIGN_TV_READ_TOKEN", "").strip()
           if not base or not token:
-              print("::warning title=Bridge TradingView non raccordé::Secrets ALIGN_TV_API_URL / ALIGN_TV_READ_TOKEN absents. Telegram n'est PAS relié à l'indicateur : le bot tourne sur Kraken/Yahoo (bridge optionnel).")
-              print("BRIDGE_STATUS=NOT_CONNECTED reason=secrets_absents fallback=Kraken/Yahoo")
-              raise SystemExit(0)
+              raise SystemExit("ÉCHEC: secrets ALIGN_TV_API_URL / ALIGN_TV_READ_TOKEN absents; bridge TradingView obligatoire, analyse Telegram bloquée.")
           for symbol in ("BTCUSD", "XAUUSD", "NAS100"):
               url = base + "/bridge/robot-v12/mtf?symbol=" + urllib.parse.quote(symbol)
               req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token, "User-Agent": "ALIGN-bridge-preflight"})
@@ -271,6 +267,7 @@ jobs:
 
       - name: Analyse BTC + Gold + NASDAQ et envoi Telegram
         env:
+          ALIGN_REQUIRE_TV_BRIDGE: "1"
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

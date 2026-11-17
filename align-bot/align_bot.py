@@ -546,6 +546,16 @@ def direction_confirmee_marche(m, dirs, d, contexte=None, now_ts=None):
                 return 0
             if bridge.get("available") is True and (tv_dirs is None or any(v != d for v in tv_dirs.values())):
                 return 0
+    elif m == "BTC" and contexte is not None and contexte.get("require_tv_bridge"):
+        # BTC garde sa règle locale H1/H4 clôturées, mais le H1 ROBOT V12 TradingView doit aussi confirmer.
+        bridge = contexte.get("tv_indicator_mtf") or {}
+        active = bridge.get("activeTimeframe")
+        snap = (bridge.get("snapshots") or {}).get(active) or {}
+        robot = snap.get("robotV12") or {}
+        if bridge.get("available") is not True or snap.get("fresh") is not True or not robot:
+            return 0
+        if _direction_tv(robot.get("lecture_60m")) != d:
+            return 0
     return d
 
 
@@ -3421,7 +3431,7 @@ def analyse_marche(etat, pair):
         except Exception as ex:
             print(m, "bridge TradingView indisponible", ex)
             r["tv_indicator_mtf"] = {"available": False, "reason": "bridge_unavailable"}
-        r["require_tv_bridge"] = os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1" and m in ("GOLD", "NASDAQ")
+        r["require_tv_bridge"] = os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1" and m in MARCHES
         fusionne_lectures_tradingview(r)
         directions = r.get("dirs_cloturees") or r.get("dirs")
         d_plan = r.get("dirPlan") or 0
@@ -12440,7 +12450,7 @@ def un_tour(etat, chats):
                 return
             r["market"] = nom_marche
             r["tv_indicator_mtf"] = fetch_tv_mtf(pair)
-            r["require_tv_bridge"] = os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1" and nom_marche in ("GOLD", "NASDAQ")
+            r["require_tv_bridge"] = os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1" and nom_marche in MARCHES
             fusionne_lectures_tradingview(r)
             # Revalider après lecture du bridge : Gold/Nasdaq ne peuvent pas ouvrir de position sans ROBOT V12 M5/M15/H1 frais.
             r["confirme"] = direction_confirmee_marche(
