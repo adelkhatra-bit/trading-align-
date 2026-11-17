@@ -5523,7 +5523,7 @@ def flash_commentateur(m, r, cle):
     return None
 
 
-LOGO_URL = "https://raw.githubusercontent.com/adelkhatra-bit/trading-auto/main/docs/live/logo_align.jpg"
+LOGO_URL = "https://raw.githubusercontent.com/adelkhatra-bit/trading-align-/main/docs/live/logo_align.jpg"
 BOT_LIEN = "https://t.me/align_mtf_adel_bot"
 # Liens d'invitation des chaînes gratuites par marché (créées par Adel le 14/11) — jamais la chaîne VIP
 LIENS_CHAINES = {"BTC": "https://t.me/+udAxidycXfdmN2Jk", "GOLD": "https://t.me/+BI-VaNlUBmM1N2E0", "NASDAQ": "https://t.me/+E-Im5stFZtZjNjI0"}
@@ -8323,7 +8323,7 @@ def alerte_gratuite_preparation(etat, texte, now=None):
 
 # ───────── ALIGN LIVE : état PUBLIC (niveau gratuit) pour la page TikTok LIVE ─────────
 # Fichier unique sur la branche « live-data » (jamais main : aucun redémarrage du bot). Aucune donnée VIP : ni prix, ni entrée, ni SL, ni TP.
-LIVE_DEPOT = os.environ.get("GITHUB_REPOSITORY") or "adelkhatra-bit/trading-auto"
+LIVE_DEPOT = os.environ.get("GITHUB_REPOSITORY") or "adelkhatra-bit/trading-align-"
 LIVE_BRANCHE, LIVE_FICHIER = "live-data", "live.json"
 LIVE_INTERVALLE, LIVE_RAFRAICHIR = 120, 300      # tentative toutes les 2 min ; republication forcée au plus toutes les 5 min
 
