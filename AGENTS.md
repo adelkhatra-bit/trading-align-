@@ -7,6 +7,17 @@
 - Apply these rules only to work explicitly identified as ALIGN/TRADING. If the account user or project context is ambiguous, ask before acting.
 - Never assume a branch name, SHA, PR state, deployment state, or runtime health. Read it from GitHub immediately before acting.
 
+## Permanent project identity lock — Claude Chrome and ALIGN
+- The user explicitly identifies the current recovery source as **Claude Chrome**. Do not rename this source to Claude Code, VS Code, Cowork, or another agent/tool. Keep those products and sessions distinct.
+- The only target project for this work is the ALIGN repository `adelkhatra-bit/trading-align-`. The target production code branch is `main`; `live-data` is only the public generated-data branch.
+- The old project/environment named `trading-auto`, its old web page, old servers, old workers, old Puppeteer sessions, and any similarly named local folders are **out of scope**. Never inspect operational data there, connect to its ports, reuse its files, change its processes, or delete it as part of ALIGN work.
+- Never infer project identity from an open port, process name, folder name, browser tab, old branch name, or a shared machine. Prove identity using the GitHub repository URL, exact branch and SHA, and file provenance.
+- Claude Chrome conversation history is a discovery index, not proof that a GitHub change was applied. Recover source material and decisions from the actual Claude Chrome conversation(s), then independently verify each claimed change against the canonical ALIGN repository and commit history.
+- Do not treat any `claude/*` branch as current or authoritative solely because it contains “claude”. In particular, `claude/live-sans-telegram` is an old v4.6 branch and is 407 commits behind current `main` (verified 2026-11-17); do not merge, reset to, or use it as a base.
+- Do not delete old files, branches, projects, servers, or history during recovery. First produce a provenance inventory (source conversation, repo, branch, SHA, paths, dependencies, tests); propose minimal extraction into a new focused branch; preserve an untouched rollback point.
+- No mass merge, mass copy, broad cleanup, or replacement of the Telegram/ALIGN foundation. Preserve all verified Telegram, Pine, MTF, bridge, AI, server, state, and live overlay behavior unless a narrowly scoped change is proven necessary and explicitly approved.
+- If Claude Chrome's source conversation or its exact project/branch cannot be accessed, report the exact missing access/evidence. Never fill gaps by guessing or substituting Claude Code history.
+
 ## Branch and change discipline
 1. Start every task by recording repository, current default branch, source branch, target branch, PR number, exact head/base SHAs, latest relevant workflow runs, and working-tree state when available.
 2. `main` is the production code branch. Never commit directly to it. Make code changes on the existing PR branch for the same issue when its head/base and purpose are verified; otherwise create one focused branch from the latest verified `main`.
