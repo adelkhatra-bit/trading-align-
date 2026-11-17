@@ -281,6 +281,7 @@ jobs:
 
       - name: Analyse BTC + Gold + NASDAQ et envoi Telegram
         env:
+          IA_AUTO: "1"  # Commentaires IA automatiques limités aux moments clés, avec cooldowns et garde-fous existants.
           ALIGN_REQUIRE_TV_BRIDGE: "1"
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
