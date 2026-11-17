@@ -184,6 +184,22 @@ class ClosedMtfSafety(unittest.TestCase):
     def test_agent_does_not_crash_or_signal_without_m1_feed(self):
         self.assertEqual(ab.agent("GOLD", {"m1": [], "r5": []}, {}, False), [])
 
+    def test_btc_requires_fresh_tradingview_h1_when_production_bridge_is_required(self):
+        ctx = fresh_context()
+        ctx["require_tv_bridge"] = True
+        ctx["tv_indicator_mtf"] = {
+            "available": True,
+            "activeTimeframe": "M5",
+            "snapshots": {"M5": {"fresh": True, "robotV12": {
+                "lecture_5m": "LONG", "lecture_15m": "LONG", "lecture_60m": "LONG"
+            }}},
+        }
+        self.assertEqual(ab.direction_confirmee_marche("BTC", [1] * 11, 1, ctx), 1)
+        ctx["tv_indicator_mtf"]["snapshots"]["M5"]["robotV12"]["lecture_60m"] = "SHORT"
+        self.assertEqual(ab.direction_confirmee_marche("BTC", [1] * 11, 1, ctx), 0)
+        ctx["tv_indicator_mtf"] = {"available": False}
+        self.assertEqual(ab.direction_confirmee_marche("BTC", [1] * 11, 1, ctx), 0)
+
     def test_btc_keeps_historical_direction_filter(self):
         self.assertEqual(ab.direction_confirmee_marche("BTC", [0] * 11, 1), 1)
 
