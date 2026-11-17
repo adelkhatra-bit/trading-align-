@@ -42,8 +42,8 @@ jobs:
 
       - name: Detect failures, retry safe transient validation errors, report blockers
         env:
-          GITHUB_TOKEN: \${{ github.token }}
-          GITHUB_REPOSITORY: \${{ github.repository }}
-          GITHUB_EVENT_NAME: \${{ github.event_name }}
-          GITHUB_EVENT_PATH: \${{ github.event_path }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
         run: python3 scripts/align_workflow_watchdog.py
