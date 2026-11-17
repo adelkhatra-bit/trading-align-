@@ -14,6 +14,19 @@ class LiveVoiceDisplayLanguage(unittest.TestCase):
         self.assertIn("id = 'align-live-animations'", source)
         self.assertIn("left:18px;bottom:72px", source)
 
+    def test_animation_off_hides_visuals_without_pausing_or_disabling_them(self):
+        source = LIVE_JS.read_text(encoding="utf-8")
+        start = source.index("const cssAnimationsToggle = document.createElement('style');")
+        end = source.index("document.head.appendChild(cssAnimationsToggle);", start)
+        toggle_css = source[start:end]
+        self.assertIn("visibility:hidden!important", toggle_css)
+        self.assertIn("#align-chrono", toggle_css)
+        self.assertIn("#align-etiq", toggle_css)
+        self.assertNotIn("animation:none", toggle_css)
+        self.assertNotIn("transition:none", toggle_css)
+        self.assertNotIn(".pause()", source)
+        self.assertIn("localStorage.setItem('alignAnimationsEnabled'", source)
+
     def test_voice_is_optional_and_reads_french_live_comments(self):
         source = LIVE_JS.read_text(encoding="utf-8")
         self.assertIn("function parlerLive(item)", source)
