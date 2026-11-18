@@ -35,7 +35,7 @@ jobs:
           python-version: "3.11"
       - name: Compile all Python files
         run: python -m compileall -q align-bot
-      - name: Compile ALIGN Copilot relay and auto-repair coordinator
+      - name: Compile ALIGN relay, repair coordinator and guarded Copilot cloud assignment
         run: python -m py_compile scripts/align_copilot_issue_relay.py scripts/align_auto_repair.py
       - name: Compile watchdog Python script
         run: python -m py_compile scripts/align_workflow_watchdog.py
