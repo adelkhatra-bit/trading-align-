@@ -11752,7 +11752,7 @@ def live_phrases_ia(etat, maintenant, derniers=None):
         "Si une donnée est absente, ne l'invente pas. Moment du live : " + moment + ". "
         "Réponds uniquement avec les lignes demandées, sans titre ni introduction."
     )
-    brut = ia(etat, consigne, donnees, premium=True, prefer_paid=True)
+    brut = ia(etat, consigne, donnees, cle_cache="live_commentary", duree=LIVE_IA_INTERVALLE, premium=True, prefer_paid=True)
     paires = phrases_bande_par_marche(brut)
     # Une réponse IA partielle ne doit pas faire taire les autres marchés : compléter chaque marché
     # présent dans les données avec une lecture factuelle locale, sans fabriquer de contexte absent.
