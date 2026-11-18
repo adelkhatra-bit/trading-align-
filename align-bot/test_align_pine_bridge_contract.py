@@ -3,7 +3,7 @@ import hashlib
 import unittest
 
 PINE = Path(__file__).parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
-BASELINE_GIT_BLOB_SHA = "823635f039ff3b59c39867a7b59dfa3ed6fafaf1"
+BASELINE_GIT_BLOB_SHA = "b49cb3ffb6f4ff287d63ddb283fb52201b74a1c0"  # main 823635f + correctif sens stable (confirmation HTF clôturée)
 SETTINGS_BLOCK = """// ═════════ BRIDGE ALIGN (optionnel, sans modification visuelle) ═════════
 grpBridge = "Bridge ALIGN (optionnel)"
 bridgeEnabled = input.bool(false, "Envoyer les snapshots au ROBOT V12", group=grpBridge)
