@@ -62,6 +62,10 @@ Le `GITHUB_TOKEN` éphémère d'Actions sert uniquement à lire et commenter l'i
 5. Vérifier un run Actions réussi, puis une réponse dans #431 signée par `github-actions[bot]` avec le marqueur exact.
 6. ChatGPT vérifie l'auteur, l'ID de tâche, le SHA `main` annoncé et le fait qu'aucun fichier n'a été modifié.
 
+## Tests de non-régression
+
+La suite `align-bot/test_align_copilot_issue_relay.py` couvre 12 cas : tâches Markdown, auteur autorisé, marqueurs usurpés, ordre temporel des réponses, IDs dupliqués, pagination et verrouillage du dépôt/de l'issue/de l'auteur.
+
 ## Limites
 
 - Le relais ne devient actif qu'après fusion et ajout du secret.
