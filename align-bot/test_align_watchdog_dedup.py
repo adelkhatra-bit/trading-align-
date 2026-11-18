@@ -35,7 +35,7 @@ class WatchdogBlockerDedupTests(unittest.TestCase):
     def test_same_open_legacy_blocker_with_matching_step_suppresses_a_new_run(self):
         legacy = issue(
             498,
-            "\\n".join([
+            "\n".join([
                 "<!-- [align-watchdog:run-44261555540] -->",
                 "## ALIGN workflow watchdog report",
                 "**Workflow:** ALIGN Copilot Issue Relay",
@@ -59,7 +59,7 @@ class WatchdogBlockerDedupTests(unittest.TestCase):
     def test_legacy_report_without_step_detail_does_not_suppress_a_failure(self):
         legacy = issue(
             498,
-            "\\n".join([
+            "\n".join([
                 "## ALIGN workflow watchdog report",
                 "**Workflow:** ALIGN Copilot Issue Relay",
                 "**Branch:** main",
@@ -79,7 +79,7 @@ class WatchdogBlockerDedupTests(unittest.TestCase):
     def test_legacy_report_with_different_failed_step_does_not_suppress(self):
         legacy = issue(
             498,
-            "\\n".join([
+            "\n".join([
                 "## ALIGN workflow watchdog report",
                 "**Workflow:** ALIGN Copilot Issue Relay",
                 "**Branch:** main",
