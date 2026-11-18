@@ -191,8 +191,8 @@ class PageLive(unittest.TestCase):
         self.assertIn("ALIGN_TV_API_URL", bridge)
         self.assertIn("ALIGN_TV_READ_TOKEN", bridge)
         self.assertIn('ALIGN_REQUIRE_TV_BRIDGE: "1"', wf)
-        self.assertIn('os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1" and m in MARCHES', bot)
-        self.assertIn('os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1" and nom_marche in MARCHES', bot)
+        self.assertIn('os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "1") == "1" and m in MARCHES', bot)
+        self.assertIn('os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "1") == "1" and nom_marche in MARCHES', bot)
 
 
 if __name__ == "__main__":
