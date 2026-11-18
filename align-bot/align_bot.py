@@ -2889,7 +2889,9 @@ def carte_coach(m, r, cle, genre, tr=None, raison=None, declencheur=None, signal
             l.append(f"⏱ Valide : {validite}")
         try:
             co = coach_fvg(r, d, r["m1"][-1]["c"], attente=False, tr=tr) if r.get("m1") else []
-            l += [""] + co if co else []
+            # Demande d'Adel : l'entrée doit se lire SANS faire défiler → 2 lignes de coach maximum ici ;
+            # le détail complet reste sous « 🧠 En savoir plus » / « ❓ Pourquoi cette décision ? ».
+            l += [""] + co[:2] if co else []
         except Exception:
             pass
         action = "ENTRER"
@@ -7379,6 +7381,10 @@ def traiter(etat, chats, updates):
                                           + "\n🔕 Tu peux me couper à tout moment : « Mon bot »"
                                           if qui not in LANG_EN else
                                           f"🔔 FOLLOWING {mk}\nI'll alert you when an entry is confirmed."))
+                    # Demande d'Adel : le coach demande UNE fois la plateforme (Topstep ou FundedNext / FTMO)
+                    # pour donner les bons prix et montants.
+                    if str(qui) not in (etat.get("plateforme") or {}):
+                        menu_plateforme(etat, qui)
                 else:
                     try:
                         telegram("answerCallbackQuery", callback_query_id=cb["id"], text="🔒 Réservé aux VIP")
