@@ -223,7 +223,8 @@ class BridgeStore:
         entry_zone_low = _finite_number(payload.get("entryZoneLow"))
         entry_zone_high = _finite_number(payload.get("entryZoneHigh"))
         entry_decision = _finite_number(payload.get("entryDecision"))
-        signal_direction = _direction(payload.get("signal"))
+        signal_text = _text(payload.get("signal"), 24).upper()
+        signal_direction = 1 if signal_text == "LONG" else -1 if signal_text == "SHORT" else None
         if plan_timeframe != "M15":
             return 400, {"ok": False, "error": "unsupported_plan_timeframe"}
         if expected_entry_tf is None or entry_timeframe != expected_entry_tf:
