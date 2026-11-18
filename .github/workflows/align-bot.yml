@@ -337,7 +337,7 @@ jobs:
 
       - name: Bridge TradingView obligatoire — échec signalé
         # Le bot a tourné sans émettre de signal ; le run reste rouge tant que le bridge n'est pas branché.
-        if: always() && env.ALIGN_TV_BRIDGE_PRET == '0'
+        if: ${{ always() && env.ALIGN_TV_BRIDGE_PRET == '0' }}
         run: |
           echo "ÉCHEC: bridge TradingView ROBOT V12 indisponible (secrets ALIGN_TV_* absents ou données invalides). Aucun signal n'a été émis."
           exit 1

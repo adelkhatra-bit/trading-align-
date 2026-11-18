@@ -194,7 +194,7 @@ class PageLive(unittest.TestCase):
         # Bridge absent : mode sans signal, puis run remis en échec (panne jamais masquée).
         self.assertIn('ALIGN_TV_BRIDGE_PRET=0', bridge)
         final = wf.split("Bridge TradingView obligatoire — échec signalé", 1)[1]
-        self.assertIn("if: always() && env.ALIGN_TV_BRIDGE_PRET == '0'", final)
+        self.assertIn("if: ${{ always() && env.ALIGN_TV_BRIDGE_PRET == '0' }}", final)
         self.assertIn("exit 1", final)
         self.assertIn('os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "1") == "1" and m in MARCHES', bot)
         self.assertIn('os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "1") == "1" and nom_marche in MARCHES', bot)
