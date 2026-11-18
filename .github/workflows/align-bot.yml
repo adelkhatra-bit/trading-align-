@@ -310,8 +310,12 @@ jobs:
 
       - name: Analyse BTC + Gold + NASDAQ et envoi Telegram
         env:
-          ALIGN_REQUIRE_TV_BRIDGE: "1"
-          ALIGN_TV_BRIDGE_PRET: ${{ steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == '0' && '0' || '1' }}
+          # Décision d'Adel (18/11, TradingView gratuit = pas de webhook) : bridge TradingView prioritaire ;
+          # s'il est indisponible, le MOTEUR v25 PYTHON prend le relais sur les vraies bougies (même stratégie MTF),
+          # sauf si la variable ALIGN_MOTEUR_PYTHON vaut 0 (retour au mode sans signal).
+          ALIGN_REQUIRE_TV_BRIDGE: ${{ (steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == '0' && vars.ALIGN_MOTEUR_PYTHON != '0') && '0' || '1' }}
+          ALIGN_TV_BRIDGE_PRET: ${{ (steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == '0' && vars.ALIGN_MOTEUR_PYTHON == '0') && '0' || '1' }}
+          ALIGN_SOURCE_SIGNAUX: ${{ steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == '0' && 'moteur-v25-python' || 'tradingview-v25' }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -363,7 +367,7 @@ jobs:
 
       - name: Bridge TradingView obligatoire — échec signalé
         # Le bot a tourné sans émettre de signal ; le run reste rouge tant que le bridge n'est pas branché.
-        if: ${{ always() && steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == '0' }}
+        if: ${{ always() && steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == '0' && vars.ALIGN_MOTEUR_PYTHON == '0' }}
         run: |
           echo "ÉCHEC: bridge TradingView ROBOT V12 indisponible (secrets ALIGN_TV_* absents ou données invalides). Aucun signal n'a été émis."
           exit 1
