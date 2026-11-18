@@ -3651,6 +3651,7 @@ class PineOnlyEntryGateTests(unittest.TestCase):
         from unittest.mock import patch
         r = self._market()
         r["require_tv_bridge"] = True
+        r["tv_indicator_mtf"] = {"available": False, "reason": "bridge inaccessible", "snapshots": {}}
         state = {"t1m": 0}
         locaux = ["manipulation", "meche_suspecte", "niveaux_cles", "resistance_fvg", "suivre_apres_sl",
                   "reprise_entree", "entree_retest", "radar_climax", "retournement_marche",
@@ -3667,6 +3668,16 @@ class PineOnlyEntryGateTests(unittest.TestCase):
                     p_.stop()
         self.assertEqual(out, [])
         self.assertFalse(state.get("trade"))
+
+    def test_bridge_absent_au_demarrage_puis_revenu_relance_le_marche(self):
+        """Run démarré sans bridge (PRET=0) : dès que de vraies données fraîches arrivent, le marché repart."""
+        from unittest.mock import patch
+        with patch.dict(align_bot.os.environ, {"ALIGN_TV_BRIDGE_PRET": "0"}):
+            self.assertTrue(align_bot.mode_sans_signal({"tv_indicator_mtf": {"available": False}}))
+            self.assertTrue(align_bot.mode_sans_signal({}))
+            self.assertFalse(align_bot.mode_sans_signal({"tv_indicator_mtf": {"available": True}}))
+        with patch.dict(align_bot.os.environ, {"ALIGN_TV_BRIDGE_PRET": "1"}):
+            self.assertFalse(align_bot.mode_sans_signal({}))
 
     def test_bridge_ready_still_runs_local_radar(self):
         """Contre-preuve : bridge prêt, le radar local reste branché (rien n'est enlevé)."""
