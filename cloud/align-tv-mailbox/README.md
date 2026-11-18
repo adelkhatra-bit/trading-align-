@@ -21,5 +21,6 @@ la fenêtre de fraîcheur de 30 s du bridge. Le namespace KV `align-tv-mailbox-k
 
 Déploiement (non fait) : secrets Worker
 `ALIGN_TV_INGEST_TOKEN` et `ALIGN_TV_MAILBOX_TOKEN`, puis secrets GitHub
-`ALIGN_TV_MAILBOX_URL` et `ALIGN_TV_MAILBOX_TOKEN`. Le branchement dans
+`ALIGN_TV_MAILBOX_URL`, `ALIGN_TV_MAILBOX_TOKEN` et `ALIGN_TV_INGEST_TOKEN` (jeton d'entrée du bridge
+local du runner, que le relais utilise pour lui transmettre les messages). Le branchement dans
 `align-bot.yml` se fera dans une PR séparée, après déploiement et preuve réelle.

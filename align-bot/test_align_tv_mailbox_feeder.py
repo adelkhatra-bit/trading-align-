@@ -53,6 +53,12 @@ class MailboxFeederTests(unittest.TestCase):
         self.assertEqual(res["BTCUSD"], "ingest_error:ConnectionRefusedError")
         self.assertEqual(res["XAUUSD"], "ingest_error:ConnectionRefusedError")
 
+    def test_one_shot_failure_is_detected_but_empty_is_not(self):
+        self.assertFalse(feeder.relay_failed({"BTCUSD": "ok", "XAUUSD": "empty"}))
+        self.assertTrue(feeder.relay_failed({"BTCUSD": "ok", "NAS100": "mailbox_http_401"}))
+        self.assertTrue(feeder.relay_failed({"BTCUSD": "ingest_error:URLError"}))
+        self.assertTrue(feeder.relay_failed({"BTCUSD": "rejected:stale_or_future_snapshot"}))
+
 
 if __name__ == "__main__":
     unittest.main()

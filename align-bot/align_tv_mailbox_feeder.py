@@ -44,6 +44,11 @@ def relay_once(fetch_mailbox, ingest, symbols=SYMBOLS):
     return results
 
 
+def relay_failed(results):
+    """Vrai si un marché a échoué (réseau, HTTP, bridge, rejet). « empty » n'est pas une panne."""
+    return any(not (v == "ok" or v == "empty") for v in results.values())
+
+
 def _http_json(url, method="GET", data=None, headers=None, timeout=8):
     req = urllib.request.Request(url, data=data, method=method, headers=headers or {})
     try:
@@ -76,9 +81,10 @@ def main():
     interval = float(os.environ.get("ALIGN_TV_RELAY_INTERVAL", "10"))
     once = "--once" in sys.argv
     while True:
-        print(json.dumps({"relay": relay_once(fetch, ingest)}), flush=True)
+        results = relay_once(fetch, ingest)
+        print(json.dumps({"relay": results}), flush=True)
         if once:
-            return 0
+            return 1 if relay_failed(results) else 0
         time.sleep(interval)
 
 
