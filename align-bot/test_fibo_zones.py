@@ -154,6 +154,7 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn("source: source || 'live'", self.js)
         self.assertIn("montrer('🧠 ' + phrase, false, 2, 'membre', false, 'ia');", self.js)
         self.assertIn("item.source !== 'ia'", self.js)
+        self.assertIn("if (maintenant - voixDerniere < 12000) return 0;", self.js)
         self.assertIn("const voixDuree = parlerLive(m);", self.js)
         self.assertIn("Math.max(4000, (W + w) / 0.38, voixDuree)", self.js)
         self.assertIn("left:16px!important;right:auto!important", self.js)
