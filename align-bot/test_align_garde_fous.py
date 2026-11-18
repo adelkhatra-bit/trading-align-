@@ -42,8 +42,12 @@ class GardeFousWorkflows(unittest.TestCase):
 
     def test_validate_lance_toute_la_suite(self):
         texte = (WF / "align-bot-validation.yml").read_text(encoding="utf-8")
-        self.assertRegex(texte, r"(?m)^  validate:", "le job « validate » (contrôle obligatoire) a disparu")
-        self.assertIn('-p "test_*.py"', texte, "validate ne lance plus toute la suite de tests")
+        self.assertRegex(texte, r"(?m)^  pull_request:", "validate ne se déclenche plus sur les PR")
+        job = re.search(r"(?ms)^  validate:\n(.*?)(?=^  \S|\Z)", texte)
+        self.assertIsNotNone(job, "le job « validate » (contrôle obligatoire) a disparu")
+        corps = job.group(1)
+        self.assertNotRegex(corps, r"(?m)^    if:", "le job validate est conditionné (risque d'être sauté sur les PR)")
+        self.assertIn('-p "test_*.py"', corps, "le job validate ne lance plus toute la suite de tests")
 
 
 class GardeFousBridge(unittest.TestCase):
@@ -53,10 +57,13 @@ class GardeFousBridge(unittest.TestCase):
 
     def test_port_dedie_et_ports_interdits(self):
         self.assertTrue({3000, 4000, 5001} <= bridge.FORBIDDEN_PORTS, "anciens ports réautorisés")
-        src = (ROOT / "align-bot" / "align_tv_bridge.py").read_text(encoding="utf-8")
-        self.assertIn('os.environ.get("ALIGN_TV_BRIDGE_PORT", "4100")', src, "port par défaut du bridge modifié")
+        import inspect
+        ecoute = inspect.getsource(bridge.main)
+        self.assertIn('os.environ.get("ALIGN_TV_BRIDGE_PORT", "4100")', ecoute,
+                      "le port d'écoute réel du bridge (main) n'est plus 4100")
 
     def test_fraicheur_non_relachee(self):
+        self.assertGreater(bridge.ACTIVE_MAX_AGE_MS, 0, "fenêtre de fraîcheur nulle : le bridge rejetterait tout")
         self.assertLessEqual(bridge.ACTIVE_MAX_AGE_MS, 30_000, "fraîcheur du prix relâchée")
         self.assertEqual(set(bridge.REQUIRED_TIMEFRAMES), {"M5", "M15", "H1", "H4", "D1", "W1"})
 
