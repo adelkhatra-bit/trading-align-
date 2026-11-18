@@ -623,6 +623,9 @@ bridgeZone = zoneBas ? "SUPPORT" : zoneHaut ? "RESISTANCE" : "PLAN"
 
 // Chaque timeframe transporte l'heure d'ouverture de SA propre bougie.
 // Le bridge calcule la fraîcheur MTF à partir de ces timestamps, pas de l'heure du webhook.
+bridgeEntryTf = strat == "SWING" ? "60" : strat == "DAY" ? "5" : strat == "SCALPING" ? "1" : ""
+[bridgeEntryOpen, bridgeEntryHigh, bridgeEntryLow, bridgeEntryClose, bridgeEntryTime] = request.security(syminfo.tickerid, bridgeEntryTf == "" ? timeframe.period : bridgeEntryTf, [open[1], high[1], low[1], close[1], time[1]], lookahead=barmerge.lookahead_on)
+bridgeEntryTimeSafe = bridgeEntryTf == "" ? na : bridgeEntryTime
 bridgeTimeM1 = request.security(syminfo.tickerid, "1", time)
 bridgeTimeM5 = request.security(syminfo.tickerid, "5", time)
 bridgeTimeM15 = request.security(syminfo.tickerid, "15", time)
