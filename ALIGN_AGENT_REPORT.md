@@ -4,7 +4,8 @@ Date: 2026-11-18
 Repository: `adelkhatra-bit/trading-align-`  
 Base branch: `main`  
 Base SHA audited before changes: `1f9a7d0b6b73fb1384c547c811d97bc1511e1403`  
-Final PR head SHA: `c389b6bee5b1590d3605d8d19028b1d1c18e84cb`
+Code and workflow validation SHA: `c389b6bee5b1590d3605d8d19028b1d1c18e84cb`  
+The subsequent report-only commit records the test evidence; it does not change the tested code or workflows.
 
 ## Mission scope
 
