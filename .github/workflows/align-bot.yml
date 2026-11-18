@@ -225,6 +225,31 @@ jobs:
           ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
         run: python3 ai_healthcheck.py
 
+      - name: Démarrer le bridge local + relais de la boîte aux lettres TradingView
+        # Chaîne réelle : alertes du Pine v25 → Worker Cloudflare (IP TradingView uniquement)
+        # → relais (lecture avec jeton dérivé de CLOUDFLARE_API_TOKEN) → align_tv_bridge.py
+        # (127.0.0.1:4100, seule validation) → bot. Jetons locaux aléatoires, masqués, propres au run.
+        # Sans secret Cloudflare (ou si ALIGN_TV_API_URL est déjà fourni), l'étape ne fait rien.
+        if: ${{ always() }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ALIGN_TV_API_URL_SECRET: ${{ secrets.ALIGN_TV_API_URL }}
+        run: |
+          if [ -n "$ALIGN_TV_API_URL_SECRET" ] || [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "Relais boîte aux lettres non démarré (bridge externe fourni ou secret Cloudflare absent)."; exit 0
+          fi
+          ING=$(python3 -c "import secrets; print(secrets.token_urlsafe(48))")
+          LEC=$(python3 -c "import secrets; print(secrets.token_urlsafe(48))")
+          echo "::add-mask::$ING"; echo "::add-mask::$LEC"
+          { echo "ALIGN_TV_INGEST_TOKEN=$ING"; echo "ALIGN_TV_READ_TOKEN_LOCAL=$LEC"; echo "ALIGN_TV_API_URL_LOCAL=http://127.0.0.1:4100"; } >> "$GITHUB_ENV"
+          ALIGN_TV_INGEST_TOKEN="$ING" ALIGN_TV_READ_TOKEN="$LEC" nohup python3 align-bot/align_tv_bridge.py > "$RUNNER_TEMP/align_bridge.log" 2>&1 &
+          for _ in $(seq 1 20); do grep -q ALIGN_TV_BRIDGE_READY "$RUNNER_TEMP/align_bridge.log" && break; sleep 0.5; done
+          grep -q ALIGN_TV_BRIDGE_READY "$RUNNER_TEMP/align_bridge.log" || { echo "ÉCHEC: bridge local non démarré"; cat "$RUNNER_TEMP/align_bridge.log"; exit 0; }
+          ALIGN_TV_INGEST_TOKEN="$ING" nohup python3 align-bot/align_tv_mailbox_feeder.py > "$RUNNER_TEMP/align_relais.log" 2>&1 &
+          sleep 12
+          echo "Bridge local prêt (127.0.0.1:4100) ; dernier relevé du relais :"
+          tail -n 1 "$RUNNER_TEMP/align_relais.log" || true
+
       - name: Vérifier le bridge TradingView ROBOT V12 (BTC + GOLD + NASDAQ)
         id: bridge
         # Contrôle strict et inchangé des données TradingView/ROBOT V12. S'il échoue : MODE SANS SIGNAL.
@@ -232,8 +257,8 @@ jobs:
         # mais Telegram, commandes et news restent actifs. L'étape finale remet le run en ÉCHEC
         # pour que la panne reste visible du watchdog : rien n'est masqué, rien n'est inventé.
         env:
-          ALIGN_TV_API_URL: ${{ secrets.ALIGN_TV_API_URL }}
-          ALIGN_TV_READ_TOKEN: ${{ secrets.ALIGN_TV_READ_TOKEN }}
+          ALIGN_TV_API_URL: ${{ secrets.ALIGN_TV_API_URL || env.ALIGN_TV_API_URL_LOCAL }}
+          ALIGN_TV_READ_TOKEN: ${{ secrets.ALIGN_TV_READ_TOKEN || env.ALIGN_TV_READ_TOKEN_LOCAL }}
         run: |
           python3 - <<'PY' || { echo "ALIGN_TV_BRIDGE_PRET=0" >> "$GITHUB_OUTPUT"; echo "MODE SANS SIGNAL : bridge TradingView indisponible, aucun signal émis ; Telegram, commandes et news actifs."; }
           import json, math, os, time, urllib.parse, urllib.request
@@ -296,8 +321,8 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
           ANTHROPIC_MAX_JOUR: ${{ vars.ANTHROPIC_MAX_JOUR }}
-          ALIGN_TV_API_URL: ${{ secrets.ALIGN_TV_API_URL }}
-          ALIGN_TV_READ_TOKEN: ${{ secrets.ALIGN_TV_READ_TOKEN }}
+          ALIGN_TV_API_URL: ${{ secrets.ALIGN_TV_API_URL || env.ALIGN_TV_API_URL_LOCAL }}
+          ALIGN_TV_READ_TOKEN: ${{ secrets.ALIGN_TV_READ_TOKEN || env.ALIGN_TV_READ_TOKEN_LOCAL }}
           ALIGN_LIVE_SUJET: ${{ secrets.ALIGN_LIVE_SUJET }}
           # Trading automatique (mode TEST tant que AUTO_TRADE / TOPSTEP_REEL ne valent pas 1)
           METAAPI_TOKEN: ${{ secrets.METAAPI_TOKEN }}
