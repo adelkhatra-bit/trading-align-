@@ -57,6 +57,11 @@ def valid_payload(now_ms=BASE_MS, symbol="BTCUSD", timeframe="M1"):
         "entryZoneLow": 99.0,
         "entryZoneHigh": 101.0,
         "entryDecision": 100.0,
+        "entryBarTime": now_ms - 300_000,
+        "entryBarOpen": 99.5,
+        "entryBarHigh": 101.0,
+        "entryBarLow": 99.0,
+        "entryBarClose": 100.5,
         "anticipation": "AUCUNE",
         "zone_proche": "FVG",
         "volume": "OK",
@@ -242,6 +247,44 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertEqual(robot["entryTimeframe"], "M5")
         self.assertEqual((robot["entryZoneLow"], robot["entryDecision"], robot["entryZoneHigh"]),
                          (99.0, 100.0, 101.0))
+
+    def test_ingest_sets_entry_trigger_only_after_closed_retest_and_decision(self):
+        payload = valid_payload()
+        status, _ = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+        _, data = self.store.read("BTCUSD", BASE_MS)
+        robot = data["snapshots"]["M1"]["robotV12"]
+        self.assertTrue(robot["entryTriggered"])
+        self.assertEqual(robot["entryBarTime"], BASE_MS - 300_000)
+
+    def test_ingest_does_not_trigger_without_retesting_zone(self):
+        payload = valid_payload()
+        payload["entryBarLow"] = 102.0
+        payload["entryBarHigh"] = 103.0
+        payload["entryBarOpen"] = 102.0
+        payload["entryBarClose"] = 102.5
+        status, _ = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+        _, data = self.store.read("BTCUSD", BASE_MS)
+        self.assertFalse(data["snapshots"]["M1"]["robotV12"]["entryTriggered"])
+
+    def test_ingest_does_not_trigger_without_close_beyond_decision_line(self):
+        payload = valid_payload()
+        payload["entryBarClose"] = 99.5
+        status, _ = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+        _, data = self.store.read("BTCUSD", BASE_MS)
+        self.assertFalse(data["snapshots"]["M1"]["robotV12"]["entryTriggered"])
+
+    def test_ingest_rejects_stale_or_future_entry_trigger_candle(self):
+        for time_value in (BASE_MS - TIMEFRAME_MS["M5"] - MTF_BAR_GRACE_MS - 1,
+                           BASE_MS + MAX_FUTURE_SKEW_MS + 1):
+            with self.subTest(entryBarTime=time_value):
+                payload = valid_payload()
+                payload["entryBarTime"] = time_value
+                status, result = self.store.ingest(payload, INGEST, BASE_MS)
+                self.assertEqual(status, 400)
+                self.assertEqual(result["error"], "stale_or_future_entry_trigger_candle")
 
     def test_read_response_never_contains_either_token(self):
         self.store.ingest(valid_payload(), INGEST, BASE_MS)
