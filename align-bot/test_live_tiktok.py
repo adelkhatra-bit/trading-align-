@@ -287,7 +287,7 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("🔊 COACH VOCAL ON", source)
         self.assertIn("voixBtn.remove()", source)
         self.assertIn("parlerLive(m)", source)
-        self.assertIn("Le coach ALIGN est en direct", source)
+        self.assertNotIn("Le coach ALIGN est en direct", source)  # v12.2.8 : plus de phrase d'accueil
 
 
 
@@ -737,7 +737,7 @@ class LiveOutbox(unittest.TestCase):
         self.assertIn("Date.now() - derniereTend < 40000", bande)
         self.assertIn("coachN++; derniereCoach = Date.now();", bande)
         self.assertIn("🔊 ACTIVER LE COMMENTATEUR", bande)
-        self.assertIn("Le coach ALIGN est en direct", bande)
+        self.assertNotIn("Le coach ALIGN est en direct", bande)  # v12.2.8 : plus de phrase d'accueil
 
     def test_ai_live_market_commentary_refreshes_every_ten_minutes(self):
         state = {}
@@ -1062,3 +1062,44 @@ class LiveNarrationPrioritizesM5M15Conflict(unittest.TestCase):
         payload = json.loads(published[0][3:])
         self.assertIn("unités courtes et de référence divergent", payload["NASDAQ"][1][0])
         self.assertIn("timeframes disagree", payload["NASDAQ"][1][1])
+
+
+class VoixNaturelleSeulementV1228(unittest.TestCase):
+    """v12.2.8 (demande d'Adel) : une seule voix naturelle, OFF = silence, pas de phrase d'accueil, pas de voix robot."""
+
+    def _lire(self, rel):
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", *rel)
+        return open(path, encoding="utf-8").read()
+
+    def test_bande_version_12_2_8(self):
+        bande = self._lire(["docs", "live", "align-bande-live.user.js"])
+        self.assertIn("// @version      12.2.8", bande)
+        self.assertIn("const VERSION = '12.2.8';", bande)
+
+    def test_bande_sans_phrase_d_accueil(self):
+        bande = self._lire(["docs", "live", "align-bande-live.user.js"])
+        self.assertNotIn("Je commente maintenant ce que fait le marché", bande)
+        self.assertNotIn("I am now commenting on market action", bande)
+
+    def test_bande_sans_voix_robot_ni_repli(self):
+        bande = self._lire(["docs", "live", "align-bande-live.user.js"])
+        # plus aucun repli sur "dansLangue[0]" (= voix robot) ; sans voix naturelle, on ne parle pas
+        self.assertNotIn("utterance.voice = dansLangue[0]", bande)
+        self.assertNotIn("dansLangue[0]", bande)
+        self.assertIn("if (!v) return 0;", bande)
+        self.assertIn("utterance.voice = v;", bande)
+
+    def test_bande_off_coupe_toute_la_parole(self):
+        bande = self._lire(["docs", "live", "align-bande-live.user.js"])
+        self.assertIn("try { window.speechSynthesis.cancel(); } catch (e) {}", bande)
+
+    def test_extension_popup_ne_parle_plus(self):
+        popup = self._lire(["tradingview-analyzer", "popup.js"])
+        self.assertIn("cette extension ne parle plus", popup)
+        self.assertNotIn("new SpeechSynthesisUtterance(_txt)\n    ;", popup)
+
+    def test_pine_plus_de_point_entree_trace(self):
+        pine = self._lire(["align-bot", "pine", "ALIGN_MTF_PRO_v25.pine"])
+        self.assertNotIn('label.new(x1, ent, "ENTRÉE "', pine)
+        self.assertNotIn("lE := line.new(x1, ent", pine)
+        self.assertIn("plus de point d'entrée tracé", pine)
