@@ -1,14 +1,13 @@
 name: ALIGN merge gate
 
-# Fusionne une PR seulement si : l'étiquette « auto-merge » est posée (accord explicite),
-# les tests passent sur le SHA exact de la PR, et la PR n'a pas de conflit.
-# En cas d'échec : aucune fusion, commentaire de diagnostic, nouvelle tentative au prochain push.
+# Porte de contrôle : teste la PR sur son SHA exact et signale le résultat.
+# Elle ne fusionne JAMAIS. La fusion reste une décision humaine (AGENTS.md).
 on:
   pull_request:
-    types: [labeled, synchronize, reopened]
+    types: [synchronize, reopened, labeled]
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: write
 
 concurrency:
@@ -17,7 +16,8 @@ concurrency:
 
 jobs:
   gate:
-    if: contains(github.event.pull_request.labels.*.name, 'auto-merge') && github.event.pull_request.base.ref == 'main'
+    # Seulement les PR venant du dépôt lui-même (pas les forks, token en lecture seule).
+    if: github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,27 +26,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Vérifier que la PR est fusionnable
-        id: mergeable
+      - name: Compilation
+        run: python -m py_compile align-bot/*.py
+      - name: Suite complète de tests ALIGN
+        run: PYTHONPATH=. python -m unittest discover -s align-bot -p 'test_*.py' -q
+      - name: Diagnostic en cas d'échec
+        if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          STATE=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }} --jq '.mergeable_state')
-          echo "mergeable_state=$STATE" >> "$GITHUB_OUTPUT"
-          echo "État de fusion : $STATE"
-      - name: Tests ALIGN (SHA exact de la PR)
-        id: tests
-        run: |
-          python -m py_compile align-bot/*.py
-          cd align-bot && python -m unittest test_align_mtf test_align_pine_bridge_contract test_closed_mtf_safety -q
-      - name: Fusionner si tout est vert
-        if: steps.tests.outcome == 'success' && steps.mergeable.outputs.mergeable_state == 'clean'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr merge ${{ github.event.pull_request.number }} --squash --match-head-commit ${{ github.event.pull_request.head.sha }}
-      - name: Diagnostic si échec
-        if: failure() || steps.mergeable.outputs.mergeable_state != 'clean'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh pr comment ${{ github.event.pull_request.number }} --body "⛔ Fusion automatique bloquée sur $(git rev-parse --short HEAD) : tests=${{ steps.tests.outcome }}, état=${{ steps.mergeable.outputs.mergeable_state }}. Pousse une correction : la porte relancera les contrôles."
+          gh pr comment ${{ github.event.pull_request.number }} --body "⛔ Contrôles en échec sur $(git rev-parse --short HEAD). Aucune fusion. Pousse une correction : la porte relancera les tests."
