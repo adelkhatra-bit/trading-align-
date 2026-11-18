@@ -216,7 +216,41 @@ class BridgeStore:
                 }
             normalized_mtf[tf] = {"direction": direction, "rsi": rsi, "barTime": bar_time}
 
+        plan_timeframe = _text(payload.get("planTimeframe"), 8).upper()
+        entry_timeframe = _text(payload.get("entryTimeframe"), 8).upper()
+        strategy = _text(payload.get("strategy"), 24).upper()
+        expected_entry_tf = {"SCALPING": "M1", "DAY": "M5", "SWING": "H1"}.get(strategy)
+        entry_zone_low = _finite_number(payload.get("entryZoneLow"))
+        entry_zone_high = _finite_number(payload.get("entryZoneHigh"))
+        entry_decision = _finite_number(payload.get("entryDecision"))
+        signal_direction = _direction(payload.get("signal"))
+        if plan_timeframe != "M15":
+            return 400, {"ok": False, "error": "unsupported_plan_timeframe"}
+        if expected_entry_tf is None or entry_timeframe != expected_entry_tf:
+            return 400, {"ok": False, "error": "entry_timeframe_strategy_mismatch"}
+        if entry_zone_low is None or entry_zone_high is None or entry_decision is None:
+            return 400, {"ok": False, "error": "missing_entry_zone"}
+        if not entry_zone_low < entry_decision < entry_zone_high:
+            return 400, {"ok": False, "error": "invalid_entry_zone_geometry"}
+        if signal_direction not in (-1, 1):
+            return 400, {"ok": False, "error": "invalid_entry_direction"}
+        plan_entry = _finite_number(payload.get("entry"))
+        plan_sl = _finite_number(payload.get("sl"))
+        if plan_entry is None or plan_sl is None:
+            return 400, {"ok": False, "error": "missing_entry_or_stop"}
+        if signal_direction == 1 and not plan_sl < entry_zone_low < entry_decision < entry_zone_high:
+            return 400, {"ok": False, "error": "long_entry_zone_vs_stop_mismatch"}
+        if signal_direction == -1 and not entry_zone_low < entry_decision < entry_zone_high < plan_sl:
+            return 400, {"ok": False, "error": "short_entry_zone_vs_stop_mismatch"}
+
         robot = _safe_robot(payload, price, now_ms)
+        robot.update({
+            "planTimeframe": plan_timeframe,
+            "entryTimeframe": entry_timeframe,
+            "entryZoneLow": entry_zone_low,
+            "entryZoneHigh": entry_zone_high,
+            "entryDecision": entry_decision,
+        })
         source_iso = _iso_utc(source_timestamp)
         snapshots = {}
         for tf in REQUIRED_TIMEFRAMES:
