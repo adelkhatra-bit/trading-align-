@@ -191,9 +191,9 @@
   const voixBtn = document.createElement('button');
   voixBtn.id = 'align-live-voice';
   voixBtn.type = 'button';
-  voixBtn.textContent = voixEtatInitial ? '🔊 COACH VOCAL ON' : '🔊 ACTIVER LE COMMENTATEUR';
+  voixBtn.textContent = voixEtatInitial ? '🔊 COACH VOCAL ON' : '🔇 COACH VOCAL OFF';
   voixBtn.setAttribute('aria-pressed', voixEtatInitial ? 'true' : 'false');
-  voixBtn.title = 'Activer le commentateur vocal du live';
+  voixBtn.title = 'Coach vocal : activer ou couper la voix du live';
   voixBtn.style.cssText = 'position:fixed;left:18px;bottom:20px;z-index:10001;padding:11px 15px;border:2px solid #35d07f;border-radius:22px;background:linear-gradient(135deg,#123b2b,#10251f);color:#fff;font:800 13px system-ui;cursor:pointer;pointer-events:auto;box-shadow:0 0 18px rgba(53,208,127,.35)';
   document.body.appendChild(voixBtn);
   const voixLangueBtn = document.createElement('button');
@@ -303,7 +303,7 @@
       voixDerniere = Date.now();
     } else {
       try { window.speechSynthesis.cancel(); } catch (e) {}   // v12.2.8 : OFF coupe tout ce qui est en file
-      voixBtn.textContent = '🔇 ACTIVER LE COMMENTATEUR';
+      voixBtn.textContent = '🔇 COACH VOCAL OFF';
       voixBtn.setAttribute('aria-pressed', 'false');
     }
   });
