@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
-SOURCE = "ALIGN_MTF_PRO_A"
+SOURCE = "ALIGN_MTF_PRO_V25"
 ALLOWED_SYMBOLS = {"BTCUSD", "XAUUSD", "NAS100"}
 ACTIVE_TIMEFRAMES = {"M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"}
 REQUIRED_TIMEFRAMES = ("M5", "M15", "H1", "H4", "D1", "W1")

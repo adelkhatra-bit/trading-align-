@@ -1,47 +1,59 @@
 from pathlib import Path
+import hashlib
 import unittest
 
-PINE = Path(__file__).parent / "pine" / "ALIGN_MTF_PRO_INSIDE_FVG_EVOLUTIVE.pine"
+PINE = Path(__file__).parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
+BASELINE_GIT_BLOB_SHA = "823635f039ff3b59c39867a7b59dfa3ed6fafaf1"
+SETTINGS_BLOCK = """// ═════════ BRIDGE ALIGN (optionnel, sans modification visuelle) ═════════
+grpBridge = "Bridge ALIGN (optionnel)"
+bridgeEnabled = input.bool(false, "Envoyer les snapshots au ROBOT V12", group=grpBridge)
+bridgeMarket = input.string("BTCUSD", "Marché ALIGN", options=["BTCUSD", "XAUUSD", "NAS100"], group=grpBridge)
+
+"""
+EXPORT_MARKER = "// ═════════ BRIDGE ALIGN — export structuré du Pine v25 (sans toucher aux signaux/visuels) ═════════"
 
 
-class PineBridgeContractTests(unittest.TestCase):
+class CanonicalPineBridgeContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.source = PINE.read_text(encoding="utf-8")
 
-    def test_original_indicator_identity_and_visual_settings_are_preserved(self):
-        self.assertIn('indicator("ALIGN MTF PRO (Inside)", shorttitle="ALIGN MTF"', self.source)
-        self.assertIn('animer   = input.bool(true, "Animation en temps réel"', self.source)
+    def test_canonical_indicator_identity_and_animation_default_are_preserved(self):
+        self.assertIn('indicator("ALIGN MTF PRO v25 (Inside)", shorttitle="ALIGN MTF v25"', self.source)
+        self.assertIn('animer   = input.bool(true, "Animation en temps réel", group=grpA)', self.source)
         self.assertIn("clignote = animer and tick % 2 == 0", self.source)
         self.assertIn('voirPlan = input.bool(true, "Afficher le plan (TP / SL)"', self.source)
 
-    def test_progressive_fvg_consumption_and_recoloring_are_preserved(self):
-        self.assertIn("if sv == 1 and low < box.get_top(b)", self.source)
-        self.assertIn("box.set_top(b, low)", self.source)
-        self.assertIn("if sv == -1 and high > box.get_bottom(b)", self.source)
-        self.assertIn("box.set_bottom(b, high)", self.source)
-        self.assertIn("prox84 ? 55 : 85", self.source)
-        self.assertIn('prox84 ? "FVG 👀" : "FVG"', self.source)
+    def test_original_pine_is_byte_identical_outside_the_two_bridge_blocks(self):
+        self.assertIn(SETTINGS_BLOCK, self.source)
+        self.assertIn(EXPORT_MARKER, self.source)
+        without_settings = self.source.replace(SETTINGS_BLOCK, "", 1)
+        without_export = without_settings.split(EXPORT_MARKER, 1)[0]
+        if without_export.endswith("\n\n"):
+            without_export = without_export[:-1]
+        raw = without_export.encode("utf-8")
+        git_blob = hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
+        self.assertEqual(git_blob, BASELINE_GIT_BLOB_SHA)
 
-    def test_existing_human_alerts_remain_and_bridge_is_opt_in(self):
+    def test_existing_human_alerts_are_preserved_and_bridge_is_opt_in(self):
         self.assertIn('alert(syminfo.ticker + " " + nomSigH', self.source)
         self.assertIn('alert(syminfo.ticker + " " + nomSigB', self.source)
-        self.assertIn('bridgeEnabled = input.bool(false,', self.source)
+        self.assertIn('bridgeEnabled = input.bool(false, "Envoyer les snapshots au ROBOT V12"', self.source)
         self.assertIn('alert(bridgePayload, alert.freq_all)', self.source)
-        self.assertIn("\"scalp_inverse\":", self.source)
-        self.assertIn("\"strategy\":\"", self.source)
+        self.assertIn('"source":"ALIGN_MTF_PRO_V25"', self.source)
 
-    def test_bridge_exports_active_plan_and_required_mtf_frames(self):
+    def test_active_plan_and_all_required_mtf_timeframes_are_exported(self):
         for key in ('"entry"', '"sl"', '"tp1"', '"tp2"', '"lecture_1m"', '"lecture_5m"', '"lecture_15m"', '"lecture_60m"'):
             self.assertIn(key, self.source)
-        for tf in ('M5', 'M15', 'H1', 'H4', 'D1', 'W1'):
+        for tf in ("M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"):
             self.assertIn('"' + tf + '"', self.source)
-        self.assertIn('"source":"ALIGN_MTF_PRO_A"', self.source)
-        self.assertIn('>= 20000', self.source)
+        self.assertIn(">= 20000", self.source)
+        self.assertLessEqual(self.source.count("request.security("), 40)
 
-    def test_no_ingest_secret_is_embedded_in_source(self):
+    def test_no_secret_is_embedded_in_pine(self):
         self.assertNotIn("ALIGN_TV_INGEST_TOKEN", self.source)
         self.assertNotIn("ingest_token", self.source)
+        self.assertNotIn("ALIGN_MTF_PRO_A", self.source)
 
 
 if __name__ == "__main__":

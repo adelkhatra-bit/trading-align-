@@ -29,7 +29,7 @@ def valid_payload(now_ms=BASE_MS, symbol="BTCUSD", timeframe="M1"):
         for tf in frames
     }
     return {
-        "source": "ALIGN_MTF_PRO_A",
+        "source": "ALIGN_MTF_PRO_V25",
         "symbol": symbol,
         "tickerid": "BINANCE:BTCUSDT",
         "timeframe": timeframe,
