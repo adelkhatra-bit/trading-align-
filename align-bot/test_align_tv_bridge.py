@@ -6,7 +6,15 @@ from http.server import ThreadingHTTPServer
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from align_tv_bridge import BridgeStore, REQUIRED_TIMEFRAMES, make_handler
+from align_tv_bridge import (
+    ACTIVE_MAX_AGE_MS,
+    MAX_FUTURE_SKEW_MS,
+    MTF_BAR_GRACE_MS,
+    TIMEFRAME_MS,
+    BridgeStore,
+    REQUIRED_TIMEFRAMES,
+    make_handler,
+)
 
 
 INGEST = "a" * 64
@@ -140,6 +148,64 @@ class BridgeStoreTests(unittest.TestCase):
         _, data = self.store.read("BTCUSD", BASE_MS + 31_000)
         self.assertFalse(data["ok"])
         self.assertFalse(data["activeTimeframeFresh"])
+
+    def test_rejects_stale_m5_h1_d1_and_w1_bars_even_in_a_recent_payload(self):
+        for tf in ("M5", "H1", "D1", "W1"):
+            with self.subTest(timeframe=tf):
+                payload = valid_payload()
+                payload["mtf"][tf]["bar_time"] = (
+                    BASE_MS - TIMEFRAME_MS[tf] - MTF_BAR_GRACE_MS - 1
+                )
+                status, result = self.store.ingest(payload, INGEST, BASE_MS)
+                self.assertEqual(status, 400)
+                self.assertEqual(result["error"], "stale_mtf_bar")
+                self.assertEqual(result["timeframe"], tf)
+
+    def test_accepts_h1_bar_near_its_expected_close(self):
+        payload = valid_payload()
+        payload["mtf"]["H1"]["bar_time"] = BASE_MS - TIMEFRAME_MS["H1"] + 1
+        status, result = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+        self.assertTrue(result["accepted"])
+
+    def test_rejects_future_mtf_bar_beyond_clock_tolerance(self):
+        payload = valid_payload()
+        payload["mtf"]["D1"]["bar_time"] = BASE_MS + MAX_FUTURE_SKEW_MS + 1
+        status, result = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 400)
+        self.assertEqual(result["error"], "future_mtf_bar")
+        self.assertEqual(result["timeframe"], "D1")
+
+    def test_repeated_recent_alerts_do_not_refresh_an_old_h1_candle(self):
+        first = valid_payload(now_ms=BASE_MS)
+        original_h1_bar = first["mtf"]["H1"]["bar_time"]
+        status, _ = self.store.ingest(first, INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+
+        repeated = valid_payload(now_ms=BASE_MS + 20_000)
+        repeated["mtf"]["H1"]["bar_time"] = original_h1_bar
+        status, _ = self.store.ingest(repeated, INGEST, BASE_MS + 20_000)
+        self.assertEqual(status, 200)
+
+        _, data = self.store.read(
+            "BTCUSD",
+            BASE_MS + TIMEFRAME_MS["H1"] + MTF_BAR_GRACE_MS + 1,
+        )
+        self.assertFalse(data["snapshots"]["H1"]["fresh"])
+        self.assertGreater(
+            data["snapshots"]["H1"]["ageMs"],
+            TIMEFRAME_MS["H1"] + MTF_BAR_GRACE_MS,
+        )
+
+    def test_snapshot_freshness_expires_from_bar_time_even_if_receipt_was_recent(self):
+        payload = valid_payload()
+        status, _ = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+        _, data = self.store.read(
+            "BTCUSD",
+            BASE_MS + TIMEFRAME_MS["M5"] + MTF_BAR_GRACE_MS + 1,
+        )
+        self.assertFalse(data["snapshots"]["M5"]["fresh"])
 
     def test_read_response_never_contains_either_token(self):
         self.store.ingest(valid_payload(), INGEST, BASE_MS)
