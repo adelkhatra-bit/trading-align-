@@ -237,9 +237,9 @@ var int dirStable = 0
 if barstate.isconfirmed
     if dirStable == 0
         dirStable := dirBrut
-    else if dirBrut != 0 and dirBrut != dirStable and (nz(d15) == dirBrut or nz(d60) == dirBrut)
+    else if dirBrut != 0 and dirBrut != dirStable and (nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut)
         dirStable := dirBrut
-    else if dirBrut == 0 and nz(d15) != dirStable and nz(d60) != dirStable
+    else if dirBrut == 0 and nz(d15Fermee) != dirStable and nz(d60Fermee) != dirStable
         dirStable := 0
 // GOLD/NASDAQ : aucune direction de trade tant que les clôtures M5, M15, H1 et H4 ne concordent pas.
 tickerUpper = str.upper(syminfo.ticker)

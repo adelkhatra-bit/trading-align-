@@ -25,5 +25,16 @@ class PineClosedMtfGuard(unittest.TestCase):
         self.assertIn("(not isGoldNasdaq or (gnConfluence and dirStable == -1))", source)
 
 
+    def test_direction_confirmation_uses_closed_htf_candles_not_live_ones(self):
+        # Régression : la confirmation du sens ne doit jamais lire la bougie 15 min / 1 h en formation
+        # (nz(d15) / nz(d60)), sinon le sens SHORT/LONG bascule à chaque tick.
+        source = PINE.read_text(encoding="utf-8")
+        start = source.index("var int dirStable = 0")
+        block = source[start:start + 700]
+        self.assertNotIn("nz(d15)", block)
+        self.assertNotIn("nz(d60)", block)
+        self.assertIn("nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut", block)
+
+
 if __name__ == "__main__":
     unittest.main()
