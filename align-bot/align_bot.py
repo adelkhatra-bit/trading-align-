@@ -92,6 +92,16 @@ def fetch_tv_mtf(pair):
         print("TradingView MTF bridge:", ex, flush=True)
         return {"available": False, "reason": "bridge inaccessible", "snapshots": {}}
 
+def mode_sans_signal(r=None):
+    """Vrai seulement si le bridge était absent au démarrage ET l'est toujours pour ce marché.
+    Le contrôle de démarrage ne condamne plus tout le run : dès que de vraies données
+    TradingView fraîches arrivent, le marché repart (jamais de données inventées)."""
+    if os.environ.get("ALIGN_TV_BRIDGE_PRET", "1") != "0":
+        return False
+    bridge = (r or {}).get("tv_indicator_mtf") or {}
+    return bridge.get("available") is not True
+
+
 def _direction_tv(value):
     text = str(value or "").strip().upper()
     if any(x in text for x in ("LONG", "BULL", "HAUSSIER", "ACHAT", "BUY")):
@@ -10702,7 +10712,7 @@ def agent(m, r, cle, ferme):
     # Mode sans signal (bridge TradingView non branché) : AUCUNE alerte calculée localement
     # (manipulation, niveaux, FVG, radar, retournement, retest, après-SL) — seule la source v25 parle.
     # Une position déjà ouverte reste suivie jusqu'à sa clôture ; aucune nouvelle info de marché.
-    sans_signal = os.environ.get("ALIGN_TV_BRIDGE_PRET", "1") == "0"
+    sans_signal = mode_sans_signal(r)
     if sans_signal and not tr:
         print(f"{m} : mode sans signal, bridge TradingView indisponible — aucune alerte locale.")
         return []
@@ -10746,7 +10756,7 @@ def agent(m, r, cle, ferme):
             cle["aligne"] = 0
             cle["prep"] = False
             cle.pop("ordre", None)
-            if os.environ.get("ALIGN_TV_BRIDGE_PRET", "1") == "0":
+            if mode_sans_signal(r):
                 # Mode sans signal (bridge non branché) : panne technique, pas une info de marché →
                 # journal seulement, jamais diffusée aux abonnés ni à la chaîne.
                 print(f"{m} : mode sans signal, bridge TradingView indisponible.")
@@ -10774,7 +10784,7 @@ def agent(m, r, cle, ferme):
             cle["prep"] = False
             cle.pop("ordre", None)
             k = str(plan_tv.get("reason") or "plan Pine absent")
-            if os.environ.get("ALIGN_TV_BRIDGE_PRET", "1") == "0":
+            if mode_sans_signal(r):
                 # Mode sans signal : panne technique, journal seulement (jamais envoyée aux abonnés).
                 print(f"{m} : mode sans signal, plan TradingView indisponible ({k}).")
             elif cle.get("tv_bridge_wait_reason") != k:
