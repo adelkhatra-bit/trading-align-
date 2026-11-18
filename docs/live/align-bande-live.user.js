@@ -1258,6 +1258,8 @@
     const pos = (B[B.length - 1][4] - ll) / Math.max(hh - ll, 1e-9);
     const volume = B[B.length - 1][5] || 0;
     const volumeFort = moyV > 0 && volume >= 1.8 * moyV;
+    // Bougie en cours (anticipation provisoire) : définie ici, car cette fonction ne recevait que B.
+    const cur = B[B.length - 1], prev = B.slice(-21, -1);
     const niveauBas = Math.min(...prev.map(x => x[3]));
     const niveauHaut = Math.max(...prev.map(x => x[2]));
     const corpsAbs = Math.abs(cur[4] - cur[1]);
@@ -1269,8 +1271,25 @@
       && mecheBasse >= Math.max(corpsAbs * 0.8, moyR * 0.08);
     const chasseAuDessus = cur[2] > niveauHaut + seuilSweep && cur[4] < niveauHaut && cur[4] < cur[1]
       && mecheHaute >= Math.max(corpsAbs * 0.8, moyR * 0.08);
+    // Bougie clôturée (validation) : balayage puis réintégration confirmés sur la dernière bougie terminée.
+    // C'est un indice de rejet, jamais une autorisation d'entrée à lui seul (confirmation M5/M15/H1/H4 requise).
+    const terminee = B[B.length - 2], avant = B.slice(-22, -2);
+    const ancienBas = Math.min(...avant.map(x => Number(x[3])));
+    const ancienHaut = Math.max(...avant.map(x => Number(x[2])));
+    const corpsT = Math.abs(Number(terminee[4]) - Number(terminee[1]));
+    const mecheBasseT = Math.min(Number(terminee[1]), Number(terminee[4])) - Number(terminee[3]);
+    const mecheHauteT = Number(terminee[2]) - Math.max(Number(terminee[1]), Number(terminee[4]));
+    const balayageBas = Number(terminee[3]) < ancienBas - seuil * 0.08 &&
+      Number(terminee[4]) > ancienBas && Number(terminee[4]) >= Number(terminee[1]) &&
+      mecheBasseT >= Math.max(corpsT * 1.1, seuil * 0.12);
+    const balayageHaut = Number(terminee[2]) > ancienHaut + seuil * 0.08 &&
+      Number(terminee[4]) < ancienHaut && Number(terminee[4]) <= Number(terminee[1]) &&
+      mecheHauteT >= Math.max(corpsT * 1.1, seuil * 0.12);
+    // Priorité : validation clôturée > anticipation en cours > tendance.
     let lecture;
-    if (chasseSousSupport) lecture = 'Possible chasse de liquidité sous un support : le prix repasse au-dessus et les acheteurs réagissent. La bougie est encore en formation ; seule sa clôture dira si le piège est confirmé.';
+    if (balayageBas) lecture = 'La dernière bougie clôturée est passée sous un ancien creux puis a réintégré la zone avec un rejet acheteur. Possible chasse de liquidité vendeuse ; ce n’est pas encore un signal LONG, on attend la confirmation M5, M15, H1 et H4.';
+    else if (balayageHaut) lecture = 'La dernière bougie clôturée est passée au-dessus d’un ancien sommet puis a réintégré la zone avec un rejet vendeur. Possible chasse de liquidité acheteuse ; ce n’est pas encore un signal SHORT, on attend la confirmation M5, M15, H1 et H4.';
+    else if (chasseSousSupport) lecture = 'Possible chasse de liquidité sous un support : le prix repasse au-dessus et les acheteurs réagissent. La bougie est encore en formation ; seule sa clôture dira si le piège est confirmé.';
     else if (chasseAuDessus) lecture = 'Possible chasse de liquidité au-dessus d’une résistance : le prix repasse dessous et les vendeurs réagissent. La bougie est encore en formation ; seule sa clôture dira si le piège est confirmé.';
     else if (dFond > 0 && dRecent < 0) lecture = 'La tendance récente reste orientée à la hausse, mais les dernières bougies corrigent. Les acheteurs doivent défendre leur mouvement ; on attend une clôture avant de conclure.';
     else if (dFond < 0 && dRecent > 0) lecture = 'Le mouvement de fond reste orienté à la baisse, mais le marché tente un rebond. Les vendeurs doivent encore montrer s’ils gardent la main ; aucune anticipation.';
