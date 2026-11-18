@@ -19,7 +19,9 @@ class LiveVoiceDisplayLanguage(unittest.TestCase):
         self.assertIn("align-live-controls-dock", source)
         self.assertIn("align-live-controls-items", source)
         self.assertIn("align-live-controls-toggle", source)
-        self.assertIn("right:16px!important", source)
+        self.assertIn("left:16px!important;right:auto!important", source)
+        self.assertIn("justify-content:flex-start!important", source)
+        self.assertNotIn("right:16px!important", source)
         self.assertIn("bottom:16px!important", source)
         self.assertIn("top:auto!important", source)
         self.assertIn("controlsDockItems.appendChild(button)", source)
@@ -45,7 +47,9 @@ class LiveVoiceDisplayLanguage(unittest.TestCase):
         source = LIVE_JS.read_text(encoding="utf-8")
         self.assertIn("function parlerLive(item)", source)
         self.assertIn("if (!voixActive || !item", source)
-        self.assertIn("parlerLive(m);", source)
+        self.assertIn("const voixDuree = parlerLive(m);", source)
+        self.assertIn("item.source !== 'ia'", source)
+        self.assertIn("Math.max(4000, (W + w) / 0.38, voixDuree)", source)
         self.assertIn("window.speechSynthesis.speak(utterance)", source)
 
     def test_animation_off_hides_visuals_without_pausing_runtime(self):

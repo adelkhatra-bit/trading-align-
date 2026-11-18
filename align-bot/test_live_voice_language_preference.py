@@ -13,7 +13,7 @@ class LiveVoiceLanguagePreference(unittest.TestCase):
         self.assertIn("voixLangueBtn", source)
         self.assertIn("localStorage.getItem('alignVoixLangue')", source)
         self.assertIn("localStorage.setItem('alignVoixLangue'", source)
-        self.assertIn("if (!!item.en !== anglais) return;", source)
+        self.assertIn("if (!!item.en !== anglais) return 0;", source)
         self.assertIn("utterance.lang = anglais ? 'en-US' : 'fr-FR';", source)
         self.assertIn("Voix FR", source)
         self.assertIn("Voix EN", source)
