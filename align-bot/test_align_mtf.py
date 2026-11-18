@@ -3820,3 +3820,9 @@ class TelegramTp1Tp2BridgeTests(unittest.TestCase):
         self.assertIn("TP2 non disponible (plan incomplet)", message)
         self.assertNotIn("TP2 67600", message)
 
+
+class TestTelegramDeliverySummary(unittest.TestCase):
+    def test_summary_counts_prepared_messages_not_deliveries(self):
+        summary = align_bot.resume_compte_envois(2, 3)
+        self.assertEqual(summary, "2 message(s) préparé(s) ; 3 chat(s) connu(s)")
+        self.assertNotIn("envoyé", summary.lower())
