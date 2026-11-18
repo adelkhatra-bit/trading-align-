@@ -20,3 +20,12 @@ let [s, b] = await call("GET", "/health"); ok(s === 200 && b.ok, "health");
 [s] = await call("GET", "/mailbox?symbol=BTCUSD"); ok(s === 401, "lecture refusée sans jeton");
 [s, b] = await call("GET", "/mailbox?symbol=BTCUSD", undefined, { authorization: "Bearer " + env.ALIGN_TV_MAILBOX_TOKEN }); ok(s === 200 && b.payload.price === 64000 && b.receivedAt > 0, "lecture BTC avec jeton");
 [s, b] = await call("GET", "/mailbox?symbol=NAS100", undefined, { authorization: "Bearer " + env.ALIGN_TV_MAILBOX_TOKEN }); ok(s === 200 && b.ok === false, "NASDAQ vide signalé");
+// Webhook TradingView sans jeton : accepté UNIQUEMENT depuis les IP officielles TradingView.
+[s] = await call("POST", "/ingest/tradingview", '{"source":"ALIGN_MTF_PRO_V25","symbol":"XAUUSD","price":2400}', { "cf-connecting-ip": "1.2.3.4" });
+ok(s === 401, "webhook /ingest/tradingview refusé hors IP TradingView");
+[s] = await call("POST", "/ingest/tradingview", '{"source":"ALIGN_MTF_PRO_V25","symbol":"XAUUSD","price":2400}');
+ok(s === 401, "webhook /ingest/tradingview refusé sans IP");
+[s] = await call("POST", "/ingest/tradingview", '{"source":"ALIGN_MTF_PRO_V25","symbol":"XAUUSD","price":2400}', { "cf-connecting-ip": "52.89.214.238" });
+ok(s === 200, "webhook TradingView accepté depuis une IP officielle");
+[s, b] = await call("GET", "/mailbox?symbol=XAUUSD", undefined, { authorization: "Bearer " + env.ALIGN_TV_MAILBOX_TOKEN });
+ok(s === 200 && b.payload.price === 2400, "GOLD lu après webhook TradingView");
