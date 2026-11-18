@@ -238,9 +238,9 @@ class BridgeStore:
         plan_sl = _finite_number(payload.get("sl"))
         if plan_entry is None or plan_sl is None:
             return 400, {"ok": False, "error": "missing_entry_or_stop"}
-        if signal_direction == 1 and not (plan_sl < entry_zone_low <= plan_entry <= entry_zone_high and entry_zone_low < entry_decision < entry_zone_high):
+        if signal_direction == 1 and not (plan_sl < plan_entry and entry_zone_low < entry_decision < entry_zone_high and plan_sl < entry_zone_low < entry_zone_high <= plan_entry):
             return 400, {"ok": False, "error": "long_entry_zone_vs_stop_mismatch"}
-        if signal_direction == -1 and not (entry_zone_low <= plan_entry <= entry_zone_high and entry_zone_low < entry_decision < entry_zone_high < plan_sl):
+        if signal_direction == -1 and not (plan_entry < plan_sl and entry_zone_low < entry_decision < entry_zone_high and plan_entry <= entry_zone_low < entry_zone_high < plan_sl):
             return 400, {"ok": False, "error": "short_entry_zone_vs_stop_mismatch"}
 
         robot = _safe_robot(payload, price, now_ms)
