@@ -506,16 +506,20 @@
   // Le JSON public expose seulement l'état (entree/preparation), jamais la direction ni les niveaux.
   const BOT_STATE_URL = 'https://raw.githubusercontent.com/adelkhatra-bit/trading-align-/live-data/live.json';
     let botEtatSyncT = null;
+  // v12.2.8 : état officiel du bot par marché (calme / preparation / entree). Sans état confirmé, la bande ne promet rien.
+  const botEtat = {};
+  function botAConfirme() { const k = codeMarche(); return !!k && (botEtat[k] === 'preparation' || botEtat[k] === 'entree'); }
   async function synchroniserEtatBot() {
     try {
       const rep = await fetch(BOT_STATE_URL + '?t=' + Date.now(), { cache: 'no-store' });
       if (!rep.ok) return;
       const data = await rep.json();
       const maj = Number(data && data.maj || 0) * 1000;
-      if (!maj || Date.now() - maj > 10 * 60 * 1000 || maj > Date.now() + 60000) return;
+      if (!maj || Date.now() - maj > 10 * 60 * 1000 || maj > Date.now() + 60000) { for (const k in botEtat) delete botEtat[k]; return; }
       for (const item of (Array.isArray(data.marches) ? data.marches : [])) {
         const k = cleMarche(item && item.m);
         if (!k) continue;
+        botEtat[k] = item.etat;
         if (item.etat === 'entree') {
           const dejaAnnonce = !!botPos[k] && Date.now() - botPos[k] < 12 * 3600 * 1000;
           botPos[k] = Date.now();
@@ -1283,6 +1287,7 @@
   let tendN = 0, derniereTend = Date.now(), derniereCoach = 0, arme = null;   // horloges séparées : l'animateur ne bloque plus le commentaire du marché
   function regarder() {
     try {
+      if (arme && !botAConfirme()) arme = null;             // v12.2.8 : pas de « grosse distribution / accumulation » sans confirmation du bot
       if (retour) return;                                   // un abonné a la main : on ne parle pas par-dessus
       const B = barres(40); if (B.length < 25) return;
       const cur = B[B.length - 1], prev = B.slice(-21, -1), m = nomMarche();
@@ -1400,7 +1405,7 @@
   // compte à rebours de la clôture 15 min : les 45 dernières secondes, gros chrono + « ça va se décider »
   const chronoT = setInterval(() => { try {
     const s = Math.floor(Date.now() / 1000), reste = 900 - (s % 900), r = zoneGraphique();
-    const enAttente = arme && arme.quart === Math.floor(s / 900);
+    const enAttente = !!arme && arme.quart === Math.floor(s / 900) && botAConfirme();   // v12.2.8 : chrono « distribution / accumulation » seulement si le bot confirme
     // v5.8 (demande d'Adel) : le chrono n'est pas là tout le temps : il surgit dans la DERNIÈRE MINUTE puis disparaît à la clôture
     // v8.5 : le bot annonce qu'une position arrive → chrono « attends le feu vert » jusqu'au verdict
     const pa = window.__ALIGN_POS__ && window.__ALIGN_POS__.fin > Date.now() ? window.__ALIGN_POS__ : null;
