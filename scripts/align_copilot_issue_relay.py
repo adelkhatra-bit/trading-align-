@@ -103,6 +103,11 @@ def pending_tasks(comments: list[dict]) -> list[tuple[dict, str, str]]:
         if not match:
             continue
         task_id = match.group(1)
+        # Task IDs are globally unique within the relay. Ignore later duplicates
+        # so a copied/replayed request cannot trigger a second Copilot charge.
+        if task_id in seen_task_ids:
+            continue
+        seen_task_ids.add(task_id)
         # A response only closes a task if it was posted by the Actions bot
         # after the corresponding request. Markers from humans are ignored.
         if replied.get(task_id, 0) > comment_id:
