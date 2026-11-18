@@ -10,6 +10,7 @@ on:
       - "scripts/**"
       - "docs/live/**"
       - ".github/workflows/**"
+      - "scripts/align_workflow_watchdog.py"
   pull_request:
     branches:
       - main
