@@ -11565,7 +11565,10 @@ def live_bande(etat, texte, cle=None, pause=60, toujours=False):
 # ───── v8.5 « SPECTACLE » (demande d'Adel 15/11) : IA gratuite + agenda (discours, annonces, ouvertures) sur la bande ─────
 LIVE_IA_INTERVALLE = max(120, min(300, int(os.environ.get("LIVE_IA_INTERVALLE", "180"))))  # commentaires IA toutes les 2 à 5 minutes
 _INTERDIT_BANDE = re.compile(r"\d|telegram|entr[ée]e|\bSL\b|\bTP\d?\b|\bstop\b|€|\$|%", re.I)
-SESSIONS_LIVE = (("🇯🇵 TOKYO", 1, 0), ("🇬🇧 LONDRES", 9, 0), ("🇺🇸 NEW YORK", 15, 30))
+# Heures locales des places : ZoneInfo applique automatiquement les changements d'heure.
+SESSIONS_LIVE = (("🇯🇵 TOKYO", "Asia/Tokyo", 9, 0),
+                 ("🇬🇧 LONDRES", "Europe/London", 8, 0),
+                 ("🇺🇸 NEW YORK", "America/New_York", 9, 30))
 MOTS_DISCOURS = ("Speaks", "Speech", "Powell", "Testifies", "Press Conference", "FOMC")
 
 
@@ -11932,18 +11935,19 @@ def live_agenda(etat, maintenant):
     if not live_actif(etat):
         return 0
     n = 0
-    now = datetime.datetime.fromtimestamp(maintenant, PARIS)
-    if now.weekday() < 5:
-        for nom, hh, mm in SESSIONS_LIVE:
-            t = int(now.replace(hour=hh, minute=mm, second=0, microsecond=0).timestamp())
-            reste = t - maintenant
-            if 14 * 60 < reste <= 16 * 60:
-                texte = f"🔔 OUVERTURE {nom} DANS 15 MIN • ça peut secouer BTC • GOLD • NASDAQ • prépare-toi 👉 lien en bio"
-            elif 0 <= -reste <= 3 * 60:
-                texte = f"🔔 {nom} EST OUVERT ! le volume arrive sur BTC • GOLD • NASDAQ • ça monte ou ça descend ? dis-le en commentaire 👇"
-            else:
-                continue
-            n += bool(live_bande(etat, texte, f"ses{nom}{t}{reste > 0}", 3600))
+    for nom, fuseau, hh, mm in SESSIONS_LIVE:
+        heure_locale = datetime.datetime.fromtimestamp(maintenant, ZoneInfo(fuseau))
+        if heure_locale.weekday() >= 5:
+            continue
+        t = int(heure_locale.replace(hour=hh, minute=mm, second=0, microsecond=0).timestamp())
+        reste = t - maintenant
+        if 14 * 60 < reste <= 16 * 60:
+            texte = f"🔔 OUVERTURE {nom} DANS 15 MIN • ça peut secouer BTC • GOLD • NASDAQ • prépare-toi 👉 lien en bio"
+        elif 0 <= -reste <= 3 * 60:
+            texte = f"🔔 {nom} EST OUVERT ! le volume arrive sur BTC • GOLD • NASDAQ • ça monte ou ça descend ? dis-le en commentaire 👇"
+        else:
+            continue
+        n += bool(live_bande(etat, texte, f"ses{nom}{t}{reste > 0}", 3600))
     try:
         evts = calendrier(etat, maintenant) or []
     except Exception as ex:
