@@ -13,6 +13,11 @@ on:
     types: [created, edited]
   check_suite:
     types: [completed]
+  # check_suite ne se déclenche pas pour les suites créées par Actions : on réagit donc
+  # explicitement à la fin de la validation (déclencheur fiable, actif une fois sur main).
+  workflow_run:
+    workflows: ["ALIGN MTF validation"]
+    types: [completed]
 
 permissions:
   contents: write
@@ -49,7 +54,8 @@ jobs:
               echo "PR #$N : aucune fusion (base=$BASE, brouillon=$DRAFT, dépôt=$HEADREPO)"; continue
             fi
             # 1. Contrôles : au moins un succès, aucun échec, aucun en cours (hors cette porte)
-            CHECKS=$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" --jq '[.check_runs[] | select(.name | test("fusion automatique") | not) | {s:.status, c:.conclusion}]')
+            # Toutes les pages de check runs (un contrôle en échec en page 2 ne doit pas passer inaperçu).
+            CHECKS=$(gh api --paginate "repos/$REPO/commits/$SHA/check-runs?per_page=100" --jq '.check_runs[] | select(.name | test("fusion automatique") | not) | {s:.status, c:.conclusion}' | jq -s '.')
             OK_CHECKS=$(echo "$CHECKS" | jq 'length > 0 and all(.[]; .s == "completed" and (.c == "success" or .c == "skipped")) and any(.[]; .c == "success")')
             # 2. Revue Codex terminée pour CE SHA, sans remarque bloquante
             # Toutes les pages (ordre chronologique) : on garde le DERNIER état Codex publié.
@@ -58,6 +64,11 @@ jobs:
             OK_CODEX=$(echo "$CODEX" | jq -r --arg s "$SHA" 'if (.code_review.commit_sha == $s and .code_review.status == "completed" and .code_review.has_unresolved_findings == false) then "yes" else "no" end' 2>/dev/null || echo no)
             echo "PR #$N sha=${SHA:0:7} checks_ok=$OK_CHECKS codex_ok=$OK_CODEX mergeable=$STATE"
             if [ "$OK_CHECKS" = "true" ] && [ "$OK_CODEX" = "yes" ] && [ "$STATE" = "clean" ]; then
+              # Dernière relecture juste avant la fusion : base, brouillon et SHA doivent être inchangés.
+              FRESH=$(gh api "repos/$REPO/pulls/$N" --jq '[.base.ref, (.draft|tostring), .head.sha] | join(" ")')
+              if [ "$FRESH" != "main false $SHA" ]; then
+                echo "PR #$N : aucune fusion (la PR a changé pendant l'évaluation : $FRESH)"; continue
+              fi
               if gh api "repos/$REPO/pulls/$N/merge" -X PUT -f merge_method=squash -f sha="$SHA" >/dev/null; then
                 echo "PR #$N fusionnée (SHA ${SHA:0:7})"
                 # Une fusion via GITHUB_TOKEN ne déclenche pas les workflows : on relance explicitement
