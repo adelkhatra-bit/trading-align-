@@ -242,10 +242,10 @@ jobs:
           LEC=$(python3 -c "import secrets; print(secrets.token_urlsafe(48))")
           echo "::add-mask::$ING"; echo "::add-mask::$LEC"
           { echo "ALIGN_TV_INGEST_TOKEN=$ING"; echo "ALIGN_TV_READ_TOKEN_LOCAL=$LEC"; echo "ALIGN_TV_API_URL_LOCAL=http://127.0.0.1:4100"; } >> "$GITHUB_ENV"
-          ALIGN_TV_INGEST_TOKEN="$ING" ALIGN_TV_READ_TOKEN="$LEC" nohup python3 align-bot/align_tv_bridge.py > "$RUNNER_TEMP/align_bridge.log" 2>&1 &
+          ALIGN_TV_INGEST_TOKEN="$ING" ALIGN_TV_READ_TOKEN="$LEC" nohup python3 align_tv_bridge.py > "$RUNNER_TEMP/align_bridge.log" 2>&1 &
           for _ in $(seq 1 20); do grep -q ALIGN_TV_BRIDGE_READY "$RUNNER_TEMP/align_bridge.log" && break; sleep 0.5; done
           grep -q ALIGN_TV_BRIDGE_READY "$RUNNER_TEMP/align_bridge.log" || { echo "ÉCHEC: bridge local non démarré"; cat "$RUNNER_TEMP/align_bridge.log"; exit 0; }
-          ALIGN_TV_INGEST_TOKEN="$ING" nohup python3 align-bot/align_tv_mailbox_feeder.py > "$RUNNER_TEMP/align_relais.log" 2>&1 &
+          ALIGN_TV_INGEST_TOKEN="$ING" nohup python3 align_tv_mailbox_feeder.py > "$RUNNER_TEMP/align_relais.log" 2>&1 &
           sleep 12
           echo "Bridge local prêt (127.0.0.1:4100) ; dernier relevé du relais :"
           tail -n 1 "$RUNNER_TEMP/align_relais.log" || true
