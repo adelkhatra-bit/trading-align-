@@ -3,7 +3,8 @@
 Date: 2026-11-18  
 Repository: `adelkhatra-bit/trading-align-`  
 Base branch: `main`  
-Base SHA audited before changes: `1f9a7d0b6b73fb1384c547c811d97bc1511e1403`
+Base SHA audited before changes: `1f9a7d0b6b73fb1384c547c811d97bc1511e1403`  
+Final PR head SHA: `c389b6bee5b1590d3605d8d19028b1d1c18e84cb`
 
 ## Mission scope
 
@@ -33,10 +34,23 @@ Base SHA audited before changes: `1f9a7d0b6b73fb1384c547c811d97bc1511e1403`
 - Agent assignment is manual when `COPILOT_GITHUB_TOKEN` is absent. If the user-owned token is present, the coordinator first verifies that `copilot-swe-agent` is enabled for the repository, checks that no other ALIGN issue already has an active Copilot assignment, then assigns Copilot using the token. Failed permission/availability checks leave the issue for manual assignment.
 - The user-owned `COPILOT_GITHUB_TOKEN` is only passed to the optional assignment step; its value is never printed, committed, or changed. No Copilot token is read when it is absent.
 
+## Final CI proof on the PR head
+
+- PR head SHA: `c389b6bee5b1590d3605d8d19028b1d1c18e84cb`.
+- ALIGN MTF validation run [#44216575080](https://github.com/adelkhatra-bit/trading-align-/actions/runs/44216575080): **success**.
+  - Python compilation: success.
+  - Animated live overlay JavaScript syntax: success.
+  - actionlint: success.
+  - Targeted auto-repair tests: **13 passed**.
+  - Full MTF regression suite: **876 tests, 0 failure**.
+- CI Integration Tests run [#44216575147](https://github.com/adelkhatra-bit/trading-align-/actions/runs/44216575147): **success**.
+- An intermediate run failed on a malformed line continuation in the new test file; it was corrected, and the final SHA above passed the full validation suite.
+- PR #436 remains open, draft, unmerged; base SHA remains `1f9a7d0b6b73fb1384c547c811d97bc1511e1403`.
+
 ## Verification plan
 
 1. Python syntax compile for the coordinator and tests.
-2. Targeted unit tests for failure filtering, excluded PRs, SHA deduplication, attempt cap metadata, and failure-step summaries.
+2. Targeted unit tests for failure filtering, excluded PRs, SHA deduplication, attempt cap metadata, failure-step summaries, and the token-gated Copilot assignment.
 3. actionlint for the new workflow and the existing validation workflow.
 4. Full ALIGN MTF regression suite through the existing CI.
 5. Inspect the PR diff and GitHub run results before any merge decision.
@@ -44,6 +58,8 @@ Base SHA audited before changes: `1f9a7d0b6b73fb1384c547c811d97bc1511e1403`
 ## Current limitations
 
 - The coordinator becomes active only after PR #436 is merged by a human.
+- The presence of `COPILOT_GITHUB_TOKEN` was not checked because secret values/configuration were not accessed. The code uses manual assignment when absent and attempts automatic assignment only when the token is present, Copilot is an assignable actor, and no other ALIGN issue already has an active Copilot agent.
+- The first live failure-to-issue round trip has not yet been observed because the workflow is still only in the draft PR.
 - A real failure-to-issue round trip is not claimed until a GitHub Actions run proves it.
 - Automatic Copilot assignment is not enabled; it remains a manual human action.
 - This PR does not fix the currently missing TradingView bridge configuration and does not declare Telegram signals restored.
