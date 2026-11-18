@@ -32,16 +32,18 @@ def issue(number, body, state="open"):
 
 
 class WatchdogBlockerDedupTests(unittest.TestCase):
-    def test_same_open_legacy_blocker_suppresses_a_new_run(self):
+    def test_same_open_legacy_blocker_with_matching_step_suppresses_a_new_run(self):
         legacy = issue(
             498,
-            "\n".join([
+            "\\n".join([
                 "<!-- [align-watchdog:run-44261555540] -->",
                 "## ALIGN workflow watchdog report",
                 "**Workflow:** ALIGN Copilot Issue Relay",
                 "**Branch:** main",
                 "### Jobs",
                 "- **relay** — failure",
+                "### Failed steps",
+                "- relay::Verify Copilot credentials only when work is pending",
             ]),
         )
         with patch.object(watchdog, "api", side_effect=[[], [legacy]]) as api_mock:
@@ -53,6 +55,48 @@ class WatchdogBlockerDedupTests(unittest.TestCase):
 
         self.assertEqual(api_mock.call_count, 2)
         self.assertNotEqual(api_mock.call_args_list[-1].kwargs.get("method"), "POST")
+
+    def test_legacy_report_without_step_detail_does_not_suppress_a_failure(self):
+        legacy = issue(
+            498,
+            "\\n".join([
+                "## ALIGN workflow watchdog report",
+                "**Workflow:** ALIGN Copilot Issue Relay",
+                "**Branch:** main",
+                "### Jobs",
+                "- **relay** — failure",
+            ]),
+        )
+        with patch.object(watchdog, "api", side_effect=[[], [legacy], {"number": 503}]) as api_mock:
+            watchdog.report(
+                run(44270000004),
+                "Workflow failed or timed out.",
+                [failed_job()],
+            )
+
+        self.assertEqual(api_mock.call_args_list[-1].kwargs.get("method"), "POST")
+
+    def test_legacy_report_with_different_failed_step_does_not_suppress(self):
+        legacy = issue(
+            498,
+            "\\n".join([
+                "## ALIGN workflow watchdog report",
+                "**Workflow:** ALIGN Copilot Issue Relay",
+                "**Branch:** main",
+                "### Jobs",
+                "- **relay** — failure",
+                "### Failed steps",
+                "- relay::Install Copilot CLI",
+            ]),
+        )
+        with patch.object(watchdog, "api", side_effect=[[], [legacy], {"number": 504}]) as api_mock:
+            watchdog.report(
+                run(44270000005),
+                "Workflow failed or timed out.",
+                [failed_job()],
+            )
+
+        self.assertEqual(api_mock.call_args_list[-1].kwargs.get("method"), "POST")
 
     def test_same_blocker_fingerprint_is_stable_across_run_ids(self):
         jobs = [failed_job()]
