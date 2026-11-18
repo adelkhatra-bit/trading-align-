@@ -101,6 +101,7 @@ def existing_blocker(run: dict, jobs: list[dict], fingerprint: str) -> dict | No
     workflow_line = f"**Workflow:** {run.get('name', 'unknown')}"
     branch_line = f"**Branch:** {run.get('head_branch', 'unknown')}"
     job_names = _job_names(jobs)
+    failed_steps = set(_failed_step_names(jobs))
 
     for item in issues:
         if "pull_request" in item:
@@ -108,13 +109,27 @@ def existing_blocker(run: dict, jobs: list[dict], fingerprint: str) -> dict | No
         body = item.get("body") or ""
         if marker in body:
             return item
-        # Compatibility with open per-run reports created before blocker fingerprints existed.
+        # Legacy reports without failed-step detail are ambiguous: do not let a
+        # failure in the same job hide a different failure step.
+        legacy_steps: set[str] = set()
+        in_failed_steps = False
+        for line in body.splitlines():
+            if line.strip() == "### Failed steps":
+                in_failed_steps = True
+                continue
+            if line.startswith("### "):
+                in_failed_steps = False
+                continue
+            if in_failed_steps and line.startswith("- "):
+                legacy_steps.add(line[2:].strip())
         if (
             item.get("state") == "open"
             and workflow_line in body
             and branch_line in body
             and job_names
             and all(f"- **{name}** —" in body for name in job_names)
+            and failed_steps
+            and legacy_steps == failed_steps
         ):
             return item
     return None
