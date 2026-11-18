@@ -97,26 +97,89 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertTrue(result["available"])
         self.assertIsNone(result["activeTimeframe"])
 
-    def test_indicator_plan_follows_the_active_tradingview_timeframe(self):
-        r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "M15", "snapshots": {
-            "M5": {"fresh": True, "robotV12": {"signal": "SHORT", "entry": 100, "sl": 102, "tp": 96}},
-            "M15": {"fresh": True, "confirmed": True, "robotV12": {"signal": "LONG", "entry": 101, "sl": 99, "tp": 105}},
-            "H4": {"fresh": True, "robotV12": {"signal": "LONG", "entry": 98, "sl": 95, "tp": 104}}
-        }}}
-        plan = align_bot.plan_indicateur(r)
-        self.assertTrue(plan["available"])
-        self.assertEqual(plan["timeframe"], "M15")
-        self.assertEqual((plan["entry"], plan["sl"], plan["tp"]), (101, 99, 105))
-        self.assertTrue(plan["confirmed"])
+    def test_indicator_plan_uses_fixed_m15_levels_when_chart_timeframe_changes(self):
+        robot = {
+            "signal": "LONG", "entry": 101, "sl": 99, "tp1": 105, "tp2": 108,
+            "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+            "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
+            "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
+            "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
+            "confirmed": True,
+        }
+        for active_tf in ("M1", "M5", "M15", "H4"):
+            with self.subTest(active_timeframe=active_tf):
+                r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": active_tf, "snapshots": {
+                    active_tf: {"fresh": True, "confirmed": True, "robotV12": dict(robot)}
+                }}}
+                plan = align_bot.plan_indicateur(r)
+                self.assertTrue(plan["available"], plan.get("reason"))
+                self.assertEqual(plan["timeframe"], active_tf)
+                self.assertEqual(plan["plan_timeframe"], "M15")
+                self.assertEqual(plan["entry_timeframe"], "M5")
+                self.assertEqual((plan["entry"], plan["sl"], plan["tp1"], plan["tp2"]), (101, 99, 105, 108))
+                self.assertEqual((plan["zone_low"], plan["decision"], plan["zone_high"]), (100, 101, 102))
+                self.assertTrue(plan["confirmed"])
+
+    def test_indicator_plan_enforces_strategy_trigger_timeframe(self):
+        cases = (("SCALPING", "M1"), ("DAY", "M5"), ("SWING", "H1"))
+        for strategy, trigger_tf in cases:
+            with self.subTest(strategy=strategy):
+                robot = {
+                    "signal": "LONG", "entry": 101, "sl": 99, "tp1": 105, "tp2": 108,
+                    "planTimeframe": "M15", "entryTimeframe": trigger_tf, "strategy": strategy,
+                    "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
+                "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
+                "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
+                    "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
+                    "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
+            "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
+            "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
+                    "confirmed": True,
+                }
+                r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "H4", "snapshots": {
+                    "H4": {"fresh": True, "confirmed": True, "robotV12": robot}
+                }}}
+                self.assertTrue(align_bot.plan_indicateur(r)["available"])
+
+    def test_indicator_plan_rejects_inconsistent_plan_or_trigger_timeframe(self):
+        valid_robot = {
+            "signal": "LONG", "entry": 101, "sl": 99, "tp1": 105, "tp2": 108,
+            "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+            "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
+            "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
+            "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
+        }
+        for key, value in (("planTimeframe", "H4"), ("entryTimeframe", "H1"),
+                           ("entryZoneLow", None), ("entryDecision", 103)):
+            with self.subTest(field=key, value=value):
+                robot = dict(valid_robot)
+                robot[key] = value
+                r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "M15", "snapshots": {
+                    "M15": {"fresh": True, "robotV12": robot}
+                }}}
+                self.assertFalse(align_bot.plan_indicateur(r)["available"])
 
     def test_indicator_plan_changes_when_active_timeframe_changes(self):
         r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "H4", "snapshots": {
-            "M15": {"fresh": True, "robotV12": {"signal": "LONG", "entry": 101, "sl": 99, "tp": 105}},
-            "H4": {"fresh": True, "robotV12": {"signal": "SHORT", "entry": 110, "sl": 112, "tp": 106}}
+            "M15": {"fresh": True, "robotV12": {
+                "signal": "LONG", "entry": 101, "sl": 99, "tp": 105,
+                "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+                "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
+                "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
+                "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
+            }},
+            "H4": {"fresh": True, "confirmed": True, "robotV12": {
+                "signal": "SHORT", "entry": 110, "sl": 112, "tp": 106,
+                "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+                "entryZoneLow": 109.5, "entryZoneHigh": 110.5, "entryDecision": 110,
+                "entryBarTime": 900_000, "entryBarOpen": 110.0, "entryBarHigh": 111.0,
+                "entryBarLow": 109.0, "entryBarClose": 109.5, "entryTriggered": False,
+            }}
         }}}
         plan = align_bot.plan_indicateur(r)
-        self.assertTrue(plan["available"])
+        self.assertTrue(plan["available"], plan.get("reason"))
         self.assertEqual(plan["timeframe"], "H4")
+        self.assertEqual(plan["plan_timeframe"], "M15")
         self.assertEqual((plan["entry"], plan["sl"], plan["tp"]), (110, 112, 106))
 
     def test_indicator_plan_rejects_stale_or_missing_active_snapshot(self):
@@ -2448,8 +2511,11 @@ class TestTradingViewReportRegression(unittest.TestCase):
             "macro": [], "fvg": [], "atr": 1.0, "distrib": False,
             "accum": False, "b5": [candle(i) for i in range(22)],
         }
-        plan = {"available": True, "timeframe": "H4", "entry": 100.0,
-                "sl": 98.0, "tp": 104.0, "confirmed": True}
+        plan = {"available": True, "timeframe": "H4", "plan_timeframe": "M15",
+                "entry_timeframe": "H1", "strategy": "SWING",
+                "entry": 100.0, "sl": 98.0, "tp": 104.0, "tp1": 104.0, "tp2": 108.0,
+                "zone_low": 99.0, "zone_high": 101.0, "decision": 100.0,
+                "confirmed": True, "triggered": False}
         with patch.object(align_bot, "plan_indicateur", return_value=plan), \
              patch.object(align_bot, "zone_txt", return_value="milieu"), \
              patch.object(align_bot, "strategie_mtf", return_value=["Profil SWING", "Horizon : plusieurs séances"]), \
@@ -2457,8 +2523,9 @@ class TestTradingViewReportRegression(unittest.TestCase):
              patch.object(align_bot, "ligne_cassure", return_value="Déclencheur"), \
              patch.object(align_bot, "prochaine", return_value="Attendre"):
             message = align_bot.texte_etat("GOLD", r, {})
-        self.assertIn("Unité sélectionnée : H4", message)
-        self.assertIn("Entrée indicateur", message)
+        self.assertIn("Plan de niveaux : M15", message)
+        self.assertIn("Unité de validation : H1 (SWING)", message)
+        self.assertIn("Déclencheur clôturé : EN ATTENTE", message)
         self.assertIn("Profil SWING", message)
 
 
@@ -3495,8 +3562,136 @@ class TelegramExplicitCoachOptInTest(unittest.TestCase):
         self.assertNotIn("next:yes", sent[0]["reply_markup"])
 
 
+class PineOnlyEntryGateTests(unittest.TestCase):
+    def _market(self, entry_bar_time=900_000, current_price=101.0):
+        return {
+            "market": "BTC",
+            "dirs": [1] * 11,
+            "rsis": [55] * 11,
+            "m1": [candle(1_000_000, c=current_price)],
+            "r5": [55, 55, 55],
+            "b5": [candle(i) for i in range(24)],
+            "confirme": 1,
+            "fermeture": False,
+            "annonce": False,
+            "atr": 20.0,
+            "atr5": 10.0,
+            "atr15": 20.0,
+            "posD": 0.5,
+            "posW": 0.5,
+            "basD": 80.0,
+            "hautD": 120.0,
+            "basW": 70.0,
+            "hautW": 130.0,
+            "t": 1_800_000_000,
+            "news": "",
+            "niv_cles": [],
+            "grosses": [],
+            "niveaux": [],
+            "fvg": [],
+            "asie": None,
+            "macro": [],
+            "ema15": 100.0,
+            "ema5": 100.0,
+            "b15": [candle(i, o=100, h=102, l=98, c=101) for i in range(3)],
+            "tv_indicator_mtf": {
+                "available": True,
+                "activeTimeframe": "M5",
+                "snapshots": {
+                    "M5": {
+                        "fresh": True,
+                        "confirmed": True,
+                        "robotV12": {
+                            "signal": "LONG", "entry": 100.0, "sl": 95.0,
+                            "tp1": 110.0, "tp2": 120.0,
+                            "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+                            "entryZoneLow": 99.0, "entryZoneHigh": 101.0,
+                            "entryDecision": 100.0,
+                            "entryBarTime": entry_bar_time,
+                            "entryBarOpen": 99.5, "entryBarHigh": 101.0,
+                            "entryBarLow": 99.0, "entryBarClose": 100.5,
+                            "entryTriggered": False,
+                            "confirmed": True,
+                        }
+                    }
+                }
+            }
+        }
+
+    def test_required_bridge_missing_never_falls_back_to_local_entry(self):
+        from unittest.mock import patch
+        r = self._market()
+        r["tv_indicator_mtf"] = {"available": False, "reason": "bridge unavailable"}
+        r["require_tv_bridge"] = True
+        state = {"t1m": 0}
+        with patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), \
+             patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")):
+            out = align_bot.agent("BTC", r, state, "")
+        self.assertFalse(state.get("trade"))
+        self.assertFalse(state.get("ordre"))
+        self.assertTrue(any("attente du plan TradingView" in str(x) for x in out))
+
+    def test_required_bridge_waits_for_pine_closed_entry_trigger(self):
+        from unittest.mock import patch
+        r = self._market()
+        r["require_tv_bridge"] = True
+        state = {"t1m": 0}
+        with patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), \
+             patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")):
+            out = align_bot.agent("BTC", r, state, "")
+        self.assertFalse(state.get("trade"))
+        self.assertEqual(state.get("ordre")["e"], 100.0)
+        self.assertTrue(any("Attendre le retest" in str(x) for x in out))
+
+    def test_required_bridge_uses_exact_pine_levels_once_per_closed_entry_bar(self):
+        from unittest.mock import patch
+        r = self._market()
+        r["require_tv_bridge"] = True
+        r["tv_indicator_mtf"]["snapshots"]["M5"]["robotV12"]["entryTriggered"] = True
+        state = {"t1m": 0}
+        with patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), \
+             patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")), \
+             patch.object(align_bot, "pause_entree_marche", return_value=None), \
+             patch.object(align_bot, "bloque_dw", return_value=False), \
+             patch.object(align_bot, "profil_trade", return_value={"mode": "DAY"}), \
+             patch.object(align_bot, "memoire_refuse", return_value=(False, 0, 0)), \
+             patch.object(align_bot, "carte_coach", return_value="PINE_SIGNAL"), \
+             patch.object(align_bot, "strategie_trade", return_value={}):
+            out = align_bot.agent("BTC", r, state, "")
+            self.assertTrue(state.get("trade"))
+            self.assertEqual(
+                (state["trade"]["e"], state["trade"]["sl"], state["trade"]["tp1"], state["trade"]["tp2"]),
+                (100.0, 95.0, 110.0, 120.0),
+            )
+            self.assertEqual(state["trade"]["pine_order_id"], "900000|M5|1")
+            self.assertEqual(state.get("pine_entry_bar_done"), 900_000)
+            second = align_bot.agent("BTC", r, state, "")
+        self.assertEqual(second, [])
+        self.assertEqual(state["trade"]["e"], 100.0)
+
+
 class TelegramTp1Tp2BridgeTests(unittest.TestCase):
     def _snapshot(self, robot, timeframe="M15"):
+        robot = dict(robot)
+        entry, stop = float(robot["entry"]), float(robot["sl"])
+        signal = str(robot.get("signal") or "LONG").upper()
+        risk = abs(entry - stop)
+        robot.setdefault("planTimeframe", "M15")
+        robot.setdefault("strategy", "DAY")
+        robot.setdefault("entryTimeframe", {"SCALPING": "M1", "DAY": "M5", "SWING": "H1"}.get(robot["strategy"], "M5"))
+        if signal == "LONG":
+            robot.setdefault("entryZoneLow", entry - 0.2 * risk)
+            robot.setdefault("entryZoneHigh", entry + 0.2 * risk)
+        else:
+            robot.setdefault("entryZoneLow", entry - 0.2 * risk)
+            robot.setdefault("entryZoneHigh", entry + 0.2 * risk)
+        robot.setdefault("entryDecision", (robot["entryZoneLow"] + robot["entryZoneHigh"]) / 2)
+        robot.setdefault("entryBarTime", 900_000)
+        robot.setdefault("entryBarOpen", entry)
+        robot.setdefault("entryBarHigh", max(entry, robot["entryZoneHigh"]))
+        robot.setdefault("entryBarLow", min(entry, robot["entryZoneLow"]))
+        robot.setdefault("entryBarClose", entry)
+        robot.setdefault("entryTriggered", False)
         return {"tv_indicator_mtf": {
             "available": True,
             "activeTimeframe": timeframe,
