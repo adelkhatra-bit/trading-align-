@@ -19,7 +19,10 @@ class QuietOptOutTest(unittest.TestCase):
                 "GOLD": {"11": {"dernier_t": 1}},
             },
             "recherche_positions_active": ["11", "22"],
-            "BTC": {"trade": {"qui": {"11": {"e": 100.0, "sl": 95.0, "tp1": 110.0}}}},
+            "BTC": {"trade": {"qui": {
+                "11": {"e": 100.0, "sl": 95.0, "tp1": 110.0},
+                "22": {"e": 100.0, "sl": 95.0, "tp1": 110.0},
+            }}},
             "telegram_outbox": [
                 {"chat_id": "11", "params": {"text": "old alert"}},
                 {"chat_id": "22", "params": {"text": "other user's alert"}},
@@ -44,7 +47,8 @@ class QuietOptOutTest(unittest.TestCase):
         self.assertTrue(all("11" not in {str(x) for x in users} for users in state["auto"].values()))
         self.assertTrue(all("11" not in {str(x) for x in users} for users in state["coach_live"].values()))
         self.assertNotIn("11", {str(x) for x in state["recherche_positions_active"]})
-        self.assertIn("11", state["BTC"]["trade"]["qui"])  # suivi d'une position déjà ouverte conservé
+        self.assertNotIn("11", state["BTC"]["trade"]["qui"])
+        self.assertIn("22", state["BTC"]["trade"]["qui"])
         self.assertEqual([x["chat_id"] for x in state["telegram_outbox"]], ["22"])
         self.assertFalse(ab.coach_actif(state, "11", "BTC"))
         self.assertTrue(ab.coach_actif(state, "22", "BTC"))
@@ -97,6 +101,32 @@ class QuietOptOutTest(unittest.TestCase):
         self.assertIn("11", state["recherche_positions_active"])
 
 
+    def test_coach_no_revokes_open_position_follow(self):
+        position = {"e": 100.0, "sl": 95.0, "tp1": 110.0}
+        state = {
+            "coach_pending": ["11"],
+            "BTC": {"trade": {"qui": {"11": dict(position), "22": dict(position)}}},
+            "telegram_outbox": [{"chat_id": "11", "params": {"text": "old position update"}}],
+        }
+        update = {
+            "update_id": 903,
+            "callback_query": {
+                "id": "coach-no-callback",
+                "data": "coach:no",
+                "from": {"id": 11, "first_name": "Test"},
+                "message": {"chat": {"id": 11, "type": "private"}},
+            },
+        }
+
+        with patch.object(ab, "telegram", return_value={"ok": True}):
+            ab.traiter(state, {"11", "22"}, [update])
+
+        self.assertIn("11", {str(x) for x in state["bot_off"]})
+        self.assertNotIn("11", state["BTC"]["trade"]["qui"])
+        self.assertIn("22", state["BTC"]["trade"]["qui"])
+        self.assertEqual(state["telegram_outbox"], [])
+
+
     def test_daily_trade_no_removes_pending_push_authorization(self):
         state = {
             "auto": {"BTC": ["11", "22"], "GOLD": ["11"]},
@@ -107,7 +137,10 @@ class QuietOptOutTest(unittest.TestCase):
                 {"chat_id": "11", "params": {"text": "queued alert"}},
                 {"chat_id": "22", "params": {"text": "other user's alert"}},
             ],
-            "BTC": {"trade": {"qui": {"11": {"e": 100.0, "sl": 95.0, "tp1": 110.0}}}},
+            "BTC": {"trade": {"qui": {
+                "11": {"e": 100.0, "sl": 95.0, "tp1": 110.0},
+                "22": {"e": 100.0, "sl": 95.0, "tp1": 110.0},
+            }}},
         }
         update = {
             "update_id": 902,
@@ -138,7 +171,8 @@ class QuietOptOutTest(unittest.TestCase):
         self.assertTrue(all("11" not in {str(x) for x in users} for users in state["coach_live"].values()))
         self.assertNotIn("11", [str(x) for x in state["coach_pending"]])
         self.assertEqual([x["chat_id"] for x in state["telegram_outbox"]], ["22"])
-        self.assertIn("11", state["BTC"]["trade"]["qui"])  # le suivi d'une position déjà ouverte reste conservé
+        self.assertNotIn("11", state["BTC"]["trade"]["qui"])
+        self.assertIn("22", state["BTC"]["trade"]["qui"])
         self.assertFalse(ab.coach_actif(state, "11", "BTC"))
 
 
