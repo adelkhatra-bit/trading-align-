@@ -709,6 +709,23 @@ class LiveOutbox(unittest.TestCase):
         self.assertIn("'% de zone consommée'", bande)
         self.assertIn("' • ' + consommation", bande)
 
+    def test_market_narration_keeps_forming_candle_anticipation_and_closed_candle_validation(self):
+        bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
+        # Bougie en cours : anticipation provisoire conservée (jamais une autorisation d'entrée).
+        self.assertIn("const cur = B[B.length - 1], prev = B.slice(-21, -1);", bande)
+        self.assertIn("chasseSousSupport", bande)
+        self.assertIn("chasseAuDessus", bande)
+        self.assertIn("La bougie est encore en formation", bande)
+        # Bougie clôturée : validation du balayage, sans signal d'entrée à elle seule.
+        self.assertIn("const terminee = B[B.length - 2]", bande)
+        self.assertIn("Possible chasse de liquidité vendeuse", bande)
+        self.assertIn("Possible chasse de liquidité acheteuse", bande)
+        self.assertIn("ce n’est pas encore un signal LONG", bande)
+        self.assertIn("ce n’est pas encore un signal SHORT", bande)
+        # Priorité : validation clôturée > anticipation en cours > tendance, chaîne else-if intacte.
+        self.assertLess(bande.index("if (balayageBas) lecture"), bande.index("else if (chasseSousSupport) lecture"))
+        self.assertLess(bande.index("else if (chasseSousSupport) lecture"), bande.index("else if (dFond > 0 && dRecent < 0) lecture"))
+
     def test_market_narration_is_factual_and_runs_independently_of_generic_coach(self):
         bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
         self.assertIn("function commentaireMarcheEnDirect(B, moyR, moyV, m)", bande)
