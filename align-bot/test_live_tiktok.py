@@ -206,7 +206,9 @@ class LiveTikTok(unittest.TestCase):
     def test_ordre_btc_gold_nasdaq_en_premier(self):
         self.etat["live_on"] = True
         kb = json.loads(ab.clavier_live(self.etat, "2"))["inline_keyboard"]
-        self.assertEqual([b["text"] for b in kb[2]], ["🟠 BTC", "🥇 Gold", "💠 NASDAQ"])
+        # 1re ligne = parcours d'Adel (choix du marché → coach → prochaine position) ; « prendre la main » reste en 4e ligne.
+        self.assertEqual([b["callback_data"] for b in kb[0]], ["livemkt:BTC", "livemkt:GOLD", "livemkt:NASDAQ"])
+        self.assertEqual([b["text"] for b in kb[3]], ["🟠 BTC", "🥇 Gold", "💠 NASDAQ"])
         self.assertIn("capture", ab.texte_live(self.etat))
 
     def test_paiement_refuse_si_live_eteint(self):
