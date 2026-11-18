@@ -175,10 +175,25 @@ def plan_indicateur(r):
     direction = _direction_tv(signal)
     if direction not in (-1, 1) or min(entry, sl, tp1, zone_low, zone_high, decision) <= 0 or (tp2 is not None and tp2 <= 0):
         return {"timeframe": active_tf, "available": False, "reason": "direction ou niveaux M15 invalides"}
+    risk = abs(entry - sl)
     if direction == 1:
-        geometrie_ok = sl < zone_low < decision < zone_high and zone_low <= entry <= zone_high and entry < tp1 and (tp2 is None or tp2 > tp1)
+        # Pine LONG: zMin >= SL + 25 % du risque ; la zone englobe le prix d'entrée.
+        geometrie_ok = (
+            sl < entry < tp1
+            and (tp2 is None or tp2 > tp1)
+            and zone_low < decision < zone_high
+            and zone_low <= entry <= zone_high
+            and zone_low >= sl + 0.25 * risk
+        )
     else:
-        geometrie_ok = tp1 < entry and entry < zone_low < decision < zone_high < sl and (tp2 is None or tp2 < tp1)
+        # Pine SHORT: zMax <= SL - 25 % du risque ; la zone englobe le prix d'entrée.
+        geometrie_ok = (
+            tp1 < entry < sl
+            and (tp2 is None or tp2 < tp1)
+            and zone_low < decision < zone_high
+            and zone_low <= entry <= zone_high
+            and zone_high <= sl - 0.25 * risk
+        )
     if not geometrie_ok:
         return {"timeframe": active_tf, "available": False, "reason": "géométrie zone / entrée / SL / TP incohérente"}
 
