@@ -311,7 +311,14 @@
       .replace(/[\p{Extended_Pictographic}\uFE0F]/gu, ' ')
       .replace(/\s+/g, ' ').trim();
     if (phrase.length < 12 || phrase === voixTexte) return 0;
-    phrase = phrase.slice(0, 220);
+    // v12.2.6 : ni disclaimer, ni phrase de spectacle / appel « lien en bio » lue à voix haute
+    if (/lien en bio|link in bio|spectacle|tapote|tap the|partage|share|DYOR|conseil en investissement|risque (élevé|eleve) de perte|high risk of capital|risque de perte/i.test(phrase)) return 0;
+    // v12.2.6 : jamais de phrase coupée au milieu : on ne lit qu'une phrase complète
+    if (phrase.length > 220) {
+      const coupe = phrase.slice(0, 220).match(/^.*[.!?…]/);
+      if (!coupe) return 0;
+      phrase = coupe[0];
+    }
     try {
       const utterance = new SpeechSynthesisUtterance(phrase);
       utterance.lang = anglais ? 'en-US' : 'fr-FR';
