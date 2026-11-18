@@ -122,15 +122,39 @@ def existing_blocker(run: dict, jobs: list[dict], fingerprint: str) -> dict | No
                 continue
             if in_failed_steps and line.startswith("- "):
                 legacy_steps.add(line[2:].strip())
-        if (
+        if not (
             item.get("state") == "open"
             and workflow_line in body
             and branch_line in body
             and job_names
             and all(f"- **{name}** —" in body for name in job_names)
-            and failed_steps
-            and legacy_steps == failed_steps
         ):
+            continue
+
+        if not legacy_steps:
+            # Older watchdog issues may have a run marker but no failed-step
+            # section. Resolve that run's failed steps before deduplicating;
+            # never suppress a distinct failure based only on workflow/job.
+            match = re.search(r"<!--\\s*\\[align-watchdog:run-(\\d+)\\]\\s*-->", body)
+            if not match:
+                continue
+            try:
+                original = api(
+                    f"/repos/{REPO}/actions/runs/{int(match.group(1))}/jobs?per_page=100"
+                )
+            except Exception as exc:
+                print(
+                    f"WATCHDOG_LEGACY_DETAIL_UNAVAILABLE issue={item.get('number')} "
+                    f"error={type(exc).__name__}"
+                )
+                continue
+            original_failed = [
+                job for job in original.get("jobs", [])
+                if job.get("conclusion") in {"failure", "timed_out", "action_required"}
+            ]
+            legacy_steps = set(_failed_step_names(original_failed))
+
+        if failed_steps and legacy_steps == failed_steps:
             return item
     return None
 
