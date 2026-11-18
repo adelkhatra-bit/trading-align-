@@ -3544,6 +3544,109 @@ class TelegramExplicitCoachOptInTest(unittest.TestCase):
         self.assertNotIn("next:yes", sent[0]["reply_markup"])
 
 
+class PineOnlyEntryGateTests(unittest.TestCase):
+    def _market(self, entry_bar_time=900_000, current_price=101.0):
+        return {
+            "market": "BTC",
+            "dirs": [1] * 11,
+            "rsis": [55] * 11,
+            "m1": [candle(1_000_000, c=current_price)],
+            "r5": [55, 55, 55],
+            "b5": [candle(i) for i in range(24)],
+            "confirme": 1,
+            "fermeture": False,
+            "annonce": False,
+            "atr": 20.0,
+            "atr5": 10.0,
+            "atr15": 20.0,
+            "posD": 0.5,
+            "posW": 0.5,
+            "news": "",
+            "niv_cles": [],
+            "grosses": [],
+            "niveaux": [],
+            "fvg": [],
+            "asie": None,
+            "macro": [],
+            "ema15": 100.0,
+            "ema5": 100.0,
+            "b15": [candle(i, o=100, h=102, l=98, c=101) for i in range(3)],
+            "tv_indicator_mtf": {
+                "available": True,
+                "activeTimeframe": "M5",
+                "snapshots": {
+                    "M5": {
+                        "fresh": True,
+                        "confirmed": True,
+                        "robotV12": {
+                            "signal": "LONG", "entry": 100.0, "sl": 95.0,
+                            "tp1": 110.0, "tp2": 120.0,
+                            "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+                            "entryZoneLow": 99.0, "entryZoneHigh": 101.0,
+                            "entryDecision": 100.0,
+                            "entryBarTime": entry_bar_time,
+                            "entryBarOpen": 99.5, "entryBarHigh": 101.0,
+                            "entryBarLow": 99.0, "entryBarClose": 100.5,
+                            "entryTriggered": False,
+                            "confirmed": True,
+                        }
+                    }
+                }
+            }
+        }
+
+    def test_required_bridge_missing_never_falls_back_to_local_entry(self):
+        from unittest.mock import patch
+        r = self._market()
+        r["tv_indicator_mtf"] = {"available": False, "reason": "bridge unavailable"}
+        r["require_tv_bridge"] = True
+        state = {"t1m": 0}
+        with patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), \
+             patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")):
+            out = align_bot.agent("BTC", r, state, "")
+        self.assertFalse(state.get("trade"))
+        self.assertFalse(state.get("ordre"))
+        self.assertTrue(any("attente du plan TradingView" in str(x) for x in out))
+
+    def test_required_bridge_waits_for_pine_closed_entry_trigger(self):
+        from unittest.mock import patch
+        r = self._market()
+        r["require_tv_bridge"] = True
+        state = {"t1m": 0}
+        with patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), \
+             patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")):
+            out = align_bot.agent("BTC", r, state, "")
+        self.assertFalse(state.get("trade"))
+        self.assertEqual(state.get("ordre")["e"], 100.0)
+        self.assertTrue(any("Attendre le retest" in str(x) for x in out))
+
+    def test_required_bridge_uses_exact_pine_levels_once_per_closed_entry_bar(self):
+        from unittest.mock import patch
+        r = self._market()
+        r["require_tv_bridge"] = True
+        r["tv_indicator_mtf"]["snapshots"]["M5"]["robotV12"]["entryTriggered"] = True
+        state = {"t1m": 0}
+        with patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), \
+             patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")), \
+             patch.object(align_bot, "pause_entree_marche", return_value=None), \
+             patch.object(align_bot, "bloque_dw", return_value=False), \
+             patch.object(align_bot, "profil_trade", return_value={"mode": "DAY"}), \
+             patch.object(align_bot, "memoire_refuse", return_value=(False, 0, 0)), \
+             patch.object(align_bot, "carte_coach", return_value="PINE_SIGNAL"), \
+             patch.object(align_bot, "strategie_trade", return_value={}):
+            out = align_bot.agent("BTC", r, state, "")
+            self.assertTrue(state.get("trade"))
+            self.assertEqual(
+                (state["trade"]["e"], state["trade"]["sl"], state["trade"]["tp1"], state["trade"]["tp2"]),
+                (100.0, 95.0, 110.0, 120.0),
+            )
+            self.assertEqual(state["trade"]["pine_order_id"], "900000|M5|1")
+            self.assertEqual(state.get("pine_entry_bar_done"), 900_000)
+            second = align_bot.agent("BTC", r, state, "")
+        self.assertEqual(second, [])
+        self.assertEqual(state["trade"]["e"], 100.0)
+
+
 class TelegramTp1Tp2BridgeTests(unittest.TestCase):
     def _snapshot(self, robot, timeframe="M15"):
         robot = dict(robot)
