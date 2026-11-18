@@ -2511,8 +2511,11 @@ class TestTradingViewReportRegression(unittest.TestCase):
             "macro": [], "fvg": [], "atr": 1.0, "distrib": False,
             "accum": False, "b5": [candle(i) for i in range(22)],
         }
-        plan = {"available": True, "timeframe": "H4", "entry": 100.0,
-                "sl": 98.0, "tp": 104.0, "confirmed": True}
+        plan = {"available": True, "timeframe": "H4", "plan_timeframe": "M15",
+                "entry_timeframe": "H1", "strategy": "SWING",
+                "entry": 100.0, "sl": 98.0, "tp": 104.0, "tp1": 104.0, "tp2": 108.0,
+                "zone_low": 99.0, "zone_high": 101.0, "decision": 100.0,
+                "confirmed": True, "triggered": False}
         with patch.object(align_bot, "plan_indicateur", return_value=plan), \
              patch.object(align_bot, "zone_txt", return_value="milieu"), \
              patch.object(align_bot, "strategie_mtf", return_value=["Profil SWING", "Horizon : plusieurs séances"]), \
@@ -2520,8 +2523,9 @@ class TestTradingViewReportRegression(unittest.TestCase):
              patch.object(align_bot, "ligne_cassure", return_value="Déclencheur"), \
              patch.object(align_bot, "prochaine", return_value="Attendre"):
             message = align_bot.texte_etat("GOLD", r, {})
-        self.assertIn("Unité sélectionnée : H4", message)
-        self.assertIn("Entrée indicateur", message)
+        self.assertIn("Plan de niveaux : M15", message)
+        self.assertIn("Unité de validation : H1 (SWING)", message)
+        self.assertIn("Déclencheur clôturé : EN ATTENTE", message)
         self.assertIn("Profil SWING", message)
 
 
