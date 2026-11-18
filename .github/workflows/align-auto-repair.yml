@@ -3,9 +3,17 @@ name: ALIGN Auto Repair Coordinator
 on:
   workflow_run:
     workflows:
+      - ALIGN contrôle IA (manuel)
+      - ALIGN worker rollover
       - ALIGN MTF validation
-      - CI Integration Tests
       - ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)
+      - ALIGN Workflow Watchdog
+      - ALIGN audit des messages envoyés (manuel)
+      - CI Integration Tests
+      - ALIGN MetaApi vérification
+      - ALIGN rejeu entrée sniper (manuel)
+      - ALIGN Topstep vérification
+      - ALIGN Copilot Issue Relay
     types: [completed]
   workflow_dispatch:
 
