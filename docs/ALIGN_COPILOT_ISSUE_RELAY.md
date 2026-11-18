@@ -68,6 +68,18 @@ Le `GITHUB_TOKEN` éphémère d'Actions sert uniquement à lire et commenter l'i
 
 La suite `align-bot/test_align_copilot_issue_relay.py` couvre 12 cas : tâches Markdown, auteur autorisé, marqueurs usurpés, ordre temporel des réponses, IDs dupliqués, pagination et verrouillage du dépôt/de l'issue/de l'auteur.
 
+## Coordination des échecs CI — AUTO-REPAIR-011
+
+Le workflow `.github/workflows/align-auto-repair.yml` écoute les workflows ALIGN existants et le relais, sans s'écouter lui-même. Il ne remplace pas `align-workflow-watchdog.yml` et n'ajoute aucun polling périodique.
+
+- Un échec de PR crée ou met à jour une issue `align-repair` contenant le SHA, la PR, le workflow, le run et le résumé des étapes échouées.
+- Les PR #401, #448 et #451 sont ignorées.
+- Les échecs sans PR associée sont traités uniquement sur `main`.
+- La déduplication repose sur le SHA complet ; deux tentatives maximum sont enregistrées.
+- Le groupe de concurrence Actions sérialise le coordinateur.
+- L'assignation Copilot est manuelle si `COPILOT_GITHUB_TOKEN` est absent. Si le secret est présent, le script vérifie l'acteur assignable et qu'aucun autre issue ALIGN n'a déjà Copilot actif avant d'utiliser l'API d'assignation. En cas de permission manquante ou de Copilot indisponible, l'issue reste manuelle.
+- Copilot reçoit des consignes de correction minimale, tests et PR brouillon uniquement. Aucun merge ni déploiement n'est autorisé.
+
 ## Limites
 
 - Le relais ne devient actif qu'après fusion et ajout du secret.
