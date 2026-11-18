@@ -186,11 +186,13 @@
   document.body.appendChild(bande);
   const piste = bande.querySelector('.piste'), flash = bande.querySelector('.flash');
   // Voix optionnelle : activation explicite par clic pour respecter le blocage audio automatique des navigateurs.
+  let voixEtatInitial = false;
+  try { voixEtatInitial = localStorage.getItem('alignVoixActive') === '1'; } catch (e) {}   // état du commentateur gardé d'une réinjection à l'autre
   const voixBtn = document.createElement('button');
   voixBtn.id = 'align-live-voice';
   voixBtn.type = 'button';
-  voixBtn.textContent = '🔊 ACTIVER LE COMMENTATEUR';
-  voixBtn.setAttribute('aria-pressed', 'false');
+  voixBtn.textContent = voixEtatInitial ? '🔊 COACH VOCAL ON' : '🔊 ACTIVER LE COMMENTATEUR';
+  voixBtn.setAttribute('aria-pressed', voixEtatInitial ? 'true' : 'false');
   voixBtn.title = 'Activer le commentateur vocal du live';
   voixBtn.style.cssText = 'position:fixed;left:18px;bottom:20px;z-index:10001;padding:11px 15px;border:2px solid #35d07f;border-radius:22px;background:linear-gradient(135deg,#123b2b,#10251f);color:#fff;font:800 13px system-ui;cursor:pointer;pointer-events:auto;box-shadow:0 0 18px rgba(53,208,127,.35)';
   document.body.appendChild(voixBtn);
@@ -275,7 +277,7 @@
     try { localStorage.setItem('alignVoixLangue', voixLangue); } catch (e) {}
     try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
   });
-  let voixActive = false, voixDerniere = 0, voixTexte = '', voixDerniereFR = 0, voixTexteEN = '';
+  let voixActive = voixEtatInitial, voixDerniere = 0, voixTexte = '', voixDerniereFR = 0, voixTexteEN = '';
   // v12.2.7 : voix la plus humaine disponible (gratuite, intégrée au navigateur / à Windows)
   const VOIX_NATURELLES = /natural|neural|online|premium|enhanced|google|denise|vivienne|henri|eloise|remy|amélie|thomas|jenny|aria|guy|samantha|ava/i;
   function choisirVoix(lang) {
@@ -291,6 +293,7 @@
       voixBtn.textContent = '⚠️ Voix indisponible'; return;
     }
     voixActive = !voixActive;
+    try { localStorage.setItem('alignVoixActive', voixActive ? '1' : '0'); } catch (e) {}
     if (voixActive) {
       window.speechSynthesis.cancel();
       window.speechSynthesis.resume();
