@@ -17,6 +17,7 @@ concurrency:
 
 jobs:
   relay:
+    # Activation ID is checked in Python; keep large snowflake IDs out of expressions.
     if: >-
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
@@ -24,7 +25,6 @@ jobs:
         github.event.issue.number == 431 &&
         github.event.issue.pull_request == null &&
         github.event.comment.user.login == 'adelkhatra-bit' &&
-        # Activation ID is checked in Python; keep large snowflake IDs out of expressions.
         contains(github.event.comment.body, '[CHATGPT → COPILOT]')
       )
     runs-on: ubuntu-latest
