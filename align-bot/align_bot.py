@@ -137,11 +137,7 @@ def fusionne_lectures_tradingview(r):
 
 
 def plan_indicateur(r):
-    """Lit le plan Pine figé sur M15 indépendamment de l'UT du graphique TradingView.
-
-    Le timeframe actif reste une source de fraîcheur/snapshots. Les niveaux viennent
-    du même robotV12 embarqué dans ce snapshot, mais sont explicitement typés M15.
-    """
+    """Plan Pine canonique M15 + bougie clôturée de déclenchement stratégie."""
     bridge = r.get("tv_indicator_mtf") or {}
     active_tf = str(bridge.get("activeTimeframe") or "").upper()
     snap = (bridge.get("snapshots") or {}).get(active_tf) or {}
@@ -157,9 +153,14 @@ def plan_indicateur(r):
         zone_low = float(robot.get("entryZoneLow"))
         zone_high = float(robot.get("entryZoneHigh"))
         decision = float(robot.get("entryDecision"))
+        entry_bar_time = int(robot.get("entryBarTime"))
+        entry_bar_open = float(robot.get("entryBarOpen"))
+        entry_bar_high = float(robot.get("entryBarHigh"))
+        entry_bar_low = float(robot.get("entryBarLow"))
+        entry_bar_close = float(robot.get("entryBarClose"))
     except (TypeError, ValueError, KeyError):
         return {"timeframe": active_tf or None, "available": False,
-                "reason": "plan M15 / zone d'entrée Pine incomplets"}
+                "reason": "plan M15 / zone / bougie de validation Pine incomplets"}
 
     if snap.get("fresh") is not True:
         return {"timeframe": active_tf, "available": False, "reason": "snapshot TradingView actif périmé"}
@@ -177,33 +178,45 @@ def plan_indicateur(r):
         return {"timeframe": active_tf, "available": False, "reason": "direction ou niveaux M15 invalides"}
     risk = abs(entry - sl)
     if direction == 1:
-        # Pine LONG: zMin >= SL + 25 % du risque ; la zone englobe le prix d'entrée.
         geometrie_ok = (
-            sl < entry < tp1
-            and (tp2 is None or tp2 > tp1)
-            and zone_low < decision < zone_high
-            and zone_low <= entry <= zone_high
+            sl < entry < tp1 and (tp2 is None or tp2 > tp1)
+            and zone_low < decision < zone_high and zone_low <= entry <= zone_high
             and zone_low >= sl + 0.25 * risk
         )
     else:
-        # Pine SHORT: zMax <= SL - 25 % du risque ; la zone englobe le prix d'entrée.
         geometrie_ok = (
-            tp1 < entry < sl
-            and (tp2 is None or tp2 < tp1)
-            and zone_low < decision < zone_high
-            and zone_low <= entry <= zone_high
+            tp1 < entry < sl and (tp2 is None or tp2 < tp1)
+            and zone_low < decision < zone_high and zone_low <= entry <= zone_high
             and zone_high <= sl - 0.25 * risk
         )
     if not geometrie_ok:
         return {"timeframe": active_tf, "available": False, "reason": "géométrie zone / entrée / SL / TP incohérente"}
+    if not (entry_bar_low <= min(entry_bar_open, entry_bar_close)
+            <= max(entry_bar_open, entry_bar_close) <= entry_bar_high):
+        return {"timeframe": active_tf, "available": False, "reason": "bougie de validation OHLC incohérente"}
+    retested_zone = entry_bar_high >= zone_low and entry_bar_low <= zone_high
+    candle_trigger = entry_bar_close > decision if direction == 1 else entry_bar_close < decision
+    candle_before_stop = entry_bar_close > sl if direction == 1 else entry_bar_close < sl
+    triggered = (
+        snap.get("confirmed") is True and robot.get("confirmed") is True
+        and robot.get("entryTriggered") is True and retested_zone
+        and candle_trigger and candle_before_stop
+    )
 
-    return {"timeframe": active_tf, "plan_timeframe": "M15", "entry_timeframe": entry_tf,
-            "strategy": strategy, "available": True, "direction": direction,
-            "entry": entry, "sl": sl, "tp": tp1, "tp1": tp1, "tp2": tp2,
-            "zone_low": zone_low, "zone_high": zone_high, "decision": decision,
-            "confirmed": snap.get("confirmed") is True, "verdict": robot.get("verdict"),
-            "long_score": robot.get("long_score"), "short_score": robot.get("short_score"),
-            "timestamp": robot.get("receivedAt") or snap.get("timestamp"), "ageMs": robot.get("ageMs")}
+    return {
+        "timeframe": active_tf, "plan_timeframe": "M15", "entry_timeframe": entry_tf,
+        "strategy": strategy, "available": True, "direction": direction,
+        "entry": entry, "sl": sl, "tp": tp1, "tp1": tp1, "tp2": tp2,
+        "zone_low": zone_low, "zone_high": zone_high, "decision": decision,
+        "entry_bar_time": entry_bar_time, "entry_bar_open": entry_bar_open,
+        "entry_bar_high": entry_bar_high, "entry_bar_low": entry_bar_low,
+        "entry_bar_close": entry_bar_close, "triggered": triggered,
+        "confirmed": snap.get("confirmed") is True and robot.get("confirmed") is True,
+        "verdict": robot.get("verdict"), "long_score": robot.get("long_score"),
+        "short_score": robot.get("short_score"),
+        "timestamp": robot.get("receivedAt") or snap.get("timestamp"),
+        "ageMs": robot.get("ageMs"),
+    }
 
 TTL_KRAKEN = {1: 5, 5: 10, 15: 30, 30: 60, 60: 120, 240: 300, 1440: 900, 10080: 1800}
 
