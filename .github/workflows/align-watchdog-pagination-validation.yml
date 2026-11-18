@@ -1,0 +1,36 @@
+name: ALIGN Watchdog Pagination Validation
+on:
+  push:
+    branches:
+      - fix/align-watchdog-pagination-20261118
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile ALIGN Python sources
+        run: python -m compileall -q align-bot
+      - name: Compile watchdog
+        run: python -m py_compile scripts/align_workflow_watchdog.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate animated live overlay
+        run: node --check docs/live/align-bande-live.user.js
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.3"
+      - name: Validate all ALIGN workflows
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/align-bot-validation.yml .github/workflows/align-bot.yml .github/workflows/align-bot-rollover.yml .github/workflows/align-workflow-watchdog.yml .github/workflows/align-copilot-issue-relay.yml .github/workflows/align-auto-repair.yml .github/workflows/align-watchdog-pagination-validation.yml
+      - name: Run targeted coordinator tests
+        run: python -m unittest discover -s align-bot -p "test_align_auto_repair.py" -v
+      - name: Run complete MTF regression suite
+        env:
+          ALIGN_PARITE_RESEAU: "1"
+        run: python -m unittest discover -s align-bot -p "test_*.py" -v
