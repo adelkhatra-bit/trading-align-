@@ -30,6 +30,19 @@ class GardeFousWorkflows(unittest.TestCase):
             self.assertTrue(chemin.exists(), f"workflow critique supprimé : {fichier}")
             self.assertIn(f"name: {nom}", chemin.read_text(encoding="utf-8"), f"nom modifié : {fichier}")
 
+    def test_declencheurs_critiques_conserves(self):
+        attendus = {
+            "align-auto-repair.yml": [r"(?m)^  workflow_run:", r"types:\s*\[completed\]"],
+            "align-workflow-watchdog.yml": [r"(?m)^  schedule:"],
+            "align-bot.yml": [r"(?m)^  workflow_run:", r'workflows:\s*\["ALIGN MTF validation"\]', r"(?m)^  schedule:"],
+            "align-bot-validation.yml": [r"(?m)^  pull_request:", r"(?m)^  push:"],
+        }
+        for fichier, motifs in attendus.items():
+            texte = (WF / fichier).read_text(encoding="utf-8")
+            entete = texte.split("\njobs:", 1)[0]
+            for motif in motifs:
+                self.assertRegex(entete, motif, f"déclencheur critique retiré dans {fichier} : {motif}")
+
     def test_aucun_workflow_critique_desactive(self):
         for fichier in CRITIQUES:
             texte = (WF / fichier).read_text(encoding="utf-8")
@@ -48,6 +61,13 @@ class GardeFousWorkflows(unittest.TestCase):
         corps = job.group(1)
         self.assertNotRegex(corps, r"(?m)^    if:", "le job validate est conditionné (risque d'être sauté sur les PR)")
         self.assertIn('-p "test_*.py"', corps, "le job validate ne lance plus toute la suite de tests")
+        # L'étape qui lance la suite ne doit pas pouvoir être sautée (pas de « if: » sur cette étape).
+        etapes = re.split(r"(?m)^      - ", corps)
+        suite = [e for e in etapes if '-p "test_*.py"' in e]
+        self.assertTrue(suite, "étape de la suite complète introuvable")
+        for etape in suite:
+            self.assertNotRegex(etape, r"(?m)^        if:", "l'étape de la suite complète est conditionnée (peut être sautée)")
+            self.assertNotRegex(etape, r"(?m)^        continue-on-error:\s*true", "l'étape de la suite complète tolère l'échec")
 
 
 class GardeFousBridge(unittest.TestCase):
