@@ -10602,35 +10602,43 @@ def agent(m, r, cle, ferme):
     else:
         r5, r5p = r["r5"][-1], r["r5"][-2]
     ctx = f"Contexte : {zone_txt(r['posD'])} Daily, {zone_txt(r['posW'])} Weekly."
-    try:
-        manipulation(out, m, r, cle)
-        meche_suspecte(out, m, r, cle)
-        niveaux_cles(out, m, r, cle)
-        resistance_fvg(out, m, r, cle)              # v7.2 : résistance / support / FVG touché → chaîne + indice live
-    except Exception as ex:
-        print("manipulation", ex)
-    try:
-        suivre_apres_sl(out, m, r, cle, hi, lo)
-    except Exception as ex:
-        print("après SL", ex)
-    try:
-        re_ = reprise_entree(m, r, cle) if not tr else None   # après « COUPE ET REPRENDS » : retour à l'entrée → on reprend
-        if re_:
-            out.append(re_)
-        er_ = entree_retest(m, r, cle) if not tr else None   # résistance cassée qui devient support (règle d'Adel)
-        if er_:
-            out.append(er_)
-        rc_ = radar_climax(m, r, cle)                 # radar retournement (volume climax + balayage + EMA9)
-        if rc_ and not tr:
-            out.append(rc_)
-    except Exception as ex:
-        print("radar_climax", ex)
-    try:
-        rv_ = retournement_marche(m, r, cle)  # surveillance active aussi pendant les positions GOLD/NASDAQ : alerte uniquement, aucune clôture automatique
-        if rv_ and not (tr and tr.get("d") == (1 if "LONG" in rv_.split("\n")[0] else -1)):
-            out.append(rv_)
-    except Exception as ex:
-        print("retournement_marche", ex)
+    # Mode sans signal (bridge TradingView non branché) : AUCUNE alerte calculée localement
+    # (manipulation, niveaux, FVG, radar, retournement, retest, après-SL) — seule la source v25 parle.
+    # Une position déjà ouverte reste suivie jusqu'à sa clôture ; aucune nouvelle info de marché.
+    sans_signal = os.environ.get("ALIGN_TV_BRIDGE_PRET", "1") == "0"
+    if sans_signal and not tr:
+        print(f"{m} : mode sans signal, bridge TradingView indisponible — aucune alerte locale.")
+        return []
+    if not sans_signal:
+        try:
+            manipulation(out, m, r, cle)
+            meche_suspecte(out, m, r, cle)
+            niveaux_cles(out, m, r, cle)
+            resistance_fvg(out, m, r, cle)              # v7.2 : résistance / support / FVG touché → chaîne + indice live
+        except Exception as ex:
+            print("manipulation", ex)
+        try:
+            suivre_apres_sl(out, m, r, cle, hi, lo)
+        except Exception as ex:
+            print("après SL", ex)
+        try:
+            re_ = reprise_entree(m, r, cle) if not tr else None   # après « COUPE ET REPRENDS » : retour à l'entrée → on reprend
+            if re_:
+                out.append(re_)
+            er_ = entree_retest(m, r, cle) if not tr else None   # résistance cassée qui devient support (règle d'Adel)
+            if er_:
+                out.append(er_)
+            rc_ = radar_climax(m, r, cle)                 # radar retournement (volume climax + balayage + EMA9)
+            if rc_ and not tr:
+                out.append(rc_)
+        except Exception as ex:
+            print("radar_climax", ex)
+        try:
+            rv_ = retournement_marche(m, r, cle)  # surveillance active aussi pendant les positions GOLD/NASDAQ : alerte uniquement, aucune clôture automatique
+            if rv_ and not (tr and tr.get("d") == (1 if "LONG" in rv_.split("\n")[0] else -1)):
+                out.append(rv_)
+        except Exception as ex:
+            print("retournement_marche", ex)
 
     # ── Bridge Pine obligatoire : aucun fallback de niveaux locaux ──
     require_tv = bool(r.get("require_tv_bridge"))
@@ -10641,7 +10649,12 @@ def agent(m, r, cle, ferme):
             cle["aligne"] = 0
             cle["prep"] = False
             cle.pop("ordre", None)
-            out.append(f"⏳ {ICONE.get(m, '')} {m} : bridge Pine M15 en attente de confirmation multi-UT.")
+            if os.environ.get("ALIGN_TV_BRIDGE_PRET", "1") == "0":
+                # Mode sans signal (bridge non branché) : panne technique, pas une info de marché →
+                # journal seulement, jamais diffusée aux abonnés ni à la chaîne.
+                print(f"{m} : mode sans signal, bridge TradingView indisponible.")
+            else:
+                out.append(f"⏳ {ICONE.get(m, '')} {m} : bridge Pine M15 en attente de confirmation multi-UT.")
             return out
         pause_ = pause_entree_marche(m, r, _ETAT_COURANT.get("etat") or {}, time.time())
         if pause_:
@@ -10664,9 +10677,12 @@ def agent(m, r, cle, ferme):
             cle["prep"] = False
             cle.pop("ordre", None)
             k = str(plan_tv.get("reason") or "plan Pine absent")
-            if cle.get("tv_bridge_wait_reason") != k:
+            if os.environ.get("ALIGN_TV_BRIDGE_PRET", "1") == "0":
+                # Mode sans signal : panne technique, journal seulement (jamais envoyée aux abonnés).
+                print(f"{m} : mode sans signal, plan TradingView indisponible ({k}).")
+            elif cle.get("tv_bridge_wait_reason") != k:
                 cle["tv_bridge_wait_reason"] = k
-                out.append(f"⏳ {ICONE.get(m, '')} {m} : attente du plan TradingView M15\\n{k}\\nAucun plan Python local ne sera substitué.")
+                out.append(f"⏳ {ICONE.get(m, '')} {m} : attente du plan TradingView M15\n{k}\nAucun plan Python local ne sera substitué.")
             return out
         if plan_tv["direction"] != d:
             cle["prep"] = False

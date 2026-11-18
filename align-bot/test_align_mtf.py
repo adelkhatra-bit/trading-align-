@@ -3631,6 +3631,55 @@ class PineOnlyEntryGateTests(unittest.TestCase):
         self.assertFalse(state.get("ordre"))
         self.assertTrue(any("attente du plan TradingView" in str(x) for x in out))
 
+    def test_no_signal_mode_sends_nothing_and_never_falls_back(self):
+        from unittest.mock import patch
+        r = self._market()
+        r["tv_indicator_mtf"] = {"available": False, "reason": "bridge unavailable"}
+        r["require_tv_bridge"] = True
+        state = {"t1m": 0}
+        with patch.dict(align_bot.os.environ, {"ALIGN_TV_BRIDGE_PRET": "0"}), \
+             patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), \
+             patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")):
+            out = align_bot.agent("BTC", r, state, "")
+        self.assertFalse(state.get("trade"))
+        self.assertFalse(state.get("ordre"))
+        self.assertFalse(any("TradingView" in str(x) or "bridge" in str(x) for x in out),
+                         "en mode sans signal, aucune panne technique n'est diffusée")
+
+    def test_no_signal_mode_silences_every_local_alert_emitter(self):
+        """Bridge absent : aucune alerte calculée en local (radar, retournement, niveaux…) n'est émise."""
+        from unittest.mock import patch
+        r = self._market()
+        r["require_tv_bridge"] = True
+        state = {"t1m": 0}
+        locaux = ["manipulation", "meche_suspecte", "niveaux_cles", "resistance_fvg", "suivre_apres_sl",
+                  "reprise_entree", "entree_retest", "radar_climax", "retournement_marche",
+                  "plan_cassure", "point_entree"]
+        patches = [patch.object(align_bot, n, side_effect=AssertionError(f"{n} appelé en mode sans signal"))
+                   for n in locaux]
+        with patch.dict(align_bot.os.environ, {"ALIGN_TV_BRIDGE_PRET": "0"}):
+            for p_ in patches:
+                p_.start()
+            try:
+                out = align_bot.agent("BTC", r, state, "")
+            finally:
+                for p_ in patches:
+                    p_.stop()
+        self.assertEqual(out, [])
+        self.assertFalse(state.get("trade"))
+
+    def test_bridge_ready_still_runs_local_radar(self):
+        """Contre-preuve : bridge prêt, le radar local reste branché (rien n'est enlevé)."""
+        from unittest.mock import patch
+        r = self._market()
+        r["require_tv_bridge"] = True
+        state = {"t1m": 0}
+        with patch.dict(align_bot.os.environ, {"ALIGN_TV_BRIDGE_PRET": "1"}), \
+             patch.object(align_bot, "radar_climax", return_value="RADAR_LOCAL") as rc:
+            out = align_bot.agent("BTC", r, state, "")
+        self.assertTrue(rc.called)
+        self.assertIn("RADAR_LOCAL", out)
+
     def test_required_bridge_waits_for_pine_closed_entry_trigger(self):
         from unittest.mock import patch
         r = self._market()
