@@ -1,0 +1,12 @@
+name = "align-tv-mailbox"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+# Un Durable Object par marché : lecture toujours à jour (KV était trop lent pour la fenêtre de 30 s).
+[[durable_objects.bindings]]
+name = "ALIGN_TV_MAILBOX"
+class_name = "AlignMailbox"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["AlignMailbox"]
