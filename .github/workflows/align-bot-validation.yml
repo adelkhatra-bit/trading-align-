@@ -37,6 +37,8 @@ jobs:
         run: python -m compileall -q align-bot
       - name: Compile ALIGN Copilot relay
         run: python -m py_compile scripts/align_copilot_issue_relay.py
+      - name: Compile watchdog Python script
+        run: python -m py_compile scripts/align_workflow_watchdog.py
       - name: Prepare Node for live overlay validation
         uses: actions/setup-node@v4
         with:
@@ -48,7 +50,7 @@ jobs:
         with:
           go-version: "1.27.3"
       - name: Validate ALIGN workflow with actionlint
-        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/align-bot-validation.yml .github/workflows/align-bot.yml .github/workflows/align-bot-rollover.yml .github/workflows/align-copilot-issue-relay.yml
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/align-bot-validation.yml .github/workflows/align-bot.yml .github/workflows/align-bot-rollover.yml .github/workflows/align-workflow-watchdog.yml .github/workflows/align-copilot-issue-relay.yml
       - name: Run complete MTF regression suite
         env:
           # Parité Pine <-> bot sur VRAIES bougies Kraken (sauté proprement si le réseau est indisponible)
