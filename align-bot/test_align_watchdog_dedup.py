@@ -246,5 +246,99 @@ class WatchdogDedupHardeningTests(unittest.TestCase):
         self.assertTrue(any(m == "POST" for _, m in calls), "un rapport distinct est créé")
 
 
+
+
+def cancelled_bot_run(run_id=44270000020):
+    item = run(run_id, workflow="ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)")
+    item["created_at"] = "2026-11-18T22:24:02Z"
+    item["conclusion"] = "cancelled"
+    return item
+
+
+def cancelled_bot_job():
+    return {
+        "name": "signaux",
+        "conclusion": "cancelled",
+        "steps": [{"name": "Analyse BTC + Gold + NASDAQ et envoi Telegram", "conclusion": "cancelled"}],
+    }
+
+
+class WatchdogCancelledWorkerTests(unittest.TestCase):
+    def test_unexpected_cancelled_bot_is_reported_and_never_restarted(self):
+        worker = cancelled_bot_run()
+        with patch.object(watchdog, "cancelled_by_successor_rollover", return_value=False), \\
+             patch.object(watchdog, "cancelled_jobs", return_value=[cancelled_bot_job()]), \\
+             patch.object(watchdog, "report") as report, \\
+             patch.object(watchdog, "api") as api_mock:
+            watchdog.handle_completed(worker)
+
+        report.assert_called_once()
+        self.assertIn("cancelled", report.call_args.args[1].lower())
+        self.assertEqual(report.call_args.args[2], [cancelled_bot_job()])
+        api_mock.assert_not_called()
+
+    def test_cancelled_bot_retired_by_newer_rollover_is_not_reported(self):
+        with patch.object(watchdog, "cancelled_by_successor_rollover", return_value=True), \\
+             patch.object(watchdog, "cancelled_jobs") as jobs, \\
+             patch.object(watchdog, "report") as report:
+            watchdog.handle_completed(cancelled_bot_run())
+
+        jobs.assert_not_called()
+        report.assert_not_called()
+
+    def test_cancelled_non_bot_workflow_is_ignored(self):
+        other = cancelled_bot_run()
+        other["name"] = "pages build and deployment"
+        with patch.object(watchdog, "cancelled_by_successor_rollover") as rollover, \\
+             patch.object(watchdog, "cancelled_jobs") as jobs, \\
+             patch.object(watchdog, "report") as report:
+            watchdog.handle_completed(other)
+
+        rollover.assert_not_called()
+        jobs.assert_not_called()
+        report.assert_not_called()
+
+    def test_cancelled_step_is_preserved_in_watchdog_report_identity(self):
+        self.assertEqual(
+            watchdog._failed_step_names([cancelled_bot_job()]),
+            ["signaux::Analyse BTC + Gold + NASDAQ et envoi Telegram"],
+        )
+
+    def test_successor_rollover_requires_a_later_successful_main_validation(self):
+        worker = cancelled_bot_run()
+        worker["created_at"] = "2026-11-18T22:00:00Z"
+        runs = {"workflow_runs": [
+            {
+                "name": "ALIGN MTF validation", "head_branch": "main", "event": "push",
+                "conclusion": "success", "created_at": "2026-11-18T22:22:40Z",
+                "head_sha": "b" * 40,
+            },
+            {
+                "name": "ALIGN worker rollover", "head_branch": "main", "status": "in_progress",
+                "conclusion": None, "created_at": "2026-11-18T22:24:02Z",
+                "head_sha": "b" * 40,
+            },
+        ]}
+        with patch.object(watchdog, "api", return_value=runs):
+            self.assertTrue(watchdog.cancelled_by_successor_rollover(worker))
+
+    def test_successor_rollover_with_wrong_sha_does_not_hide_cancellation(self):
+        worker = cancelled_bot_run()
+        worker["created_at"] = "2026-11-18T22:00:00Z"
+        runs = {"workflow_runs": [
+            {
+                "name": "ALIGN MTF validation", "head_branch": "main", "event": "push",
+                "conclusion": "success", "created_at": "2026-11-18T22:22:40Z",
+                "head_sha": "b" * 40,
+            },
+            {
+                "name": "ALIGN worker rollover", "head_branch": "main", "status": "completed",
+                "conclusion": "success", "created_at": "2026-11-18T22:24:02Z",
+                "head_sha": "c" * 40,
+            },
+        ]}
+        with patch.object(watchdog, "api", return_value=runs):
+            self.assertFalse(watchdog.cancelled_by_successor_rollover(worker))
+
 if __name__ == "__main__":
     unittest.main()
