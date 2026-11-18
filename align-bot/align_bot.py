@@ -11422,7 +11422,7 @@ def live_bande(etat, texte, cle=None, pause=60, toujours=False):
         _LIVE_DERNIER[cle] = time.time()
     return live_publier(texte)
 
-# ───── v8.5 « SPECTACLE » (demande d'Adel 15/11) : IA gratuite + agenda (discours, annonces, ouvertures) sur la bande ─────
+# ───── v8.5 « SPECTACLE » : commentaire Claude prioritaire avec quotas + repli IA gratuit ; agenda sur la bande ─────
 LIVE_IA_INTERVALLE = max(120, min(300, int(os.environ.get("LIVE_IA_INTERVALLE", "180"))))  # commentaires IA toutes les 2 à 5 minutes
 _INTERDIT_BANDE = re.compile(r"\d|telegram|entr[ée]e|\bSL\b|\bTP\d?\b|\bstop\b|€|\$|%", re.I)
 SESSIONS_LIVE = (("🇯🇵 TOKYO", 1, 0), ("🇬🇧 LONDRES", 9, 0), ("🇺🇸 NEW YORK", 15, 30))
@@ -11720,7 +11720,7 @@ def commentaires_live_de_secours(donnees):
 
 
 def live_phrases_ia(etat, maintenant, derniers=None):
-    """Génère des commentaires IA par marché depuis les analyses en mémoire, sans nouvel appel de données."""
+    """Génère les commentaires live depuis les données en mémoire ; Claude prioritaire, quotas/cache actifs, repli gratuit."""
     if not live_actif(etat) or maintenant - etat.get("live_ia_t", 0) < LIVE_IA_INTERVALLE:
         return False
     etat["live_ia_t"] = maintenant
