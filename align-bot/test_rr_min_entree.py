@@ -28,3 +28,28 @@ class RRMinEntree(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RRAttenteExplicite(unittest.TestCase):
+    def test_message_radar_affiche_attente_avec_le_ratio(self):
+        src = open(os.path.join(HERE, "align_bot.py"), encoding="utf-8").read()
+        self.assertIn("🟡 ATTENTE — gain/risque 1:{rr:.1f} sous le minimum 1:{RR_MIN_ENTREE:g}", src)
+
+
+class MargeSLNeCasseJamaisLeRatio(unittest.TestCase):
+    def _cle(self):
+        return {"sl_appris": {"hist": [4.0]}}
+
+    def test_marge_qui_fait_passer_sous_1_2_est_refusee_sans_modifier_le_trade(self):
+        tr = {"d": 1, "e": 100.0, "sl": 96.0, "tp1": 108.0}   # ratio 2.0 avant marge
+        ok = ab.appliquer_marge_sl("NASDAQ", self._cle(), tr, {"atr": 10.0})
+        self.assertFalse(ok)
+        self.assertEqual(tr["sl"], 96.0)
+        self.assertNotIn("marge_sl", tr)
+
+    def test_marge_acceptee_si_le_ratio_reste_au_minimum(self):
+        tr = {"d": 1, "e": 100.0, "sl": 96.0, "tp1": 120.0}   # ratio 5.0 avant marge -> 2.5 après
+        ok = ab.appliquer_marge_sl("NASDAQ", self._cle(), tr, {"atr": 10.0})
+        self.assertTrue(ok)
+        self.assertEqual(tr["sl"], 92.0)
+        self.assertGreaterEqual(tr["rr"], ab.RR_MIN_ENTREE)
