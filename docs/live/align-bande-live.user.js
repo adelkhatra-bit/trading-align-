@@ -305,7 +305,7 @@
     }
   });
   function parlerLive(item) {
-    if (!voixActive || !item || item.source !== 'ia' || !('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return 0;
+    if (!voixActive || !item || (item.source !== 'ia' && item.source !== 'marche') ||!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return 0;
     // v12.2.7 (règle d'Adel) : chaque info est dite en FRANÇAIS, puis la même en ANGLAIS, jamais mélangées.
     const anglais = !!item.en;
     const maintenant = Date.now();
@@ -1091,9 +1091,9 @@
   window.__ALIGN_SHOW__ = { ennui: teteEnnui, pop, lueur, coeurs, lignes: () => lignesAlign() };
   // une info du spectacle sur la bande : jamais par-dessus une vraie info du bot, et pas plus d'une par minute
   let dernierShow = 0;
-  function bandeShow(txt) {
+  function bandeShow(txt, source) {
     if (occupe || file.length || Date.now() - dernierShow < 52000) return false;
-    dernierShow = Date.now(); montrer(txt, false, 1); return true;
+    dernierShow = Date.now(); montrer(txt, false, 1, undefined, false, source); return true;
   }
   // v5.9 : chaque événement vu à l'écran part aussi au bot → message détaillé dans la chaîne Telegram du marché
   function codeMarche() { const s = String((chart() && chart().symbol()) || ''); return /BTC/i.test(s) ? 'BTC' : /XAU|GOLD/i.test(s) ? 'GOLD' : /NAS|NQ|US100/i.test(s) ? 'NASDAQ' : ''; }
@@ -1405,7 +1405,8 @@
         const L = (tendN % 4 !== 3 && narration) ? [narration] : calme ? (pos < 0.25 ? COACH.rebond : pos > 0.75 ? COACH.cassure : [COACH.anim, COACH.anim, PHRASES.ennui, CAL][tendN % 4]) : tour === 3 ? PHRASES.commente : tour === 2 ? PHRASES.branche
           : tour === 1 ? (pos < 0.2 ? PHRASES.bas_zone : pos > 0.8 ? PHRASES.haut_zone : PHRASES.milieu)
           : larg < 3.2 ? PHRASES.range : pente > 1.2 ? PHRASES.hausse : pente < -1.2 ? PHRASES.baisse : PHRASES.range;
-        if (bandeShow(L[Math.floor(tendN / 3) % L.length].replace('{m}', m))) {
+        const parleNarration = L.length === 1 && L[0] === narration;   // v12.2.9 : la narration de marché est lue à voix haute
+        if (bandeShow(L[Math.floor(tendN / 3) % L.length].replace('{m}', m), parleNarration ? 'marche' : undefined)) {
           if (L === PHRASES.ennui) teteEnnui();
           if (L === PHRASES.bas_zone || L === PHRASES.haut_zone) versBot('zone', L === PHRASES.bas_zone ? -1 : 1);   // la vraie réponse part dans la chaîne du marché
           derniereTend = Date.now(); tendN++;
