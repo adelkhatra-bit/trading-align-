@@ -26,11 +26,20 @@ def relay_once(fetch_mailbox, ingest, symbols=SYMBOLS):
         except Exception as exc:  # réseau : on le signale, on ne fabrique rien
             results[symbol] = "mailbox_error:" + type(exc).__name__
             continue
-        payload = box.get("payload") if isinstance(box, dict) and box.get("ok") else None
+        http_status = box.get("_http_status", 200) if isinstance(box, dict) else None
+        if http_status != 200:
+            # 401 (mauvais jeton), 5xx… : on le dit, on ne le confond pas avec « vide ».
+            results[symbol] = "mailbox_http_" + str(http_status)
+            continue
+        payload = box.get("payload") if box.get("ok") else None
         if not isinstance(payload, dict):
             results[symbol] = "empty"
             continue
-        status, body = ingest(payload)
+        try:
+            status, body = ingest(payload)
+        except Exception as exc:  # bridge local momentanément indisponible : on réessaiera au cycle suivant
+            results[symbol] = "ingest_error:" + type(exc).__name__
+            continue
         results[symbol] = "ok" if status == 200 else "rejected:" + str(body.get("error", status))
     return results
 
@@ -54,8 +63,10 @@ def main():
         return 1
 
     def fetch(symbol):
-        _, body = _http_json(mailbox_url + "/mailbox?symbol=" + symbol,
-                             headers={"Authorization": "Bearer " + mailbox_token})
+        status, body = _http_json(mailbox_url + "/mailbox?symbol=" + symbol,
+                                  headers={"Authorization": "Bearer " + mailbox_token})
+        body = body if isinstance(body, dict) else {}
+        body["_http_status"] = status
         return body
 
     def ingest(payload):

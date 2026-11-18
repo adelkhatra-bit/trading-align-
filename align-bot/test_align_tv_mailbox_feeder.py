@@ -39,6 +39,20 @@ class MailboxFeederTests(unittest.TestCase):
         self.assertEqual(res["NAS100"], "mailbox_error:OSError")
         self.assertFalse(self.store.read("NAS100", now_ms=BASE_MS)[1]["ok"])
 
+    def test_mailbox_auth_failure_is_reported_not_called_empty(self):
+        res = feeder.relay_once(lambda s: {"ok": False, "error": "unauthorized", "_http_status": 401},
+                                self._ingest, symbols=("BTCUSD",))
+        self.assertEqual(res["BTCUSD"], "mailbox_http_401")
+
+    def test_local_bridge_down_does_not_stop_the_loop(self):
+        box = {"ok": True, "payload": valid_payload(BASE_MS, "BTCUSD"), "_http_status": 200}
+
+        def down(_payload):
+            raise ConnectionRefusedError("bridge local arrêté")
+        res = feeder.relay_once(lambda s: box, down, symbols=("BTCUSD", "XAUUSD"))
+        self.assertEqual(res["BTCUSD"], "ingest_error:ConnectionRefusedError")
+        self.assertEqual(res["XAUUSD"], "ingest_error:ConnectionRefusedError")
+
 
 if __name__ == "__main__":
     unittest.main()

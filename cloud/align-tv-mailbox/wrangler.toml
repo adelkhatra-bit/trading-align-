@@ -2,7 +2,11 @@ name = "align-tv-mailbox"
 main = "worker.js"
 compatibility_date = "2026-11-01"
 
-# Namespace KV réservé à ALIGN (aucun autre projet ne l'utilise).
-[[kv_namespaces]]
-binding = "ALIGN_TV_KV"
-id = "26d55deaf6cd48d8a5eae93f521f49b9"  # align-tv-mailbox-kv, créé le 18/11/2026
+# Un Durable Object par marché : lecture toujours à jour (KV était trop lent pour la fenêtre de 30 s).
+[[durable_objects.bindings]]
+name = "ALIGN_TV_MAILBOX"
+class_name = "AlignMailbox"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["AlignMailbox"]
