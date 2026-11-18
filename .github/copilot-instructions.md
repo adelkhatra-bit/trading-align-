@@ -8,3 +8,4 @@ Avant toute action, lis `docs/ALIGN_SOURCE_DE_VERITE.md` puis `AGENTS.md`.
 - Une issue = une branche partie de `main` = une PR minimale. Lance `PYTHONPATH=. python -m unittest discover -s align-bot -p 'test_*.py'` avant de pousser.
 - Ne fusionne jamais toi-même. La fusion dépend de la règle de `main` (`validate` vert) et de la décision du propriétaire, ou de la porte automatique une fois la PR #539 fusionnée.
 - Jamais de secret en clair, jamais d'ordre broker réel, jamais de changement de design ou d'animation non demandé.
+- Jamais de donnée inventée, simulée ou de remplacement : seules les vraies données de l'indicateur v25 sont utilisées ; si elles manquent, rien n'est émis.

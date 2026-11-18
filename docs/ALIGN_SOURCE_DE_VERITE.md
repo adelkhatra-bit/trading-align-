@@ -64,6 +64,10 @@ Règle : quand `ALIGN_REQUIRE_TV_BRIDGE=1`, **aucun repli** sur des niveaux calc
 
 ## 6. Interdits absolus
 
+- **Aucune donnée inventée, simulée ou de remplacement** à la place d'une vraie donnée de l'indicateur v25.
+  Si la vraie donnée manque ou est périmée : on n'émet rien (`WAIT`) et on signale la panne, on ne comble jamais le trou.
+  Appliqué par les tests : `test_align_tv_bot_gate.py` (le bot exige le bridge TradingView par défaut)
+  et `test_align_tv_bridge.py::test_rejects_missing_required_timeframe_instead_of_fabricating_it`.
 - Aucun ordre broker réel ; `AUTO_TRADE` et `TOPSTEP_REEL` restent à `0` tant que le propriétaire ne dit pas « réel ».
 - Ne jamais afficher, copier ou committer la valeur d'un secret.
 - Ne jamais modifier le design, les animations ou l'indicateur sans demande explicite.
