@@ -57,6 +57,16 @@ class RelayTaskSelectionTests(unittest.TestCase):
             ["RELAY-TEST-011"],
         )
 
+    def test_reused_task_id_is_processed_only_once(self):
+        duplicate = comment(
+            relay.START_COMMENT_ID + 30,
+            "adelkhatra-bit",
+            "[CHATGPT → COPILOT][RELAY-TEST-011] duplicate replay",
+        )
+        pending = relay.pending_tasks([self.task, duplicate])
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0][0]["id"], self.task["id"])
+
     def test_task_before_activation_marker_is_ignored(self):
         old = comment(
             relay.START_COMMENT_ID - 1,
@@ -94,6 +104,15 @@ class RelayScopeTests(unittest.TestCase):
         with patch.object(relay, "REPO", "another/repository"), patch.object(
             relay, "ISSUE", relay.EXPECTED_ISSUE
         ), patch.object(relay, "GH_TOKEN", "test-token"):
+            with self.assertRaisesRegex(RuntimeError, "scope mismatch"):
+                relay.validate_scope()
+
+    def test_scope_rejects_changed_allowed_author(self):
+        with patch.object(relay, "REPO", relay.EXPECTED_REPO), patch.object(
+            relay, "ISSUE", relay.EXPECTED_ISSUE
+        ), patch.object(relay, "ALLOWED_AUTHOR", "someone-else"), patch.object(
+            relay, "GH_TOKEN", "test-token"
+        ):
             with self.assertRaisesRegex(RuntimeError, "scope mismatch"):
                 relay.validate_scope()
 
