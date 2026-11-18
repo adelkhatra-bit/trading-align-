@@ -23,8 +23,10 @@ Le dépôt est personnel. Pour ce contexte, utiliser le secret du dépôt :
 
 - Nom : `COPILOT_GITHUB_TOKEN`
 - Type : fine-grained personal access token créé depuis le compte personnel propriétaire.
-- Permission de compte : `Copilot Requests` uniquement.
-- Accès dépôt : public repositories suffit pour la lecture du dépôt public ALIGN.
+- Permission de compte : `Copilot Requests` pour le relais CLI.
+- Permissions du dépôt requises pour l'assignation cloud agent : accès lecture aux métadonnées et accès lecture/écriture à Actions, Contents, Issues et Pull requests.
+- L'assignation automatique est activée uniquement si ce secret existe, si `copilot-swe-agent` apparaît dans les acteurs assignables du dépôt et si aucun autre issue ALIGN n'a déjà un agent Copilot actif.
+- Sans secret, sans acteur disponible ou en cas de permission insuffisante, l'issue reste créée et l'assignation est manuelle.
 - Stockage : dépôt ALIGN → Settings → Secrets and variables → Actions → New repository secret.
 - Ne jamais publier le token dans une issue, un fichier ou une conversation.
 
