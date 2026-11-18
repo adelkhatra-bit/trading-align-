@@ -28,6 +28,8 @@ TELEGRAM_PULL_CONTEXT = threading.local()
 TELEGRAM_PULL_MODE = False  # activé par main(); les tests unitaires du wrapper restent isolés par défaut
 MARCHES = {"BTC": "XBTUSD", "GOLD": "XAUUSD", "NASDAQ": "NAS100"}  # BTC → FTMO (CFD 24/7) • GOLD → Topstep (MGC) / FTMO • NASDAQ → FX:NAS100 (TradingView)
 MIN_ALIGN, MIN_SQZ, MARGE_ATR, GAIN_MIN = 8, 4, 0.5, 1.5   # = réglages par défaut de l'indicateur ALIGN MTF PRO v24
+# Décision trader : gain/risque minimum 1:2 pour AUTORISER une entrée (sinon ATTENTE). GAIN_MIN reste celui de l'indicateur (parité Pine).
+RR_MIN_ENTREE = 2.0
 LIEN_RESULTATS = "https://t.me/+RajFd_hMgl1kNmQ0"     # groupe ALIGN Résultats (lien privé)
 RISQUE_MAX = 1.5      # SL jamais plus loin que 1,5 ATR 15 min : pas de gros SL, on attend mieux
 UT = ["1", "3", "5", "10", "15", "30", "45", "1h", "2h", "4h", "D"]   # 3 min comme l'indicateur TradingView (unité standard)
@@ -4537,7 +4539,7 @@ def entree_retest(m, r, cle):
             continue
         (tp1, n1), (tp2, n2) = objectifs(r, d, entree, risque)
         rr = abs(tp1 - entree) / risque
-        if d * (tp1 - entree) <= 0 or d * (tp2 - tp1) <= 0 or rr < GAIN_MIN:
+        if d * (tp1 - entree) <= 0 or d * (tp2 - tp1) <= 0 or rr < RR_MIN_ENTREE:
             continue
         # Ne consomme le cooldown que lorsqu'une alerte Gold/Nasdaq complète est réellement produite.
         vu[k] = r.get("t", 0)
@@ -4608,7 +4610,7 @@ def radar_climax(m, r, cle):
                             "Balayage détecté, mais niveaux TP/SL complets indisponibles.\n⛔ Aucune entrée publiée.")
                 (tp1, n1), (tp2, n2) = objectifs(r, sens, e, risque)
                 rr = abs(tp1 - e) / risque
-                if sens * (tp1 - e) <= 0 or sens * (tp2 - tp1) <= 0 or rr < GAIN_MIN:
+                if sens * (tp1 - e) <= 0 or sens * (tp2 - tp1) <= 0 or rr < RR_MIN_ENTREE:
                     return (f"👀 RADAR CLIMAX — SURVEILLANCE {ICONE.get(m, '')} {m}\n"
                             "Le retournement est repéré, mais le gain/risque ne valide pas une position.\n⛔ Aucune entrée publiée.")
                 return (f"🔄 RETOURNEMENT CONFIRMÉ — {'LONG' if sens == 1 else 'SHORT'} POSSIBLE — {ICONE.get(m, '')} {m}\n"
@@ -10806,7 +10808,7 @@ def agent(m, r, cle, ferme):
         risk = abs(entry - stop)
         atr15 = float(r.get("atr") or 0)
         rr = abs(tp1 - entry) / max(risk, 1e-9)
-        if risk <= 0 or atr15 <= 0 or risk > RISQUE_MAX * atr15 or rr < GAIN_MIN:
+        if risk <= 0 or atr15 <= 0 or risk > RISQUE_MAX * atr15 or rr < RR_MIN_ENTREE:
             cle["prep"] = False
             cle.pop("ordre", None)
             out.append(f"⛔ {ICONE.get(m, '')} {m} : plan Pine M15 refusé par le filtre risque / rendement ALIGN.")
@@ -10923,7 +10925,7 @@ def agent(m, r, cle, ferme):
             return out
         # ── Entrée sur CASSURE confirmée (clôture 5 min au-delà du niveau) ──
         pc = plan_cassure(r, d)
-        if pc and pc.get("rr", 0) >= GAIN_MIN and pc["t15"] != cle.get("cassure_t") and not r.get("annonce"):
+        if pc and pc.get("rr", 0) >= RR_MIN_ENTREE and pc["t15"] != cle.get("cassure_t") and not r.get("annonce"):
             cle["cassure_t"] = pc["t15"]
             tr = dict(pc, statut="entree", cree=r["t"], ouvert_t=time.time(), encore=0, atr_e=r["atr"], sl0=pc.get("sl"))
             tr["profil"] = profil_trade(m, tr, r)
@@ -10998,7 +11000,7 @@ def agent(m, r, cle, ferme):
                            f"{ligne_cassure(r, d)}\n\n"
                            f"{fmt_trade(m, o, p)}\n\n"
                            f"📐 Zone = {o['src']}{ferme}", bouton_auto(m)))
-        if (bloque and not cle.get("ordre")) or o["rr"] < GAIN_MIN:
+        if (bloque and not cle.get("ordre")) or o["rr"] < RR_MIN_ENTREE:
             return out
         # Petit repli en cours avant d'arriver dans la zone : on le dit tout de suite
         if not cle.get("prep") and d * (p - o["e"]) > 0:
