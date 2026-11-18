@@ -11,14 +11,11 @@ on:
       - "docs/live/**"
       - ".github/workflows/**"
       - "scripts/align_workflow_watchdog.py"
+  # Pas de filtre de chemins sur les PR : « validate » est un contrôle obligatoire
+  # de la règle de protection de main ; il doit donc tourner sur toutes les PR.
   pull_request:
     branches:
       - main
-    paths:
-      - "align-bot/**"
-      - "scripts/**"
-      - "docs/live/**"
-      - ".github/workflows/**"
 
 concurrency:
   group: align-mtf-${{ github.event.pull_request.number || github.ref }}
