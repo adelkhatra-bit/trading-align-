@@ -34,6 +34,7 @@ TIMEFRAME_MS = {
     "W1": 604_800_000,
 }
 ACTIVE_MAX_AGE_MS = 30_000
+MTF_BAR_GRACE_MS = 30_000
 MAX_FUTURE_SKEW_MS = 5_000
 MAX_BODY_BYTES = 32_768
 TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
@@ -201,8 +202,18 @@ class BridgeStore:
             bar_time = _epoch_ms(item.get("bar_time"))
             if direction is None or rsi is None or not 0 <= rsi <= 100 or bar_time is None:
                 return 400, {"ok": False, "error": "invalid_mtf_snapshot", "timeframe": tf}
-            if bar_time > now_ms + MAX_FUTURE_SKEW_MS:
+            bar_age = now_ms - bar_time
+            if bar_age < -MAX_FUTURE_SKEW_MS:
                 return 400, {"ok": False, "error": "future_mtf_bar", "timeframe": tf}
+            max_bar_age = TIMEFRAME_MS[tf] + MTF_BAR_GRACE_MS
+            if bar_age > max_bar_age:
+                return 400, {
+                    "ok": False,
+                    "error": "stale_mtf_bar",
+                    "timeframe": tf,
+                    "ageMs": bar_age,
+                    "maxAgeMs": max_bar_age,
+                }
             normalized_mtf[tf] = {"direction": direction, "rsi": rsi, "barTime": bar_time}
 
         robot = _safe_robot(payload, price, now_ms)
@@ -273,9 +284,11 @@ class BridgeStore:
         active_age = now_ms - int(state["sourceTimestamp"])
         active_fresh = 0 <= active_age <= ACTIVE_MAX_AGE_MS
         for tf, snap in snapshots.items():
-            age = now_ms - int(snap.get("updatedAt", 0))
-            max_age = max(120_000, TIMEFRAME_MS.get(tf, 60_000) * 3)
-            snap["fresh"] = 0 <= age <= max_age
+            # Freshness follows the TradingView candle's own open time, not
+            # the receipt time of a newer payload carrying the same candle.
+            age = now_ms - int(snap.get("barTime", 0))
+            max_age = TIMEFRAME_MS.get(tf, 60_000) + MTF_BAR_GRACE_MS
+            snap["fresh"] = -MAX_FUTURE_SKEW_MS <= age <= max_age
             snap["ageMs"] = max(0, age)
         required_fresh = all(snapshots.get(tf, {}).get("fresh") is True for tf in REQUIRED_TIMEFRAMES)
         active_snapshot_fresh = snapshots.get(active_tf, {}).get("fresh") is True
