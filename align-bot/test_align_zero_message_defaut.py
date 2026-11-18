@@ -145,6 +145,14 @@ class ParcoursLiveEtBudget(unittest.TestCase):
             ab.live_annoncer_debut(etat, {"22"})
         self.assertEqual(envois, [])                # budget de 2 atteint
 
+    def test_le_coach_demande_la_plateforme_une_fois(self):
+        bloc = SOURCE.split('if choix == "auto" and mk in MARCHES:', 1)[1].split('if choix == "followmarket"', 1)[0]
+        self.assertIn('if str(qui) not in (etat.get("plateforme") or {}):', bloc)
+        self.assertIn("menu_plateforme(etat, qui)", bloc)
+
+    def test_entree_lisible_sans_defiler(self):
+        self.assertIn("l += [\"\"] + co[:2] if co else []", SOURCE)
+
     def test_le_coach_se_coupe_apres_l_entree(self):
         """Une fois la position donnée, la personne sort de la liste d'attente : pas de 2e position."""
         self.assertIn('for cid in list(dict.fromkeys(etat.get("auto", {}).pop(m, []) + auto)):', SOURCE)
