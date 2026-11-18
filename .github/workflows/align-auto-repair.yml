@@ -15,7 +15,6 @@ on:
       - ALIGN Topstep vérification
       - ALIGN Copilot Issue Relay
     types: [completed]
-  workflow_dispatch:
 
 permissions:
   actions: read
@@ -29,7 +28,7 @@ concurrency:
 
 jobs:
   report:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure'
+    if: github.event.workflow_run.conclusion == 'failure'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
