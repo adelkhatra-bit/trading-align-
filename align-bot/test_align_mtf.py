@@ -2084,8 +2084,18 @@ class AlignAiChainTest(unittest.TestCase):
         self.assertEqual(align_bot.ANTHROPIC_MAX_TOKENS, 300)
 
     def test_free_ai_answers_first_and_claude_is_not_called(self):
-        txt, appels = self._ia({}, premium=True)
+        txt, appels = self._ia({}, premium=False)
         self.assertEqual([a[0] for a in appels], ["Gemini"]); self.assertIn("Gemini", txt)
+
+    def test_live_paid_preference_uses_existing_anthropic_first(self):
+        txt, appels = self._ia({}, premium=True, prefer_paid=True)
+        self.assertEqual([a[0] for a in appels], ["Anthropic"])
+        self.assertIn("Anthropic", txt)
+
+    def test_paid_preference_does_not_enable_anthropic_outside_premium(self):
+        txt, appels = self._ia({}, premium=False, prefer_paid=True)
+        self.assertEqual([a[0] for a in appels], ["Gemini"])
+        self.assertNotIn("Anthropic", [a[0] for a in appels])
 
     def test_fallback_gemini_then_groq_then_free_then_claude_last_resort(self):
         txt, appels = self._ia({}, echecs=("Gemini", "Gemini 3.8", "Groq", "OVH"), premium=True)
