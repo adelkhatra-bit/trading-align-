@@ -726,9 +726,10 @@ class LiveOutbox(unittest.TestCase):
         with mock.patch.object(ab, "LIVE_IA_INTERVALLE", 600), \
              mock.patch.object(ab, "live_actif", return_value=True), \
              mock.patch.object(ab, "contexte_technique_live", return_value={"marches": {"BTC": {"biais_plan": "haussier"}}}), \
-             mock.patch.object(ab, "ia", return_value="BTC | Les acheteurs gardent la main mais le rythme ralentit. | Buyers remain in control but momentum is slowing."), \
+             mock.patch.object(ab, "ia", return_value="BTC | Les acheteurs gardent la main mais le rythme ralentit. | Buyers remain in control but momentum is slowing.") as ia_mock, \
              mock.patch.object(ab, "live_publier", side_effect=lambda message: sent.append(message) or True):
             self.assertTrue(ab.live_phrases_ia(state, 1000, {}))
+            ia_mock.assert_called_with(mock.ANY, mock.ANY, mock.ANY, premium=True, prefer_paid=True)
             self.assertFalse(ab.live_phrases_ia(state, 1599, {}))
             self.assertTrue(ab.live_phrases_ia(state, 1600, {}))
         self.assertEqual(len(sent), 2)
