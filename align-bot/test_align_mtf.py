@@ -3451,6 +3451,24 @@ class TelegramExplicitCoachOptInTest(unittest.TestCase):
         self.assertEqual(removed, 2)
         self.assertEqual([x["chat_id"] for x in state["telegram_outbox"]], [22])
 
+    def test_quiet_refusal_removes_only_that_user_from_open_position_followers(self):
+        position = {"e": 100.0, "sl": 98.0, "tp1": 104.0, "d": 1, "t": 1}
+        state = {
+            "BTC": {"trade": {"qui": {"11": dict(position), "22": dict(position)}}},
+            "GOLD": {"trade": {"qui": {"11": dict(position), "22": dict(position)}}},
+            "NASDAQ": {"trade": {"qui": {"22": dict(position)}}},
+        }
+
+        align_bot.retirer_suivi_positions(state, "11")
+
+        self.assertEqual(align_bot.en_position(state, "11"), [])
+        self.assertEqual(set(align_bot.en_position(state, "22")), {"BTC", "GOLD", "NASDAQ"})
+        with unittest.mock.patch.object(align_bot, "noter") as notify:
+            for market in ("BTC", "GOLD", "NASDAQ"):
+                align_bot.cloturer_abonnes(state, market, state[market]["trade"], 104.0, "TP1")
+        self.assertEqual([call.args[1] for call in notify.call_args_list], ["22", "22", "22"])
+
+
     def test_daily_checkin_skips_active_coach_and_open_positions(self):
         now = datetime.datetime(2026, 11, 16, 9, 0, tzinfo=align_bot.PARIS).timestamp()
         state = {
