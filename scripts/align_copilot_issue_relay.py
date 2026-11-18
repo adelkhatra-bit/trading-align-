@@ -14,9 +14,12 @@ import urllib.request
 API = "https://api.github.com"
 EXPECTED_REPO = "adelkhatra-bit/trading-align-"
 EXPECTED_ISSUE = 431
+EXPECTED_AUTHOR = "adelkhatra-bit"
+EXPECTED_START_COMMENT_ID = 6962101708
+MAX_COMMENT_PAGES = 100
 ISSUE = int(os.environ.get("ALIGN_ISSUE_NUMBER", str(EXPECTED_ISSUE)))
-ALLOWED_AUTHOR = os.environ.get("ALIGN_ALLOWED_AUTHOR", "adelkhatra-bit")
-START_COMMENT_ID = int(os.environ.get("ALIGN_RELAY_START_COMMENT_ID", "6962101708"))
+ALLOWED_AUTHOR = os.environ.get("ALIGN_ALLOWED_AUTHOR", EXPECTED_AUTHOR)
+START_COMMENT_ID = int(os.environ.get("ALIGN_RELAY_START_COMMENT_ID", str(EXPECTED_START_COMMENT_ID)))
 REPO = os.environ.get("GITHUB_REPOSITORY", "")
 GH_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 COPILOT_TOKEN = os.environ.get("COPILOT_GITHUB_TOKEN", "")
@@ -32,8 +35,16 @@ REPLY_RE = re.compile(
 
 
 def validate_scope() -> None:
-    if REPO != EXPECTED_REPO or ISSUE != EXPECTED_ISSUE:
-        raise RuntimeError("Relay scope mismatch; only the canonical ALIGN repository and issue #431 are allowed.")
+    if (
+        REPO != EXPECTED_REPO
+        or ISSUE != EXPECTED_ISSUE
+        or ALLOWED_AUTHOR != EXPECTED_AUTHOR
+        or START_COMMENT_ID != EXPECTED_START_COMMENT_ID
+    ):
+        raise RuntimeError(
+            "Relay scope mismatch; only the canonical ALIGN repository, issue #431, "
+            "owner author and activation marker are allowed."
+        )
     if not GH_TOKEN:
         raise RuntimeError("Missing GitHub Actions token.")
 
@@ -59,7 +70,7 @@ def request_json(path: str, method: str = "GET", payload: dict | None = None):
 
 def fetch_all_comments() -> list[dict]:
     comments: list[dict] = []
-    for page in range(1, 101):
+    for page in range(1, MAX_COMMENT_PAGES + 1):
         query = urllib.parse.urlencode({"per_page": 100, "page": page})
         batch = request_json(f"/repos/{REPO}/issues/{ISSUE}/comments?{query}")
         if not isinstance(batch, list):
@@ -67,7 +78,7 @@ def fetch_all_comments() -> list[dict]:
         comments.extend(batch)
         if len(batch) < 100:
             return comments
-    raise RuntimeError("Issue comment pagination exceeded the safety limit of 100 pages.")
+    raise RuntimeError(f"Issue comment pagination exceeded the safety limit of {MAX_COMMENT_PAGES} pages.")
 
 
 def pending_tasks(comments: list[dict]) -> list[tuple[dict, str, str]]:
@@ -80,6 +91,7 @@ def pending_tasks(comments: list[dict]) -> list[tuple[dict, str, str]]:
             replied[match.group(1)] = max(replied.get(match.group(1), 0), int(item.get("id", 0)))
 
     pending: list[tuple[dict, str, str]] = []
+    seen_task_ids: set[str] = set()
     for comment in comments:
         comment_id = int(comment.get("id", 0))
         if comment_id < START_COMMENT_ID:
