@@ -455,8 +455,7 @@
     texte = sansPrix(texte);
     const urgent = g && g !== 'proche' ? 1 : 0;
     // v6.4 : chaque info passe en français PUIS en anglais (au moins 2 passages)
-    // v6.5 (règle d'Adel) : chaque info rappelle le risque, en français puis en anglais
-    if (!/risque|risk/i.test(texte)) texte += ' • ⚠️ Ceci n\'est pas un conseil en investissement, fais tes propres recherches (DYOR) • risque de perte';
+    // v12.2.8 : plus de « risque de perte » ajouté à chaque info : la mention légale reste seulement dans le pied de bande
     // v7.3 (règle d'Adel, 15/11) : chaque info passe 2 fois en français PUIS 2 fois en anglais
     const nPass = Math.max(4, 2 * (fois || 1)), items = []; for (let i = 0; i < nPass; i++) items.push({ texte: (i >= nPass / 2 ? '🇬🇧 ' : '🇫🇷 ') + plateforme(i >= nPass / 2 ? enAnglais(texte) : texte), bulle, g, en: i >= nPass / 2, source: source || 'live' });   // v7.4 : jamais FR et EN mélangés, drapeau + teinte
     if (devant) { file.splice(0, file.length, ...items, ...file.filter(m => m.g && m.g !== 'proche')); couper(); }   // v7.5 : clic sur une zone = la bande en parle TOUT DE SUITE
