@@ -266,10 +266,12 @@ def cancelled_bot_job():
 class WatchdogCancelledWorkerTests(unittest.TestCase):
     def test_unexpected_cancelled_bot_is_reported_and_never_restarted(self):
         worker = cancelled_bot_run()
-        with patch.object(watchdog, "cancelled_by_successor_rollover", return_value=False), \\
-             patch.object(watchdog, "cancelled_jobs", return_value=[cancelled_bot_job()]), \\
-             patch.object(watchdog, "report") as report, \\
-             patch.object(watchdog, "api") as api_mock:
+        with (
+            patch.object(watchdog, "cancelled_by_successor_rollover", return_value=False),
+            patch.object(watchdog, "cancelled_jobs", return_value=[cancelled_bot_job()]),
+            patch.object(watchdog, "report") as report,
+            patch.object(watchdog, "api") as api_mock,
+        ):
             watchdog.handle_completed(worker)
 
         report.assert_called_once()
@@ -278,9 +280,11 @@ class WatchdogCancelledWorkerTests(unittest.TestCase):
         api_mock.assert_not_called()
 
     def test_cancelled_bot_retired_by_newer_rollover_is_not_reported(self):
-        with patch.object(watchdog, "cancelled_by_successor_rollover", return_value=True), \\
-             patch.object(watchdog, "cancelled_jobs") as jobs, \\
-             patch.object(watchdog, "report") as report:
+        with (
+            patch.object(watchdog, "cancelled_by_successor_rollover", return_value=True),
+            patch.object(watchdog, "cancelled_jobs") as jobs,
+            patch.object(watchdog, "report") as report,
+        ):
             watchdog.handle_completed(cancelled_bot_run())
 
         jobs.assert_not_called()
@@ -289,9 +293,11 @@ class WatchdogCancelledWorkerTests(unittest.TestCase):
     def test_cancelled_non_bot_workflow_is_ignored(self):
         other = cancelled_bot_run()
         other["name"] = "pages build and deployment"
-        with patch.object(watchdog, "cancelled_by_successor_rollover") as rollover, \\
-             patch.object(watchdog, "cancelled_jobs") as jobs, \\
-             patch.object(watchdog, "report") as report:
+        with (
+            patch.object(watchdog, "cancelled_by_successor_rollover") as rollover,
+            patch.object(watchdog, "cancelled_jobs") as jobs,
+            patch.object(watchdog, "report") as report,
+        ):
             watchdog.handle_completed(other)
 
         rollover.assert_not_called()
@@ -339,6 +345,7 @@ class WatchdogCancelledWorkerTests(unittest.TestCase):
         ]}
         with patch.object(watchdog, "api", return_value=runs):
             self.assertFalse(watchdog.cancelled_by_successor_rollover(worker))
+
 
 if __name__ == "__main__":
     unittest.main()
