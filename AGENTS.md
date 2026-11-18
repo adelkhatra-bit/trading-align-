@@ -1,5 +1,7 @@
 # ALIGN TRADING — AGENT RULES
 
+> Read `docs/ALIGN_SOURCE_DE_VERITE.md` first: canonical repository, branches, indicator, data chain and secret status.
+
 ## Scope and identity
 - This repository is the canonical project: `adelkhatra-bit/trading-align-`.
 - Production code branch: `main`. Public live-data publication branch: `live-data`.

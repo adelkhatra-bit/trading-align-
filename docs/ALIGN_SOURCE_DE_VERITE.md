@@ -2,7 +2,7 @@
 
 Ce fichier s'adresse à toute IA (Claude Code, Codex, Copilot, ChatGPT) et à tout humain.
 Si une information ci-dessous contredit ce que tu crois savoir : **ce fichier gagne**.
-Si une tâche ne correspond à aucune ligne de ce tableau : **arrête-toi et demande**.
+Si l'**identité du projet** est ambiguë (autre dépôt, autre branche de production, autre indicateur, autre projet) : **arrête-toi et demande**. Une tâche de maintenance ALIGN normale (test, workflow, bot) se traite normalement.
 
 ## 1. Identité du projet
 
@@ -46,8 +46,9 @@ Règle : quand `ALIGN_REQUIRE_TV_BRIDGE=1`, **aucun repli** sur des niveaux calc
 
 - Règle GitHub active sur `main` : **aucune fusion sans le contrôle `validate` vert** sur le dernier commit,
   suppression et réécriture forcée interdites. Elle s'applique à tout le monde, IA comprises.
-- Seule la porte `.github/workflows/align-auto-merge.yml` fusionne automatiquement, et seulement si :
-  dépôt identique, contrôles verts sur le SHA exact, revue Codex de ce SHA sans remarque, état `clean`.
+- Fusion automatique : prévue par la PR #539 (`.github/workflows/align-auto-merge.yml`), **pas encore sur `main`**.
+  Une fois fusionnée, elle seule fusionne, et seulement si : dépôt identique, PR non brouillon, contrôles verts
+  sur le SHA exact, revue Codex de ce SHA sans remarque, état `clean`. D'ici là, toute fusion reste une décision du propriétaire.
 - Une PR = un sujet. Toujours partir de `main` à jour. Ne jamais réutiliser une branche d'une autre PR.
 
 ## 5. Secrets (noms seulement — jamais les valeurs)
@@ -70,6 +71,6 @@ Règle : quand `ALIGN_REQUIRE_TV_BRIDGE=1`, **aucun repli** sur des niveaux calc
 
 ## 7. Limite honnête
 
-Les IA qui travaillent **dans** le dépôt (Copilot, Codex, Claude Code) lisent ce fichier.
+Les IA qui travaillent **dans** le dépôt y sont renvoyées : Copilot par `.github/copilot-instructions.md`, Codex et Claude Code par `AGENTS.md`.
 Une conversation ChatGPT ouverte ailleurs ne le lit pas d'elle-même : colle-lui ce lien en premier message.
 Ce qui protège vraiment `main`, c'est la règle GitHub du point 4, pas ce texte.
