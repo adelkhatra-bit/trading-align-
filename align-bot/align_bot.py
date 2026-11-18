@@ -102,6 +102,11 @@ def mode_sans_signal(r=None):
     return bridge.get("available") is not True
 
 
+
+def resume_compte_envois(nombre_messages, nombre_chats):
+    """Compte les messages préparés, sans prétendre qu’ils ont été livrés par Telegram."""
+    return f"{nombre_messages} message(s) préparé(s) ; {nombre_chats} chat(s) connu(s)"
+
 def _direction_tv(value):
     text = str(value or "").strip().upper()
     if any(x in text for x in ("LONG", "BULL", "HAUSSIER", "ACHAT", "BUY")):
@@ -13115,7 +13120,7 @@ def un_tour(etat, chats):
                 envoyer_analyse_a(etat, cid, marche, DERNIERS[marche], etat.get(marche, {}))
                 demandes_servies.add((index, marche))
     journal_vider_sortants(etat)
-    print(f"{len(envois)} signal(s) envoyé(s) à {len(chats)} téléphone(s)")
+    print(resume_compte_envois(len(envois), len(chats)))
     sauver_etat(etat, chats)
 
 STATE_SCHEMA_VERSION = 3
