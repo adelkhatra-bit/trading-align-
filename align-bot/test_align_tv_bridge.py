@@ -139,6 +139,42 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertIsNone(robot["entry"])
         self.assertFalse(robot["confirmed"])
 
+    def test_explicit_wait_without_plan_replaces_previous_signal(self):
+        status, _ = self.store.ingest(valid_payload(), INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+
+        payload = valid_payload(now_ms=BASE_MS + 1_000)
+        payload.update({
+            "signal": "WAIT",
+            "verdict": "EN ATTENTE",
+            "confirmed": False,
+            "strategy": "NONE",
+            "entryTimeframe": "UNSUPPORTED",
+            "entryZoneLow": None,
+            "entryZoneHigh": None,
+            "entryDecision": None,
+            "entry": None,
+            "sl": None,
+            "tp1": None,
+            "tp2": None,
+            "entryBarTime": None,
+            "entryBarOpen": None,
+            "entryBarHigh": None,
+            "entryBarLow": None,
+            "entryBarClose": None,
+        })
+        status, result = self.store.ingest(payload, INGEST, BASE_MS + 1_000)
+        self.assertEqual(status, 200)
+        self.assertTrue(result["accepted"])
+
+        _, data = self.store.read("BTCUSD", BASE_MS + 1_000)
+        robot = data["snapshots"]["M1"]["robotV12"]
+        self.assertEqual(robot["signal"], "WAIT")
+        self.assertFalse(robot["confirmed"])
+        self.assertFalse(robot["entryTriggered"])
+        for key in ("entry", "sl", "tp1", "tp2"):
+            self.assertIsNone(robot[key])
+
     def test_inverse_scalp_is_never_marked_confirmed(self):
         payload = valid_payload()
         payload["scalp_inverse"] = True
