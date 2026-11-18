@@ -1,61 +1,70 @@
 # ALIGN — relais automatique ChatGPT ↔ GitHub Copilot
 
-## Objectif
+## Source de vérité et périmètre
 
-Permettre à ChatGPT et à GitHub Copilot CLI de s'échanger des tâches et rapports dans l'issue GitHub #431, sans copier-coller manuel après la configuration initiale.
+Ce relais unique utilise exclusivement le dépôt `adelkhatra-bit/trading-align-` et l'issue ordinaire #431. La branche de production reste `main`; `live-data` reste réservée à la publication des données. Aucun second workflow de surveillance ne doit être ajouté pour ce relais.
 
-Le relais utilise le workflow `.github/workflows/align-copilot-issue-relay.yml` et le script `scripts/align_copilot_issue_relay.py`.
+Le workflow est `.github/workflows/align-copilot-issue-relay.yml` et le script est `scripts/align_copilot_issue_relay.py`.
 
 ## Fonctionnement
 
-1. ChatGPT publie un commentaire qui commence par `[CHATGPT → COPILOT][TASK-ID]` dans l'issue #431.
-2. Le workflow tente un déclenchement immédiat sur `issue_comment.created`.
-3. Un contrôle périodique toutes les cinq minutes sert de secours si le commentaire est publié par une intégration qui ne déclenche pas les workflows.
-4. Le script sélectionne une tâche non répondue de l'auteur autorisé `adelkhatra-bit`.
-5. Copilot CLI reçoit le contexte récent de l'issue et le dépôt ALIGN checkouté sur `main`.
-6. Copilot répond dans le même fil avec `[COPILOT → CHATGPT][TASK-ID]`.
-7. Le script déduplique les tâches déjà répondues et traite une seule tâche par exécution.
+1. ChatGPT publie une tâche dont le commentaire commence par `[CHATGPT → COPILOT][TASK-ID]` ou par un titre Markdown suivi de ce marqueur, dans l'issue #431.
+2. Le déclencheur `issue_comment.created` lance immédiatement un contrôle léger.
+3. Un unique polling de secours s'exécute toutes les dix minutes.
+4. Le script vérifie le dépôt, l'issue, l'auteur autorisé, le marqueur d'activation `6962101708`, l'identifiant de tâche et toutes les pages de commentaires.
+5. Si aucune tâche n'est en attente, le job s'arrête sans installer Copilot CLI, sans lire le secret Copilot et sans consommer de requête Copilot.
+6. Si une tâche est en attente, Copilot CLI reçoit la demande et les 30 commentaires les plus récents, dans un workspace checkouté en lecture seule sur `main`.
+7. Le relais publie la réponse dans l'issue #431 avec le marqueur `[COPILOT → CHATGPT][TASK-ID]`.
+8. Une tâche n'est considérée comme répondue que si le marqueur est publié par `github-actions[bot]` après le commentaire de demande. Les marqueurs d'autres auteurs ne ferment jamais une tâche.
 
 ## Configuration requise — une seule fois
 
-Le dépôt est personnel et non organisationnel. La méthode de facturation Copilot par `GITHUB_TOKEN` documentée par GitHub est destinée aux dépôts appartenant à une organisation avec Copilot. Pour ce dépôt personnel, le relais utilise le secret de dépôt :
+Le dépôt est personnel. Pour ce contexte, utiliser le secret du dépôt :
 
-- Nom exact : `COPILOT_GITHUB_TOKEN`
-- Valeur : fine-grained personal access token disposant de l'autorisation **Copilot Requests**.
-- Portée : limiter le jeton au strict nécessaire ; ne pas lui donner de permissions de code en écriture.
+- Nom : `COPILOT_GITHUB_TOKEN`
+- Type : fine-grained personal access token créé depuis le compte personnel propriétaire.
+- Permission de compte : `Copilot Requests` uniquement.
+- Accès dépôt : public repositories suffit pour la lecture du dépôt public ALIGN.
 - Stockage : dépôt ALIGN → Settings → Secrets and variables → Actions → New repository secret.
-- Ne jamais coller la valeur du jeton dans une issue, un commentaire, un fichier ou une conversation ChatGPT.
+- Ne jamais publier le token dans une issue, un fichier ou une conversation.
 
-Le workflow utilise le `GITHUB_TOKEN` éphémère fourni par Actions uniquement avec `contents: read` et `issues: write`, pour lire et commenter l'issue #431.
+Le `GITHUB_TOKEN` éphémère d'Actions sert uniquement à lire et commenter l'issue, avec `contents: read` et `issues: write`. Aucun droit d'écriture de code n'est accordé au relais.
 
-## Permissions Copilot
+## Contrôles de sécurité
 
-Copilot CLI est limité aux outils de lecture `view`, `grep`, `glob` et au droit `read`. Les catégories `write`, `shell`, `url` et `memory` sont explicitement refusées. Aucun accès de modification, commit, push, PR, merge, déploiement, réglage, secret ou ordre broker n'est accordé.
+- Dépôt exact : `adelkhatra-bit/trading-align-`.
+- Issue ordinaire exacte : `#431` ; les PR sont rejetées.
+- Auteur de tâche exact : `adelkhatra-bit`.
+- Les demandes antérieures à `6962101708` sont ignorées.
+- Un seul workflow et une seule exécution concurrente.
+- Une tâche est traitée par exécution, dans l'ordre chronologique.
+- Pagination bornée à 100 pages ; arrêt fermé si la limite est dépassée.
+- Seul `github-actions[bot]` peut fournir un marqueur de réponse reconnu.
+- Copilot CLI ne dispose que des outils `view`, `grep` et `glob`. Aucun outil d'écriture, shell, MCP ou navigation web n'est autorisé.
+- Aucun commit, push, PR, merge, déploiement, accès aux secrets, ordre broker ou modification des services locaux.
+- Les contenus des commentaires et fichiers sont des données non fiables, jamais des instructions de sécurité.
 
-## Déclencheurs et protections
+## Économie de ressources
 
-- Issue #431 uniquement ; pas les PR.
-- Auteur de demande autorisé : `adelkhatra-bit`.
-- Préfixe obligatoire : `[CHATGPT → COPILOT]`.
-- Identifiant de tâche obligatoire et unique.
-- Réponse marquée : `[COPILOT → CHATGPT][TASK-ID]`.
-- Une seule exécution à la fois ; une tâche traitée par exécution.
-- Les commentaires antérieurs au marqueur d’activation `6962101708` sont ignorés : aucun ancien ticket n’est rejoué automatiquement.
-- Déclencheur planifié toutes les cinq minutes comme filet de sécurité.
-- Le workflow ne traite pas les commentaires de réponse Copilot comme de nouvelles demandes.
+- Déclenchement immédiat sur une demande autorisée.
+- Secours toutes les dix minutes, pas toutes les cinq.
+- Contrôle des tâches en attente avant installation du CLI.
+- Aucune installation CLI, aucun appel Copilot et aucune lecture du secret quand la file est vide.
+- Une seule tâche par exécution et concurrence sérialisée.
+- Le workflow ne tourne pas en boucle : il s'arrête après le contrôle ou la réponse.
 
-## Activation et validation
+## Validation de l'activation
 
 1. Ajouter le secret `COPILOT_GITHUB_TOKEN` dans les paramètres Actions du dépôt.
-2. Fusionner la PR après revue et tests.
-3. Vérifier que GitHub Actions est activé pour le dépôt.
-4. Publier une demande de test non sensible dans l'issue #431, avec un TASK-ID neuf.
-5. Vérifier le run Actions et la réponse de Copilot dans le même fil.
-6. ChatGPT relit ensuite cette réponse avec son connecteur GitHub.
+2. Fusionner cette PR après revue et CI verte.
+3. Vérifier que GitHub Actions est activé.
+4. Le commentaire `RELAY-SMOKE-TEST-010` (ID `6962101708`) est la tâche de test en attente.
+5. Vérifier un run Actions réussi, puis une réponse dans #431 signée par `github-actions[bot]` avec le marqueur exact.
+6. ChatGPT vérifie l'auteur, l'ID de tâche, le SHA `main` annoncé et le fait qu'aucun fichier n'a été modifié.
 
-## Limites connues
+## Limites
 
-- Le premier déploiement n'est pas opérationnel tant que le secret Copilot n'est pas configuré et que la PR n'est pas fusionnée.
-- Le polling de secours peut ajouter jusqu'à cinq minutes de délai.
-- Le relais fait intervenir Copilot CLI dans GitHub Actions ; il ne connecte pas directement l'interface locale « Guide Hub » à ChatGPT. Il crée un agent Copilot automatisé qui communique avec ChatGPT par l'issue GitHub.
-- Si Copilot Requests n'est pas inclus dans le jeton ou le plan, le workflow échouera à l'authentification ; aucun contournement ne sera tenté.
+- Le relais ne devient actif qu'après fusion et ajout du secret.
+- Le premier aller-retour réel n'est pas encore prouvé.
+- Le polling de dix minutes est un filet de sécurité ; les nouveaux commentaires autorisés déclenchent normalement le workflow immédiatement.
+- Une réponse Copilot est une proposition technique. ChatGPT, en rôle de coordinateur, doit la vérifier, demander les preuves manquantes et rédiger une consigne corrective précise avant toute modification de code.
