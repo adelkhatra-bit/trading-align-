@@ -31,9 +31,9 @@ class ZeroMessageParDefaut(unittest.TestCase):
             self.assertIn(f'os.environ.get("{var}", "0") == "1"', SOURCE)
 
     def test_question_quotidienne_appelee_seulement_si_rallumee(self):
-        appels = [l.strip() for l in SOURCE.splitlines() if re.search(r"\bquestion_quotidienne\(etat, chats\)", l)]
-        self.assertEqual(appels, ["question_quotidienne(etat, chats)"])
-        self.assertRegex(SOURCE, r"if QUESTION_QUOTIDIENNE:\n\s+question_quotidienne\(etat, chats\)")
+        appels = [l.strip() for l in SOURCE.splitlines() if re.search(r"\bquestion_quotidienne\(etat, chats", l) and not l.lstrip().startswith("def ")]
+        self.assertEqual(appels, ["question_quotidienne(etat, chats, creneau=creneau_)"])
+        self.assertRegex(SOURCE, r"if QUESTION_QUOTIDIENNE and creneau_:\n\s+question_quotidienne\(etat, chats, creneau=creneau_\)")
 
     def test_nouveaux_boutons_envoyes_seulement_si_rallumes(self):
         self.assertRegex(SOURCE, r"if ENVOI_CLAVIER_SPONTANE:\n\s+renvoyer_claviers\(etat, chats\)")
@@ -94,22 +94,56 @@ class ParcoursLiveEtBudget(unittest.TestCase):
             dest = ab.destinataires_message(etat, {"11"}, "🟢 BTC - LONG\n📍 Entrée 65 000.0\n🛑 SL 64 500.0\n🎯 TP1 66 000.0")
         self.assertIn("11", dest)
 
-    def test_une_seule_notification_spontanee_par_jour(self):
+    def test_deux_notifications_spontanees_par_jour_au_maximum(self):
         etat = {}
-        self.assertTrue(ab.notif_du_jour_libre(etat, "11", "2026-11-18"))
-        ab.marquer_notif_du_jour(etat, "11", "2026-11-18")
+        for _ in range(2):
+            self.assertTrue(ab.notif_du_jour_libre(etat, "11", "2026-11-18"))
+            ab.marquer_notif_du_jour(etat, "11", "2026-11-18")
         self.assertFalse(ab.notif_du_jour_libre(etat, "11", "2026-11-18"))
         self.assertTrue(ab.notif_du_jour_libre(etat, "11", "2026-11-19"))
 
+    def test_creneaux_londres_et_new_york_heure_de_paris(self):
+        def a(h, mi):
+            return ab.datetime.datetime(2026, 11, 18, h, mi, tzinfo=ab.PARIS).timestamp()
+        self.assertEqual(ab.creneau_notif(a(9, 0)), "londres")
+        self.assertEqual(ab.creneau_notif(a(15, 30)), "new-york")
+        self.assertIsNone(ab.creneau_notif(a(12, 0)))
+        self.assertIsNone(ab.creneau_notif(a(22, 0)))
+
+    def test_seconde_question_seulement_sans_reponse(self):
+        jour_ts = ab.datetime.datetime(2026, 11, 18, 15, 30, tzinfo=ab.PARIS).timestamp()
+        etat = {"question_quotidienne": {"11": "2026-11-18|londres", "22": "2026-11-18|londres"},
+                "notif_spontanee": {"11": {"jour": "2026-11-18", "n": 1}, "22": {"jour": "2026-11-18", "n": 1}},
+                "reponse_jour": {"22": "2026-11-18"}}
+        envois = []
+        with mock.patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append(str(c)) or {"ok": True}), \
+             mock.patch.object(ab, "en_position", return_value=[]), mock.patch.object(ab, "coach_actif", return_value=False):
+            ab.question_quotidienne(etat, {"11", "22"}, jour_ts, creneau="new-york")
+            ab.question_quotidienne(etat, {"11", "22"}, jour_ts, creneau="new-york")
+        self.assertEqual(envois, ["11"])            # 22 a déjà répondu ; 11 une seule fois sur ce créneau
+
+    def test_chaines_silencieuses_sauf_entree_validee(self):
+        etat = {"canal": "-1001", "canaux_marche": {"BTC": "-1002"}}
+        self.assertTrue(ab.chaine_silencieuse(etat, "-1002", "📐 Fibonacci 61,8 % touché"))
+        self.assertTrue(ab.chaine_silencieuse(etat, "-1001", "🔌 Prochaine position ▓▓▓░░ 70%"))
+        with mock.patch.object(ab, "est_entree", return_value=True):
+            self.assertFalse(ab.chaine_silencieuse(etat, "-1001", "🟢 BTC - LONG"))
+        self.assertFalse(ab.chaine_silencieuse(etat, "555", "réponse privée"))
+
     def test_annonce_du_live_respecte_le_budget_du_jour(self):
         jour = ab.datetime.datetime.now(ab.PARIS).strftime("%Y-%m-%d")
-        etat = {"question_quotidienne": {"11": jour}, "quiet": ["33"]}
+        etat = {"notif_spontanee": {"11": {"jour": jour, "n": 2}}, "quiet": ["33"]}
         envois = []
         with mock.patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append(str(c))), \
              mock.patch.object(ab, "clavier_live", return_value=None):
             ab.live_annoncer_debut(etat, {"11", "22", "33"})
             ab.live_annoncer_debut(etat, {"11", "22", "33"})
-        self.assertEqual(envois, ["22"])            # 11 déjà notifié, 33 a dit « pas aujourd'hui », 22 une seule fois
+        self.assertEqual(envois, ["22", "22"])      # 11 a déjà ses 2, 33 a dit « pas aujourd'hui », 22 jusqu'à 2 maximum
+        envois.clear()
+        with mock.patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append(str(c))), \
+             mock.patch.object(ab, "clavier_live", return_value=None):
+            ab.live_annoncer_debut(etat, {"22"})
+        self.assertEqual(envois, [])                # budget de 2 atteint
 
     def test_le_coach_se_coupe_apres_l_entree(self):
         """Une fois la position donnée, la personne sort de la liste d'attente : pas de 2e position."""

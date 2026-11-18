@@ -3268,6 +3268,17 @@ def _telegram_sortant_autorise(methode, params):
     return False
 
 
+def chaine_silencieuse(etat, chat_id, texte):
+    """Vrai pour un message de CHAÎNE qui ne doit pas faire sonner les téléphones (tout sauf une entrée validée)."""
+    c = str(chat_id or "")
+    chaines = {str(etat.get("canal") or ""), str(etat.get("canal_preuves") or "")}
+    chaines |= {str(v) for v in (etat.get("canaux_marche") or {}).values()}
+    chaines.discard("")
+    if c not in chaines and not c.startswith("-100"):
+        return False                      # conversation privée : réponse à une demande de l'utilisateur
+    return not est_entree(texte)
+
+
 def telegram(methode, **params):
     params_initiaux = dict(params)
     if methode == "answerCallbackQuery":
@@ -3290,6 +3301,11 @@ def telegram(methode, **params):
             params["caption"] = traduire(params["caption"])
         if params.get("reply_markup"):
             params["reply_markup"] = traduire_clavier(params["reply_markup"])
+    if methode in ("sendMessage", "sendPhoto") and "disable_notification" not in params:
+        # Règle d'Adel : dans les chaînes, plus de sonnerie pour chaque info (Fibonacci, jauges, %…).
+        # Seule une ENTRÉE validée fait sonner ; tout le reste arrive en silencieux (le contenu ne change pas).
+        if chaine_silencieuse(DERNIER_ETAT or {}, params.get("chat_id"), params.get("text") or params.get("caption")):
+            params["disable_notification"] = "true"
     if methode in ("sendMessage", "sendPhoto") and "reply_markup" not in params:
         kb_ = boutons_auto_chaine(DERNIER_ETAT or {}, params.get("chat_id"))
         if kb_:
@@ -3419,15 +3435,35 @@ REGLES_PRIVEES_SPONTANEES = os.environ.get("ALIGN_REGLES_PRIVEES_SPONTANEES", "0
 RELANCE_VIP_SPONTANEE = os.environ.get("ALIGN_RELANCE_VIP_SPONTANEE", "0") == "1"   # « réservé aux VIP »
 
 
+NOTIF_MAX_JOUR = max(0, min(2, int(os.environ.get("ALIGN_NOTIF_MAX_JOUR", "2"))))   # demande d'Adel : 2 maximum
+# Les deux meilleurs moments (heure de Paris) : avant l'ouverture de Londres et avant celle de New York.
+CRENEAUX_NOTIF = (("londres", (8, 45), (10, 0)), ("new-york", (15, 0), (16, 15)))
+
+
+def _compteur_notif(etat, cid, jour):
+    v = (etat.get("notif_spontanee") or {}).get(str(cid))
+    if isinstance(v, dict) and v.get("jour") == jour:
+        return int(v.get("n") or 0)
+    return 1 if v == jour else 0          # ancien format (une date) = 1 notification déjà envoyée
+
+
 def notif_du_jour_libre(etat, cid, jour):
-    """Vrai si la personne n'a encore reçu AUCUNE notification spontanée aujourd'hui (budget : 1 par jour)."""
-    cid = str(cid)
-    return (etat.get("notif_spontanee", {}).get(cid) != jour
-            and etat.get("question_quotidienne", {}).get(cid) != jour)
+    """Vrai s'il reste du budget de notifications spontanées aujourd'hui (2 au maximum, partagé)."""
+    return _compteur_notif(etat, cid, jour) < NOTIF_MAX_JOUR
 
 
 def marquer_notif_du_jour(etat, cid, jour):
-    etat.setdefault("notif_spontanee", {})[str(cid)] = jour
+    etat.setdefault("notif_spontanee", {})[str(cid)] = {"jour": jour, "n": _compteur_notif(etat, cid, jour) + 1}
+
+
+def creneau_notif(now=None):
+    """Nom du créneau de notification en cours (heure de Paris), sinon None."""
+    t = datetime.datetime.fromtimestamp(time.time() if now is None else float(now), PARIS)
+    hm = (t.hour, t.minute)
+    for nom, debut, fin in CRENEAUX_NOTIF:
+        if debut <= hm < fin:
+            return nom
+    return None
 
 
 def envois_spontanes_prives():
@@ -6875,6 +6911,8 @@ def traiter(etat, chats, updates):
             qui = str(cb_chat["id"])
             retenir_prenom(etat, qui, cb.get("from"))
             if choix == "trade":
+                if mk in ("yes", "no"):
+                    etat.setdefault("reponse_jour", {})[qui] = datetime.datetime.now(PARIS).strftime("%Y-%m-%d")
                 if mk == "no":
                     etat.setdefault("trade_jour", {})[qui] = datetime.datetime.now(PARIS).strftime("%Y-%m-%d")
                     off = etat.setdefault("bot_off", [])
@@ -12657,11 +12695,14 @@ def surveiller_releve():
         except Exception as ex:
             print("surveiller releve", type(ex).__name__, flush=True)
 
-def question_quotidienne(etat, chats, now=None):
-    """Un seul message privé par jour : demande si la personne compte trader aujourd'hui."""
+def question_quotidienne(etat, chats, now=None, creneau=None):
+    """Question « tu trades aujourd'hui ? » : 1 par créneau (Londres puis New York), 2 par jour au maximum,
+    la seconde seulement si la personne n'a pas répondu à la première."""
     now = time.time() if now is None else float(now)
     jour = datetime.datetime.fromtimestamp(now, PARIS).strftime("%Y-%m-%d")
     deja = etat.setdefault("question_quotidienne", {})
+    cle_jour = f"{jour}|{creneau}" if creneau else jour
+    repondu = {str(c) for c, j in (etat.get("reponse_jour") or {}).items() if j == jour}
     # Le rappel quotidien ne vise que les conversations privées actives, jamais les prospects.
     # Aucun rappel pendant un suivi coach actif ou tant qu'une position est ouverte.
     cibles = {str(c) for c in chats}
@@ -12670,7 +12711,7 @@ def question_quotidienne(etat, chats, now=None):
     for cid in sorted(cibles - {canal, ""}):
         if cid in silencieux:
             continue
-        if deja.get(cid) == jour or en_position(etat, cid) or not notif_du_jour_libre(etat, cid, jour):
+        if deja.get(cid) in (jour, cle_jour) or cid in repondu or en_position(etat, cid) or not notif_du_jour_libre(etat, cid, jour):
             continue
         if any(coach_actif(etat, cid, m) for m in MARCHES):
             continue
@@ -12686,7 +12727,7 @@ def question_quotidienne(etat, chats, now=None):
         texte = "Are you trading today?" if cid in LANG_EN else "Vas-tu trader aujourd'hui ?"
         resultat = _envoi_sur(cid, text=texte, reply_markup=clavier)
         if isinstance(resultat, dict) and resultat.get("ok") is True:
-            deja[cid] = jour
+            deja[cid] = cle_jour
             marquer_notif_du_jour(etat, cid, jour)
 
 
@@ -12704,8 +12745,9 @@ def un_tour(etat, chats):
         traiter_file_live(etat, limite=30)
         if SHUTDOWN_REQUESTED.is_set():
             return
-        if QUESTION_QUOTIDIENNE:
-            question_quotidienne(etat, chats)
+        creneau_ = creneau_notif()
+        if QUESTION_QUOTIDIENNE and creneau_:
+            question_quotidienne(etat, chats, creneau=creneau_)
         if etat.get("clavier") != 9:
             # Le nouveau clavier sera joint au prochain vrai message du bot.
             # Aucun message vide, promotionnel ou de démarrage n'est envoyé.
