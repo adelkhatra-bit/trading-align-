@@ -24,13 +24,13 @@ Base SHA audited before changes: `1f9a7d0b6b73fb1384c547c811d97bc1511e1403`
 
 ## Proposed coordinator behavior in this PR
 
-- A single `workflow_run` coordinator listens to the existing validation, integration, and production bot workflows.
+- A single `workflow_run` coordinator listens to all ten existing ALIGN workflows plus the existing Copilot relay; it does not listen to itself.
 - Failed PRs are filtered by their associated PR number; #401, #448 and #451 are excluded.
 - Unlinked failures are processed only on `main`.
 - One repair issue is created per exact 40-character SHA, with the workflow run, URL, and failed job/step summary.
 - Repeated failures on the same SHA update the existing issue, with a maximum of two recorded attempts.
 - GitHub Actions concurrency serializes the coordinator, preventing simultaneous agent handoffs.
-- Agent assignment is manual when `COPILOT_GITHUB_TOKEN` is absent. If the user-owned token is present, the coordinator first verifies that `copilot-swe-agent` is enabled for the repository, checks that no other ALIGN repair issue already has an active Copilot assignment, then assigns Copilot using the token. Failed permission/availability checks leave the issue for manual assignment.
+- Agent assignment is manual when `COPILOT_GITHUB_TOKEN` is absent. If the user-owned token is present, the coordinator first verifies that `copilot-swe-agent` is enabled for the repository, checks that no other ALIGN issue already has an active Copilot assignment, then assigns Copilot using the token. Failed permission/availability checks leave the issue for manual assignment.
 - The user-owned `COPILOT_GITHUB_TOKEN` is only passed to the optional assignment step; its value is never printed, committed, or changed. No Copilot token is read when it is absent.
 
 ## Verification plan
