@@ -53,3 +53,20 @@ Never merge or deploy on a failed, missing, stale, or mismatched required check.
 
 ## Required work report
 For each task report, concisely: issue and proven root cause; repository/branch/PR/base SHA/head SHA; files changed; minimal fix; tests and exact results; runtime checks; residual risks; and rollback plan. State explicitly what was not verified. Never claim continuous background monitoring or completed work without evidence.
+
+
+## Agent protocol: diagnose and propose before editing
+
+This section applies to every Copilot, Codex, and other coding agent working in this repository.
+
+1. **Read-only first.** Before editing, verify the repository, task, branch, PR, base/head SHAs, changed-file list, latest checks, and exact canonical source files.
+2. **Localize the defect.** Identify the exact file, function/block, line range, root cause, reproduction scenario, and affected behavior. Do not infer a cause from a failing workflow name alone.
+3. **Propose before changing code.** Post a concise diagnosis and a minimal patch plan: exact files/lines, intended behavior, targeted regression tests, possible side effects, and rollback. Wait for explicit approval before writing files or commits.
+4. **No branch takeover.** Never replace, rewrite, rebase, reset, force-push, or bulk-synchronize an existing branch. Preserve every existing commit and unrelated change. Work only on the verified task branch; if it contains unrelated work or has drifted, stop and propose an isolated branch instead.
+5. **One defect, one focused change.** Do not bundle unrelated review findings or opportunistic refactors. Touch only the smallest set of files required by the proven dependency chain. Explain every additional file before changing it.
+6. **Canonical TradingView indicator — strict identity.** The only authorized indicator is `align-bot/pine/ALIGN_MTF_PRO_v25.pine`. Its canonical header is `indicator("ALIGN MTF PRO v25 (Inside)", shorttitle="ALIGN MTF v25", ...)`; the canonical main baseline blob at the time of this rule is `823635f039ff3b59c39867a7b59dfa3ed6fafaf1`. The setting `Animation en temps réel` must remain enabled by default. The word `Inside` in this exact title does not authorize use of another project or Pine file. Never substitute `ALIGN_MTF_PRO_INSIDE_FVG_EVOLUTIVE.pine`, an older v24 file, or any unrelated indicator.
+7. **Zero regression.** Preserve ALIGN identity, Pine calculations, signals, Entry/SL/TP, MTF behavior, design, Claude-era v12.2 animations, AI commentary, alerts, Telegram, bridge, server, and the strict separation between `main` and `live-data`. Do not modify those components unless the approved task requires it and the plan names the exact scope.
+8. **Stop on uncertainty or failure.** If the canonical source, branch ownership, required access, live dependency, or expected behavior cannot be verified, report the blocker. If a test fails, stop and diagnose; do not weaken/delete tests or claim completion.
+9. **Evidence-based handoff.** Report the exact head SHA, changed files, minimal diff, test names/results, workflow URLs, unresolved findings, runtime checks not performed, and rollback path. Never claim an agent is running without a verifiable run/response/commit.
+
+No agent may merge, deploy, modify secrets, restart production services, or place broker orders under these rules.
