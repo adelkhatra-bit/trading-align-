@@ -227,49 +227,56 @@ class BridgeStore:
         signal_direction = 1 if signal_text == "LONG" else -1 if signal_text == "SHORT" else None
         if plan_timeframe != "M15":
             return 400, {"ok": False, "error": "unsupported_plan_timeframe"}
-        if expected_entry_tf is None or entry_timeframe != expected_entry_tf:
-            return 400, {"ok": False, "error": "entry_timeframe_strategy_mismatch"}
-        if entry_zone_low is None or entry_zone_high is None or entry_decision is None:
-            return 400, {"ok": False, "error": "missing_entry_zone"}
-        if not entry_zone_low < entry_decision < entry_zone_high:
-            return 400, {"ok": False, "error": "invalid_entry_zone_geometry"}
-        if signal_direction not in (-1, 1):
-            return 400, {"ok": False, "error": "invalid_entry_direction"}
-        plan_entry = _finite_number(payload.get("entry"))
-        plan_sl = _finite_number(payload.get("sl"))
-        if plan_entry is None or plan_sl is None:
-            return 400, {"ok": False, "error": "missing_entry_or_stop"}
-        if signal_direction == 1 and not (
-            plan_sl < plan_entry
-            and plan_sl + 0.25 * (plan_entry - plan_sl) <= entry_zone_low <= plan_entry <= entry_zone_high
-            and entry_zone_low < entry_decision < entry_zone_high
-        ):
-            return 400, {"ok": False, "error": "long_entry_zone_vs_stop_mismatch"}
-        if signal_direction == -1 and not (
-            plan_entry < plan_sl
-            and entry_zone_low <= plan_entry <= entry_zone_high <= plan_sl - 0.25 * (plan_sl - plan_entry)
-            and entry_zone_low < entry_decision < entry_zone_high
-        ):
-            return 400, {"ok": False, "error": "short_entry_zone_vs_stop_mismatch"}
+        if signal_text not in {"LONG", "SHORT", "WAIT"}:
+            return 400, {"ok": False, "error": "invalid_signal"}
 
-        entry_bar_time = _epoch_ms(payload.get("entryBarTime"))
-        entry_bar_open = _finite_number(payload.get("entryBarOpen"))
-        entry_bar_high = _finite_number(payload.get("entryBarHigh"))
-        entry_bar_low = _finite_number(payload.get("entryBarLow"))
-        entry_bar_close = _finite_number(payload.get("entryBarClose"))
-        entry_tf_ms = TIMEFRAME_MS[entry_timeframe]
-        if entry_bar_time is None or None in (entry_bar_open, entry_bar_high, entry_bar_low, entry_bar_close):
-            return 400, {"ok": False, "error": "missing_entry_trigger_candle"}
-        entry_bar_age = now_ms - entry_bar_time
-        if entry_bar_age < -MAX_FUTURE_SKEW_MS or entry_bar_age > entry_tf_ms + MTF_BAR_GRACE_MS:
-            return 400, {"ok": False, "error": "stale_or_future_entry_trigger_candle"}
-        if not (entry_bar_low <= min(entry_bar_open, entry_bar_close) <= max(entry_bar_open, entry_bar_close) <= entry_bar_high):
-            return 400, {"ok": False, "error": "invalid_entry_trigger_ohlc"}
-        retested_zone = entry_bar_high >= entry_zone_low and entry_bar_low <= entry_zone_high
-        trigger_closed = entry_bar_close > entry_decision if signal_direction == 1 else entry_bar_close < entry_decision
-        entry_triggered = bool(payload.get("confirmed") is True and signal_direction in (-1, 1)
-                               and retested_zone and trigger_closed
-                               and (entry_bar_close > plan_sl if signal_direction == 1 else entry_bar_close < plan_sl))
+        entry_triggered = False
+        if signal_direction in (-1, 1):
+            if expected_entry_tf is None or entry_timeframe != expected_entry_tf:
+                return 400, {"ok": False, "error": "entry_timeframe_strategy_mismatch"}
+            if entry_zone_low is None or entry_zone_high is None or entry_decision is None:
+                return 400, {"ok": False, "error": "missing_entry_zone"}
+            if not entry_zone_low < entry_decision < entry_zone_high:
+                return 400, {"ok": False, "error": "invalid_entry_zone_geometry"}
+            plan_entry = _finite_number(payload.get("entry"))
+            plan_sl = _finite_number(payload.get("sl"))
+            if plan_entry is None or plan_sl is None:
+                return 400, {"ok": False, "error": "missing_entry_or_stop"}
+            if signal_direction == 1 and not (
+                plan_sl < plan_entry
+                and plan_sl + 0.25 * (plan_entry - plan_sl) <= entry_zone_low <= plan_entry <= entry_zone_high
+                and entry_zone_low < entry_decision < entry_zone_high
+            ):
+                return 400, {"ok": False, "error": "long_entry_zone_vs_stop_mismatch"}
+            if signal_direction == -1 and not (
+                plan_entry < plan_sl
+                and entry_zone_low <= plan_entry <= entry_zone_high <= plan_sl - 0.25 * (plan_sl - plan_entry)
+                and entry_zone_low < entry_decision < entry_zone_high
+            ):
+                return 400, {"ok": False, "error": "short_entry_zone_vs_stop_mismatch"}
+
+            entry_bar_time = _epoch_ms(payload.get("entryBarTime"))
+            entry_bar_open = _finite_number(payload.get("entryBarOpen"))
+            entry_bar_high = _finite_number(payload.get("entryBarHigh"))
+            entry_bar_low = _finite_number(payload.get("entryBarLow"))
+            entry_bar_close = _finite_number(payload.get("entryBarClose"))
+            entry_tf_ms = TIMEFRAME_MS[entry_timeframe]
+            if entry_bar_time is None or None in (entry_bar_open, entry_bar_high, entry_bar_low, entry_bar_close):
+                return 400, {"ok": False, "error": "missing_entry_trigger_candle"}
+            entry_bar_age = now_ms - entry_bar_time
+            if entry_bar_age < -MAX_FUTURE_SKEW_MS or entry_bar_age > entry_tf_ms + MTF_BAR_GRACE_MS:
+                return 400, {"ok": False, "error": "stale_or_future_entry_trigger_candle"}
+            if not (entry_bar_low <= min(entry_bar_open, entry_bar_close) <= max(entry_bar_open, entry_bar_close) <= entry_bar_high):
+                return 400, {"ok": False, "error": "invalid_entry_trigger_ohlc"}
+            retested_zone = entry_bar_high >= entry_zone_low and entry_bar_low <= entry_zone_high
+            trigger_closed = entry_bar_close > entry_decision if signal_direction == 1 else entry_bar_close < entry_decision
+            entry_triggered = bool(payload.get("confirmed") is True and retested_zone and trigger_closed
+                                   and (entry_bar_close > plan_sl if signal_direction == 1 else entry_bar_close < plan_sl))
+        else:
+            # Pine emits WAIT with null plan/zone fields. Accept the fresh market snapshot
+            # and replace the prior signal instead of leaving an old LONG/SHORT cached.
+            entry_zone_low = entry_zone_high = entry_decision = None
+            entry_bar_time = entry_bar_open = entry_bar_high = entry_bar_low = entry_bar_close = None
 
         robot = _safe_robot(payload, price, now_ms)
         robot.update({
