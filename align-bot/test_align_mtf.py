@@ -167,13 +167,13 @@ class AlignMtfRulesTest(unittest.TestCase):
                 "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
                 "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
                 "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
-            "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
-            "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
             }},
             "H4": {"fresh": True, "confirmed": True, "robotV12": {
                 "signal": "SHORT", "entry": 110, "sl": 112, "tp": 106,
                 "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
                 "entryZoneLow": 109.5, "entryZoneHigh": 110.5, "entryDecision": 110,
+                "entryBarTime": 900_000, "entryBarOpen": 110.0, "entryBarHigh": 111.0,
+                "entryBarLow": 109.0, "entryBarClose": 109.5, "entryTriggered": False,
             }}
         }}}
         plan = align_bot.plan_indicateur(r)
