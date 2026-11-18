@@ -137,10 +137,14 @@ def fusionne_lectures_tradingview(r):
 
 
 def plan_indicateur(r):
-    """Utilise le plan du timeframe réellement actif sur TradingView, avec TP1/TP2 distincts."""
+    """Lit le plan Pine figé sur M15 indépendamment de l'UT du graphique TradingView.
+
+    Le timeframe actif reste une source de fraîcheur/snapshots. Les niveaux viennent
+    du même robotV12 embarqué dans ce snapshot, mais sont explicitement typés M15.
+    """
     bridge = r.get("tv_indicator_mtf") or {}
-    preferred = str(bridge.get("activeTimeframe") or "").upper()
-    snap = (bridge.get("snapshots") or {}).get(preferred) or {}
+    active_tf = str(bridge.get("activeTimeframe") or "").upper()
+    snap = (bridge.get("snapshots") or {}).get(active_tf) or {}
     robot = snap.get("robotV12") or {}
     try:
         entry, sl = float(robot.get("entry")), float(robot.get("sl"))
@@ -150,29 +154,40 @@ def plan_indicateur(r):
         tp1 = float(raw_tp1)
         raw_tp2 = robot.get("tp2")
         tp2 = float(raw_tp2) if raw_tp2 not in (None, "") else None
+        zone_low = float(robot.get("entryZoneLow"))
+        zone_high = float(robot.get("entryZoneHigh"))
+        decision = float(robot.get("entryDecision"))
     except (TypeError, ValueError, KeyError):
-        return {"timeframe": preferred or None, "available": False,
-                "reason": "aucun plan ROBOT V12 complet pour l'unité TradingView active"}
-    if not snap.get("fresh"):
-        return {"timeframe": preferred, "available": False, "reason": "plan ROBOT V12 périmé"}
+        return {"timeframe": active_tf or None, "available": False,
+                "reason": "plan M15 / zone d'entrée Pine incomplets"}
+
+    if snap.get("fresh") is not True:
+        return {"timeframe": active_tf, "available": False, "reason": "snapshot TradingView actif périmé"}
+    if str(robot.get("planTimeframe") or "").upper() != "M15":
+        return {"timeframe": active_tf, "available": False, "reason": "référence du plan différente de M15"}
+    strategy = str(robot.get("strategy") or "").upper()
+    expected_entry_tf = {"SCALPING": "M1", "DAY": "M5", "SWING": "H1"}.get(strategy)
+    entry_tf = str(robot.get("entryTimeframe") or "").upper()
+    if expected_entry_tf is None or entry_tf != expected_entry_tf:
+        return {"timeframe": active_tf, "available": False, "reason": "unité de validation incohérente avec la stratégie"}
+
     signal = str(robot.get("signal") or robot.get("verdict") or "").upper()
     direction = _direction_tv(signal)
-    if direction not in (-1, 1) or min(entry, sl, tp1) <= 0 or (tp2 is not None and tp2 <= 0):
-        return {"timeframe": preferred, "available": False, "reason": "direction ou niveaux ROBOT V12 invalides"}
+    if direction not in (-1, 1) or min(entry, sl, tp1, zone_low, zone_high, decision) <= 0 or (tp2 is not None and tp2 <= 0):
+        return {"timeframe": active_tf, "available": False, "reason": "direction ou niveaux M15 invalides"}
     if direction == 1:
-        geometrie_ok = sl < entry < tp1 and (tp2 is None or tp2 > tp1)
+        geometrie_ok = sl < zone_low < decision < zone_high and zone_low <= entry <= zone_high and entry < tp1 and (tp2 is None or tp2 > tp1)
     else:
-        geometrie_ok = tp1 < entry < sl and (tp2 is None or tp2 < tp1)
+        geometrie_ok = tp1 < entry and entry < zone_low < decision < zone_high < sl and (tp2 is None or tp2 < tp1)
     if not geometrie_ok:
-        return {"timeframe": preferred, "available": False, "reason": "géométrie entrée/SL/TP incohérente"}
-    return {"timeframe": preferred, "available": True, "direction": direction, "entry": entry, "sl": sl,
-            "tp": tp1, "tp1": tp1, "tp2": tp2,
+        return {"timeframe": active_tf, "available": False, "reason": "géométrie zone / entrée / SL / TP incohérente"}
+
+    return {"timeframe": active_tf, "plan_timeframe": "M15", "entry_timeframe": entry_tf,
+            "strategy": strategy, "available": True, "direction": direction,
+            "entry": entry, "sl": sl, "tp": tp1, "tp1": tp1, "tp2": tp2,
+            "zone_low": zone_low, "zone_high": zone_high, "decision": decision,
             "confirmed": snap.get("confirmed") is True, "verdict": robot.get("verdict"),
-            "macro_bull": robot.get("macro_bull"), "macro_bear": robot.get("macro_bear"),
             "long_score": robot.get("long_score"), "short_score": robot.get("short_score"),
-            "anticipation": robot.get("anticipation"), "anticipation_force": robot.get("anticipation_force"),
-            "zone_proche": robot.get("zone_proche"), "liq_haute_active": robot.get("liq_haute_active"),
-            "liq_basse_active": robot.get("liq_basse_active"),
             "timestamp": robot.get("receivedAt") or snap.get("timestamp"), "ageMs": robot.get("ageMs")}
 
 TTL_KRAKEN = {1: 5, 5: 10, 15: 30, 30: 60, 60: 120, 240: 300, 1440: 900, 10080: 1800}
