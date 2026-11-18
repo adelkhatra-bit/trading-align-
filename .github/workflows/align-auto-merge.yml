@@ -36,7 +36,7 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -u
-          PRS=$(gh api "repos/$REPO/pulls?state=open&base=main&per_page=50" --jq '.[] | select(.head.repo.full_name == env.REPO) | .number')
+          PRS=$(gh api "repos/$REPO/pulls?state=open&base=main&per_page=50" --jq '.[] | select(.head.repo.full_name == env.REPO and (.draft == false)) | .number')
           for N in $PRS; do
             SHA=$(gh api "repos/$REPO/pulls/$N" --jq '.head.sha')
             STATE=$(gh api "repos/$REPO/pulls/$N" --jq '.mergeable_state')
