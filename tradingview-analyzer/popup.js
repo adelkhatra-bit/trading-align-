@@ -120,6 +120,9 @@ function _drainSpeakQueue() {
 }
 
 function speak(text) {
+  // v12.2.8 (demande d'Adel) : cette extension ne parle plus. Seule la voix du coach ALIGN (bande live) parle.
+  return;
+  // eslint-disable-next-line no-unreachable
   if (state.muted) return;
   try {
     if (!window.speechSynthesis) return;

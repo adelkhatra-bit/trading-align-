@@ -418,8 +418,6 @@ if barstate.islast
     line.delete(lTP1)
     line.delete(lTP2)
     line.delete(lSL)
-    line.delete(lE)
-    label.delete(eE)
     label.delete(eTP1)
     label.delete(eTP2)
     label.delete(eSL)
@@ -429,8 +427,7 @@ if barstate.islast
         lTP1 := line.new(x1, tp1, x2, tp1, color=color.aqua, width=2, extend=extend.right)
         lTP2 := line.new(x1, tp2, x2, tp2, color=color.new(color.aqua, 35), width=2, style=line.style_dashed, extend=extend.right)
         lSL  := line.new(x1, sl, x2, sl, color=color.red, width=2, extend=extend.right)
-        lE   := line.new(x1, ent, x2, ent, color=color.yellow, width=2, style=line.style_dotted, extend=extend.right)
-        eE   := label.new(x1, ent, "ENTRÉE " + px(ent), style=label.style_label_right, color=color.new(color.yellow, 10), textcolor=color.black, size=size.small, tooltip="Point d'entrée : " + tEnt + "\nJuste devant la zone 1h / 4h, dans le sens des grosses UT")
+        // v25 (décision d'Adel) : plus de point d'entrée tracé sur le graphique (ni ligne ni étiquette ENTRÉE)
         eTP1 := label.new(x1, tp1, "TP1 " + px(tp1), style=label.style_label_right, color=color.new(color.aqua, 20), textcolor=color.black, size=size.small, tooltip="Objectif 1 : " + tTP1 + "\nGain/risque ≈ " + str.tostring(rr, "#.#"))
         eTP2 := label.new(x1, tp2, "TP2 " + px(tp2), style=label.style_label_right, color=color.new(color.aqua, 35), textcolor=color.black, size=size.small, tooltip="Objectif 2 : " + tTP2 + "\nObjectif final du plan ALIGN")
         if voirFibo and fR > 0
