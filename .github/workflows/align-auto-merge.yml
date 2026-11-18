@@ -16,7 +16,7 @@ on:
   # check_suite ne se déclenche pas pour les suites créées par Actions : on réagit donc
   # explicitement à la fin de la validation (déclencheur fiable, actif une fois sur main).
   workflow_run:
-    workflows: ["ALIGN MTF validation"]
+    workflows: ["ALIGN MTF validation", "CI Integration Tests"]
     types: [completed]
 
 permissions:
@@ -41,7 +41,7 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -u
-          PRS=$(gh api "repos/$REPO/pulls?state=open&base=main&per_page=50" --jq '.[] | select(.head.repo.full_name == env.REPO and (.draft == false)) | .number')
+          PRS=$(gh api --paginate "repos/$REPO/pulls?state=open&base=main&per_page=100" --jq '.[] | select(.head.repo.full_name == env.REPO and (.draft == false)) | .number')
           for N in $PRS; do
             # Une seule lecture fraîche de la PR : base, brouillon, SHA et état relus juste avant de décider.
             PR=$(gh api "repos/$REPO/pulls/$N")
@@ -74,6 +74,9 @@ jobs:
                 # Une fusion via GITHUB_TOKEN ne déclenche pas les workflows : on relance explicitement
                 # la validation + le déploiement du bot sur main.
                 gh workflow run align-bot.yml --repo "$REPO" --ref main && echo "align-bot.yml relancé sur main"
+                # Une seule fusion par exécution (jamais de fusion en masse) : la suivante sera
+                # évaluée au prochain déclenchement, sur une main à jour.
+                break
               else
                 echo "PR #$N : fusion refusée par GitHub, aucune action forcée"
               fi
