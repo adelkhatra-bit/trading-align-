@@ -4,6 +4,7 @@
 - This repository is the canonical project: `adelkhatra-bit/trading-align-`.
 - Production code branch: `main`. Public live-data publication branch: `live-data`.
 - Markets: BTC, GOLD, NASDAQ. Telegram bot: `@align_mtf_adel_bot`.
+- Canonical indicator: `align-bot/pine/ALIGN_MTF_PRO_v25.pine` (TradingView title « ALIGN MTF PRO (Inside) »). Other Pine files (v24*, *_PROPOSITION*) are history, never the active indicator. Before acting, every agent verifies repository, branch, PR, SHA, symbol and indicator version; if any is ambiguous or belongs to another project, it stops.
 - Apply these rules only to work explicitly identified as ALIGN/TRADING. If the account user or project context is ambiguous, ask before acting.
 - Never assume a branch name, SHA, PR state, deployment state, or runtime health. Read it from GitHub immediately before acting.
 
@@ -50,6 +51,7 @@ Before a PR is approved or merged:
 5. Verify no stable feature, animation, comment, user setting, memory, or unrelated change was lost.
 6. Confirm deployment and runtime behavior after merge when access permits.
 Never merge or deploy on a failed, missing, stale, or mismatched required check. Do not merge automatically; obtain explicit user approval for the merge.
+- Owner-approved exception (2026-11-18): the workflow `ALIGN fusion automatique contrôlée` (`.github/workflows/align-auto-merge.yml`) may merge a PR into `main` only when ALL hold on the exact head SHA: same repository (no fork), all check runs completed and green, Codex review completed for that SHA with no unresolved finding, and `mergeable_state == clean`. It pins the merge to the tested SHA and never bypasses branch protection. Any other merge still requires explicit owner approval.
 
 ## Required work report
 For each task report, concisely: issue and proven root cause; repository/branch/PR/base SHA/head SHA; files changed; minimal fix; tests and exact results; runtime checks; residual risks; and rollback plan. State explicitly what was not verified. Never claim continuous background monitoring or completed work without evidence.

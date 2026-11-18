@@ -18,6 +18,7 @@ permissions:
   contents: write
   pull-requests: write
   checks: read
+  actions: write
 
 concurrency:
   group: align-auto-merge
@@ -47,7 +48,14 @@ jobs:
             OK_CODEX=$(echo "$CODEX" | jq -r --arg s "$SHA" 'if (.code_review.commit_sha == $s and .code_review.status == "completed" and .code_review.has_unresolved_findings == false) then "yes" else "no" end' 2>/dev/null || echo no)
             echo "PR #$N sha=${SHA:0:7} checks_ok=$OK_CHECKS codex_ok=$OK_CODEX mergeable=$STATE"
             if [ "$OK_CHECKS" = "true" ] && [ "$OK_CODEX" = "yes" ] && [ "$STATE" = "clean" ]; then
-              gh api "repos/$REPO/pulls/$N/merge" -X PUT -f merge_method=squash -f sha="$SHA" >/dev/null && echo "PR #$N fusionnée (SHA ${SHA:0:7})" || echo "PR #$N : fusion refusée par GitHub, aucune action forcée"
+              if gh api "repos/$REPO/pulls/$N/merge" -X PUT -f merge_method=squash -f sha="$SHA" >/dev/null; then
+                echo "PR #$N fusionnée (SHA ${SHA:0:7})"
+                # Une fusion via GITHUB_TOKEN ne déclenche pas les workflows : on relance explicitement
+                # la validation + le déploiement du bot sur main.
+                gh workflow run align-bot.yml --repo "$REPO" --ref main && echo "align-bot.yml relancé sur main"
+              else
+                echo "PR #$N : fusion refusée par GitHub, aucune action forcée"
+              fi
             else
               echo "PR #$N : aucune fusion (conditions non remplies)"
             fi
