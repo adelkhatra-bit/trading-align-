@@ -62,3 +62,28 @@ class MailboxFeederTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class JetonLectureDerive(unittest.TestCase):
+    def test_secret_direct_prioritaire(self):
+        import align_tv_mailbox_feeder as f
+        self.assertEqual(f.jeton_lecture({"ALIGN_TV_MAILBOX_TOKEN": "abc", "CLOUDFLARE_API_TOKEN": "x"}), "abc")
+
+    def test_derive_du_jeton_cloudflare_stable_et_long(self):
+        import align_tv_mailbox_feeder as f
+        a = f.jeton_lecture({"CLOUDFLARE_API_TOKEN": "racine-test"})
+        self.assertEqual(a, f.jeton_lecture({"CLOUDFLARE_API_TOKEN": "racine-test"}))
+        self.assertEqual(len(a), 64)                       # ≥ 32 caractères exigés par le Worker
+        self.assertNotIn("racine-test", a)
+        self.assertNotEqual(a, f.jeton_lecture({"CLOUDFLARE_API_TOKEN": "autre"}))
+
+    def test_rien_sans_secret(self):
+        import align_tv_mailbox_feeder as f
+        self.assertEqual(f.jeton_lecture({}), "")
+
+
+class AgentUtilisateur(unittest.TestCase):
+    def test_agent_identifie_jamais_python_urllib(self):
+        import align_tv_mailbox_feeder as f
+        self.assertTrue(f.USER_AGENT.startswith("ALIGN-relais/"))
+        self.assertNotIn("Python-urllib", f.USER_AGENT)

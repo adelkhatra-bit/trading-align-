@@ -6,6 +6,7 @@ from http.server import ThreadingHTTPServer
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+import align_tv_bridge as bridge
 from align_tv_bridge import (
     ACTIVE_MAX_AGE_MS,
     MAX_FUTURE_SKEW_MS,
@@ -20,6 +21,8 @@ from align_tv_bridge import (
 INGEST = "a" * 64
 READ = "b" * 64
 BASE_MS = 1_800_000_000_000
+# Copié tel quel du journal des alertes TradingView (indicateur bridge, BTCUSD M15, 18/11/2026).
+REAL_TV_PAYLOAD_BTC_SWING_20261118 = r'''{"source":"ALIGN_MTF_PRO_V25","symbol":"BTCUSD","tickerid":"CRYPTO:BTCUSD","timeframe":"M15","planTimeframe":"M15","entryTimeframe":"H1","entryZoneLow":63277.56,"entryZoneHigh":63803.65,"entryDecision":63540.60,"entryBarTime":1795017600000,"entryBarOpen":63066.10,"entryBarHigh":63067.01,"entryBarLow":62233.39,"entryBarClose":62690.24,"price":63436.08,"timestamp":1795023311064,"candle_time":1795023000000,"confirmed":true,"candle_confirmed":false,"bar_confirmed":false,"signal":"SHORT","verdict":"INTÉRESSANT : attendre les conditions finales","entry":63462.39,"sl":63917.40,"tp1":62779.89,"tp2":61869.88,"rrRatio":1.50,"macro_bull":1,"macro_bear":6,"long_score":0,"short_score":82,"scalp_inverse":false,"strategy":"SWING","anticipation":"AUCUNE","zone_proche":"PLAN","volume":"OK","rsi_etat":"NORMAL","rsi_1m":73.36,"rsi_5m":62.47,"rsi_15m":49.42,"rsi_60m":40.97,"lecture_1m":"LONG","lecture_5m":"NEUTRAL","lecture_15m":"SHORT","lecture_60m":"SHORT","mtf":{"M1":{"direction":1,"rsi":73.36,"bar_time":1795023300000},"M5":{"direction":0,"rsi":62.47,"bar_time":1795023300000},"M15":{"direction":0,"rsi":49.42,"bar_time":1795023000000},"M30":{"direction":-1,"rsi":42.50,"bar_time":1795023000000},"H1":{"direction":-1,"rsi":40.97,"bar_time":1795021200000},"H2":{"direction":-1,"rsi":40.36,"bar_time":1795017600000},"H4":{"direction":-1,"rsi":36.65,"bar_time":1795017600000},"D1":{"direction":-1,"rsi":22.27,"bar_time":1794960000000},"W1":{"direction":-1,"rsi":37.09,"bar_time":1794787200000}}}'''
 
 
 def valid_payload(now_ms=BASE_MS, symbol="BTCUSD", timeframe="M1"):
@@ -102,6 +105,54 @@ class BridgeStoreTests(unittest.TestCase):
         status, result = self.store.ingest(valid_payload(), "c" * 64, BASE_MS)
         self.assertEqual(status, 401)
         self.assertEqual(result["error"], "unauthorized")
+
+    def test_rejects_market_mixed_with_chart(self):
+        # 18/11 : alerte posée sur NAS100 avec « Marché ALIGN » = BTCUSD.
+        payload = valid_payload()
+        payload["tickerid"] = "FX:NAS100"
+        status, result = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 400)
+        self.assertEqual(result["error"], "symbol_tickerid_mismatch")
+        payload = valid_payload(symbol="XAUUSD")
+        status, result = self.store.ingest(payload, INGEST, BASE_MS)  # tickerid BTCUSDT
+        self.assertEqual(result["error"], "symbol_tickerid_mismatch")
+        self.assertEqual(self.store.read("BTCUSD", BASE_MS)[1]["snapshots"], {})
+
+    def test_accepts_real_tradingview_tickers(self):
+        for symbol, tickerid in (("BTCUSD", "CRYPTO:BTCUSD"), ("BTCUSD", "BINANCE:BTCUSDT"),
+                                 ("XAUUSD", "FOREXCOM:XAUUSD"), ("XAUUSD", "OANDA:XAUUSD"),
+                                 ("NAS100", "FX:NAS100"), ("NAS100", "CAPITALCOM:US100")):
+            self.assertTrue(bridge.tickerid_matches_symbol(symbol, tickerid), tickerid)
+        self.assertFalse(bridge.tickerid_matches_symbol("BTCUSD", ""))
+        self.assertFalse(bridge.tickerid_matches_symbol("NAS100", "FOREXCOM:XAUUSD"))
+
+    def test_real_tradingview_swing_payload_18_11_accepted(self):
+        # Payload RÉEL du journal TradingView (BTC SWING, 18/11) refusé à tort deux fois :
+        # bord de zone arrondi à 25 % du risque, bougie H1 clôturée âgée de 1 h 35.
+        p = json.loads(REAL_TV_PAYLOAD_BTC_SWING_20261118)
+        status, result = self.store.ingest(p, INGEST, p["timestamp"] + 5000)
+        self.assertEqual((status, result.get("ok")), (200, True), result)
+        lu = self.store.read("BTCUSD", p["timestamp"] + 8000)[1]
+        self.assertTrue(lu["ok"])
+        self.assertEqual(lu["snapshots"]["M15"]["robotV12"]["signal"], "SHORT")
+
+    def test_wait_without_plan_keeps_real_mtf_reading(self):
+        payload = valid_payload()
+        payload.update({"signal": "WAIT", "strategy": "", "entryTimeframe": "UNSUPPORTED",
+                        "entry": None, "sl": None, "tp1": None, "tp2": None,
+                        "entryZoneLow": None, "entryZoneHigh": None, "entryDecision": None})
+        status, result = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 200, result)
+        robot = self.store.read("BTCUSD", BASE_MS)[1]["snapshots"]["M1"]["robotV12"]
+        self.assertEqual(robot["signal"], "WAIT")
+        self.assertIsNone(robot["entry"])
+        self.assertFalse(robot["entryTriggered"])
+
+    def test_entry_candle_older_than_two_timeframes_rejected(self):
+        payload = valid_payload()
+        payload["entryBarTime"] = BASE_MS - 2 * 300_000 - 60_000  # DAY → M5
+        status, result = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(result["error"], "stale_or_future_entry_trigger_candle")
 
     def test_rejects_unsupported_symbol(self):
         status, result = self.store.ingest(valid_payload(symbol="EURUSD"), INGEST, BASE_MS)
@@ -277,7 +328,7 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertFalse(data["snapshots"]["M1"]["robotV12"]["entryTriggered"])
 
     def test_ingest_rejects_stale_or_future_entry_trigger_candle(self):
-        for time_value in (BASE_MS - TIMEFRAME_MS["M5"] - MTF_BAR_GRACE_MS - 1,
+        for time_value in (BASE_MS - 2 * TIMEFRAME_MS["M5"] - MTF_BAR_GRACE_MS - 1,
                            BASE_MS + MAX_FUTURE_SKEW_MS + 1):
             with self.subTest(entryBarTime=time_value):
                 payload = valid_payload()

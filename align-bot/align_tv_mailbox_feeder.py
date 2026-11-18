@@ -8,6 +8,8 @@ validation reste donc celle de BridgeStore : un seul bridge, aucune copie.
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import os
 import sys
@@ -15,6 +17,25 @@ import time
 import urllib.request
 
 SYMBOLS = ("BTCUSD", "XAUUSD", "NAS100")
+DEFAULT_MAILBOX_URL = "https://align-tv-mailbox.adel-khatra.workers.dev"
+_LABEL_LECTURE = b"align-tv-mailbox-read-v1"
+
+
+def jeton_lecture(env=None):
+    """Jeton de lecture de la boîte aux lettres.
+
+    Priorité au secret ALIGN_TV_MAILBOX_TOKEN ; sinon il est DÉRIVÉ (HMAC-SHA256) du secret
+    CLOUDFLARE_API_TOKEN, exactement comme le fait le workflow qui le pose dans le Worker.
+    Personne n'a donc à copier ce jeton ; il n'est jamais affiché.
+    """
+    env = os.environ if env is None else env
+    direct = str(env.get("ALIGN_TV_MAILBOX_TOKEN") or "").strip()
+    if direct:
+        return direct
+    racine = str(env.get("CLOUDFLARE_API_TOKEN") or "").strip()
+    if not racine:
+        return ""
+    return hmac.new(racine.encode(), _LABEL_LECTURE, hashlib.sha256).hexdigest()
 
 
 def relay_once(fetch_mailbox, ingest, symbols=SYMBOLS):
@@ -49,8 +70,14 @@ def relay_failed(results):
     return any(not (v == "ok" or v == "empty") for v in results.values())
 
 
+# Cloudflare refuse l'agent par défaut « Python-urllib » (HTTP 403) : on s'identifie clairement.
+USER_AGENT = "ALIGN-relais/1.0 (+github.com/adelkhatra-bit/trading-align-)"
+
+
 def _http_json(url, method="GET", data=None, headers=None, timeout=8):
-    req = urllib.request.Request(url, data=data, method=method, headers=headers or {})
+    h = {"User-Agent": USER_AGENT}
+    h.update(headers or {})
+    req = urllib.request.Request(url, data=data, method=method, headers=h)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return resp.status, json.loads(resp.read() or b"{}")
@@ -59,8 +86,14 @@ def _http_json(url, method="GET", data=None, headers=None, timeout=8):
 
 
 def main():
-    mailbox_url = os.environ.get("ALIGN_TV_MAILBOX_URL", "").rstrip("/")
-    mailbox_token = os.environ.get("ALIGN_TV_MAILBOX_TOKEN", "")
+    mailbox_url = (os.environ.get("ALIGN_TV_MAILBOX_URL") or DEFAULT_MAILBOX_URL).rstrip("/")
+    mailbox_token = jeton_lecture()
+    if "--print-derived-token-to-github-mask" in sys.argv:
+        # Utilisé par le workflow : masque la valeur dans les journaux puis l'écrit dans un fichier temporaire.
+        print("::add-mask::" + mailbox_token)
+        with open(os.environ["ALIGN_TOKEN_FILE"], "w", encoding="utf-8") as f:
+            f.write(mailbox_token)
+        return 0 if mailbox_token else 1
     local_url = os.environ.get("ALIGN_TV_LOCAL_URL", "http://127.0.0.1:4100").rstrip("/")
     local_ingest = os.environ.get("ALIGN_TV_INGEST_TOKEN", "")
     if not (mailbox_url and mailbox_token and local_ingest):

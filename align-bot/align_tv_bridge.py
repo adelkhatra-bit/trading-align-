@@ -20,6 +20,22 @@ from urllib.parse import parse_qs, urlsplit
 
 SOURCE = "ALIGN_MTF_PRO_V25"
 ALLOWED_SYMBOLS = {"BTCUSD", "XAUUSD", "NAS100"}
+# Le marché déclaré (input « Marché ALIGN » du Pine) doit correspondre au graphique
+# réellement calculé (syminfo.tickerid). Panne réelle du 18/11 : 12 alertes NAS100/XAUUSD
+# envoyaient « BTCUSD » → prix du Gold/NASDAQ dans la boîte BTC. Jamais de mélange de marchés.
+TICKER_MARKERS = {
+    "BTCUSD": ("BTC", "XBT"),
+    "XAUUSD": ("XAU", "GOLD"),
+    "NAS100": ("NAS100", "NDX", "US100", "USTEC", "NQ"),
+}
+
+
+def tickerid_matches_symbol(symbol, tickerid):
+    ticker = _text(tickerid, 64).upper().split(":")[-1]
+    if not ticker:
+        return False
+    hits = [m for m, marks in TICKER_MARKERS.items() if any(k in ticker for k in marks)]
+    return hits == [symbol]
 ACTIVE_TIMEFRAMES = {"M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"}
 REQUIRED_TIMEFRAMES = ("M5", "M15", "H1", "H4", "D1", "W1")
 TIMEFRAME_MS = {
@@ -179,6 +195,8 @@ class BridgeStore:
             return 400, {"ok": False, "error": "unsupported_symbol"}
         if timeframe not in ACTIVE_TIMEFRAMES:
             return 400, {"ok": False, "error": "unsupported_active_timeframe"}
+        if not tickerid_matches_symbol(symbol, payload.get("tickerid")):
+            return 400, {"ok": False, "error": "symbol_tickerid_mismatch", "symbol": symbol}
 
         price = _finite_number(payload.get("price"))
         source_timestamp = _epoch_ms(payload.get("timestamp"))
@@ -227,50 +245,60 @@ class BridgeStore:
         signal_direction = 1 if signal_text == "LONG" else -1 if signal_text == "SHORT" else None
         if plan_timeframe != "M15":
             return 400, {"ok": False, "error": "unsupported_plan_timeframe"}
-        if expected_entry_tf is None or entry_timeframe != expected_entry_tf:
-            return 400, {"ok": False, "error": "entry_timeframe_strategy_mismatch"}
-        if entry_zone_low is None or entry_zone_high is None or entry_decision is None:
-            return 400, {"ok": False, "error": "missing_entry_zone"}
-        if not entry_zone_low < entry_decision < entry_zone_high:
-            return 400, {"ok": False, "error": "invalid_entry_zone_geometry"}
-        if signal_direction not in (-1, 1):
-            return 400, {"ok": False, "error": "invalid_entry_direction"}
-        plan_entry = _finite_number(payload.get("entry"))
-        plan_sl = _finite_number(payload.get("sl"))
-        if plan_entry is None or plan_sl is None:
-            return 400, {"ok": False, "error": "missing_entry_or_stop"}
-        if signal_direction == 1 and not (
-            plan_sl < plan_entry
-            and plan_sl + 0.25 * (plan_entry - plan_sl) <= entry_zone_low <= plan_entry <= entry_zone_high
-            and entry_zone_low < entry_decision < entry_zone_high
-        ):
-            return 400, {"ok": False, "error": "long_entry_zone_vs_stop_mismatch"}
-        if signal_direction == -1 and not (
-            plan_entry < plan_sl
-            and entry_zone_low <= plan_entry <= entry_zone_high <= plan_sl - 0.25 * (plan_sl - plan_entry)
-            and entry_zone_low < entry_decision < entry_zone_high
-        ):
-            return 400, {"ok": False, "error": "short_entry_zone_vs_stop_mismatch"}
+        has_plan = signal_direction in (-1, 1)
+        if has_plan:
+            if expected_entry_tf is None or entry_timeframe != expected_entry_tf:
+                return 400, {"ok": False, "error": "entry_timeframe_strategy_mismatch"}
+            if entry_zone_low is None or entry_zone_high is None or entry_decision is None:
+                return 400, {"ok": False, "error": "missing_entry_zone"}
+            if not entry_zone_low < entry_decision < entry_zone_high:
+                return 400, {"ok": False, "error": "invalid_entry_zone_geometry"}
+            plan_entry = _finite_number(payload.get("entry"))
+            plan_sl = _finite_number(payload.get("sl"))
+            if plan_entry is None or plan_sl is None:
+                return 400, {"ok": False, "error": "missing_entry_or_stop"}
+            # Tolérance d'arrondi : le Pine pose le bord de zone EXACTEMENT à 25 % du risque et
+            # le JSON arrondit à 2 décimales (18/11 : 63803,65 refusé contre 63803,6475).
+            tol = abs(plan_entry - plan_sl) * 0.001
+            if signal_direction == 1 and not (
+                plan_sl < plan_entry
+                and plan_sl + 0.25 * (plan_entry - plan_sl) - tol <= entry_zone_low <= plan_entry <= entry_zone_high
+                and entry_zone_low < entry_decision < entry_zone_high
+            ):
+                return 400, {"ok": False, "error": "long_entry_zone_vs_stop_mismatch"}
+            if signal_direction == -1 and not (
+                plan_entry < plan_sl
+                and entry_zone_low <= plan_entry <= entry_zone_high <= plan_sl - 0.25 * (plan_sl - plan_entry) + tol
+                and entry_zone_low < entry_decision < entry_zone_high
+            ):
+                return 400, {"ok": False, "error": "short_entry_zone_vs_stop_mismatch"}
 
-        entry_bar_time = _epoch_ms(payload.get("entryBarTime"))
-        entry_bar_open = _finite_number(payload.get("entryBarOpen"))
-        entry_bar_high = _finite_number(payload.get("entryBarHigh"))
-        entry_bar_low = _finite_number(payload.get("entryBarLow"))
-        entry_bar_close = _finite_number(payload.get("entryBarClose"))
-        entry_tf_ms = TIMEFRAME_MS[entry_timeframe]
-        if entry_bar_time is None or None in (entry_bar_open, entry_bar_high, entry_bar_low, entry_bar_close):
-            return 400, {"ok": False, "error": "missing_entry_trigger_candle"}
-        entry_bar_age = now_ms - entry_bar_time
-        if entry_bar_age < -MAX_FUTURE_SKEW_MS or entry_bar_age > entry_tf_ms + MTF_BAR_GRACE_MS:
-            return 400, {"ok": False, "error": "stale_or_future_entry_trigger_candle"}
-        if not (entry_bar_low <= min(entry_bar_open, entry_bar_close) <= max(entry_bar_open, entry_bar_close) <= entry_bar_high):
-            return 400, {"ok": False, "error": "invalid_entry_trigger_ohlc"}
-        retested_zone = entry_bar_high >= entry_zone_low and entry_bar_low <= entry_zone_high
-        trigger_closed = entry_bar_close > entry_decision if signal_direction == 1 else entry_bar_close < entry_decision
-        entry_triggered = bool(payload.get("confirmed") is True and signal_direction in (-1, 1)
-                               and retested_zone and trigger_closed
-                               and (entry_bar_close > plan_sl if signal_direction == 1 else entry_bar_close < plan_sl))
+            entry_bar_time = _epoch_ms(payload.get("entryBarTime"))
+            entry_bar_open = _finite_number(payload.get("entryBarOpen"))
+            entry_bar_high = _finite_number(payload.get("entryBarHigh"))
+            entry_bar_low = _finite_number(payload.get("entryBarLow"))
+            entry_bar_close = _finite_number(payload.get("entryBarClose"))
+            entry_tf_ms = TIMEFRAME_MS[entry_timeframe]
+            if entry_bar_time is None or None in (entry_bar_open, entry_bar_high, entry_bar_low, entry_bar_close):
+                return 400, {"ok": False, "error": "missing_entry_trigger_candle"}
+            entry_bar_age = now_ms - entry_bar_time
+            # Le Pine envoie l'heure d'OUVERTURE de la dernière bougie CLÔTURÉE (time[1]) :
+            # son âge va donc jusqu'à 2 UT (18/11 : SWING H1 refusé à 1 h 35 alors que valide).
+            if entry_bar_age < -MAX_FUTURE_SKEW_MS or entry_bar_age > 2 * entry_tf_ms + MTF_BAR_GRACE_MS:
+                return 400, {"ok": False, "error": "stale_or_future_entry_trigger_candle"}
+            if not (entry_bar_low <= min(entry_bar_open, entry_bar_close) <= max(entry_bar_open, entry_bar_close) <= entry_bar_high):
+                return 400, {"ok": False, "error": "invalid_entry_trigger_ohlc"}
+            retested_zone = entry_bar_high >= entry_zone_low and entry_bar_low <= entry_zone_high
+            trigger_closed = entry_bar_close > entry_decision if signal_direction == 1 else entry_bar_close < entry_decision
+            entry_triggered = bool(payload.get("confirmed") is True and signal_direction in (-1, 1)
+                                   and retested_zone and trigger_closed
+                                   and (entry_bar_close > plan_sl if signal_direction == 1 else entry_bar_close < plan_sl))
 
+        else:
+            # Pas de plan (WAIT) : la lecture MTF réelle reste publiée, aucun niveau, aucune entrée.
+            entry_zone_low = entry_zone_high = entry_decision = None
+            entry_bar_time = entry_bar_open = entry_bar_high = entry_bar_low = entry_bar_close = None
+            entry_triggered = False
         robot = _safe_robot(payload, price, now_ms)
         robot.update({
             "planTimeframe": plan_timeframe,

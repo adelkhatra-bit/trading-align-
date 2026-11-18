@@ -7,7 +7,9 @@
 // à KV dont le cache peut dépasser la fenêtre de fraîcheur de 30 s du bridge).
 //
 // Routes :
-//   POST /ingest/<ALIGN_TV_INGEST_TOKEN>      ← webhook d'alerte TradingView
+//   POST /ingest/tradingview                  ← webhook TradingView, SANS jeton dans l'URL :
+//                                               accepté seulement depuis les 4 IP officielles de TradingView
+//   POST /ingest/<ALIGN_TV_INGEST_TOKEN>      ← envoi manuel / tests (jeton)
 //   GET  /mailbox?symbol=BTCUSD               ← lecture (Authorization: Bearer <ALIGN_TV_MAILBOX_TOKEN>)
 //   GET  /health                              ← santé, sans secret
 // Liaison : ALIGN_TV_MAILBOX (Durable Object). Secrets : ALIGN_TV_INGEST_TOKEN, ALIGN_TV_MAILBOX_TOKEN.
@@ -16,6 +18,27 @@ const SOURCE = "ALIGN_MTF_PRO_V25";
 const SYMBOLS = new Set(["BTCUSD", "XAUUSD", "NAS100"]);
 const MAX_BODY = 32768;
 const MAX_AGE_MS = 10 * 60 * 1000; // au-delà de 10 min, le message n'est plus servi
+// IP d'envoi publiées par TradingView (support.tradingview.com, « About webhooks »).
+const TRADINGVIEW_IPS = new Set(["52.89.214.238", "34.212.75.30", "54.218.53.128", "52.32.178.7"]);
+
+// Le marché déclaré doit correspondre au graphique réel (syminfo.tickerid) : jamais de mélange
+// (18/11 : alertes NAS100/XAUUSD envoyées avec « BTCUSD »). Même règle que align_tv_bridge.py.
+const TICKER_MARKERS = {
+  BTCUSD: ["BTC", "XBT"],
+  XAUUSD: ["XAU", "GOLD"],
+  NAS100: ["NAS100", "NDX", "US100", "USTEC", "NQ"],
+};
+
+export function tickerMatchesSymbol(symbol, tickerid) {
+  const ticker = String(tickerid || "").trim().slice(0, 64).toUpperCase().split(":").pop();
+  if (!ticker) return false;
+  const hits = Object.keys(TICKER_MARKERS).filter((m) => TICKER_MARKERS[m].some((k) => ticker.includes(k)));
+  return hits.length === 1 && hits[0] === symbol;
+}
+
+function depuisTradingView(request) {
+  return TRADINGVIEW_IPS.has(String(request.headers.get("cf-connecting-ip") || "").trim());
+}
 
 function json(status, body) {
   return new Response(JSON.stringify(body), {
@@ -57,7 +80,8 @@ export default {
     }
 
     if (request.method === "POST" && url.pathname.startsWith("/ingest/")) {
-      if (!sameSecret(url.pathname.slice("/ingest/".length), env.ALIGN_TV_INGEST_TOKEN)) {
+      const viaTradingView = url.pathname === "/ingest/tradingview" && depuisTradingView(request);
+      if (!viaTradingView && !sameSecret(url.pathname.slice("/ingest/".length), env.ALIGN_TV_INGEST_TOKEN)) {
         return json(401, { ok: false, error: "unauthorized" });
       }
       const raw = await request.text();
@@ -67,6 +91,9 @@ export default {
       if (!payload || payload.source !== SOURCE) return json(202, { ok: true, ignored: true, reason: "not_an_align_snapshot" });
       const symbol = String(payload.symbol || "").toUpperCase();
       if (!SYMBOLS.has(symbol)) return json(400, { ok: false, error: "unsupported_symbol" });
+      if (!tickerMatchesSymbol(symbol, payload.tickerid)) {
+        return json(400, { ok: false, error: "symbol_tickerid_mismatch", symbol });
+      }
       await box(env, symbol).fetch("https://box/", { method: "PUT", body: JSON.stringify({ receivedAt: Date.now(), payload }) });
       return json(200, { ok: true, symbol });
     }

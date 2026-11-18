@@ -9,6 +9,7 @@ on:
       - "align-bot/**"
       - "scripts/**"
       - "docs/live/**"
+      - "cloud/**"
       - ".github/workflows/**"
       - "scripts/align_workflow_watchdog.py"
   # Pas de filtre de chemins sur les PR : « validate » est un contrôle obligatoire
@@ -45,6 +46,8 @@ jobs:
           node-version: "22"
       - name: Validate animated TradingView live overlay JavaScript
         run: node --check docs/live/align-bande-live.user.js
+      - name: Test Cloudflare mailbox Worker (anti-mélange des marchés)
+        run: node cloud/align-tv-mailbox/test_worker.mjs
       - name: Prepare Go for actionlint
         uses: actions/setup-go@v5
         with:
