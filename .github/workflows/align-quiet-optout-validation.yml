@@ -1,0 +1,15 @@
+name: ALIGN quiet opt-out validation (temporary)
+
+on:
+  push:
+    branches:
+      - fix/align-quiet-refusal-revoke-open-position-follow-20261118
+    paths:
+      - ".github/workflows/align-quiet-optout-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    uses: ./.github/workflows/align-bot-validation.yml
