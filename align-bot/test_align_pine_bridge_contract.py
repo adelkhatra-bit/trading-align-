@@ -55,6 +55,20 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertIn('na(v) ? "null" : str.tostring(v)', export_block)
         self.assertIn('na(v) ? "null" : v == 1', export_block)
 
+    def test_robot_v12_exports_closed_mtf_directions_for_entry_confirmation(self):
+        self.assertIn(
+            "bridgeClosedMtfOk = isGoldNasdaq ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan)",
+            self.source,
+        )
+        self.assertIn(
+            'bridgeConfirmed = bridgePlanValid and etatS == "CONFIRMÉ" and scoreV >= 75 and bridgeClosedMtfOk',
+            self.source,
+        )
+        export_block = self.source.split(EXPORT_MARKER, 1)[1]
+        self.assertIn('"lecture_5m":\' + f_align_v25_json_dir(nz(d5Fermee))', export_block)
+        self.assertIn('"lecture_15m":\' + f_align_v25_json_dir(nz(d15Fermee))', export_block)
+        self.assertIn('"lecture_60m":\' + f_align_v25_json_dir(nz(d60Fermee))', export_block)
+
     def test_no_secret_is_embedded_in_pine(self):
         self.assertNotIn("ALIGN_TV_INGEST_TOKEN", self.source)
         self.assertNotIn("ingest_token", self.source)
