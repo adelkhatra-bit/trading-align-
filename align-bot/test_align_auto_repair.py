@@ -1,4 +1,6 @@
 import unittest
+from unittest.mock import patch
+from scripts import align_auto_repair as repair
 from scripts.align_auto_repair import (
     event_target, find_issue_for_sha, next_attempt, repair_issue_body,
     summarize_failed_jobs,
@@ -72,6 +74,31 @@ class RepairIssueTests(unittest.TestCase):
         self.assertIn("MTF regression", summary)
         self.assertNotIn("setup", summary)
         self.assertNotIn("lint", summary)
+
+
+class CopilotAssignmentGateTests(unittest.TestCase):
+    def test_no_user_token_keeps_assignment_manual(self):
+        with patch.object(repair, "COPILOT_TOKEN", ""), patch.object(repair, "request_graphql") as query:
+            self.assertFalse(repair.assign_copilot_if_available(77, []))
+            query.assert_not_called()
+
+    def test_active_copilot_issue_blocks_parallel_assignment(self):
+        active = [{"state": "open", "assignees": [{"login": "copilot-swe-agent[bot]"}]}]
+        with patch.object(repair, "COPILOT_TOKEN", "user-token"), patch.object(repair, "request_graphql") as query:
+            self.assertFalse(repair.assign_copilot_if_available(77, active))
+            query.assert_not_called()
+
+    def test_cloud_agent_assignment_uses_user_token_only_after_actor_check(self):
+        actors = {"data": {"repository": {"suggestedActors": {"nodes": [{"login": "copilot-swe-agent"}]}}}}
+        with patch.object(repair, "COPILOT_TOKEN", "user-token"), \\
+             patch.object(repair, "request_graphql", return_value=actors), \\
+             patch.object(repair, "request_json", return_value={}) as request:
+            self.assertTrue(repair.assign_copilot_if_available(77, []))
+        args = request.call_args
+        self.assertEqual(args.args[0], "/repos/adelkhatra-bit/trading-align-/issues/77/assignees")
+        self.assertEqual(args.kwargs["token"], "user-token")
+        self.assertEqual(args.kwargs["payload"]["assignees"], ["copilot-swe-agent[bot]"])
+        self.assertEqual(args.kwargs["payload"]["agent_assignment"]["base_branch"], "main")
 
 
 if __name__ == "__main__":
