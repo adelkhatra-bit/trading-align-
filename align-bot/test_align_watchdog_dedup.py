@@ -76,6 +76,63 @@ class WatchdogBlockerDedupTests(unittest.TestCase):
 
         self.assertEqual(api_mock.call_args_list[-1].kwargs.get("method"), "POST")
 
+    def test_legacy_report_without_step_detail_resolves_original_run_before_dedup(self):
+        legacy = issue(
+            501,
+            "\\n".join([
+                "<!-- [align-watchdog:run-44265635694] -->",
+                "## ALIGN workflow watchdog report",
+                "**Workflow:** ALIGN Copilot Issue Relay",
+                "**Branch:** main",
+                "### Jobs",
+                "- **relay** — failure",
+            ]),
+        )
+        with patch.object(
+            watchdog,
+            "api",
+            side_effect=[[], [legacy], {"jobs": [failed_job()]}],
+        ) as api_mock:
+            watchdog.report(
+                run(44270000006),
+                "Workflow failed or timed out.",
+                [failed_job()],
+            )
+
+        self.assertEqual(api_mock.call_count, 3)
+        self.assertIn("/actions/runs/44265635694/jobs", api_mock.call_args_list[2].args[0])
+        self.assertNotEqual(api_mock.call_args_list[-1].kwargs.get("method"), "POST")
+
+    def test_legacy_report_without_step_detail_does_not_hide_a_different_original_step(self):
+        legacy = issue(
+            501,
+            "\\n".join([
+                "<!-- [align-watchdog:run-44265635695] -->",
+                "## ALIGN workflow watchdog report",
+                "**Workflow:** ALIGN Copilot Issue Relay",
+                "**Branch:** main",
+                "### Jobs",
+                "- **relay** — failure",
+            ]),
+        )
+        with patch.object(
+            watchdog,
+            "api",
+            side_effect=[
+                [],
+                [legacy],
+                {"jobs": [failed_job(step="Install Copilot CLI")]},
+                {"number": 505},
+            ],
+        ) as api_mock:
+            watchdog.report(
+                run(44270000007),
+                "Workflow failed or timed out.",
+                [failed_job()],
+            )
+
+        self.assertEqual(api_mock.call_args_list[-1].kwargs.get("method"), "POST")
+
     def test_legacy_report_with_different_failed_step_does_not_suppress(self):
         legacy = issue(
             498,
