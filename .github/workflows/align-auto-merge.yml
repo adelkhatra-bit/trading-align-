@@ -1,0 +1,53 @@
+name: ALIGN fusion automatique contrôlée
+
+# Fusionne une PR ALIGN vers main seulement si TOUTES les conditions sont vraies sur son SHA exact :
+# - dépôt identique (pas de fork), base main ;
+# - tous les contrôles de la PR sont verts (succès, aucun échec ni en cours) ;
+# - revue Codex terminée pour ce SHA, sans remarque bloquante ;
+# - état de fusion propre (pas de conflit).
+# Sinon : aucune fusion. Ne contourne jamais les protections GitHub.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:
+    types: [created, edited]
+  check_suite:
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+concurrency:
+  group: align-auto-merge
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+    steps:
+      - name: Évaluer et fusionner les PR conformes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -u
+          PRS=$(gh api "repos/$REPO/pulls?state=open&base=main&per_page=50" --jq '.[] | select(.head.repo.full_name == env.REPO) | .number')
+          for N in $PRS; do
+            SHA=$(gh api "repos/$REPO/pulls/$N" --jq '.head.sha')
+            STATE=$(gh api "repos/$REPO/pulls/$N" --jq '.mergeable_state')
+            # 1. Contrôles : au moins un succès, aucun échec, aucun en cours (hors cette porte)
+            CHECKS=$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" --jq '[.check_runs[] | select(.name | test("fusion automatique") | not) | {s:.status, c:.conclusion}]')
+            OK_CHECKS=$(echo "$CHECKS" | jq 'length > 0 and all(.[]; .s == "completed" and (.c == "success" or .c == "skipped")) and any(.[]; .c == "success")')
+            # 2. Revue Codex terminée pour CE SHA, sans remarque bloquante
+            CODEX=$(gh api "repos/$REPO/issues/$N/comments?per_page=100" --jq '[.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .body | capture("codex-review-state:v1 (?<j>\\{.*?\\}) -->")?.j] | last // "{}"' | sed 's/&#123;/{/g; s/&#125;/}/g; s/\\"/"/g' )
+            OK_CODEX=$(echo "$CODEX" | jq -r --arg s "$SHA" 'if (.code_review.commit_sha == $s and .code_review.status == "completed" and .code_review.has_unresolved_findings == false) then "yes" else "no" end' 2>/dev/null || echo no)
+            echo "PR #$N sha=${SHA:0:7} checks_ok=$OK_CHECKS codex_ok=$OK_CODEX mergeable=$STATE"
+            if [ "$OK_CHECKS" = "true" ] && [ "$OK_CODEX" = "yes" ] && [ "$STATE" = "clean" ]; then
+              gh api "repos/$REPO/pulls/$N/merge" -X PUT -f merge_method=squash -f sha="$SHA" >/dev/null && echo "PR #$N fusionnée (SHA ${SHA:0:7})" || echo "PR #$N : fusion refusée par GitHub, aucune action forcée"
+            else
+              echo "PR #$N : aucune fusion (conditions non remplies)"
+            fi
+          done
