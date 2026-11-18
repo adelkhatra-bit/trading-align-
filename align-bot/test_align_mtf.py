@@ -2274,9 +2274,14 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
         self.assertIn("<i>ℹ️ note</i>", html)
 
     def test_analysis_shows_todays_us_news(self):
-        import time as _t
-        now = _t.time()
-        e = {"cal": {"t": 1, "jour": [{"titre": "Unemployment Claims", "t": int(now - 60), "impact": "Low", "prev": "220K"}]}}
+        # Ancrer le test à midi, heure de Paris, pour éviter le basculement
+        # de date locale lorsque la CI s'exécute autour de minuit UTC.
+        import datetime as _dt
+        evenement = _dt.datetime.now(align_bot.PARIS).replace(
+            hour=12, minute=0, second=0, microsecond=0
+        )
+        now = evenement.timestamp() + 60
+        e = {"cal": {"t": 1, "jour": [{"titre": "Unemployment Claims", "t": int(evenement.timestamp()), "impact": "Low", "prev": "220K"}]}}
         lignes = align_bot.news_du_jour(e, maintenant=now)
         self.assertEqual(lignes[0], "📰 NEWS USA DU JOUR")
         self.assertIn("Unemployment Claims (prévu 220K) — sortie", lignes[1])

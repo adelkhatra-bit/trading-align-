@@ -1,0 +1,49 @@
+name: ALIGN Workflow Watchdog
+
+on:
+  workflow_run:
+    workflows:
+      - "ALIGN MTF validation"
+      - "ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)"
+      - "pages build and deployment"
+      - "ALIGN worker rollover"
+      - "CI Integration Tests"
+      - "ALIGN contrôle IA (manuel)"
+      - "ALIGN audit des messages envoyés (manuel)"
+      - "ALIGN MetaApi vérification"
+      - "ALIGN Topstep vérification"
+      - "ALIGN rejeu entrée sniper (manuel)"
+    types: [completed]
+    branches: [main, live-data]
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  issues: write
+  contents: read
+
+concurrency:
+  group: align-workflow-watchdog-${{ github.event.workflow_run.id || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  inspect-and-recover:
+    if: github.repository == 'adelkhatra-bit/trading-align-'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout watchdog from production branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Detect failures, retry safe transient validation errors, report blockers
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+        run: python3 scripts/align_workflow_watchdog.py
