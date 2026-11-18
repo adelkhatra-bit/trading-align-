@@ -183,20 +183,39 @@ def inspect_stale_runs() -> None:
 
 
 def inspect_recent_failures() -> None:
-    """Fallback scan: catch failed runs even when chained workflow_run events are not delivered."""
+    """Fallback scan: paginate until the 24-hour cutoff so noisy workflows cannot hide failures."""
     cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=24)
     failures = {"failure", "timed_out", "action_required"}
+    page_size = 100
     for branch in ("main", "live-data"):
-        query = urllib.parse.urlencode({"branch": branch, "status": "completed", "per_page": 100})
-        payload = api(f"/repos/{REPO}/actions/runs?{query}")
-        for run in payload.get("workflow_runs", []):
-            if run.get("name") == "ALIGN Workflow Watchdog":
-                continue
-            if run.get("conclusion") not in failures:
-                continue
-            if parse_time(run["created_at"]) < cutoff:
-                continue
-            handle_completed(run)
+        page = 1
+        while True:
+            query = urllib.parse.urlencode({
+                "branch": branch,
+                "status": "completed",
+                "per_page": page_size,
+                "page": page,
+            })
+            payload = api(f"/repos/{REPO}/actions/runs?{query}")
+            runs = payload.get("workflow_runs", [])
+            if not runs:
+                break
+
+            older_than_cutoff = False
+            for run in runs:
+                # GitHub returns runs newest first; once the cutoff is crossed,
+                # no later page can contain a recent failure.
+                if parse_time(run["created_at"]) < cutoff:
+                    older_than_cutoff = True
+                    break
+                if run.get("name") == "ALIGN Workflow Watchdog":
+                    continue
+                if run.get("conclusion") in failures:
+                    handle_completed(run)
+
+            if older_than_cutoff or len(runs) < page_size:
+                break
+            page += 1
 
 
 def main() -> int:
