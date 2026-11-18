@@ -44,7 +44,9 @@ jobs:
             CHECKS=$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" --jq '[.check_runs[] | select(.name | test("fusion automatique") | not) | {s:.status, c:.conclusion}]')
             OK_CHECKS=$(echo "$CHECKS" | jq 'length > 0 and all(.[]; .s == "completed" and (.c == "success" or .c == "skipped")) and any(.[]; .c == "success")')
             # 2. Revue Codex terminée pour CE SHA, sans remarque bloquante
-            CODEX=$(gh api "repos/$REPO/issues/$N/comments?per_page=100" --jq '[.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .body | capture("codex-review-state:v1 (?<j>\\{.*?\\}) -->")?.j] | last // "{}"' | sed 's/&#123;/{/g; s/&#125;/}/g; s/\\"/"/g' )
+            # Toutes les pages (ordre chronologique) : on garde le DERNIER état Codex publié.
+            CODEX=$(gh api --paginate "repos/$REPO/issues/$N/comments?per_page=100" --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .body | capture("codex-review-state:v1 (?<j>\\{.*?\\}) -->")?.j' | tail -n 1 | sed 's/&#123;/{/g; s/&#125;/}/g; s/\\"/"/g')
+            [ -n "$CODEX" ] || CODEX='{}'
             OK_CODEX=$(echo "$CODEX" | jq -r --arg s "$SHA" 'if (.code_review.commit_sha == $s and .code_review.status == "completed" and .code_review.has_unresolved_findings == false) then "yes" else "no" end' 2>/dev/null || echo no)
             echo "PR #$N sha=${SHA:0:7} checks_ok=$OK_CHECKS codex_ok=$OK_CODEX mergeable=$STATE"
             if [ "$OK_CHECKS" = "true" ] && [ "$OK_CODEX" = "yes" ] && [ "$STATE" = "clean" ]; then
