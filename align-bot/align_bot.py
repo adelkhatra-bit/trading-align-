@@ -3408,6 +3408,20 @@ def epingler(etat, cid):
     except Exception as ex:
         print("epingler", cid, ex)
 
+# Règle d'Adel (18/11) : AUCUN message privé par défaut. Une personne ne reçoit que ce qu'elle a
+# demandé (marché choisi + coach activé, ou une commande). Ces envois spontanés restent dans le code
+# mais sont éteints ; ils ne se rallument que par une variable explicite à 1.
+QUESTION_QUOTIDIENNE = os.environ.get("ALIGN_QUESTION_QUOTIDIENNE", "0") == "1"   # « tu trades aujourd'hui ? »
+ENVOI_CLAVIER_SPONTANE = os.environ.get("ALIGN_ENVOI_CLAVIER_SPONTANE", "0") == "1"   # « nouveaux boutons »
+REGLES_PRIVEES_SPONTANEES = os.environ.get("ALIGN_REGLES_PRIVEES_SPONTANEES", "0") == "1"   # règles épinglées en privé
+RELANCE_VIP_SPONTANEE = os.environ.get("ALIGN_RELANCE_VIP_SPONTANEE", "0") == "1"   # « réservé aux VIP »
+
+
+def envois_spontanes_prives():
+    """État des envois privés spontanés (tous éteints par défaut)."""
+    return {"question_quotidienne": QUESTION_QUOTIDIENNE, "clavier": ENVOI_CLAVIER_SPONTANE,
+            "regles_privees": REGLES_PRIVEES_SPONTANEES, "relance_vip": RELANCE_VIP_SPONTANEE}
+
 PARTAGE_JOURS = int(os.environ.get("PARTAGE_JOURS", "3"))  # rappel « partage à tes amis » tous les X jours
 PARTAGE_HEURE = int(os.environ.get("PARTAGE_HEURE", "18"))  # heure de Paris du rappel de partage
 PROPRIO_VUE_GRATUITE = os.environ.get("PROPRIO_VUE_GRATUITE", "0") == "1"  # 1 = propriétaire toujours en vue gratuite
@@ -12614,7 +12628,8 @@ def un_tour(etat, chats):
         traiter_file_live(etat, limite=30)
         if SHUTDOWN_REQUESTED.is_set():
             return
-        question_quotidienne(etat, chats)
+        if QUESTION_QUOTIDIENNE:
+            question_quotidienne(etat, chats)
         if etat.get("clavier") != 9:
             # Le nouveau clavier sera joint au prochain vrai message du bot.
             # Aucun message vide, promotionnel ou de démarrage n'est envoyé.
@@ -12659,6 +12674,8 @@ def un_tour(etat, chats):
                     chats.discard(cid)
                     if cid not in etat.setdefault("prospects", []):
                         etat["prospects"].append(cid)
+                    if not RELANCE_VIP_SPONTANEE:
+                        continue                    # aucun message promotionnel spontané
                     _envoi_sur(cid, reply_markup=CLAVIER_VISITEUR, text=(
                         "🔒 Les positions en direct sont réservées aux VIP\n"
                         + ("🎁 Ta position gratuite du jour est encore dispo\n" if cid not in etat.get("bienvenue", {}) else "")
@@ -12892,8 +12909,10 @@ def un_tour(etat, chats):
         except Exception as ex:
             print("live news", ex)
         if TOKEN:
+            canal_ = str(etat.get("canal") or "")
             for cid in set(destinataires(etat, chats)) | set(etat.get("prospects", [])):
-                epingler(etat, cid)
+                if str(cid) == canal_ or REGLES_PRIVEES_SPONTANEES:
+                    epingler(etat, cid)             # chaîne VIP toujours ; privé seulement si rallumé
             menu_canal_vip(etat)
             menu_canal_resultats(etat)
         # Aucun rappel promotionnel privé : une seule question quotidienne est autorisée.
@@ -12940,7 +12959,8 @@ def un_tour(etat, chats):
             preparer_chaines(etat)
             epingler_menus_chaines(etat)
             epingler_compte_finance(etat)          # v8.9 : message « compte financé » épinglé
-            renvoyer_claviers(etat, chats)
+            if ENVOI_CLAVIER_SPONTANE:
+                renvoyer_claviers(etat, chats)
         except Exception as ex:
             print("préparer chaînes", ex)
         for nom_marche in MARCHES:
