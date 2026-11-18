@@ -20,6 +20,22 @@ from urllib.parse import parse_qs, urlsplit
 
 SOURCE = "ALIGN_MTF_PRO_V25"
 ALLOWED_SYMBOLS = {"BTCUSD", "XAUUSD", "NAS100"}
+# Le marché déclaré (input « Marché ALIGN » du Pine) doit correspondre au graphique
+# réellement calculé (syminfo.tickerid). Panne réelle du 18/11 : 12 alertes NAS100/XAUUSD
+# envoyaient « BTCUSD » → prix du Gold/NASDAQ dans la boîte BTC. Jamais de mélange de marchés.
+TICKER_MARKERS = {
+    "BTCUSD": ("BTC", "XBT"),
+    "XAUUSD": ("XAU", "GOLD"),
+    "NAS100": ("NAS100", "NDX", "US100", "USTEC", "NQ"),
+}
+
+
+def tickerid_matches_symbol(symbol, tickerid):
+    ticker = _text(tickerid, 64).upper().split(":")[-1]
+    if not ticker:
+        return False
+    hits = [m for m, marks in TICKER_MARKERS.items() if any(k in ticker for k in marks)]
+    return hits == [symbol]
 ACTIVE_TIMEFRAMES = {"M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"}
 REQUIRED_TIMEFRAMES = ("M5", "M15", "H1", "H4", "D1", "W1")
 TIMEFRAME_MS = {
@@ -179,6 +195,8 @@ class BridgeStore:
             return 400, {"ok": False, "error": "unsupported_symbol"}
         if timeframe not in ACTIVE_TIMEFRAMES:
             return 400, {"ok": False, "error": "unsupported_active_timeframe"}
+        if not tickerid_matches_symbol(symbol, payload.get("tickerid")):
+            return 400, {"ok": False, "error": "symbol_tickerid_mismatch", "symbol": symbol}
 
         price = _finite_number(payload.get("price"))
         source_timestamp = _epoch_ms(payload.get("timestamp"))

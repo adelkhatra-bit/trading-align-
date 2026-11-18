@@ -6,6 +6,7 @@ from http.server import ThreadingHTTPServer
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+import align_tv_bridge as bridge
 from align_tv_bridge import (
     ACTIVE_MAX_AGE_MS,
     MAX_FUTURE_SKEW_MS,
@@ -102,6 +103,26 @@ class BridgeStoreTests(unittest.TestCase):
         status, result = self.store.ingest(valid_payload(), "c" * 64, BASE_MS)
         self.assertEqual(status, 401)
         self.assertEqual(result["error"], "unauthorized")
+
+    def test_rejects_market_mixed_with_chart(self):
+        # 18/11 : alerte posée sur NAS100 avec « Marché ALIGN » = BTCUSD.
+        payload = valid_payload()
+        payload["tickerid"] = "FX:NAS100"
+        status, result = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 400)
+        self.assertEqual(result["error"], "symbol_tickerid_mismatch")
+        payload = valid_payload(symbol="XAUUSD")
+        status, result = self.store.ingest(payload, INGEST, BASE_MS)  # tickerid BTCUSDT
+        self.assertEqual(result["error"], "symbol_tickerid_mismatch")
+        self.assertEqual(self.store.read("BTCUSD", BASE_MS)[1]["snapshots"], {})
+
+    def test_accepts_real_tradingview_tickers(self):
+        for symbol, tickerid in (("BTCUSD", "CRYPTO:BTCUSD"), ("BTCUSD", "BINANCE:BTCUSDT"),
+                                 ("XAUUSD", "FOREXCOM:XAUUSD"), ("XAUUSD", "OANDA:XAUUSD"),
+                                 ("NAS100", "FX:NAS100"), ("NAS100", "CAPITALCOM:US100")):
+            self.assertTrue(bridge.tickerid_matches_symbol(symbol, tickerid), tickerid)
+        self.assertFalse(bridge.tickerid_matches_symbol("BTCUSD", ""))
+        self.assertFalse(bridge.tickerid_matches_symbol("NAS100", "FOREXCOM:XAUUSD"))
 
     def test_rejects_unsupported_symbol(self):
         status, result = self.store.ingest(valid_payload(symbol="EURUSD"), INGEST, BASE_MS)
