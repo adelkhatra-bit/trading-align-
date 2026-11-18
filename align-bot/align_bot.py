@@ -1448,12 +1448,15 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
          "━━━━━━━━━━━━━━━━━━", "📈 RSI PAR UNITÉ DE TEMPS",
          "  /  ".join(f"{nom} {R[i]:.0f}" for nom, i in ut)]
     if tv_plan["available"]:
-        l += ["━━━━━━━━━━━━━━━━━━", "📡 PLAN DE L'INDICATEUR TRADINGVIEW",
-              f"Unité sélectionnée : {tv_plan['timeframe']}",
-              f"Entrée indicateur : {px(tv_plan['entry'])} • SL : {px(tv_plan['sl'])} • TP1 : {px(tv_plan.get('tp1') if tv_plan.get('tp1') is not None else tv_plan.get('tp'))}" +
+        l += ["━━━━━━━━━━━━━━━━━━", "📡 PLAN CANONIQUE PINE v25",
+              "Plan de niveaux : M15 (indépendant de l'unité du graphique)",
+              f"Unité de validation : {tv_plan['entry_timeframe']} ({tv_plan['strategy']})",
+              f"Entrée : {px(tv_plan['entry'])} • SL : {px(tv_plan['sl'])} • TP1 : {px(tv_plan['tp1'])}" +
               (f" • TP2 : {px(tv_plan['tp2'])}" if tv_plan.get("tp2") is not None else " • TP2 : non fourni par le bridge"),
-              "Clôture confirmée par l'indicateur : " + ("OUI" if tv_plan["confirmed"] else "NON / NON FOURNIE"),
-              "⚠️ Plan indicateur séparé du verdict de sécurité ALIGN."]
+              f"Zone verte : {px(tv_plan['zone_low'])} → {px(tv_plan['zone_high'])} • Décision : {px(tv_plan['decision'])}",
+              "Clôture MTF Pine : " + ("CONFIRMÉE" if tv_plan["confirmed"] else "EN ATTENTE"),
+              "Déclencheur clôturé : " + ("VALIDÉ" if tv_plan["triggered"] else "EN ATTENTE"),
+              "⚠️ Les filtres de sécurité ALIGN peuvent refuser l'entrée sans modifier les niveaux Pine."]
     elif r.get("tv_indicator_mtf", {}).get("available"):
         l += ["━━━━━━━━━━━━━━━━━━", "📡 PLAN TRADINGVIEW",
               f"{tv_plan['timeframe']} : {tv_plan['reason']}"]
