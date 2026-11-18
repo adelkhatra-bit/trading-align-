@@ -36,6 +36,8 @@ TRANSIENT_PATTERNS = (
     r"rate limit exceeded",
 )
 BOT_WORKFLOW = "ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)"
+RUNS_PER_PAGE = 100
+MAX_RUNS_PER_QUERY = 1000
 
 
 def api(path: str, method: str = "GET", payload: dict | None = None):
@@ -182,40 +184,99 @@ def inspect_stale_runs() -> None:
                 )
 
 
-def inspect_recent_failures() -> None:
-    """Fallback scan: paginate until the 24-hour cutoff so noisy workflows cannot hide failures."""
-    cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=24)
-    failures = {"failure", "timed_out", "action_required"}
-    page_size = 100
-    for branch in ("main", "live-data"):
-        page = 1
-        while True:
-            query = urllib.parse.urlencode({
-                "branch": branch,
-                "status": "completed",
-                "per_page": page_size,
-                "page": page,
-            })
+def _api_time(value: dt.datetime) -> str:
+    return value.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _scan_completed_window(
+    branch: str,
+    start: dt.datetime,
+    end: dt.datetime,
+    failures: set[str],
+    seen_run_ids: set[int],
+) -> None:
+    """Scan one created-time window without silently crossing GitHub's 1,000-result cap."""
+    query_base = {
+        "branch": branch,
+        "status": "completed",
+        "created": f"{_api_time(start)}..{_api_time(end)}",
+        "per_page": RUNS_PER_PAGE,
+    }
+    first_query = urllib.parse.urlencode({**query_base, "page": 1})
+    first_payload = api(f"/repos/{REPO}/actions/runs?{first_query}")
+    first_runs = first_payload.get("workflow_runs", [])
+    total_count_value = first_payload.get("total_count")
+    if total_count_value is None:
+        if len(first_runs) >= RUNS_PER_PAGE:
+            raise RuntimeError(
+                f"WATCHDOG_SCAN_INCOMPLETE branch={branch}: GitHub omitted total_count "
+                "for a full page; refusing to assume the 1,000-result cap was not reached."
+            )
+        total_count = len(first_runs)
+    else:
+        total_count = int(total_count_value)
+
+    if total_count > MAX_RUNS_PER_QUERY:
+        span_seconds = int((end - start).total_seconds())
+        if span_seconds < 2:
+            raise RuntimeError(
+                f"WATCHDOG_SCAN_INCOMPLETE branch={branch}: {total_count} runs remain "
+                "inside the smallest supported time window."
+            )
+        midpoint = start + dt.timedelta(seconds=span_seconds // 2)
+        if midpoint <= start or midpoint >= end:
+            raise RuntimeError(
+                f"WATCHDOG_SCAN_INCOMPLETE branch={branch}: unable to subdivide "
+                "a saturated GitHub Actions query."
+            )
+        print(
+            f"WATCHDOG_SPLIT_WINDOW branch={branch} total={total_count} "
+            f"start={_api_time(start)} end={_api_time(end)}"
+        )
+        _scan_completed_window(branch, start, midpoint, failures, seen_run_ids)
+        _scan_completed_window(branch, midpoint, end, failures, seen_run_ids)
+        return
+
+    if total_count == 0:
+        return
+
+    page_count = (total_count + RUNS_PER_PAGE - 1) // RUNS_PER_PAGE
+    for page in range(1, page_count + 1):
+        if page == 1:
+            runs = first_runs
+        else:
+            query = urllib.parse.urlencode({**query_base, "page": page})
             payload = api(f"/repos/{REPO}/actions/runs?{query}")
             runs = payload.get("workflow_runs", [])
-            if not runs:
-                break
 
-            older_than_cutoff = False
-            for run in runs:
-                # GitHub returns runs newest first; once the cutoff is crossed,
-                # no later page can contain a recent failure.
-                if parse_time(run["created_at"]) < cutoff:
-                    older_than_cutoff = True
-                    break
-                if run.get("name") == "ALIGN Workflow Watchdog":
-                    continue
-                if run.get("conclusion") in failures:
-                    handle_completed(run)
+        if not runs:
+            raise RuntimeError(
+                f"WATCHDOG_SCAN_INCOMPLETE branch={branch}: empty page {page} "
+                f"before expected page {page_count}."
+            )
 
-            if older_than_cutoff or len(runs) < page_size:
-                break
-            page += 1
+        for run in runs:
+            run_id = int(run.get("id") or 0)
+            if not run_id or run_id in seen_run_ids:
+                continue
+            seen_run_ids.add(run_id)
+
+            created_at = parse_time(run["created_at"])
+            if created_at < start or created_at > end:
+                continue
+            if run.get("name") == "ALIGN Workflow Watchdog":
+                continue
+            if run.get("conclusion") in failures:
+                handle_completed(run)
+
+
+def inspect_recent_failures() -> None:
+    """Fallback scan: cover the full 24-hour window, splitting saturated API ranges."""
+    now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
+    cutoff = now - dt.timedelta(hours=24)
+    failures = {"failure", "timed_out", "action_required"}
+    for branch in ("main", "live-data"):
+        _scan_completed_window(branch, cutoff, now, failures, set())
 
 
 def main() -> int:
