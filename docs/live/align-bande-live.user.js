@@ -304,7 +304,7 @@
     const anglais = voixLangue === 'en';
     if (!!item.en !== anglais) return 0; // un seul passage vocal, dans la langue choisie
     const maintenant = Date.now();
-    if (maintenant - voixDerniere < 12000) return; // pas de mitraillette vocale
+    if (maintenant - voixDerniere < 12000) return 0; // pas de mitraillette vocale
     let phrase = String(item.texte || '').replace(/^🇫🇷\s*|^🇬🇧\s*/, '')
       .replace(/⚠️ Ceci n'est pas un conseil en investissement[^•]*/gi, '')
       .replace(/https?:\/\/\S+/g, '')
