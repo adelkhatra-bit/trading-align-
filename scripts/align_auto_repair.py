@@ -15,6 +15,7 @@ EXPECTED_REPO = "adelkhatra-bit/trading-align-"
 LABEL = "align-repair"
 IGNORED_PRS = {401, 448, 451}
 MAX_ATTEMPTS = 2
+BOT_LOGIN = "github-actions[bot]"
 SHA_MARKER = re.compile(r"<!-- ALIGN_REPAIR_SHA=([0-9a-f]{40}) -->")
 ATTEMPT_MARKER = re.compile(r"<!-- ALIGN_REPAIR_ATTEMPT=(\d+) -->")
 RUN_MARKER = re.compile(r"<!-- ALIGN_REPAIR_RUN=(\d+) -->")
@@ -40,9 +41,14 @@ def request_json(path: str, method: str = "GET", payload: dict | None = None, to
         return json.loads(raw.decode("utf-8")) if raw else None
 
 
+def is_actions_bot(item: dict | None) -> bool:
+    user = item.get("user") if isinstance(item, dict) else None
+    return isinstance(user, dict) and user.get("login") == BOT_LOGIN
+
+
 def event_target(event: dict) -> dict | None:
     run = event.get("workflow_run")
-    if not isinstance(run, dict) or run.get("conclusion") != "failure":
+    if not isinstance(run, dict) or run.get("conclusion") not in {"failure", "timed_out"}:
         return None
     sha = str(run.get("head_sha") or "").lower()
     branch = str(run.get("head_branch") or "")
@@ -71,12 +77,12 @@ def event_target(event: dict) -> dict | None:
 def summarize_failed_jobs(jobs_payload: dict) -> str:
     lines = []
     for job in jobs_payload.get("jobs") or []:
-        if job.get("conclusion") != "failure":
+        if job.get("conclusion") not in {"failure", "timed_out"}:
             continue
         failed_steps = [
             str(step.get("name") or "step")
             for step in job.get("steps") or []
-            if step.get("conclusion") == "failure"
+            if step.get("conclusion") in {"failure", "timed_out"}
         ]
         suffix = "; étapes en échec : " + ", ".join(failed_steps[:8]) if failed_steps else ""
         lines.append(f"- {job.get('name') or 'job'}{suffix}")
@@ -170,7 +176,7 @@ def assign_copilot_if_available(issue_number: int, issues: list[dict]) -> bool:
 
 def find_issue_for_sha(issues: list[dict], sha: str) -> dict | None:
     marker = f"<!-- ALIGN_REPAIR_SHA={sha} -->"
-    return next((item for item in issues if marker in (item.get("body") or "")), None)
+    return next((item for item in issues if is_actions_bot(item) and marker in (item.get("body") or "")), None)
 
 
 def ensure_label() -> None:
@@ -201,10 +207,19 @@ def comments_for_issue(number: int) -> list[dict]:
 
 
 def next_attempt(issue: dict, comments: list[dict]) -> int:
-    values = [int(x) for x in ATTEMPT_MARKER.findall(issue.get("body") or "")]
+    values = []
+    if is_actions_bot(issue):
+        values.extend(int(x) for x in ATTEMPT_MARKER.findall(issue.get("body") or ""))
     for item in comments:
-        values.extend(int(x) for x in ATTEMPT_MARKER.findall(item.get("body") or ""))
+        if is_actions_bot(item):
+            values.extend(int(x) for x in ATTEMPT_MARKER.findall(item.get("body") or ""))
     return max(values, default=0) + 1
+
+
+def has_run_marker(issue: dict, comments: list[dict], marker: str) -> bool:
+    if is_actions_bot(issue) and marker in (issue.get("body") or ""):
+        return True
+    return any(is_actions_bot(item) and marker in (item.get("body") or "") for item in comments)
 
 
 def repair_issue_body(target: dict, failure_summary: str, attempt: int) -> str:
@@ -261,7 +276,7 @@ def main() -> int:
     if existing:
         comments = comments_for_issue(int(existing["number"]))
         run_marker = f"<!-- ALIGN_REPAIR_RUN={target['run_id']} -->"
-        if run_marker in (existing.get("body") or "") or any(run_marker in (c.get("body") or "") for c in comments):
+        if has_run_marker(existing, comments, run_marker):
             print(f"Duplicate failure ignored for SHA {target['sha']} and run {target['run_id']}.")
             return 0
         attempt = next_attempt(existing, comments)

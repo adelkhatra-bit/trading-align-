@@ -2,11 +2,13 @@ import unittest
 from unittest.mock import patch
 from scripts import align_auto_repair as repair
 from scripts.align_auto_repair import (
-    event_target, find_issue_for_sha, next_attempt, repair_issue_body,
+    event_target, find_issue_for_sha, has_run_marker, next_attempt, repair_issue_body,
     summarize_failed_jobs,
 )
 
 SHA = "1" * 40
+BOT = {"login": "github-actions[bot]"}
+USER = {"login": "adelkhatra-bit"}
 
 
 class RepairEventTests(unittest.TestCase):
@@ -22,6 +24,9 @@ class RepairEventTests(unittest.TestCase):
 
     def test_failed_pull_request_run_is_eligible(self):
         self.assertEqual(event_target(self.run_event(prs=[{"number": 500}]))["pr_numbers"], [500])
+
+    def test_timed_out_main_run_is_eligible(self):
+        self.assertEqual(event_target(self.run_event(conclusion="timed_out", branch="main"))["sha"], SHA)
 
     def test_non_failure_is_ignored(self):
         self.assertIsNone(event_target(self.run_event(conclusion="success", branch="main")))
@@ -41,14 +46,32 @@ class RepairEventTests(unittest.TestCase):
 
 class RepairIssueTests(unittest.TestCase):
     def test_deduplicates_by_exact_sha_marker(self):
-        issue = {"number": 9, "body": f"report <!-- ALIGN_REPAIR_SHA={SHA} -->"}
+        issue = {"number": 9, "user": BOT, "body": f"report <!-- ALIGN_REPAIR_SHA={SHA} -->"}
         self.assertEqual(find_issue_for_sha([issue], SHA), issue)
         self.assertIsNone(find_issue_for_sha([issue], "2" * 40))
 
+    def test_user_authored_sha_marker_cannot_suppress_repair(self):
+        issue = {"number": 10, "user": USER, "body": f"<!-- ALIGN_REPAIR_SHA={SHA} -->"}
+        self.assertIsNone(find_issue_for_sha([issue], SHA))
+
     def test_attempt_counter_starts_at_one_and_increments(self):
-        issue = {"body": "<!-- ALIGN_REPAIR_ATTEMPT=1 -->"}
-        comments = [{"body": "<!-- ALIGN_REPAIR_ATTEMPT=2 -->"}]
+        issue = {"user": BOT, "body": "<!-- ALIGN_REPAIR_ATTEMPT=1 -->"}
+        comments = [{"user": BOT, "body": "<!-- ALIGN_REPAIR_ATTEMPT=2 -->"}]
         self.assertEqual(next_attempt(issue, comments), 3)
+
+    def test_user_comment_cannot_inflate_attempt_counter(self):
+        issue = {"user": BOT, "body": "<!-- ALIGN_REPAIR_ATTEMPT=1 -->"}
+        comments = [
+            {"user": USER, "body": "<!-- ALIGN_REPAIR_ATTEMPT=99 -->"},
+            {"user": BOT, "body": "<!-- ALIGN_REPAIR_ATTEMPT=2 -->"},
+        ]
+        self.assertEqual(next_attempt(issue, comments), 3)
+
+    def test_only_bot_run_marker_deduplicates(self):
+        marker = "<!-- ALIGN_REPAIR_RUN=123 -->"
+        issue = {"user": BOT, "body": ""}
+        self.assertFalse(has_run_marker(issue, [{"user": USER, "body": marker}], marker))
+        self.assertTrue(has_run_marker(issue, [{"user": BOT, "body": marker}], marker))
 
     def test_issue_body_contains_evidence_and_guardrails(self):
         target = {
@@ -62,6 +85,13 @@ class RepairIssueTests(unittest.TestCase):
         self.assertIn("pytest failed", body)
         self.assertIn("live-data/live.json", body)
         self.assertIn("1/2", body)
+
+    def test_timed_out_job_and_step_are_included(self):
+        summary = summarize_failed_jobs({"jobs": [{"name": "timed", "conclusion": "timed_out", "steps": [
+            {"name": "stalled", "conclusion": "timed_out"},
+        ]}]})
+        self.assertIn("timed", summary)
+        self.assertIn("stalled", summary)
 
     def test_failed_job_summary_lists_failed_steps_only(self):
         summary = summarize_failed_jobs({"jobs": [
