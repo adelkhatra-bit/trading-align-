@@ -182,6 +182,23 @@ def inspect_stale_runs() -> None:
                 )
 
 
+def inspect_recent_failures() -> None:
+    """Fallback scan: catch failed runs even when chained workflow_run events are not delivered."""
+    cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=24)
+    failures = {"failure", "timed_out", "action_required"}
+    for branch in ("main", "live-data"):
+        query = urllib.parse.urlencode({"branch": branch, "status": "completed", "per_page": 100})
+        payload = api(f"/repos/{REPO}/actions/runs?{query}")
+        for run in payload.get("workflow_runs", []):
+            if run.get("name") == "ALIGN Workflow Watchdog":
+                continue
+            if run.get("conclusion") not in failures:
+                continue
+            if parse_time(run["created_at"]) < cutoff:
+                continue
+            handle_completed(run)
+
+
 def main() -> int:
     if EVENT_NAME == "workflow_run":
         with open(EVENT_PATH, encoding="utf-8") as handle:
@@ -193,6 +210,7 @@ def main() -> int:
         handle_completed(run)
     else:
         inspect_stale_runs()
+        inspect_recent_failures()
     return 0
 
 
