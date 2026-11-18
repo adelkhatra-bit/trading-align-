@@ -137,10 +137,10 @@ def fusionne_lectures_tradingview(r):
 
 
 def plan_indicateur(r):
-    """Utilise le plan du timeframe réellement actif sur TradingView, avec TP1/TP2 distincts."""
+    """Plan Pine canonique M15 + bougie clôturée de déclenchement stratégie."""
     bridge = r.get("tv_indicator_mtf") or {}
-    preferred = str(bridge.get("activeTimeframe") or "").upper()
-    snap = (bridge.get("snapshots") or {}).get(preferred) or {}
+    active_tf = str(bridge.get("activeTimeframe") or "").upper()
+    snap = (bridge.get("snapshots") or {}).get(active_tf) or {}
     robot = snap.get("robotV12") or {}
     try:
         entry, sl = float(robot.get("entry")), float(robot.get("sl"))
@@ -150,30 +150,73 @@ def plan_indicateur(r):
         tp1 = float(raw_tp1)
         raw_tp2 = robot.get("tp2")
         tp2 = float(raw_tp2) if raw_tp2 not in (None, "") else None
+        zone_low = float(robot.get("entryZoneLow"))
+        zone_high = float(robot.get("entryZoneHigh"))
+        decision = float(robot.get("entryDecision"))
+        entry_bar_time = int(robot.get("entryBarTime"))
+        entry_bar_open = float(robot.get("entryBarOpen"))
+        entry_bar_high = float(robot.get("entryBarHigh"))
+        entry_bar_low = float(robot.get("entryBarLow"))
+        entry_bar_close = float(robot.get("entryBarClose"))
     except (TypeError, ValueError, KeyError):
-        return {"timeframe": preferred or None, "available": False,
-                "reason": "aucun plan ROBOT V12 complet pour l'unité TradingView active"}
-    if not snap.get("fresh"):
-        return {"timeframe": preferred, "available": False, "reason": "plan ROBOT V12 périmé"}
+        return {"timeframe": active_tf or None, "available": False,
+                "reason": "plan M15 / zone / bougie de validation Pine incomplets"}
+
+    if snap.get("fresh") is not True:
+        return {"timeframe": active_tf, "available": False, "reason": "snapshot TradingView actif périmé"}
+    if str(robot.get("planTimeframe") or "").upper() != "M15":
+        return {"timeframe": active_tf, "available": False, "reason": "référence du plan différente de M15"}
+    strategy = str(robot.get("strategy") or "").upper()
+    expected_entry_tf = {"SCALPING": "M1", "DAY": "M5", "SWING": "H1"}.get(strategy)
+    entry_tf = str(robot.get("entryTimeframe") or "").upper()
+    if expected_entry_tf is None or entry_tf != expected_entry_tf:
+        return {"timeframe": active_tf, "available": False, "reason": "unité de validation incohérente avec la stratégie"}
+
     signal = str(robot.get("signal") or robot.get("verdict") or "").upper()
     direction = _direction_tv(signal)
-    if direction not in (-1, 1) or min(entry, sl, tp1) <= 0 or (tp2 is not None and tp2 <= 0):
-        return {"timeframe": preferred, "available": False, "reason": "direction ou niveaux ROBOT V12 invalides"}
+    if direction not in (-1, 1) or min(entry, sl, tp1, zone_low, zone_high, decision) <= 0 or (tp2 is not None and tp2 <= 0):
+        return {"timeframe": active_tf, "available": False, "reason": "direction ou niveaux M15 invalides"}
+    risk = abs(entry - sl)
     if direction == 1:
-        geometrie_ok = sl < entry < tp1 and (tp2 is None or tp2 > tp1)
+        geometrie_ok = (
+            sl < entry < tp1 and (tp2 is None or tp2 > tp1)
+            and zone_low < decision < zone_high and zone_low <= entry <= zone_high
+            and zone_low >= sl + 0.25 * risk
+        )
     else:
-        geometrie_ok = tp1 < entry < sl and (tp2 is None or tp2 < tp1)
+        geometrie_ok = (
+            tp1 < entry < sl and (tp2 is None or tp2 < tp1)
+            and zone_low < decision < zone_high and zone_low <= entry <= zone_high
+            and zone_high <= sl - 0.25 * risk
+        )
     if not geometrie_ok:
-        return {"timeframe": preferred, "available": False, "reason": "géométrie entrée/SL/TP incohérente"}
-    return {"timeframe": preferred, "available": True, "direction": direction, "entry": entry, "sl": sl,
-            "tp": tp1, "tp1": tp1, "tp2": tp2,
-            "confirmed": snap.get("confirmed") is True, "verdict": robot.get("verdict"),
-            "macro_bull": robot.get("macro_bull"), "macro_bear": robot.get("macro_bear"),
-            "long_score": robot.get("long_score"), "short_score": robot.get("short_score"),
-            "anticipation": robot.get("anticipation"), "anticipation_force": robot.get("anticipation_force"),
-            "zone_proche": robot.get("zone_proche"), "liq_haute_active": robot.get("liq_haute_active"),
-            "liq_basse_active": robot.get("liq_basse_active"),
-            "timestamp": robot.get("receivedAt") or snap.get("timestamp"), "ageMs": robot.get("ageMs")}
+        return {"timeframe": active_tf, "available": False, "reason": "géométrie zone / entrée / SL / TP incohérente"}
+    if not (entry_bar_low <= min(entry_bar_open, entry_bar_close)
+            <= max(entry_bar_open, entry_bar_close) <= entry_bar_high):
+        return {"timeframe": active_tf, "available": False, "reason": "bougie de validation OHLC incohérente"}
+    retested_zone = entry_bar_high >= zone_low and entry_bar_low <= zone_high
+    candle_trigger = entry_bar_close > decision if direction == 1 else entry_bar_close < decision
+    candle_before_stop = entry_bar_close > sl if direction == 1 else entry_bar_close < sl
+    triggered = (
+        snap.get("confirmed") is True and robot.get("confirmed") is True
+        and robot.get("entryTriggered") is True and retested_zone
+        and candle_trigger and candle_before_stop
+    )
+
+    return {
+        "timeframe": active_tf, "plan_timeframe": "M15", "entry_timeframe": entry_tf,
+        "strategy": strategy, "available": True, "direction": direction,
+        "entry": entry, "sl": sl, "tp": tp1, "tp1": tp1, "tp2": tp2,
+        "zone_low": zone_low, "zone_high": zone_high, "decision": decision,
+        "entry_bar_time": entry_bar_time, "entry_bar_open": entry_bar_open,
+        "entry_bar_high": entry_bar_high, "entry_bar_low": entry_bar_low,
+        "entry_bar_close": entry_bar_close, "triggered": triggered,
+        "confirmed": snap.get("confirmed") is True and robot.get("confirmed") is True,
+        "verdict": robot.get("verdict"), "long_score": robot.get("long_score"),
+        "short_score": robot.get("short_score"),
+        "timestamp": robot.get("receivedAt") or snap.get("timestamp"),
+        "ageMs": robot.get("ageMs"),
+    }
 
 TTL_KRAKEN = {1: 5, 5: 10, 15: 30, 30: 60, 60: 120, 240: 300, 1440: 900, 10080: 1800}
 
@@ -1405,12 +1448,15 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
          "━━━━━━━━━━━━━━━━━━", "📈 RSI PAR UNITÉ DE TEMPS",
          "  /  ".join(f"{nom} {R[i]:.0f}" for nom, i in ut)]
     if tv_plan["available"]:
-        l += ["━━━━━━━━━━━━━━━━━━", "📡 PLAN DE L'INDICATEUR TRADINGVIEW",
-              f"Unité sélectionnée : {tv_plan['timeframe']}",
-              f"Entrée indicateur : {px(tv_plan['entry'])} • SL : {px(tv_plan['sl'])} • TP1 : {px(tv_plan.get('tp1') if tv_plan.get('tp1') is not None else tv_plan.get('tp'))}" +
+        l += ["━━━━━━━━━━━━━━━━━━", "📡 PLAN CANONIQUE PINE v25",
+              "Plan de niveaux : M15 (indépendant de l'unité du graphique)",
+              f"Unité de validation : {tv_plan['entry_timeframe']} ({tv_plan['strategy']})",
+              f"Entrée : {px(tv_plan['entry'])} • SL : {px(tv_plan['sl'])} • TP1 : {px(tv_plan['tp1'])}" +
               (f" • TP2 : {px(tv_plan['tp2'])}" if tv_plan.get("tp2") is not None else " • TP2 : non fourni par le bridge"),
-              "Clôture confirmée par l'indicateur : " + ("OUI" if tv_plan["confirmed"] else "NON / NON FOURNIE"),
-              "⚠️ Plan indicateur séparé du verdict de sécurité ALIGN."]
+              f"Zone verte : {px(tv_plan['zone_low'])} → {px(tv_plan['zone_high'])} • Décision : {px(tv_plan['decision'])}",
+              "Clôture MTF Pine : " + ("CONFIRMÉE" if tv_plan["confirmed"] else "EN ATTENTE"),
+              "Déclencheur clôturé : " + ("VALIDÉ" if tv_plan["triggered"] else "EN ATTENTE"),
+              "⚠️ Les filtres de sécurité ALIGN peuvent refuser l'entrée sans modifier les niveaux Pine."]
     elif r.get("tv_indicator_mtf", {}).get("available"):
         l += ["━━━━━━━━━━━━━━━━━━", "📡 PLAN TRADINGVIEW",
               f"{tv_plan['timeframe']} : {tv_plan['reason']}"]
@@ -3362,6 +3408,20 @@ def epingler(etat, cid):
     except Exception as ex:
         print("epingler", cid, ex)
 
+# Règle d'Adel (18/11) : AUCUN message privé par défaut. Une personne ne reçoit que ce qu'elle a
+# demandé (marché choisi + coach activé, ou une commande). Ces envois spontanés restent dans le code
+# mais sont éteints ; ils ne se rallument que par une variable explicite à 1.
+QUESTION_QUOTIDIENNE = os.environ.get("ALIGN_QUESTION_QUOTIDIENNE", "0") == "1"   # « tu trades aujourd'hui ? »
+ENVOI_CLAVIER_SPONTANE = os.environ.get("ALIGN_ENVOI_CLAVIER_SPONTANE", "0") == "1"   # « nouveaux boutons »
+REGLES_PRIVEES_SPONTANEES = os.environ.get("ALIGN_REGLES_PRIVEES_SPONTANEES", "0") == "1"   # règles épinglées en privé
+RELANCE_VIP_SPONTANEE = os.environ.get("ALIGN_RELANCE_VIP_SPONTANEE", "0") == "1"   # « réservé aux VIP »
+
+
+def envois_spontanes_prives():
+    """État des envois privés spontanés (tous éteints par défaut)."""
+    return {"question_quotidienne": QUESTION_QUOTIDIENNE, "clavier": ENVOI_CLAVIER_SPONTANE,
+            "regles_privees": REGLES_PRIVEES_SPONTANEES, "relance_vip": RELANCE_VIP_SPONTANEE}
+
 PARTAGE_JOURS = int(os.environ.get("PARTAGE_JOURS", "3"))  # rappel « partage à tes amis » tous les X jours
 PARTAGE_HEURE = int(os.environ.get("PARTAGE_HEURE", "18"))  # heure de Paris du rappel de partage
 PROPRIO_VUE_GRATUITE = os.environ.get("PROPRIO_VUE_GRATUITE", "0") == "1"  # 1 = propriétaire toujours en vue gratuite
@@ -3462,7 +3522,7 @@ def analyse_marche(etat, pair):
         except Exception as ex:
             print(m, "bridge TradingView indisponible", ex)
             r["tv_indicator_mtf"] = {"available": False, "reason": "bridge_unavailable"}
-        r["require_tv_bridge"] = os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1" and m in MARCHES
+        r["require_tv_bridge"] = os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "1") == "1" and m in MARCHES
         fusionne_lectures_tradingview(r)
         directions = r.get("dirs_cloturees") or r.get("dirs")
         d_plan = r.get("dirPlan") or 0
@@ -5052,6 +5112,7 @@ def en_position(etat, cid):
             and not etat[m]["trade"]["qui"][str(cid)].get("fini")]
 
 
+
 def retirer_suivi_positions(etat, cid):
     """Retire uniquement cet utilisateur des suivis de positions encore ouvertes."""
     cid = str(cid)
@@ -5062,7 +5123,6 @@ def retirer_suivi_positions(etat, cid):
             for identifiant in list(abonnes):
                 if str(identifiant) == cid:
                     abonnes.pop(identifiant, None)
-
 
 SON_PIECE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "son_piece.mp3")
 
@@ -6819,10 +6879,10 @@ def traiter(etat, chats, updates):
                     etat.setdefault("trade_jour", {})[qui] = datetime.datetime.now(PARIS).strftime("%Y-%m-%d")
                     off = etat.setdefault("bot_off", [])
                     if qui not in off:
-                        off.append(qui)       # stoppe les nouveaux signaux et les notifications de positions
+                        off.append(qui)       # stoppe les nouveaux signaux ; le suivi d'une position déjà ouverte reste actif
                     purger_messages_en_attente(etat, qui)
                     etat["coach_pending"] = [x for x in etat.get("coach_pending", []) if str(x) != qui]
-                    # Le refus quotidien retire aussi les recherches live et le suivi des positions ouvertes.
+                    # Le refus quotidien doit aussi retirer l'autorisation de push différé et les recherches live actives.
                     for abonnements in etat.setdefault("auto", {}).values():
                         if isinstance(abonnements, list):
                             abonnements[:] = [x for x in abonnements if str(x) != qui]
@@ -10572,35 +10632,176 @@ def agent(m, r, cle, ferme):
     else:
         r5, r5p = r["r5"][-1], r["r5"][-2]
     ctx = f"Contexte : {zone_txt(r['posD'])} Daily, {zone_txt(r['posW'])} Weekly."
-    try:
-        manipulation(out, m, r, cle)
-        meche_suspecte(out, m, r, cle)
-        niveaux_cles(out, m, r, cle)
-        resistance_fvg(out, m, r, cle)              # v7.2 : résistance / support / FVG touché → chaîne + indice live
-    except Exception as ex:
-        print("manipulation", ex)
-    try:
-        suivre_apres_sl(out, m, r, cle, hi, lo)
-    except Exception as ex:
-        print("après SL", ex)
-    try:
-        re_ = reprise_entree(m, r, cle) if not tr else None   # après « COUPE ET REPRENDS » : retour à l'entrée → on reprend
-        if re_:
-            out.append(re_)
-        er_ = entree_retest(m, r, cle) if not tr else None   # résistance cassée qui devient support (règle d'Adel)
-        if er_:
-            out.append(er_)
-        rc_ = radar_climax(m, r, cle)                 # radar retournement (volume climax + balayage + EMA9)
-        if rc_ and not tr:
-            out.append(rc_)
-    except Exception as ex:
-        print("radar_climax", ex)
-    try:
-        rv_ = retournement_marche(m, r, cle)  # surveillance active aussi pendant les positions GOLD/NASDAQ : alerte uniquement, aucune clôture automatique
-        if rv_ and not (tr and tr.get("d") == (1 if "LONG" in rv_.split("\n")[0] else -1)):
-            out.append(rv_)
-    except Exception as ex:
-        print("retournement_marche", ex)
+    # Mode sans signal (bridge TradingView non branché) : AUCUNE alerte calculée localement
+    # (manipulation, niveaux, FVG, radar, retournement, retest, après-SL) — seule la source v25 parle.
+    # Une position déjà ouverte reste suivie jusqu'à sa clôture ; aucune nouvelle info de marché.
+    sans_signal = os.environ.get("ALIGN_TV_BRIDGE_PRET", "1") == "0"
+    if sans_signal and not tr:
+        print(f"{m} : mode sans signal, bridge TradingView indisponible — aucune alerte locale.")
+        return []
+    if not sans_signal:
+        try:
+            manipulation(out, m, r, cle)
+            meche_suspecte(out, m, r, cle)
+            niveaux_cles(out, m, r, cle)
+            resistance_fvg(out, m, r, cle)              # v7.2 : résistance / support / FVG touché → chaîne + indice live
+        except Exception as ex:
+            print("manipulation", ex)
+        try:
+            suivre_apres_sl(out, m, r, cle, hi, lo)
+        except Exception as ex:
+            print("après SL", ex)
+        try:
+            re_ = reprise_entree(m, r, cle) if not tr else None   # après « COUPE ET REPRENDS » : retour à l'entrée → on reprend
+            if re_:
+                out.append(re_)
+            er_ = entree_retest(m, r, cle) if not tr else None   # résistance cassée qui devient support (règle d'Adel)
+            if er_:
+                out.append(er_)
+            rc_ = radar_climax(m, r, cle)                 # radar retournement (volume climax + balayage + EMA9)
+            if rc_ and not tr:
+                out.append(rc_)
+        except Exception as ex:
+            print("radar_climax", ex)
+        try:
+            rv_ = retournement_marche(m, r, cle)  # surveillance active aussi pendant les positions GOLD/NASDAQ : alerte uniquement, aucune clôture automatique
+            if rv_ and not (tr and tr.get("d") == (1 if "LONG" in rv_.split("\n")[0] else -1)):
+                out.append(rv_)
+        except Exception as ex:
+            print("retournement_marche", ex)
+
+    # ── Bridge Pine obligatoire : aucun fallback de niveaux locaux ──
+    require_tv = bool(r.get("require_tv_bridge"))
+    if require_tv and not tr:
+        if r.get("fermeture"):
+            return out
+        if not d:
+            cle["aligne"] = 0
+            cle["prep"] = False
+            cle.pop("ordre", None)
+            if os.environ.get("ALIGN_TV_BRIDGE_PRET", "1") == "0":
+                # Mode sans signal (bridge non branché) : panne technique, pas une info de marché →
+                # journal seulement, jamais diffusée aux abonnés ni à la chaîne.
+                print(f"{m} : mode sans signal, bridge TradingView indisponible.")
+            else:
+                out.append(f"⏳ {ICONE.get(m, '')} {m} : bridge Pine M15 en attente de confirmation multi-UT.")
+            return out
+        pause_ = pause_entree_marche(m, r, _ETAT_COURANT.get("etat") or {}, time.time())
+        if pause_:
+            cle["prep"] = False
+            cle.pop("ordre", None)
+            cle.pop("traverse", None)
+            cle["aligne"] = d
+            out.append(f"⏳ {ICONE.get(m, '')} {m} : ENTRÉES EN PAUSE\\n{pause_}\\nAucun nouveau signal avant stabilisation.")
+            return out
+        if bloque_dw(r, d, p):
+            cle["prep"] = False
+            cle.pop("ordre", None)
+            if alerte_extreme_due(cle, d, r["t"]):
+                out.append(texte_zone_extreme(m, r, d))
+            cle["aligne"] = d
+            return out
+
+        plan_tv = plan_indicateur(r)
+        if not plan_tv.get("available"):
+            cle["prep"] = False
+            cle.pop("ordre", None)
+            k = str(plan_tv.get("reason") or "plan Pine absent")
+            if os.environ.get("ALIGN_TV_BRIDGE_PRET", "1") == "0":
+                # Mode sans signal : panne technique, journal seulement (jamais envoyée aux abonnés).
+                print(f"{m} : mode sans signal, plan TradingView indisponible ({k}).")
+            elif cle.get("tv_bridge_wait_reason") != k:
+                cle["tv_bridge_wait_reason"] = k
+                out.append(f"⏳ {ICONE.get(m, '')} {m} : attente du plan TradingView M15\n{k}\nAucun plan Python local ne sera substitué.")
+            return out
+        if plan_tv["direction"] != d:
+            cle["prep"] = False
+            cle.pop("ordre", None)
+            out.append(f"⏳ {ICONE.get(m, '')} {m} : sens Pine M15 différent de la lecture locale ; aucune entrée.")
+            return out
+        cle.pop("tv_bridge_wait_reason", None)
+
+        # Les niveaux sont ceux du Pine, jamais recalculés ni ajustés par l'apprentissage SL.
+        entry = float(plan_tv["entry"])
+        stop = float(plan_tv["sl"])
+        tp1 = float(plan_tv["tp1"])
+        tp2 = plan_tv.get("tp2")
+        risk = abs(entry - stop)
+        atr15 = float(r.get("atr") or 0)
+        rr = abs(tp1 - entry) / max(risk, 1e-9)
+        if risk <= 0 or atr15 <= 0 or risk > RISQUE_MAX * atr15 or rr < GAIN_MIN:
+            cle["prep"] = False
+            cle.pop("ordre", None)
+            out.append(f"⛔ {ICONE.get(m, '')} {m} : plan Pine M15 refusé par le filtre risque / rendement ALIGN.")
+            return out
+
+        order_id = f"{plan_tv['entry_bar_time']}|{plan_tv['entry_timeframe']}|{d}"
+        o = {
+            "d": d, "e": entry, "sl": stop, "tp1": tp1, "tp2": tp2,
+            "za": plan_tv["zone_low"], "zb": plan_tv["zone_high"],
+            "src": "Pine v25 • plan M15", "sl_ut": "15 min",
+            "rr": rr, "n1": "TP1 Pine", "n2": "TP2 Pine" if tp2 is not None else "",
+            "entry_timeframe": plan_tv["entry_timeframe"],
+            "entry_bar_time": plan_tv["entry_bar_time"],
+            "entry_bar_close": plan_tv["entry_bar_close"],
+            "pine_order_id": order_id,
+        }
+        cle["aligne"] = d
+        cle["ordre"] = o
+        cle["ordre_t"] = r["t"]
+        cle["prep"] = False
+
+        if not plan_tv.get("triggered"):
+            last_wait = cle.get("pine_wait_bar")
+            if last_wait != plan_tv["entry_bar_time"]:
+                cle["pine_wait_bar"] = plan_tv["entry_bar_time"]
+                out.append((
+                    f"🟡 PLAN PINE M15 — {ICONE.get(m, '')} {m}\\n{SENS[d]}\\n"
+                    f"🎯 Entrée : {px(entry)} • SL : {px(stop)} • TP1 : {px(tp1)}"
+                    + (f" • TP2 : {px(tp2)}" if tp2 is not None else "")
+                    + f"\\n🟨 Zone verte : {px(plan_tv['zone_low'])} → {px(plan_tv['zone_high'])}"
+                    + f"\\n⚪ Décision : {px(plan_tv['decision'])}"
+                    + f"\\n⏳ Attendre le retest puis la clôture {plan_tv['entry_timeframe']} validée par Pine.\\n"
+                    "Aucune entrée n'est autorisée par une simple mèche."
+                    + ferme, bouton_auto(m)
+                ))
+            return out
+
+        # Déclencheur Pine clôturé : une seule entrée par bougie de validation.
+        if cle.get("pine_entry_bar_done") == plan_tv["entry_bar_time"]:
+            return out
+        if r.get("annonce"):
+            out.append(f"⛔ {ICONE.get(m, '')} {m} : déclencheur Pine ignoré pendant l'annonce.")
+            return out
+        cle["pine_entry_bar_done"] = plan_tv["entry_bar_time"]
+        tr = dict(
+            o, statut="entree", cree=r["t"], ouvert_t=time.time(),
+            encore=0, atr_e=atr15, sl0=stop, profil=profil_trade(m, o, r),
+            src="Pine v25 M15 / " + plan_tv["entry_timeframe"],
+            strategie=plan_tv["strategy"],
+        )
+        tr.update(strategie_trade(r, d))
+        tr["retour"] = retournement_confirme(cle, d, r)
+        # Ne pas appliquer appliquer_marge_sl() : le SL est celui du plan Pine canonique.
+        non, n_, w_ = memoire_refuse(tr["profil"])
+        if non:
+            cle.pop("ordre", None)
+            out.append(f"🧠 {ICONE.get(m, '')} {m} : déclencheur Pine valide mais filtré par la mémoire de risque ({w_}/{n_} gagnés).")
+            return out
+        cle["trade"] = tr
+        cle["prep"] = False
+        cle["attente_rsi"] = False
+        cle["parti"] = False
+        cle.pop("ordre", None)
+        cle.pop("sans_setup", None)
+        out.append((
+            carte_coach(
+                m, r, cle, "signal", tr=tr,
+                validite=validite_cloture(r, plan_tv["entry_timeframe"].lower()),
+                signal=f"Retest zone verte + clôture {plan_tv['entry_timeframe']} Pine M15"
+            ) + ferme, boutons(m)
+        ))
+        return out
 
     # ── Pas de trade : tendance 4h confirmée par 1h, puis timing d'entrée en 5m ──
     if not tr and r.get("fermeture"):
@@ -12459,7 +12660,8 @@ def un_tour(etat, chats):
         traiter_file_live(etat, limite=30)
         if SHUTDOWN_REQUESTED.is_set():
             return
-        question_quotidienne(etat, chats)
+        if QUESTION_QUOTIDIENNE:
+            question_quotidienne(etat, chats)
         if etat.get("clavier") != 9:
             # Le nouveau clavier sera joint au prochain vrai message du bot.
             # Aucun message vide, promotionnel ou de démarrage n'est envoyé.
@@ -12504,6 +12706,8 @@ def un_tour(etat, chats):
                     chats.discard(cid)
                     if cid not in etat.setdefault("prospects", []):
                         etat["prospects"].append(cid)
+                    if not RELANCE_VIP_SPONTANEE:
+                        continue                    # aucun message promotionnel spontané
                     _envoi_sur(cid, reply_markup=CLAVIER_VISITEUR, text=(
                         "🔒 Les positions en direct sont réservées aux VIP\n"
                         + ("🎁 Ta position gratuite du jour est encore dispo\n" if cid not in etat.get("bienvenue", {}) else "")
@@ -12532,7 +12736,7 @@ def un_tour(etat, chats):
                 return
             r["market"] = nom_marche
             r["tv_indicator_mtf"] = fetch_tv_mtf(pair)
-            r["require_tv_bridge"] = os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1" and nom_marche in MARCHES
+            r["require_tv_bridge"] = os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "1") == "1" and nom_marche in MARCHES
             fusionne_lectures_tradingview(r)
             # Revalider après lecture du bridge : Gold/Nasdaq ne peuvent pas ouvrir de position sans ROBOT V12 M5/M15/H1 frais.
             r["confirme"] = direction_confirmee_marche(
@@ -12737,8 +12941,10 @@ def un_tour(etat, chats):
         except Exception as ex:
             print("live news", ex)
         if TOKEN:
+            canal_ = str(etat.get("canal") or "")
             for cid in set(destinataires(etat, chats)) | set(etat.get("prospects", [])):
-                epingler(etat, cid)
+                if str(cid) == canal_ or REGLES_PRIVEES_SPONTANEES:
+                    epingler(etat, cid)             # chaîne VIP toujours ; privé seulement si rallumé
             menu_canal_vip(etat)
             menu_canal_resultats(etat)
         # Aucun rappel promotionnel privé : une seule question quotidienne est autorisée.
@@ -12785,7 +12991,8 @@ def un_tour(etat, chats):
             preparer_chaines(etat)
             epingler_menus_chaines(etat)
             epingler_compte_finance(etat)          # v8.9 : message « compte financé » épinglé
-            renvoyer_claviers(etat, chats)
+            if ENVOI_CLAVIER_SPONTANE:
+                renvoyer_claviers(etat, chats)
         except Exception as ex:
             print("préparer chaînes", ex)
         for nom_marche in MARCHES:

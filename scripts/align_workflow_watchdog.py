@@ -7,6 +7,7 @@ Never edits source code, merges PRs, or publishes to live-data.
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import io
 import os
@@ -63,8 +64,107 @@ def parse_time(value: str) -> dt.datetime:
 
 def existing_report(run_id: int) -> bool:
     issues = api(f"/repos/{REPO}/issues?state=all&per_page=100")
-    marker = f"[align-watchdog:run-{run_id}]"
+    marker = f"<!-- [align-watchdog:run-{run_id}] -->"
     return any(marker in (item.get("body") or "") for item in issues if "pull_request" not in item)
+
+
+def _job_names(jobs: list[dict]) -> list[str]:
+    return sorted({str(job.get("name") or "unknown") for job in jobs})
+
+
+def _failed_step_names(jobs: list[dict]) -> list[str]:
+    failed = {"failure", "timed_out", "action_required"}
+    names = set()
+    for job in jobs:
+        job_name = str(job.get("name") or "unknown")
+        for step in job.get("steps") or []:
+            if step.get("conclusion") in failed:
+                step_name = str(step.get("name") or "unknown")
+                names.add(f"{job_name}::{step_name}")
+    return sorted(names)
+
+
+def blocker_fingerprint(run: dict, jobs: list[dict]) -> str:
+    identity = {
+        "workflow": str(run.get("name") or "unknown"),
+        "branch": str(run.get("head_branch") or "unknown"),
+        "jobs": _job_names(jobs),
+        "steps": _failed_step_names(jobs),
+    }
+    canonical = json.dumps(identity, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+
+
+def existing_blocker(run: dict, jobs: list[dict], fingerprint: str) -> dict | None:
+    # Toutes les pages (plafond 10 × 100) : un rapport existant au-delà de la 1re page ne doit pas être dupliqué.
+    issues: list[dict] = []
+    for page in range(1, 11):
+        batch = api(f"/repos/{REPO}/issues?state=open&per_page=100&page={page}")
+        if not batch:
+            break
+        issues.extend(batch)
+        if len(batch) < 100:
+            break
+    marker = f"<!-- [align-watchdog:blocker-{fingerprint}] -->"
+    workflow_line = f"**Workflow:** {run.get('name', 'unknown')}"
+    branch_line = f"**Branch:** {run.get('head_branch', 'unknown')}"
+    job_names = _job_names(jobs)
+    failed_steps = set(_failed_step_names(jobs))
+
+    for item in issues:
+        if "pull_request" in item:
+            continue
+        body = item.get("body") or ""
+        if marker in body:
+            return item
+        # Legacy reports without failed-step detail are ambiguous: do not let a
+        # failure in the same job hide a different failure step.
+        legacy_steps: set[str] = set()
+        in_failed_steps = False
+        for line in body.splitlines():
+            if line.strip() == "### Failed steps":
+                in_failed_steps = True
+                continue
+            if line.startswith("### "):
+                in_failed_steps = False
+                continue
+            if in_failed_steps and line.startswith("- "):
+                legacy_steps.add(line[2:].strip())
+        if not (
+            item.get("state") == "open"
+            and workflow_line in body
+            and branch_line in body
+            and job_names
+            and all(f"- **{name}** —" in body for name in job_names)
+        ):
+            continue
+
+        if not legacy_steps:
+            # Older watchdog issues may have a run marker but no failed-step
+            # section. Resolve that run's failed steps before deduplicating;
+            # never suppress a distinct failure based only on workflow/job.
+            match = re.search(r"<!--\s*\[align-watchdog:run-(\d+)\]\s*-->", body)
+            if not match:
+                continue
+            try:
+                original = api(
+                    f"/repos/{REPO}/actions/runs/{int(match.group(1))}/jobs?per_page=100"
+                )
+            except Exception as exc:
+                print(
+                    f"WATCHDOG_LEGACY_DETAIL_UNAVAILABLE issue={item.get('number')} "
+                    f"error={type(exc).__name__}"
+                )
+                continue
+            original_failed = [
+                job for job in original.get("jobs", [])
+                if job.get("conclusion") in {"failure", "timed_out", "action_required"}
+            ]
+            legacy_steps = set(_failed_step_names(original_failed))
+
+        if failed_steps and legacy_steps == failed_steps:
+            return item
+    return None
 
 
 def report(run: dict, reason: str, jobs: list[dict] | None = None) -> None:
@@ -72,13 +172,27 @@ def report(run: dict, reason: str, jobs: list[dict] | None = None) -> None:
     if existing_report(run_id):
         print(f"WATCHDOG_REPORT_EXISTS run={run_id}")
         return
+
     failed = jobs or []
+    fingerprint = blocker_fingerprint(run, failed)
+    # Sans détail de job (run bloqué / périmé), l'identité du blocage est incertaine : pas de dédoublonnage.
+    blocker = existing_blocker(run, failed, fingerprint) if failed else None
+    if blocker:
+        print(
+            f"WATCHDOG_BLOCKER_EXISTS issue={blocker.get('number', 'unknown')} "
+            f"workflow={run.get('name', 'unknown')} branch={run.get('head_branch', 'unknown')}"
+        )
+        return
+
     job_lines = [
         f"- **{job.get('name', 'unknown')}** — {job.get('conclusion') or job.get('status')}"
         for job in failed
     ] or ["- No failed job detail available from the Actions API."]
+    step_names = _failed_step_names(failed)
+    step_lines = [f"- {name}" for name in step_names] or ["- No failed step detail available from the Actions API."]
     body = "\n".join([
         f"<!-- [align-watchdog:run-{run_id}] -->",
+        f"<!-- [align-watchdog:blocker-{fingerprint}] -->",
         "## ALIGN workflow watchdog report",
         "",
         f"**Workflow:** {run.get('name', 'unknown')}",
@@ -92,15 +206,17 @@ def report(run: dict, reason: str, jobs: list[dict] | None = None) -> None:
         "### Jobs",
         *job_lines,
         "",
+        "### Failed steps",
+        *step_lines,
+        "",
         "### Safety",
         "- The production Telegram worker is never automatically rerun.",
         "- No source file, secret, branch protection, PR, or deployment is modified.",
         "- Inspect the failing job logs, prepare a minimal fix on a dedicated branch, and require green tests before merge.",
     ])
-    title = f"ALIGN watchdog: {run.get('name', 'workflow')} blocked/failed (run {run_id})"
+    title = f"ALIGN watchdog: {run.get('name', 'workflow')} blocked/failed on {run.get('head_branch', 'unknown')}"
     api(f"/repos/{REPO}/issues", method="POST", payload={"title": title[:240], "body": body})
-    print(f"WATCHDOG_ISSUE_CREATED run={run_id}")
-
+    print(f"WATCHDOG_ISSUE_CREATED run={run_id} blocker={fingerprint}")
 
 def failed_jobs(run_id: int) -> list[dict]:
     payload = api(f"/repos/{REPO}/actions/runs/{run_id}/jobs?per_page=100")

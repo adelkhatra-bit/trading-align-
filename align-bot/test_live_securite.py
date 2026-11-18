@@ -191,8 +191,17 @@ class PageLive(unittest.TestCase):
         self.assertIn("ALIGN_TV_API_URL", bridge)
         self.assertIn("ALIGN_TV_READ_TOKEN", bridge)
         self.assertIn('ALIGN_REQUIRE_TV_BRIDGE: "1"', wf)
-        self.assertIn('os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1" and m in MARCHES', bot)
-        self.assertIn('os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1" and nom_marche in MARCHES', bot)
+        # Bridge absent : mode sans signal, puis run remis en échec (panne jamais masquée).
+        # Statut transmis par une SORTIE d'étape (GITHUB_OUTPUT), lue par steps.bridge.outputs.
+        self.assertIn("id: bridge", bridge)
+        self.assertIn('echo "ALIGN_TV_BRIDGE_PRET=0" >> "$GITHUB_OUTPUT"', bridge)
+        self.assertIn("ALIGN_TV_BRIDGE_PRET: ${{ steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == '0' && '0' || '1' }}", wf)
+        self.assertNotIn("env.ALIGN_TV_BRIDGE_PRET", wf)
+        final = wf.split("Bridge TradingView obligatoire — échec signalé", 1)[1]
+        self.assertIn("if: ${{ always() && steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == '0' }}", final)
+        self.assertIn("exit 1", final)
+        self.assertIn('os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "1") == "1" and m in MARCHES', bot)
+        self.assertIn('os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "1") == "1" and nom_marche in MARCHES', bot)
 
 
 if __name__ == "__main__":
