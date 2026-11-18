@@ -2,7 +2,7 @@ name = "align-tv-mailbox"
 main = "worker.js"
 compatibility_date = "2026-11-01"
 
-# Remplacer l'id par celui du namespace KV créé pour ALIGN (jamais celui d'un autre projet).
+# Namespace KV réservé à ALIGN (aucun autre projet ne l'utilise).
 [[kv_namespaces]]
 binding = "ALIGN_TV_KV"
-id = "A_RENSEIGNER_APRES_CREATION"
+id = "26d55deaf6cd48d8a5eae93f521f49b9"  # align-tv-mailbox-kv, créé le 18/11/2026
