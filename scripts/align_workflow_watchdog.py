@@ -135,7 +135,7 @@ def existing_blocker(run: dict, jobs: list[dict], fingerprint: str) -> dict | No
             # Older watchdog issues may have a run marker but no failed-step
             # section. Resolve that run's failed steps before deduplicating;
             # never suppress a distinct failure based only on workflow/job.
-            match = re.search(r"<!--\\s*\\[align-watchdog:run-(\\d+)\\]\\s*-->", body)
+            match = re.search(r"<!--\s*\[align-watchdog:run-(\d+)\]\s*-->", body)
             if not match:
                 continue
             try:
