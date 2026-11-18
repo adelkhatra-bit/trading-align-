@@ -90,16 +90,10 @@ class CopilotAssignmentGateTests(unittest.TestCase):
 
     def test_cloud_agent_assignment_uses_user_token_only_after_actor_check(self):
         actors = {"data": {"repository": {"suggestedActors": {"nodes": [{"login": "copilot-swe-agent"}]}}}}
-        with patch.object(repair, "COPILOT_TOKEN", "user-token") as token_patch:
+        with patch.object(repair, "COPILOT_TOKEN", "user-token"):
             with patch.object(repair, "request_graphql", return_value=actors):
                 with patch.object(repair, "request_json", return_value={}) as request:
                     self.assertTrue(repair.assign_copilot_if_available(77, []))
-        args = request.call_args
-        self.assertEqual(args.args[0], "/repos/adelkhatra-bit/trading-align-/issues/77/assignees")
-        self.assertEqual(args.kwargs["token"], "user-token")
-        self.assertEqual(args.kwargs["payload"]["assignees"], ["copilot-swe-agent[bot]"])
-        self.assertEqual(args.kwargs["payload"]["agent_assignment"]["base_branch"], "main")
-            self.assertTrue(repair.assign_copilot_if_available(77, []))
         args = request.call_args
         self.assertEqual(args.args[0], "/repos/adelkhatra-bit/trading-align-/issues/77/assignees")
         self.assertEqual(args.kwargs["token"], "user-token")
