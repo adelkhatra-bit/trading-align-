@@ -10602,35 +10602,43 @@ def agent(m, r, cle, ferme):
     else:
         r5, r5p = r["r5"][-1], r["r5"][-2]
     ctx = f"Contexte : {zone_txt(r['posD'])} Daily, {zone_txt(r['posW'])} Weekly."
-    try:
-        manipulation(out, m, r, cle)
-        meche_suspecte(out, m, r, cle)
-        niveaux_cles(out, m, r, cle)
-        resistance_fvg(out, m, r, cle)              # v7.2 : résistance / support / FVG touché → chaîne + indice live
-    except Exception as ex:
-        print("manipulation", ex)
-    try:
-        suivre_apres_sl(out, m, r, cle, hi, lo)
-    except Exception as ex:
-        print("après SL", ex)
-    try:
-        re_ = reprise_entree(m, r, cle) if not tr else None   # après « COUPE ET REPRENDS » : retour à l'entrée → on reprend
-        if re_:
-            out.append(re_)
-        er_ = entree_retest(m, r, cle) if not tr else None   # résistance cassée qui devient support (règle d'Adel)
-        if er_:
-            out.append(er_)
-        rc_ = radar_climax(m, r, cle)                 # radar retournement (volume climax + balayage + EMA9)
-        if rc_ and not tr:
-            out.append(rc_)
-    except Exception as ex:
-        print("radar_climax", ex)
-    try:
-        rv_ = retournement_marche(m, r, cle)  # surveillance active aussi pendant les positions GOLD/NASDAQ : alerte uniquement, aucune clôture automatique
-        if rv_ and not (tr and tr.get("d") == (1 if "LONG" in rv_.split("\n")[0] else -1)):
-            out.append(rv_)
-    except Exception as ex:
-        print("retournement_marche", ex)
+    # Mode sans signal (bridge TradingView non branché) : AUCUNE alerte calculée localement
+    # (manipulation, niveaux, FVG, radar, retournement, retest, après-SL) — seule la source v25 parle.
+    # Une position déjà ouverte reste suivie jusqu'à sa clôture ; aucune nouvelle info de marché.
+    sans_signal = os.environ.get("ALIGN_TV_BRIDGE_PRET", "1") == "0"
+    if sans_signal and not tr:
+        print(f"{m} : mode sans signal, bridge TradingView indisponible — aucune alerte locale.")
+        return []
+    if not sans_signal:
+        try:
+            manipulation(out, m, r, cle)
+            meche_suspecte(out, m, r, cle)
+            niveaux_cles(out, m, r, cle)
+            resistance_fvg(out, m, r, cle)              # v7.2 : résistance / support / FVG touché → chaîne + indice live
+        except Exception as ex:
+            print("manipulation", ex)
+        try:
+            suivre_apres_sl(out, m, r, cle, hi, lo)
+        except Exception as ex:
+            print("après SL", ex)
+        try:
+            re_ = reprise_entree(m, r, cle) if not tr else None   # après « COUPE ET REPRENDS » : retour à l'entrée → on reprend
+            if re_:
+                out.append(re_)
+            er_ = entree_retest(m, r, cle) if not tr else None   # résistance cassée qui devient support (règle d'Adel)
+            if er_:
+                out.append(er_)
+            rc_ = radar_climax(m, r, cle)                 # radar retournement (volume climax + balayage + EMA9)
+            if rc_ and not tr:
+                out.append(rc_)
+        except Exception as ex:
+            print("radar_climax", ex)
+        try:
+            rv_ = retournement_marche(m, r, cle)  # surveillance active aussi pendant les positions GOLD/NASDAQ : alerte uniquement, aucune clôture automatique
+            if rv_ and not (tr and tr.get("d") == (1 if "LONG" in rv_.split("\n")[0] else -1)):
+                out.append(rv_)
+        except Exception as ex:
+            print("retournement_marche", ex)
 
     # ── Bridge Pine obligatoire : aucun fallback de niveaux locaux ──
     require_tv = bool(r.get("require_tv_bridge"))
