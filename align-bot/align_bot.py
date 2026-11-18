@@ -10613,14 +10613,15 @@ def agent(m, r, cle, ferme):
         suivre_apres_sl(out, m, r, cle, hi, lo)
     except Exception as ex:
         print("après SL", ex)
+    require_tv = bool(r.get("require_tv_bridge"))
     try:
-        re_ = reprise_entree(m, r, cle) if not tr else None   # après « COUPE ET REPRENDS » : retour à l'entrée → on reprend
+        re_ = reprise_entree(m, r, cle) if not tr and not require_tv else None   # après « COUPE ET REPRENDS » : retour à l'entrée → on reprend
         if re_:
             out.append(re_)
-        er_ = entree_retest(m, r, cle) if not tr else None   # résistance cassée qui devient support (règle d'Adel)
+        er_ = entree_retest(m, r, cle) if not tr and not require_tv else None   # résistance cassée qui devient support (règle d'Adel)
         if er_:
             out.append(er_)
-        rc_ = radar_climax(m, r, cle)                 # radar retournement (volume climax + balayage + EMA9)
+        rc_ = radar_climax(m, r, cle) if not (require_tv and not tr) else None                 # radar retournement (volume climax + balayage + EMA9)
         if rc_ and not tr:
             out.append(rc_)
     except Exception as ex:
@@ -10633,7 +10634,6 @@ def agent(m, r, cle, ferme):
         print("retournement_marche", ex)
 
     # ── Bridge Pine obligatoire : aucun fallback de niveaux locaux ──
-    require_tv = bool(r.get("require_tv_bridge"))
     if require_tv and not tr:
         if r.get("fermeture"):
             return out

@@ -3631,6 +3631,24 @@ class PineOnlyEntryGateTests(unittest.TestCase):
         self.assertFalse(state.get("ordre"))
         self.assertTrue(any("attente du plan TradingView" in str(x) for x in out))
 
+    def test_required_bridge_skips_local_entry_helpers_before_pine_plan(self):
+        from unittest.mock import patch
+        r = self._market()
+        r["tv_indicator_mtf"] = {"available": False, "reason": "bridge unavailable"}
+        r["require_tv_bridge"] = True
+        state = {"t1m": 0}
+        with patch.object(align_bot, "reprise_entree", return_value="LOCAL_REPRISE") as reprise, \\
+             patch.object(align_bot, "entree_retest", return_value="LOCAL_RETEST") as retest, \\
+             patch.object(align_bot, "radar_climax", return_value="LOCAL_RADAR") as radar, \\
+             patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), \\
+             patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")):
+            out = align_bot.agent("BTC", r, state, "")
+        reprise.assert_not_called()
+        retest.assert_not_called()
+        radar.assert_not_called()
+        self.assertFalse(any("LOCAL_" in str(item) for item in out))
+        self.assertFalse(state.get("trade"))
+
     def test_required_bridge_waits_for_pine_closed_entry_trigger(self):
         from unittest.mock import patch
         r = self._market()
