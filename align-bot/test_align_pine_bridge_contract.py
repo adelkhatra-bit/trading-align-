@@ -69,6 +69,18 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertIn('"lecture_15m":\' + f_align_v25_json_dir(nz(d15Fermee))', export_block)
         self.assertIn('"lecture_60m":\' + f_align_v25_json_dir(nz(d60Fermee))', export_block)
 
+    def test_bridge_exports_fixed_m15_plan_zone_and_strategy_trigger(self):
+        export_block = self.source.split(EXPORT_MARKER, 1)[1]
+        self.assertIn('"planTimeframe":"M15"', export_block)
+        self.assertIn('"entryTimeframe":"', export_block)
+        self.assertIn('"entryZoneLow":', export_block)
+        self.assertIn('"entryZoneHigh":', export_block)
+        self.assertIn('"entryDecision":', export_block)
+        self.assertIn('strat == "SWING" ? "H1" : strat == "DAY" ? "M5" : strat == "SCALPING" ? "M1"', export_block)
+        self.assertIn('f_align_v25_json_num(bridgePlanValid ? zBas : na)', export_block)
+        self.assertIn('f_align_v25_json_num(bridgePlanValid ? zHaut : na)', export_block)
+        self.assertIn('f_align_v25_json_num(bridgePlanValid ? (zBas + zHaut) / 2 : na)', export_block)
+
     def test_no_secret_is_embedded_in_pine(self):
         self.assertNotIn("ALIGN_TV_INGEST_TOKEN", self.source)
         self.assertNotIn("ingest_token", self.source)
