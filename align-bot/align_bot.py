@@ -6819,15 +6819,16 @@ def traiter(etat, chats, updates):
                     etat.setdefault("trade_jour", {})[qui] = datetime.datetime.now(PARIS).strftime("%Y-%m-%d")
                     off = etat.setdefault("bot_off", [])
                     if qui not in off:
-                        off.append(qui)       # stoppe les nouveaux signaux ; le suivi d'une position déjà ouverte reste actif
+                        off.append(qui)       # stoppe les nouveaux signaux et les notifications de positions
                     purger_messages_en_attente(etat, qui)
                     etat["coach_pending"] = [x for x in etat.get("coach_pending", []) if str(x) != qui]
-                    # Le refus quotidien doit aussi retirer l'autorisation de push différé et les recherches live actives.
+                    # Le refus quotidien retire aussi les recherches live et le suivi des positions ouvertes.
                     for abonnements in etat.setdefault("auto", {}).values():
                         if isinstance(abonnements, list):
                             abonnements[:] = [x for x in abonnements if str(x) != qui]
                     for marche in MARCHES:
                         activer_coach_live(etat, qui, marche, False)
+                    retirer_suivi_positions(etat, qui)
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="Bien noté")
                     continue
                 if mk == "yes":
@@ -6864,6 +6865,7 @@ def traiter(etat, chats, updates):
                         etat["bot_off"].append(qui)
                     purger_messages_en_attente(etat, qui)
                     etat["coach_pending"] = [x for x in etat.get("coach_pending", []) if str(x) != qui]
+                    retirer_suivi_positions(etat, qui)
                 continue
             if live_callback(etat, chats, cb, choix, mk, qui):
                 continue
