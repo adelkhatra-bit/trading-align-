@@ -190,11 +190,11 @@ Instructions:
         print("Copilot returned an empty response; no reply was posted.", file=sys.stderr)
         return 1
     marker = f"[COPILOT → CHATGPT][{task_id}]"
-    if marker not in answer:
-        answer += f"\n\n{marker}"
-    answer = answer[:55000]
-    if marker not in answer:
-        answer = answer[: 55000 - len(marker) - 2] + "\n\n" + marker
+    # Never trust a marker echoed from issue context; append our own canonical
+    # marker after truncation so only this Actions-authored comment closes work.
+    answer = REPLY_RE.sub("", answer).strip()
+    answer = answer[: 55000 - len(marker) - 2].rstrip()
+    answer += f"\n\n{marker}"
 
     request_json(
         f"/repos/{REPO}/issues/{ISSUE}/comments",
