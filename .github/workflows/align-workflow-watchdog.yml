@@ -25,7 +25,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: align-workflow-watchdog-${{ github.event.workflow_run.id || github.run_id }}
+  # Groupe unique : deux passages ne vérifient/créent jamais le même rapport en même temps.
+  group: align-workflow-watchdog
   cancel-in-progress: false
 
 jobs:

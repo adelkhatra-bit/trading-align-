@@ -212,5 +212,39 @@ class WatchdogBlockerDedupTests(unittest.TestCase):
         self.assertEqual(api_mock.call_args_list[-1].kwargs.get("method"), "POST")
 
 
+class WatchdogDedupHardeningTests(unittest.TestCase):
+    def _legacy(self):
+        return issue(
+            700,
+            "\n".join([
+                "<!-- [align-watchdog:run-1] -->",
+                "**Workflow:** ALIGN Copilot Issue Relay",
+                "**Branch:** main",
+                "### Jobs",
+                "- **relay** — failure",
+                "### Failed steps",
+                "- relay::Verify Copilot credentials only when work is pending",
+            ]),
+        )
+
+    def test_existing_blocker_on_second_page_is_found(self):
+        page1 = [issue(n, "sans rapport") for n in range(100)]
+        with patch.object(watchdog, "api", side_effect=[[], page1, [self._legacy()]]) as api_mock:
+            watchdog.report(run(44270000002), "Workflow failed or timed out.", [failed_job()])
+        self.assertIn("page=2", api_mock.call_args_list[2].args[0])
+        self.assertNotEqual(api_mock.call_args_list[-1].kwargs.get("method"), "POST")
+
+    def test_stale_run_without_job_detail_is_never_deduplicated(self):
+        calls = []
+
+        def fake(path, method="GET", payload=None):
+            calls.append((path, method))
+            return {"number": 1} if method == "POST" else []
+        with patch.object(watchdog, "api", side_effect=fake):
+            watchdog.report(run(44270000003), "Run stuck.", None)
+        self.assertFalse(any("issues?state=open" in p for p, _ in calls), "pas de recherche de doublon sans détail")
+        self.assertTrue(any(m == "POST" for _, m in calls), "un rapport distinct est créé")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -96,7 +96,15 @@ def blocker_fingerprint(run: dict, jobs: list[dict]) -> str:
 
 
 def existing_blocker(run: dict, jobs: list[dict], fingerprint: str) -> dict | None:
-    issues = api(f"/repos/{REPO}/issues?state=open&per_page=100")
+    # Toutes les pages (plafond 10 × 100) : un rapport existant au-delà de la 1re page ne doit pas être dupliqué.
+    issues: list[dict] = []
+    for page in range(1, 11):
+        batch = api(f"/repos/{REPO}/issues?state=open&per_page=100&page={page}")
+        if not batch:
+            break
+        issues.extend(batch)
+        if len(batch) < 100:
+            break
     marker = f"<!-- [align-watchdog:blocker-{fingerprint}] -->"
     workflow_line = f"**Workflow:** {run.get('name', 'unknown')}"
     branch_line = f"**Branch:** {run.get('head_branch', 'unknown')}"
@@ -167,7 +175,8 @@ def report(run: dict, reason: str, jobs: list[dict] | None = None) -> None:
 
     failed = jobs or []
     fingerprint = blocker_fingerprint(run, failed)
-    blocker = existing_blocker(run, failed, fingerprint)
+    # Sans détail de job (run bloqué / périmé), l'identité du blocage est incertaine : pas de dédoublonnage.
+    blocker = existing_blocker(run, failed, fingerprint) if failed else None
     if blocker:
         print(
             f"WATCHDOG_BLOCKER_EXISTS issue={blocker.get('number', 'unknown')} "
