@@ -8636,7 +8636,8 @@ def analyse_visiteur(etat, cid, mq=None):
             continue
         try:
             r = analyse_marche(etat, pair); cle = etat.get(nom_marche, {})
-            _envoi_sur(cid, text=texte_etat(nom_marche, r, cle, vip=False), **kw)
+            # Modèle d'Adel : positions et news gratuites, VIP = coach / prise de main.
+            _envoi_sur(cid, text=texte_etat(nom_marche, r, cle, vip=True), **kw)
         except Exception as ex:
             print("analyse visiteur", ex)
 
