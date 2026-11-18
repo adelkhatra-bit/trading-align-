@@ -1015,7 +1015,7 @@
   }
   function chevauche(a, b) { return a.left < b.right + 8 && a.right > b.left - 8 && a.top < b.bottom + 8 && a.bottom > b.top - 8; }
   function placerPastille(e, sens) {
-    const r = zoneGraphique(), H = r.height || 600, w = e.offsetWidth, h = e.offsetHeight, haut = r.top + 96, bas = r.top + H - 205 - h;
+    const r = zoneGraphique(), H = r.height || 600, w = e.offsetWidth, h = e.offsetHeight, haut = r.top + 96, bas = r.top + H - 250 - h;   // v12.2.9 : réserve 250 px pour le tableau de bord des unités (la bulle ne le recouvre plus)
     const P = pointPrix();
     let left = Math.max(r.left + 10, r.left + r.width - 70 - w - 14);
     if (P && P.x > r.left + 60 && P.x < r.left + r.width - 70) left = Math.max(r.left + 10, Math.min(P.x - w + 70, r.left + r.width - 70 - w - 14));   // la pointe vise la dernière bougie
