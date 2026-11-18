@@ -3631,6 +3631,21 @@ class PineOnlyEntryGateTests(unittest.TestCase):
         self.assertFalse(state.get("ordre"))
         self.assertTrue(any("attente du plan TradingView" in str(x) for x in out))
 
+    def test_no_signal_mode_sends_nothing_and_never_falls_back(self):
+        from unittest.mock import patch
+        r = self._market()
+        r["tv_indicator_mtf"] = {"available": False, "reason": "bridge unavailable"}
+        r["require_tv_bridge"] = True
+        state = {"t1m": 0}
+        with patch.dict(align_bot.os.environ, {"ALIGN_TV_BRIDGE_PRET": "0"}), \
+             patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), \
+             patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")):
+            out = align_bot.agent("BTC", r, state, "")
+        self.assertFalse(state.get("trade"))
+        self.assertFalse(state.get("ordre"))
+        self.assertFalse(any("TradingView" in str(x) or "bridge" in str(x) for x in out),
+                         "en mode sans signal, aucune panne technique n'est diffusée")
+
     def test_required_bridge_waits_for_pine_closed_entry_trigger(self):
         from unittest.mock import patch
         r = self._market()

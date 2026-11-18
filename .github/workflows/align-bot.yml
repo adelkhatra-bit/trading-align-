@@ -226,12 +226,15 @@ jobs:
         run: python3 ai_healthcheck.py
 
       - name: Vérifier le bridge TradingView ROBOT V12 (BTC + GOLD + NASDAQ)
-        # Contrôle bloquant : aucune analyse de production sans les données TradingView/ROBOT V12 fraîches des trois marchés.
+        # Contrôle strict et inchangé des données TradingView/ROBOT V12. S'il échoue : MODE SANS SIGNAL.
+        # Aucun signal n'est émis (ALIGN_REQUIRE_TV_BRIDGE=1 : le bot refuse tout plan sans bridge),
+        # mais Telegram, commandes et news restent actifs. L'étape finale remet le run en ÉCHEC
+        # pour que la panne reste visible du watchdog : rien n'est masqué, rien n'est inventé.
         env:
           ALIGN_TV_API_URL: ${{ secrets.ALIGN_TV_API_URL }}
           ALIGN_TV_READ_TOKEN: ${{ secrets.ALIGN_TV_READ_TOKEN }}
         run: |
-          python3 - <<'PY'
+          python3 - <<'PY' || { echo "ALIGN_TV_BRIDGE_PRET=0" >> "$GITHUB_ENV"; echo "MODE SANS SIGNAL : bridge TradingView indisponible, aucun signal émis ; Telegram, commandes et news actifs."; }
           import json, math, os, time, urllib.parse, urllib.request
           base = os.environ.get("ALIGN_TV_API_URL", "").strip().rstrip("/")
           token = os.environ.get("ALIGN_TV_READ_TOKEN", "").strip()
@@ -282,6 +285,7 @@ jobs:
       - name: Analyse BTC + Gold + NASDAQ et envoi Telegram
         env:
           ALIGN_REQUIRE_TV_BRIDGE: "1"
+          ALIGN_TV_BRIDGE_PRET: ${{ env.ALIGN_TV_BRIDGE_PRET || '1' }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -330,3 +334,10 @@ jobs:
         with:
           path: align-bot/state.json
           key: ${{ steps.cle_sauvegarde.outputs.b }}
+
+      - name: Bridge TradingView obligatoire — échec signalé
+        # Le bot a tourné sans émettre de signal ; le run reste rouge tant que le bridge n'est pas branché.
+        if: always() && env.ALIGN_TV_BRIDGE_PRET == '0'
+        run: |
+          echo "ÉCHEC: bridge TradingView ROBOT V12 indisponible (secrets ALIGN_TV_* absents ou données invalides). Aucun signal n'a été émis."
+          exit 1

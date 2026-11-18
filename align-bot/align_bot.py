@@ -10641,7 +10641,12 @@ def agent(m, r, cle, ferme):
             cle["aligne"] = 0
             cle["prep"] = False
             cle.pop("ordre", None)
-            out.append(f"⏳ {ICONE.get(m, '')} {m} : bridge Pine M15 en attente de confirmation multi-UT.")
+            if os.environ.get("ALIGN_TV_BRIDGE_PRET", "1") == "0":
+                # Mode sans signal (bridge non branché) : panne technique, pas une info de marché →
+                # journal seulement, jamais diffusée aux abonnés ni à la chaîne.
+                print(f"{m} : mode sans signal, bridge TradingView indisponible.")
+            else:
+                out.append(f"⏳ {ICONE.get(m, '')} {m} : bridge Pine M15 en attente de confirmation multi-UT.")
             return out
         pause_ = pause_entree_marche(m, r, _ETAT_COURANT.get("etat") or {}, time.time())
         if pause_:
@@ -10664,9 +10669,12 @@ def agent(m, r, cle, ferme):
             cle["prep"] = False
             cle.pop("ordre", None)
             k = str(plan_tv.get("reason") or "plan Pine absent")
-            if cle.get("tv_bridge_wait_reason") != k:
+            if os.environ.get("ALIGN_TV_BRIDGE_PRET", "1") == "0":
+                # Mode sans signal : panne technique, journal seulement (jamais envoyée aux abonnés).
+                print(f"{m} : mode sans signal, plan TradingView indisponible ({k}).")
+            elif cle.get("tv_bridge_wait_reason") != k:
                 cle["tv_bridge_wait_reason"] = k
-                out.append(f"⏳ {ICONE.get(m, '')} {m} : attente du plan TradingView M15\\n{k}\\nAucun plan Python local ne sera substitué.")
+                out.append(f"⏳ {ICONE.get(m, '')} {m} : attente du plan TradingView M15\n{k}\nAucun plan Python local ne sera substitué.")
             return out
         if plan_tv["direction"] != d:
             cle["prep"] = False
