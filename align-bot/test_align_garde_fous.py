@@ -19,7 +19,7 @@ CRITIQUES = {
     "align-bot.yml": "ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)",
     "align-bot-validation.yml": "ALIGN MTF validation",
     "align-workflow-watchdog.yml": "ALIGN Workflow Watchdog",
-    "align-auto-repair.yml": "ALIGN Auto Repair Coordinator",
+    "align-auto-repair.yml": "ALIGN Coordinateur de réparation automatique",
 }
 
 

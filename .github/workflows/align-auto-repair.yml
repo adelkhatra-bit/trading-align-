@@ -1,4 +1,4 @@
-name: ALIGN Auto Repair Coordinator
+name: ALIGN Coordinateur de réparation automatique
 
 on:
   workflow_run:
