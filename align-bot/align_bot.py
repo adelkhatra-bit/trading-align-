@@ -10629,6 +10629,131 @@ def agent(m, r, cle, ferme):
     except Exception as ex:
         print("retournement_marche", ex)
 
+    # ── Bridge Pine obligatoire : aucun fallback de niveaux locaux ──
+    require_tv = bool(r.get("require_tv_bridge"))
+    if require_tv and not tr:
+        if r.get("fermeture"):
+            return out
+        if not d:
+            cle["aligne"] = 0
+            cle["prep"] = False
+            cle.pop("ordre", None)
+            out.append(f"⏳ {ICONE.get(m, '')} {m} : bridge Pine M15 en attente de confirmation multi-UT.")
+            return out
+        pause_ = pause_entree_marche(m, r, _ETAT_COURANT.get("etat") or {}, time.time())
+        if pause_:
+            cle["prep"] = False
+            cle.pop("ordre", None)
+            cle.pop("traverse", None)
+            cle["aligne"] = d
+            out.append(f"⏳ {ICONE.get(m, '')} {m} : ENTRÉES EN PAUSE\\n{pause_}\\nAucun nouveau signal avant stabilisation.")
+            return out
+        if bloque_dw(r, d, p):
+            cle["prep"] = False
+            cle.pop("ordre", None)
+            if alerte_extreme_due(cle, d, r["t"]):
+                out.append(texte_zone_extreme(m, r, d))
+            cle["aligne"] = d
+            return out
+
+        plan_tv = plan_indicateur(r)
+        if not plan_tv.get("available"):
+            cle["prep"] = False
+            cle.pop("ordre", None)
+            k = str(plan_tv.get("reason") or "plan Pine absent")
+            if cle.get("tv_bridge_wait_reason") != k:
+                cle["tv_bridge_wait_reason"] = k
+                out.append(f"⏳ {ICONE.get(m, '')} {m} : attente du plan TradingView M15\\n{k}\\nAucun plan Python local ne sera substitué.")
+            return out
+        if plan_tv["direction"] != d:
+            cle["prep"] = False
+            cle.pop("ordre", None)
+            out.append(f"⏳ {ICONE.get(m, '')} {m} : sens Pine M15 différent de la lecture locale ; aucune entrée.")
+            return out
+        cle.pop("tv_bridge_wait_reason", None)
+
+        # Les niveaux sont ceux du Pine, jamais recalculés ni ajustés par l'apprentissage SL.
+        entry = float(plan_tv["entry"])
+        stop = float(plan_tv["sl"])
+        tp1 = float(plan_tv["tp1"])
+        tp2 = plan_tv.get("tp2")
+        risk = abs(entry - stop)
+        atr15 = float(r.get("atr") or 0)
+        rr = abs(tp1 - entry) / max(risk, 1e-9)
+        if risk <= 0 or atr15 <= 0 or risk > RISQUE_MAX * atr15 or rr < GAIN_MIN:
+            cle["prep"] = False
+            cle.pop("ordre", None)
+            out.append(f"⛔ {ICONE.get(m, '')} {m} : plan Pine M15 refusé par le filtre risque / rendement ALIGN.")
+            return out
+
+        order_id = f"{plan_tv['entry_bar_time']}|{plan_tv['entry_timeframe']}|{d}"
+        o = {
+            "d": d, "e": entry, "sl": stop, "tp1": tp1, "tp2": tp2,
+            "za": plan_tv["zone_low"], "zb": plan_tv["zone_high"],
+            "src": "Pine v25 • plan M15", "sl_ut": "15 min",
+            "rr": rr, "n1": "TP1 Pine", "n2": "TP2 Pine" if tp2 is not None else "",
+            "entry_timeframe": plan_tv["entry_timeframe"],
+            "entry_bar_time": plan_tv["entry_bar_time"],
+            "entry_bar_close": plan_tv["entry_bar_close"],
+            "pine_order_id": order_id,
+        }
+        cle["aligne"] = d
+        cle["ordre"] = o
+        cle["ordre_t"] = r["t"]
+        cle["prep"] = False
+
+        if not plan_tv.get("triggered"):
+            last_wait = cle.get("pine_wait_bar")
+            if last_wait != plan_tv["entry_bar_time"]:
+                cle["pine_wait_bar"] = plan_tv["entry_bar_time"]
+                out.append((
+                    f"🟡 PLAN PINE M15 — {ICONE.get(m, '')} {m}\\n{SENS[d]}\\n"
+                    f"🎯 Entrée : {px(entry)} • SL : {px(stop)} • TP1 : {px(tp1)}"
+                    + (f" • TP2 : {px(tp2)}" if tp2 is not None else "")
+                    + f"\\n🟨 Zone verte : {px(plan_tv['zone_low'])} → {px(plan_tv['zone_high'])}"
+                    + f"\\n⚪ Décision : {px(plan_tv['decision'])}"
+                    + f"\\n⏳ Attendre le retest puis la clôture {plan_tv['entry_timeframe']} validée par Pine.\\n"
+                    "Aucune entrée n'est autorisée par une simple mèche."
+                    + ferme, bouton_auto(m)
+                ))
+            return out
+
+        # Déclencheur Pine clôturé : une seule entrée par bougie de validation.
+        if cle.get("pine_entry_bar_done") == plan_tv["entry_bar_time"]:
+            return out
+        if r.get("annonce"):
+            out.append(f"⛔ {ICONE.get(m, '')} {m} : déclencheur Pine ignoré pendant l'annonce.")
+            return out
+        cle["pine_entry_bar_done"] = plan_tv["entry_bar_time"]
+        tr = dict(
+            o, statut="entree", cree=r["t"], ouvert_t=time.time(),
+            encore=0, atr_e=atr15, sl0=stop, profil=profil_trade(m, o, r),
+            src="Pine v25 M15 / " + plan_tv["entry_timeframe"],
+            strategie=plan_tv["strategy"],
+        )
+        tr.update(strategie_trade(r, d))
+        tr["retour"] = retournement_confirme(cle, d, r)
+        # Ne pas appliquer appliquer_marge_sl() : le SL est celui du plan Pine canonique.
+        non, n_, w_ = memoire_refuse(tr["profil"])
+        if non:
+            cle.pop("ordre", None)
+            out.append(f"🧠 {ICONE.get(m, '')} {m} : déclencheur Pine valide mais filtré par la mémoire de risque ({w_}/{n_} gagnés).")
+            return out
+        cle["trade"] = tr
+        cle["prep"] = False
+        cle["attente_rsi"] = False
+        cle["parti"] = False
+        cle.pop("ordre", None)
+        cle.pop("sans_setup", None)
+        out.append((
+            carte_coach(
+                m, r, cle, "signal", tr=tr,
+                validite=validite_cloture(r, plan_tv["entry_timeframe"].lower()),
+                signal=f"Retest zone verte + clôture {plan_tv['entry_timeframe']} Pine M15"
+            ) + ferme, boutons(m)
+        ))
+        return out
+
     # ── Pas de trade : tendance 4h confirmée par 1h, puis timing d'entrée en 5m ──
     if not tr and r.get("fermeture"):
         if r["t"] - cle.get("ferm_dit", 0) > 3 * 3600:
