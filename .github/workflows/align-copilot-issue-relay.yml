@@ -24,7 +24,6 @@ jobs:
         github.event.issue.number == 431 &&
         github.event.issue.pull_request == null &&
         github.event.comment.user.login == 'adelkhatra-bit' &&
-        github.event.comment.id > 6962101708 &&
         contains(github.event.comment.body, '[CHATGPT → COPILOT]')
       )
     runs-on: ubuntu-latest
