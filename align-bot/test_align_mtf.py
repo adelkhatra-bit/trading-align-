@@ -151,12 +151,21 @@ class AlignMtfRulesTest(unittest.TestCase):
 
     def test_indicator_plan_changes_when_active_timeframe_changes(self):
         r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "H4", "snapshots": {
-            "M15": {"fresh": True, "robotV12": {"signal": "LONG", "entry": 101, "sl": 99, "tp": 105}},
-            "H4": {"fresh": True, "robotV12": {"signal": "SHORT", "entry": 110, "sl": 112, "tp": 106}}
+            "M15": {"fresh": True, "robotV12": {
+                "signal": "LONG", "entry": 101, "sl": 99, "tp": 105,
+                "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+                "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
+            }},
+            "H4": {"fresh": True, "confirmed": True, "robotV12": {
+                "signal": "SHORT", "entry": 110, "sl": 112, "tp": 106,
+                "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+                "entryZoneLow": 109.5, "entryZoneHigh": 110.5, "entryDecision": 110,
+            }}
         }}}
         plan = align_bot.plan_indicateur(r)
-        self.assertTrue(plan["available"])
+        self.assertTrue(plan["available"], plan.get("reason"))
         self.assertEqual(plan["timeframe"], "H4")
+        self.assertEqual(plan["plan_timeframe"], "M15")
         self.assertEqual((plan["entry"], plan["sl"], plan["tp"]), (110, 112, 106))
 
     def test_indicator_plan_rejects_stale_or_missing_active_snapshot(self):
@@ -3537,6 +3546,20 @@ class TelegramExplicitCoachOptInTest(unittest.TestCase):
 
 class TelegramTp1Tp2BridgeTests(unittest.TestCase):
     def _snapshot(self, robot, timeframe="M15"):
+        robot = dict(robot)
+        entry, stop = float(robot["entry"]), float(robot["sl"])
+        signal = str(robot.get("signal") or "LONG").upper()
+        risk = abs(entry - stop)
+        robot.setdefault("planTimeframe", "M15")
+        robot.setdefault("strategy", "DAY")
+        robot.setdefault("entryTimeframe", {"SCALPING": "M1", "DAY": "M5", "SWING": "H1"}.get(robot["strategy"], "M5"))
+        if signal == "LONG":
+            robot.setdefault("entryZoneLow", entry - 0.2 * risk)
+            robot.setdefault("entryZoneHigh", entry + 0.2 * risk)
+        else:
+            robot.setdefault("entryZoneLow", entry - 0.2 * risk)
+            robot.setdefault("entryZoneHigh", entry + 0.2 * risk)
+        robot.setdefault("entryDecision", (robot["entryZoneLow"] + robot["entryZoneHigh"]) / 2)
         return {"tv_indicator_mtf": {
             "available": True,
             "activeTimeframe": timeframe,
