@@ -19,7 +19,7 @@ class SlAppris(unittest.TestCase):
         ab.suivre_apres_sl(out, "GOLD", {"t": 1200, "atr": 5.0}, cle, 96.0, 89.5)   # puis TP1
         self.assertIn("3 pips", out[0])
         self.assertNotIn("apres_sl", cle)
-        tr = {"d": -1, "e": 95.0, "sl": 100.0, "tp1": 90.0}
+        tr = {"d": -1, "e": 95.0, "sl": 100.0, "tp1": 80.0}   # 1:3 avant marge : la marge reste sous le minimum 1:2
         ab.appliquer_marge_sl("GOLD", cle, tr, {"atr": 5.0})
         self.assertAlmostEqual(tr["sl"], 100.3)
         self.assertAlmostEqual(tr["marge_sl"], 0.3)
@@ -29,7 +29,7 @@ class SlAppris(unittest.TestCase):
         ab.suivre_apres_sl(out, "BTC", {"t": 60, "atr": 50.0}, cle, 101.0, 96.0)
         ab.suivre_apres_sl(out, "BTC", {"t": 120, "atr": 50.0}, cle, 111.0, 104.0)
         self.assertIn("4 pips", out[0])
-        tr = {"d": 1, "e": 105.0, "sl": 100.0, "tp1": 110.0}
+        tr = {"d": 1, "e": 105.0, "sl": 100.0, "tp1": 125.0}   # 1:4 avant marge : 1:2.2 après marge
         ab.appliquer_marge_sl("BTC", cle, tr, {"atr": 50.0})
         self.assertAlmostEqual(tr["sl"], 96.0)
 
