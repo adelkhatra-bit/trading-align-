@@ -70,8 +70,14 @@ def relay_failed(results):
     return any(not (v == "ok" or v == "empty") for v in results.values())
 
 
+# Cloudflare refuse l'agent par défaut « Python-urllib » (HTTP 403) : on s'identifie clairement.
+USER_AGENT = "ALIGN-relais/1.0 (+github.com/adelkhatra-bit/trading-align-)"
+
+
 def _http_json(url, method="GET", data=None, headers=None, timeout=8):
-    req = urllib.request.Request(url, data=data, method=method, headers=headers or {})
+    h = {"User-Agent": USER_AGENT}
+    h.update(headers or {})
+    req = urllib.request.Request(url, data=data, method=method, headers=h)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return resp.status, json.loads(resp.read() or b"{}")

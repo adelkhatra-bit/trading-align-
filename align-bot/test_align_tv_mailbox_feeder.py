@@ -80,3 +80,10 @@ class JetonLectureDerive(unittest.TestCase):
     def test_rien_sans_secret(self):
         import align_tv_mailbox_feeder as f
         self.assertEqual(f.jeton_lecture({}), "")
+
+
+class AgentUtilisateur(unittest.TestCase):
+    def test_agent_identifie_jamais_python_urllib(self):
+        import align_tv_mailbox_feeder as f
+        self.assertTrue(f.USER_AGENT.startswith("ALIGN-relais/"))
+        self.assertNotIn("Python-urllib", f.USER_AGENT)
