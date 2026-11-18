@@ -102,6 +102,8 @@ class AlignMtfRulesTest(unittest.TestCase):
             "signal": "LONG", "entry": 101, "sl": 99, "tp1": 105, "tp2": 108,
             "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
             "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
+            "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
+            "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
             "confirmed": True,
         }
         for active_tf in ("M1", "M5", "M15", "H4"):
@@ -126,6 +128,12 @@ class AlignMtfRulesTest(unittest.TestCase):
                     "signal": "LONG", "entry": 101, "sl": 99, "tp1": 105, "tp2": 108,
                     "planTimeframe": "M15", "entryTimeframe": trigger_tf, "strategy": strategy,
                     "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
+                "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
+                "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
+                    "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
+                    "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
+            "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
+            "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
                     "confirmed": True,
                 }
                 r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "H4", "snapshots": {
@@ -138,6 +146,8 @@ class AlignMtfRulesTest(unittest.TestCase):
             "signal": "LONG", "entry": 101, "sl": 99, "tp1": 105, "tp2": 108,
             "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
             "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
+            "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
+            "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
         }
         for key, value in (("planTimeframe", "H4"), ("entryTimeframe", "H1"),
                            ("entryZoneLow", None), ("entryDecision", 103)):
@@ -155,6 +165,10 @@ class AlignMtfRulesTest(unittest.TestCase):
                 "signal": "LONG", "entry": 101, "sl": 99, "tp": 105,
                 "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
                 "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
+                "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
+                "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
+            "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
+            "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
             }},
             "H4": {"fresh": True, "confirmed": True, "robotV12": {
                 "signal": "SHORT", "entry": 110, "sl": 112, "tp": 106,
@@ -3668,6 +3682,12 @@ class TelegramTp1Tp2BridgeTests(unittest.TestCase):
             robot.setdefault("entryZoneLow", entry - 0.2 * risk)
             robot.setdefault("entryZoneHigh", entry + 0.2 * risk)
         robot.setdefault("entryDecision", (robot["entryZoneLow"] + robot["entryZoneHigh"]) / 2)
+        robot.setdefault("entryBarTime", 900_000)
+        robot.setdefault("entryBarOpen", entry)
+        robot.setdefault("entryBarHigh", max(entry, robot["entryZoneHigh"]))
+        robot.setdefault("entryBarLow", min(entry, robot["entryZoneLow"]))
+        robot.setdefault("entryBarClose", entry)
+        robot.setdefault("entryTriggered", False)
         return {"tv_indicator_mtf": {
             "available": True,
             "activeTimeframe": timeframe,
