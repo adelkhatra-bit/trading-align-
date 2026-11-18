@@ -45,6 +45,18 @@ class GardeFousWorkflows(unittest.TestCase):
             for motif in motifs:
                 self.assertRegex(entete, motif, f"déclencheur critique retiré dans {fichier} : {motif}")
 
+    def test_scripts_lances_par_le_bot_existent(self):
+        # Le job « signaux » tourne dans align-bot/ (defaults.run.working-directory) :
+        # un « python3 align-bot/x.py » y pointe vers align-bot/align-bot/x.py, absent
+        # (panne réelle du 18/11 : bridge local jamais démarré, bot en mode sans signal).
+        texte = (WF / "align-bot.yml").read_text(encoding="utf-8")
+        self.assertIn("working-directory: align-bot", texte)
+        scripts = re.findall(r"python3\s+([\w./-]+\.py)", texte)
+        self.assertTrue(scripts, "aucun script python lancé par align-bot.yml ?")
+        for script in scripts:
+            self.assertTrue((ROOT / "align-bot" / script).exists(),
+                            f"align-bot.yml lance {script} introuvable depuis align-bot/")
+
     def test_aucun_workflow_critique_desactive(self):
         for fichier in CRITIQUES:
             texte = (WF / fichier).read_text(encoding="utf-8")
