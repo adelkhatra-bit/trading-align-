@@ -28,7 +28,9 @@ class GardeFousWorkflows(unittest.TestCase):
         for fichier, nom in CRITIQUES.items():
             chemin = WF / fichier
             self.assertTrue(chemin.exists(), f"workflow critique supprimé : {fichier}")
-            self.assertIn(f"name: {nom}", chemin.read_text(encoding="utf-8"), f"nom modifié : {fichier}")
+            # Nom EXACT : align-bot.yml écoute « ALIGN MTF validation » par son nom exact (workflow_run).
+            self.assertRegex(chemin.read_text(encoding="utf-8"), rf"(?m)^name:\s*{re.escape(nom)}\s*$",
+                             f"nom modifié : {fichier}")
 
     def test_declencheurs_critiques_conserves(self):
         attendus = {
@@ -46,7 +48,8 @@ class GardeFousWorkflows(unittest.TestCase):
     def test_aucun_workflow_critique_desactive(self):
         for fichier in CRITIQUES:
             texte = (WF / fichier).read_text(encoding="utf-8")
-            self.assertIsNone(re.search(r"^\s*if:\s*(false|\$\{\{\s*false\s*\}\})\s*$", texte, re.M),
+            # Le commentaire YAML en fin de ligne (« if: false # pause ») ne doit pas masquer la désactivation.
+            self.assertIsNone(re.search(r"^\s*if:\s*(false|\$\{\{\s*false\s*\}\})\s*(#.*)?$", texte, re.M),
                               f"job désactivé par « if: false » dans {fichier}")
 
     def test_watchdog_reste_planifie(self):
@@ -60,6 +63,7 @@ class GardeFousWorkflows(unittest.TestCase):
         self.assertIsNotNone(job, "le job « validate » (contrôle obligatoire) a disparu")
         corps = job.group(1)
         self.assertNotRegex(corps, r"(?m)^    if:", "le job validate est conditionné (risque d'être sauté sur les PR)")
+        self.assertNotRegex(corps, r"(?m)^    continue-on-error:\s*(true|\$\{\{)", "le job validate tolère l'échec")
         self.assertIn('-p "test_*.py"', corps, "le job validate ne lance plus toute la suite de tests")
         # L'étape qui lance la suite ne doit pas pouvoir être sautée (pas de « if: » sur cette étape).
         etapes = re.split(r"(?m)^      - ", corps)
