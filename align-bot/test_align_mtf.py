@@ -97,17 +97,57 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertTrue(result["available"])
         self.assertIsNone(result["activeTimeframe"])
 
-    def test_indicator_plan_follows_the_active_tradingview_timeframe(self):
-        r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "M15", "snapshots": {
-            "M5": {"fresh": True, "robotV12": {"signal": "SHORT", "entry": 100, "sl": 102, "tp": 96}},
-            "M15": {"fresh": True, "confirmed": True, "robotV12": {"signal": "LONG", "entry": 101, "sl": 99, "tp": 105}},
-            "H4": {"fresh": True, "robotV12": {"signal": "LONG", "entry": 98, "sl": 95, "tp": 104}}
-        }}}
-        plan = align_bot.plan_indicateur(r)
-        self.assertTrue(plan["available"])
-        self.assertEqual(plan["timeframe"], "M15")
-        self.assertEqual((plan["entry"], plan["sl"], plan["tp"]), (101, 99, 105))
-        self.assertTrue(plan["confirmed"])
+    def test_indicator_plan_uses_fixed_m15_levels_when_chart_timeframe_changes(self):
+        robot = {
+            "signal": "LONG", "entry": 101, "sl": 99, "tp1": 105, "tp2": 108,
+            "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+            "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
+            "confirmed": True,
+        }
+        for active_tf in ("M1", "M5", "M15", "H4"):
+            with self.subTest(active_timeframe=active_tf):
+                r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": active_tf, "snapshots": {
+                    active_tf: {"fresh": True, "confirmed": True, "robotV12": dict(robot)}
+                }}}
+                plan = align_bot.plan_indicateur(r)
+                self.assertTrue(plan["available"], plan.get("reason"))
+                self.assertEqual(plan["timeframe"], active_tf)
+                self.assertEqual(plan["plan_timeframe"], "M15")
+                self.assertEqual(plan["entry_timeframe"], "M5")
+                self.assertEqual((plan["entry"], plan["sl"], plan["tp1"], plan["tp2"]), (101, 99, 105, 108))
+                self.assertEqual((plan["zone_low"], plan["decision"], plan["zone_high"]), (100, 101, 102))
+                self.assertTrue(plan["confirmed"])
+
+    def test_indicator_plan_enforces_strategy_trigger_timeframe(self):
+        cases = (("SCALPING", "M1"), ("DAY", "M5"), ("SWING", "H1"))
+        for strategy, trigger_tf in cases:
+            with self.subTest(strategy=strategy):
+                robot = {
+                    "signal": "LONG", "entry": 101, "sl": 99, "tp1": 105, "tp2": 108,
+                    "planTimeframe": "M15", "entryTimeframe": trigger_tf, "strategy": strategy,
+                    "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
+                    "confirmed": True,
+                }
+                r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "H4", "snapshots": {
+                    "H4": {"fresh": True, "confirmed": True, "robotV12": robot}
+                }}}
+                self.assertTrue(align_bot.plan_indicateur(r)["available"])
+
+    def test_indicator_plan_rejects_inconsistent_plan_or_trigger_timeframe(self):
+        valid_robot = {
+            "signal": "LONG", "entry": 101, "sl": 99, "tp1": 105, "tp2": 108,
+            "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+            "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
+        }
+        for key, value in (("planTimeframe", "H4"), ("entryTimeframe", "H1"),
+                           ("entryZoneLow", None), ("entryDecision", 103)):
+            with self.subTest(field=key, value=value):
+                robot = dict(valid_robot)
+                robot[key] = value
+                r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "M15", "snapshots": {
+                    "M15": {"fresh": True, "robotV12": robot}
+                }}}
+                self.assertFalse(align_bot.plan_indicateur(r)["available"])
 
     def test_indicator_plan_changes_when_active_timeframe_changes(self):
         r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "H4", "snapshots": {
