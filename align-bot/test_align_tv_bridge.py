@@ -52,6 +52,11 @@ def valid_payload(now_ms=BASE_MS, symbol="BTCUSD", timeframe="M1"):
         "short_score": 0,
         "scalp_inverse": False,
         "strategy": "DAY",
+        "planTimeframe": "M15",
+        "entryTimeframe": "M5",
+        "entryZoneLow": 99.0,
+        "entryZoneHigh": 101.0,
+        "entryDecision": 100.0,
         "anticipation": "AUCUNE",
         "zone_proche": "FVG",
         "volume": "OK",
@@ -206,6 +211,37 @@ class BridgeStoreTests(unittest.TestCase):
             BASE_MS + TIMEFRAME_MS["M5"] + MTF_BAR_GRACE_MS + 1,
         )
         self.assertFalse(data["snapshots"]["M5"]["fresh"])
+
+    def test_ingest_rejects_plan_timeframe_other_than_m15(self):
+        payload = valid_payload()
+        payload["planTimeframe"] = "H4"
+        status, result = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 400)
+        self.assertEqual(result["error"], "unsupported_plan_timeframe")
+
+    def test_ingest_rejects_strategy_trigger_timeframe_mismatch(self):
+        payload = valid_payload()
+        payload["entryTimeframe"] = "H1"
+        status, result = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 400)
+        self.assertEqual(result["error"], "entry_timeframe_strategy_mismatch")
+
+    def test_ingest_rejects_invalid_entry_zone_geometry(self):
+        payload = valid_payload()
+        payload["entryDecision"] = payload["entryZoneHigh"]
+        status, result = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 400)
+        self.assertEqual(result["error"], "invalid_entry_zone_geometry")
+
+    def test_ingest_persists_plan_reference_zone_and_trigger_timeframe(self):
+        status, _ = self.store.ingest(valid_payload(), INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+        _, data = self.store.read("BTCUSD", BASE_MS)
+        robot = data["snapshots"]["M1"]["robotV12"]
+        self.assertEqual(robot["planTimeframe"], "M15")
+        self.assertEqual(robot["entryTimeframe"], "M5")
+        self.assertEqual((robot["entryZoneLow"], robot["entryDecision"], robot["entryZoneHigh"]),
+                         (99.0, 100.0, 101.0))
 
     def test_read_response_never_contains_either_token(self):
         self.store.ingest(valid_payload(), INGEST, BASE_MS)
