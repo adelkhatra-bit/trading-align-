@@ -1,0 +1,47 @@
+name: ALIGN Auto Repair Coordinator
+
+on:
+  workflow_run:
+    workflows:
+      - ALIGN MTF validation
+      - CI Integration Tests
+      - ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: align-auto-repair-single-agent
+  cancel-in-progress: false
+
+jobs:
+  report:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout ALIGN main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Prepare Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compile repair coordinator
+        run: python -m py_compile scripts/align_auto_repair.py
+
+      - name: Create or update one deduplicated repair issue
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+        run: python scripts/align_auto_repair.py
