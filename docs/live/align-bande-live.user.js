@@ -312,7 +312,7 @@
       .replace(/\s+/g, ' ').trim();
     if (phrase.length < 12 || phrase === voixTexte) return 0;
     // v12.2.6 : ni disclaimer, ni phrase de spectacle / appel « lien en bio » lue à voix haute
-    if (/lien (en|dans la) bio|link in (the )?bio|spectacle|tapote|tap the|partage|share|DYOR|do your own research|conseil en investissement|not (a )?financial advice|investment advice|risque (élevé|eleve) de perte|risque de perte|high risk of (capital )?loss|risk of loss/i.test(phrase)) return 0;
+    if (/lien (en|dans la) bio|link in (the )?bio|spectacle|tapote|tap the screen|tap on the screen|partage|share (the|this) (live|stream|video)|share it|DYOR|do your own research|conseil en investissement|not (a )?financial advice|investment advice|risque (élevé|eleve) de perte|risque de perte|high risk of (capital )?loss|risk of loss/i.test(phrase)) return 0;
     // v12.2.6 : jamais de phrase coupée au milieu : on ne lit qu'une phrase complète
     if (phrase.length > 220) {
       const coupe = phrase.slice(0, 220).match(/^.*[.!?…]/);
