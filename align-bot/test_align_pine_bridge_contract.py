@@ -49,9 +49,11 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
             self.assertIn('"' + tf + '"', self.source)
         self.assertIn(">= 20000", self.source)
         self.assertLessEqual(self.source.count("request.security("), 40)
-        for missing_value_fallback in ("nz(r1, 50)", "nz(r5, 50)", "nz(r15, 50)", "nz(r60, 50)", "str.tostring(nz(d1))"):
-            self.assertNotIn(missing_value_fallback, self.source)
-        self.assertIn('na(v) ? "null" : str.tostring(v)', self.source)
+        export_block = self.source.split(EXPORT_MARKER, 1)[1]
+        for missing_value_fallback in ("f_align_v25_json_num(nz(r1, 50))", "f_align_v25_json_num(nz(r5, 50))", "f_align_v25_json_num(nz(r15, 50))", "f_align_v25_json_num(nz(r60, 50))", "str.tostring(nz(d1))"):
+            self.assertNotIn(missing_value_fallback, export_block)
+        self.assertIn('na(v) ? "null" : str.tostring(v)', export_block)
+        self.assertIn('na(v) ? "null" : v == 1', export_block)
 
     def test_no_secret_is_embedded_in_pine(self):
         self.assertNotIn("ALIGN_TV_INGEST_TOKEN", self.source)
