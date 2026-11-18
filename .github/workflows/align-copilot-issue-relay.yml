@@ -4,7 +4,7 @@ on:
   issue_comment:
     types: [created]
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -24,32 +24,47 @@ jobs:
         github.event.issue.number == 431 &&
         github.event.issue.pull_request == null &&
         github.event.comment.user.login == 'adelkhatra-bit' &&
-        startsWith(github.event.comment.body, '[CHATGPT → COPILOT]')
+        github.event.comment.id > 6962101708 &&
+        contains(github.event.comment.body, '[CHATGPT → COPILOT]')
       )
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout ALIGN main (read-only workspace)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           ref: main
           persist-credentials: false
 
-      - name: Verify relay credentials are configured
-        env:
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          test -n "$GITHUB_TOKEN" || { echo "::error::GITHUB_TOKEN unavailable"; exit 1; }
-          test -n "$COPILOT_GITHUB_TOKEN" || { echo "::error::Missing repository secret COPILOT_GITHUB_TOKEN. Add a fine-grained token with Copilot Requests permission in ALIGN repository Actions secrets."; exit 1; }
-
       - name: Validate relay Python syntax
         run: python3 -m py_compile scripts/align_copilot_issue_relay.py
 
-      - name: Install GitHub Copilot CLI
+      - name: Check for a pending authorized task
+        id: pending
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ALIGN_ISSUE_NUMBER: "431"
+          ALIGN_ALLOWED_AUTHOR: "adelkhatra-bit"
+          ALIGN_RELAY_START_COMMENT_ID: "6962101708"
+        run: python3 scripts/align_copilot_issue_relay.py --check-pending
+
+      - name: Verify Copilot credentials only when work is pending
+        if: steps.pending.outputs.pending == 'true'
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+        run: |
+          test -n "$COPILOT_GITHUB_TOKEN" || {
+            echo "::error::Missing repository secret COPILOT_GITHUB_TOKEN. Add a user-owned fine-grained token with Copilot Requests permission."
+            exit 1
+          }
+
+      - name: Install GitHub Copilot CLI only when work is pending
+        if: steps.pending.outputs.pending == 'true'
         run: npm install --global @github/copilot
 
-      - name: Process one pending ChatGPT task and reply in issue #431
+      - name: Process one pending task and reply in issue #431
+        if: steps.pending.outputs.pending == 'true'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
