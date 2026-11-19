@@ -591,6 +591,20 @@ class LiveOutbox(unittest.TestCase):
             self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "other", "text": "ALERT"}))
             self.assertFalse(ab._telegram_sortant_autorise("sendPhoto", {"chat_id": "channel", "photo": "x"}))
 
+    def test_pull_mode_lets_only_a_validated_entry_reach_a_configured_channel(self):
+        etat = {"canal": "-1001", "canaux_marche": {"GOLD": "-1002"}}
+        with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True), mock.patch.object(ab, "DERNIER_ETAT", etat):
+            ab.TELEGRAM_PULL_CONTEXT.chat_id = ""
+            ab.TELEGRAM_PULL_CONTEXT.private = False
+            entree = "🎯 POSITION ALIGN DÉTECTÉE — GOLD"
+            self.assertTrue(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "-1002", "text": entree}))
+            self.assertTrue(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "-1001", "text": entree}))
+            # Chaîne : tout le reste reste bloqué (point de marché, commentaire, mise à jour).
+            self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "-1002", "text": "📡 POINT DE MARCHÉ"}))
+            self.assertFalse(ab._telegram_sortant_autorise("editMessageText", {"chat_id": "-1002", "text": entree}))
+            # Chat inconnu : bloqué même pour une entrée.
+            self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "-1999", "text": entree}))
+
     def test_telegram_pull_mode_allows_only_current_private_interaction(self):
         with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True):
             ab.TELEGRAM_PULL_CONTEXT.chat_id = "42"

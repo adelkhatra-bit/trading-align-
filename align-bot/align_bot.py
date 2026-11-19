@@ -1473,8 +1473,10 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
                     "⚪ Aucune position VIP pour le moment")
         return "\n".join([entete, "━━━━━━━━━━━━━━━━━━", "📡 POINT DE MARCHÉ",
                             etat_pos, r.get("news") or "📰 Calendrier économique indisponible",
-                            "━━━━━━━━━━━━━━━━━━", "🔒 Direction et niveaux de trading réservés aux VIP",
-                            "💎 Accès VIP : 49,90 € / mois"])
+                            "━━━━━━━━━━━━━━━━━━"] + (
+                            # TOUT_GRATUIT (décision d'Adel, 15/11) : plus aucun prix VIP affiché, les positions sont gratuites.
+                            ["🎁 Positions gratuites : active ton coach pour recevoir la prochaine entrée"] if TOUT_GRATUIT else
+                            ["🔒 Direction et niveaux de trading réservés aux VIP", "💎 Accès VIP : 49,90 € / mois"]))
     tv_plan = plan_indicateur(r)
     D, R = r["dirs"], r["rsis"]
     maj, n_ok = alignement(r)
@@ -3306,6 +3308,13 @@ def _telegram_sortant_autorise(methode, params):
     actifs = {str(x) for x in etat.get("recherche_positions_active", [])}
     texte = str(params.get("text") or params.get("caption") or "")
     if cid and cid in actifs and methode in ("sendMessage", "sendPhoto") and _telegram_position_attendue(texte):
+        return True
+    # Règle d'Adel (18/11) : chaînes silencieuses SAUF une ENTRÉE validée, et Telegram reste le lieu où l'on
+    # reçoit les positions. Une chaîne configurée (VIP / marché) reçoit donc l'entrée ; rien d'autre ne passe.
+    chaines = {str(etat.get("canal") or ""), str(etat.get("canal_preuves") or "")}
+    chaines |= {str(v) for v in (etat.get("canaux_marche") or {}).values()}
+    chaines.discard("")
+    if cid and cid in chaines and methode in ("sendMessage", "sendPhoto") and _telegram_position_attendue(texte):
         return True
     print(f"TELEGRAM_PULL_BLOCK method={methode} chat={cid or '-'}", flush=True)
     return False
