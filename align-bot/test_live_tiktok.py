@@ -1133,6 +1133,12 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         self.assertIn("const sensReel = ((cel.t || '').match(/\\b(SHORT|LONG)\\b/) || [])[1];", bande)
         self.assertIn("const vert = sensReel ? sensReel === 'LONG' : vertClignote;", bande)
 
+    def test_bande_sans_sens_connu_pas_de_faux_long_short(self):
+        """Sans sens lisible dans le plan, la bannière n'affiche ni LONG ni SHORT et reste neutre."""
+        bande = self._lire(["docs", "live", "align-bande-live.user.js"])
+        self.assertIn("!sensReel ? '#4a4a4a'", bande)
+        self.assertIn(": (en ? 'ENTRY' : 'ENTRÉE') + ' <span class=\"cle\">❓</span> • TP", bande)
+
     def test_bande_sans_phrase_d_accueil(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
         self.assertNotIn("Je commente maintenant ce que fait le marché", bande)
