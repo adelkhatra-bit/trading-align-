@@ -3251,7 +3251,7 @@ def _telegram_file_ajouter(params):
     if any(x.get("key") == cle for x in file):
         return True
     if len(file) >= 500:
-        print(f"TELEGRAM_OUTBOX_FULL chat={cid}", flush=True)
+        print(f"TELEGRAM_OUTBOX_FULL recipient_id_present={bool(cid)}", flush=True)
         return False
     prive = (bool(getattr(TELEGRAM_PULL_CONTEXT, "private", False))
              and str(getattr(TELEGRAM_PULL_CONTEXT, "chat_id", "") or "") == cid)
@@ -3286,7 +3286,7 @@ def traiter_file_telegram(etat, maintenant=None, limite=20):
                 TELEGRAM_PULL_CONTEXT.chat_id, TELEGRAM_PULL_CONTEXT.private = prec
             if isinstance(res_, dict) and res_.get("blocked_by_pull_mode"):
                 file.remove(item)
-                print(f"TELEGRAM_OUTBOX_DROP chat={cid} reason=blocked_by_pull_mode", flush=True)
+                print(f"TELEGRAM_OUTBOX_DROP recipient_id_present={bool(cid)} reason=blocked_by_pull_mode", flush=True)
                 continue
             if isinstance(res_, dict) and res_.get("ok") is False:
                 raise RuntimeError(str(res_.get("description") or "réponse Telegram non ok"))
@@ -3294,20 +3294,20 @@ def traiter_file_telegram(etat, maintenant=None, limite=20):
             erreur = str(ex).lower()
             if any(x in erreur for x in ("bot was blocked", "chat not found", "user is deactivated", "chat_id is empty")):
                 file.remove(item)
-                print(f"TELEGRAM_OUTBOX_DROP chat={cid} reason=recipient_unavailable", flush=True)
+                print(f"TELEGRAM_OUTBOX_DROP recipient_id_present={bool(cid)} reason=recipient_unavailable", flush=True)
                 continue
             if "http error 400" in erreur or "bad request" in erreur:
                 file.remove(item)
-                print(f"TELEGRAM_OUTBOX_DROP chat={cid} reason=bad_request", flush=True)
+                print(f"TELEGRAM_OUTBOX_DROP recipient_id_present={bool(cid)} reason=bad_request", flush=True)
                 continue
             item["tries"] = int(item.get("tries", 0)) + 1
             attente = min(900, 5 * (2 ** min(item["tries"], 7)))
             item["next_t"] = max(maintenant + attente, float(TELEGRAM_RETRY_UNTIL.get(cid, 0)))
-            print(f"TELEGRAM_OUTBOX_RETRY chat={cid} tries={item['tries']} in={int(item['next_t']-maintenant)}s", flush=True)
+            print(f"TELEGRAM_OUTBOX_RETRY recipient_id_present={bool(cid)} tries={item['tries']} in={int(item['next_t'] - maintenant)}s", flush=True)
         else:
             file.remove(item)
             envoyes += 1
-            print(f"TELEGRAM_OUTBOX_SENT chat={cid} remaining={len(file)}", flush=True)
+            print(f"TELEGRAM_OUTBOX_SENT recipient_id_present={bool(cid)} remaining={len(file)}", flush=True)
     return envoyes
 
 
@@ -3410,7 +3410,7 @@ def telegram(methode, **params):
         if "HTTP Error 429" in str(ex):
             delai = _telegram_enregistre_429(cle_cooldown, ex)
             if delai:
-                print(f"telegram rate limit chat={chat_id}: pause {delai}s; message mis en attente")
+                print(f"telegram rate limit: pause {delai}s; message mis en attente")
         if methode == "sendMessage" and chat_id is not None and (
             "HTTP Error 429" in str(ex) or "cooldown actif" in str(ex).lower()
         ):
@@ -3495,13 +3495,13 @@ def epingler(etat, cid):
             etat["epingles_v5"].append(cid)
             return
     except Exception as ex:
-        print("epingler getChat", cid, ex)
+        print("epingler getChat failed", type(ex).__name__)
     try:
         res = telegram("sendMessage", chat_id=cid, text=REGLES, disable_notification="true")
         telegram("pinChatMessage", chat_id=cid, message_id=res["result"]["message_id"], disable_notification="true")
         etat["epingles_v5"].append(cid)
     except Exception as ex:
-        print("epingler", cid, ex)
+        print("epingler failed", type(ex).__name__)
 
 # Règle d'Adel (18/11) : AUCUN message privé par défaut. Une personne ne reçoit que ce qu'elle a
 # demandé (marché choisi + coach activé, ou une commande). Ces envois spontanés restent dans le code
@@ -5091,13 +5091,13 @@ def _editer_chrono_ou_recreer(cid, chrono, texte):
                 nouveau = telegram("sendMessage", chat_id=cid, text=texte, disable_notification="true")
                 chrono["mid"] = nouveau["result"]["message_id"]
                 chrono["maj"] = time.time()
-                print("chrono réparé", cid, chrono["mid"])
+                print("chrono repaired recipient_id_present=", bool(cid))
                 return True
             except Exception as remplacement:
-                print("chrono remplacement", cid, remplacement)
+                print("chrono replaced recipient_id_present=", bool(cid))
                 return False
         if any(x in erreur for x in ("bot was blocked", "chat not found", "user is deactivated")):
-            print("chrono destinataire indisponible", cid, ex)
+            print("chrono recipient unavailable", type(ex).__name__)
             return False
         raise
 
@@ -5128,7 +5128,7 @@ def _maj_chronos_verrouille(etat, m, r):
                 if not _editer_chrono_ou_recreer(cid, c, chrono_txt(m, r, cle, c["t0"])):
                     ch.pop(cid, None)
         except Exception as ex:
-            print("chrono", cid, ex)
+            print("chrono failed", type(ex).__name__)
 
 def maj_chronos(etat, m, r):
     """Sérialise les éditions du chrono entre la boucle principale et le worker indépendant."""
@@ -5777,7 +5777,7 @@ def photo_canal(cid):
         with urllib.request.urlopen(req, timeout=60) as rep:
             return json.loads(rep.read().decode()).get("ok", False)
     except Exception as ex:
-        print("photo chaîne", cid, ex)
+        print("photo channel failed", type(ex).__name__)
         return False
 
 
@@ -8435,7 +8435,7 @@ def radar_tick(etat, chats, derniers, now=None):
                 else:
                     raise
         except Exception as ex:
-            print("radar", cid, type(ex).__name__, ex)
+            print("radar delivery failed", type(ex).__name__)
 
 # ───────── /statut : tout est-il opérationnel ? (lu sur l'état réel du worker, jamais supposé) ─────────
 def prochaine_session(now):
@@ -8829,7 +8829,7 @@ def envoyer_differes(etat, now=None, dodo=True):
                 try:
                     telegram("sendMessage", chat_id=cid, text=txt)
                 except Exception as ex:
-                    print("dodo", cid, ex)
+                    print("dodo failed", type(ex).__name__)
 
 def envoyer_prospects(etat, texte, signal, clavier=None):
     """Aucune position gratuite n'est poussée automatiquement en privé."""
@@ -8881,7 +8881,7 @@ def envoyer_prospects(etat, texte, signal, clavier=None):
         try:
             telegram("sendMessage", chat_id=cid, text=txt, **k)
         except Exception as ex:
-            print("prospect", cid, ex)
+            print("prospect delivery failed", type(ex).__name__)
             if "403" in str(ex) and cid in etat.get("prospects", []):
                 etat["prospects"].remove(cid)
 
@@ -8908,7 +8908,7 @@ def _envoi_sur(cid, **kw):
     try:
         return telegram("sendMessage", chat_id=cid, **kw)
     except Exception as ex:
-        print("envoi", cid, ex)
+        print("envoi failed", type(ex).__name__)
         return None
 
 def _envoi_sur_demande(cid, **kw):
@@ -12647,7 +12647,7 @@ def live_annoncer_debut(etat, chats):
                                   if anglais else "🔴 ADEL EST EN LIVE\n📺 Le graphique ALIGN en direct (YouTube • TikTok)\n🎮 Tu peux prendre la main sur le graphique"),
                        reply_markup=clavier_live(etat, cid, anglais))
         except Exception as ex:
-            print("live annonce", cid, ex)
+            print("live annonce failed", type(ex).__name__)
 
 def live_callback(etat, chats, cb, choix, mk, qui):
     """Boutons du live. Renvoie True si le bouton appartenait au live."""
@@ -13290,7 +13290,7 @@ def un_tour(etat, chats):
                     else:
                         telegram("sendMessage", chat_id=cid, text=texte_cid)
                 except Exception as ex:
-                    print("envoi", cid, ex)
+                    print("envoi failed", type(ex).__name__)
                     if "403" in str(ex) and cid not in proprio(etat):
                         chats.discard(cid)   # l'abonné a bloqué le bot
             # Visiteurs non abonnés : teaser (positions masquées + bouton de paiement)
