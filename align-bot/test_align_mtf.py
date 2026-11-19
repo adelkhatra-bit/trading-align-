@@ -3641,7 +3641,9 @@ class PineOnlyEntryGateTests(unittest.TestCase):
             out = align_bot.agent("BTC", r, state, "")
         self.assertFalse(state.get("trade"))
         self.assertFalse(state.get("ordre"))
-        self.assertTrue(any("attente du plan TradingView" in str(x) for x in out))
+        # Bridge tombé en cours de run (PRET=1) = même règle que le mode sans signal (PRET=0) :
+        # aucune entrée, aucune alerte locale, et aucune panne technique diffusée (journal seulement).
+        self.assertFalse(any("TradingView" in str(x) or "bridge" in str(x) for x in out))
 
     def test_no_signal_mode_sends_nothing_and_never_falls_back(self):
         from unittest.mock import patch
@@ -3690,6 +3692,17 @@ class PineOnlyEntryGateTests(unittest.TestCase):
             self.assertFalse(align_bot.mode_sans_signal({"tv_indicator_mtf": {"available": True}}))
         with patch.dict(align_bot.os.environ, {"ALIGN_TV_BRIDGE_PRET": "1"}):
             self.assertFalse(align_bot.mode_sans_signal({}))
+
+    def test_bridge_pret_au_demarrage_puis_tombe_coupe_les_alertes_locales(self):
+        """Bridge bon au démarrage (PRET=1) puis indisponible pendant le run : mode sans signal pour ce marché."""
+        from unittest.mock import patch
+        with patch.dict(align_bot.os.environ, {"ALIGN_TV_BRIDGE_PRET": "1"}):
+            tombe = {"require_tv_bridge": True, "tv_indicator_mtf": {"available": False, "reason": "bridge inaccessible"}}
+            self.assertTrue(align_bot.mode_sans_signal(tombe))
+            revenu = {"require_tv_bridge": True, "tv_indicator_mtf": {"available": True}}
+            self.assertFalse(align_bot.mode_sans_signal(revenu))
+            # Marché sans exigence de bridge : inchangé.
+            self.assertFalse(align_bot.mode_sans_signal({"require_tv_bridge": False, "tv_indicator_mtf": {"available": False}}))
 
     def test_bridge_ready_still_runs_local_radar(self):
         """Contre-preuve : bridge prêt, le radar local reste branché (rien n'est enlevé)."""
