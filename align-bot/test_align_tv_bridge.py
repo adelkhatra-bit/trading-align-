@@ -204,6 +204,28 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertIsNone(robot["entry"])
         self.assertFalse(robot["confirmed"])
 
+    def test_last_rejection_is_exposed_for_diagnosis_and_cleared_by_a_valid_snapshot(self):
+        # Le journal du bot doit pouvoir dire POURQUOI un marché est indisponible (jamais de secret).
+        refuse = valid_payload()
+        refuse["timestamp"] = BASE_MS - 120_000  # trop vieux : stale_or_future_snapshot
+        status, body = self.store.ingest(refuse, INGEST, BASE_MS)
+        self.assertEqual(status, 400, body)
+        _, data = self.store.read("BTCUSD", BASE_MS + 4_000)
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["lastRejection"], {"error": body["error"], "ageMs": 4_000})
+        self.assertNotIn(INGEST, json.dumps(data))
+        self.assertNotIn(READ, json.dumps(data))
+        status, _ = self.store.ingest(valid_payload(), INGEST, BASE_MS + 5_000)
+        self.assertEqual(status, 200)
+        _, data = self.store.read("BTCUSD", BASE_MS + 5_000)
+        self.assertIsNone(data["lastRejection"])
+
+    def test_wrong_ingest_token_never_records_a_rejection(self):
+        status, _ = self.store.ingest(valid_payload(), "mauvais-jeton", BASE_MS)
+        self.assertEqual(status, 401)
+        _, data = self.store.read("BTCUSD", BASE_MS)
+        self.assertIsNone(data["lastRejection"])
+
     def test_inverse_scalp_is_never_marked_confirmed(self):
         payload = valid_payload()
         payload["scalp_inverse"] = True

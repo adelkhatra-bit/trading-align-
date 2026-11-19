@@ -65,6 +65,34 @@ def http_json(url, data=None):
 ALIGN_TV_API_URL = os.environ.get("ALIGN_TV_API_URL", "").strip().rstrip("/")
 ALIGN_TV_READ_TOKEN = os.environ.get("ALIGN_TV_READ_TOKEN", "").strip()
 
+def detail_bridge_invalide(payload):
+    """Cause lisible d'une réponse bridge non exploitable. Journal uniquement : jamais Telegram, jamais de secret."""
+    if not isinstance(payload, dict):
+        return "réponse illisible"
+    snaps = payload.get("snapshots") if isinstance(payload.get("snapshots"), dict) else {}
+    requis = ("M5", "M15", "H1", "H4", "D1", "W1")
+    morceaux = []
+    if not snaps:
+        morceaux.append("aucun snapshot reçu")
+    else:
+        age = payload.get("activeTimeframeAgeMs")
+        morceaux.append(f"UT active {payload.get('activeTimeframe')} "
+                        + ("fraîche" if payload.get("activeTimeframeFresh") is True else "périmée")
+                        + (f" ({round(age / 1000)} s)" if isinstance(age, (int, float)) else ""))
+        absents = [tf for tf in requis if tf not in snaps]
+        perimes = [tf for tf in requis if tf in snaps and (snaps[tf] or {}).get("fresh") is not True]
+        if absents:
+            morceaux.append("UT absentes " + ",".join(absents))
+        if perimes:
+            morceaux.append("UT périmées " + ",".join(perimes))
+    rejet = payload.get("lastRejection")
+    if isinstance(rejet, dict) and rejet.get("error"):
+        age = rejet.get("ageMs")
+        morceaux.append(f"dernier envoi refusé : {rejet['error']}"
+                        + (f" (il y a {round(age / 1000)} s)" if isinstance(age, (int, float)) else ""))
+    return " ; ".join(morceaux)
+
+
 def fetch_tv_mtf(pair):
     """Lit les snapshots Pine/ROBOT V12 conservés par symbole et timeframe ; jamais de données inventées."""
     if not ALIGN_TV_API_URL or not ALIGN_TV_READ_TOKEN:
@@ -76,7 +104,8 @@ def fetch_tv_mtf(pair):
         with urllib.request.urlopen(req, timeout=8) as response:
             payload = json.loads(response.read().decode("utf-8"))
         if not payload.get("ok") or not isinstance(payload.get("snapshots"), dict):
-            return {"available": False, "reason": "réponse bridge invalide", "snapshots": {}}
+            return {"available": False, "reason": "réponse bridge invalide",
+                    "detail": detail_bridge_invalide(payload), "snapshots": {}}
         active_tf = str(payload.get("activeTimeframe") or "").upper()
         active_fresh = payload.get("activeTimeframeFresh") is True
         if active_tf not in {"M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"} or not active_fresh:
@@ -92,7 +121,7 @@ def fetch_tv_mtf(pair):
         }
     except Exception as ex:
         print("TradingView MTF bridge:", ex, flush=True)
-        return {"available": False, "reason": "bridge inaccessible", "snapshots": {}}
+        return {"available": False, "reason": "bridge inaccessible", "detail": type(ex).__name__, "snapshots": {}}
 
 def mode_sans_signal(r=None):
     """Vrai seulement si le bridge était absent au démarrage ET l'est toujours pour ce marché.
@@ -10725,7 +10754,8 @@ def agent(m, r, cle, ferme):
     # Une position déjà ouverte reste suivie jusqu'à sa clôture ; aucune nouvelle info de marché.
     sans_signal = mode_sans_signal(r)
     if sans_signal and not tr:
-        print(f"{m} : mode sans signal, bridge TradingView indisponible — aucune alerte locale.")
+        cause = (r.get("tv_indicator_mtf") or {}).get("detail") or (r.get("tv_indicator_mtf") or {}).get("reason") or "inconnue"
+        print(f"{m} : mode sans signal, bridge TradingView indisponible — aucune alerte locale. Cause : {cause}")
         return []
     if not sans_signal:
         try:
