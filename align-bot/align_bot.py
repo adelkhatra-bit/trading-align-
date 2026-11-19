@@ -3257,7 +3257,7 @@ def _telegram_file_ajouter(params):
              and str(getattr(TELEGRAM_PULL_CONTEXT, "chat_id", "") or "") == cid)
     file.append({"key": cle, "chat_id": cid, "method": "sendMessage", "params": dict(params),
                  "tries": 0, "next_t": float(TELEGRAM_RETRY_UNTIL.get(cid, 0)), "prive": prive})
-    print(f"TELEGRAM_OUTBOX_QUEUED chat={cid} pending={len(file)}", flush=True)
+    print(f"TELEGRAM_OUTBOX_QUEUED chat_id_present={bool(cid)} pending={len(file)}", flush=True)
     return True
 
 
@@ -3341,7 +3341,7 @@ def _telegram_sortant_autorise(methode, params):
     chaines.discard("")
     if cid and cid in chaines and methode in ("sendMessage", "sendPhoto") and _telegram_position_attendue(texte):
         return True
-    print(f"TELEGRAM_PULL_BLOCK method={methode} chat={cid or '-'}", flush=True)
+    print(f"TELEGRAM_PULL_BLOCK method={methode} chat_id_present={bool(cid)}", flush=True)
     return False
 
 
@@ -6209,7 +6209,7 @@ def envoyer_analyse_a(etat, cid, m, r, cle):
     res = _envoi_sur_demande(cid, text=texte_apercu(m, r, cle, vip=bool(autorise(etat, str(cid), str(cid)))),
                      reply_markup=markup_analyse(etat, m, r, cid))
     if not isinstance(res, dict) or res.get("ok") is not True:
-        print(f"ANALYSE_NON_LIVREE market={m} chat={cid} reason=telegram_send_not_confirmed")
+        print(f"ANALYSE_NON_LIVREE market={m} chat_id_present={bool(cid)} reason=telegram_send_not_confirmed")
         return
     vu[str(cid)] = {"sig": sig, "t": time.time()}
     try:
