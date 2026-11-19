@@ -1134,10 +1134,10 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", *rel)
         return open(path, encoding="utf-8").read()
 
-    def test_bande_version_12_2_10(self):
+    def test_bande_version_12_2_11(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
-        self.assertIn("// @version      12.2.10", bande)
-        self.assertIn("const VERSION = '12.2.10';", bande)
+        self.assertIn("// @version      12.2.11", bande)
+        self.assertIn("const VERSION = '12.2.11';", bande)
         self.assertIn('let voixUtterance = null', bande)
         self.assertIn('voixUtterance = utterance;', bande)
 

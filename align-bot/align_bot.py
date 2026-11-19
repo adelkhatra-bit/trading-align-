@@ -12627,7 +12627,10 @@ def menu_live(etat, cid):
         bridge_configure = bool(ALIGN_TV_API_URL and ALIGN_TV_READ_TOKEN)
         statut_bridge = ("🟡 Bridge ROBOT V12 : paramètres présents (fraîcheur contrôlée avant analyse)" if bridge_configure else
                          "🔴 Bridge ROBOT V12 non connecté — analyses et signaux suspendus jusqu'au retour des données TradingView")
-        texte += f"\n━━━━━━━━━━━━━━━\n{statut_ecran}\n{statut_bridge}\n🔐 Code écran (admin) : {LIVE_SUJET or 'absent'}"
+        texte += f"\n━━━━━━━━━━━━━━━\n{statut_ecran}\n{statut_bridge}"
+        # v12.2.11 : le code écran n'est montré que dans le chat privé de l'admin (id positif), jamais dans un groupe (id négatif)
+        if int(cid) > 0:
+            texte += f"\n🔐 Code écran (admin) : {LIVE_SUJET or 'absent'}"
     _envoi_sur(cid, text=texte, **({"reply_markup": kb} if kb else {}))
 
 def live_annoncer_debut(etat, chats):
