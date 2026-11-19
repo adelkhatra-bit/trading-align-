@@ -319,6 +319,8 @@ jobs:
         env:
           ALIGN_REQUIRE_TV_BRIDGE: "1"
           ALIGN_TV_BRIDGE_PRET: ${{ steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == '0' && '0' || '1' }}
+          ALIGN_EXIGER_MEMOIRE: "1"     # jamais de redémarrage silencieux à vide (mémoire non restaurée = arrêt préventif)
+          ALIGN_ETAT_VIERGE_OK: ${{ vars.ALIGN_ETAT_VIERGE_OK }}
           ALIGN_FERMES_LIVE_DATA: "1"   # #556 : clôtures notées hors du cache (live-data/fermes.json, empreintes seulement)
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

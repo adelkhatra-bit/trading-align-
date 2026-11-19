@@ -13328,9 +13328,27 @@ def un_tour(etat, chats):
 
 STATE_SCHEMA_VERSION = 3
 
+def _bot_deja_en_service():
+    """Vrai si le bot a déjà tourné (live-data/live.json existe). En cas de doute (API muette) : vrai."""
+    try:
+        _api_github(f"/contents/{LIVE_FICHIER}?ref={LIVE_BRANCHE}")
+        return True
+    except urllib.error.HTTPError as ex:
+        return ex.code != 404
+    except Exception:
+        return True
+
+
 def charger_etat():
-    """Charge l'état sans jamais repartir à zéro silencieusement si le fichier est abîmé."""
+    """Charge l'état sans jamais repartir à zéro silencieusement si le fichier est abîmé ou absent."""
     if not os.path.exists(ETAT_FICHIER):
+        # Mémoire non restaurée (cache GitHub expiré ou perdu) alors que le bot a déjà tourné :
+        # repartir à vide effacerait abonnés, positions ouvertes et clôtures (doublons). Arrêt
+        # préventif, visible du watchdog. Premier démarrage volontaire : variable ALIGN_ETAT_VIERGE_OK=1.
+        if (os.environ.get("ALIGN_EXIGER_MEMOIRE") == "1" and os.environ.get("ALIGN_ETAT_VIERGE_OK") != "1"
+                and _bot_deja_en_service()):
+            raise RuntimeError("MÉMOIRE ALIGN ABSENTE — arrêt préventif : aucune sauvegarde restaurée alors que le bot "
+                               "a déjà tourné. Rien n'est écrasé. Démarrage à vide volontaire : variable ALIGN_ETAT_VIERGE_OK=1.")
         return {"schema_version": STATE_SCHEMA_VERSION}
     try:
         with open(ETAT_FICHIER, "r", encoding="utf-8") as f:
