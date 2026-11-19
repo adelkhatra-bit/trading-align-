@@ -160,6 +160,31 @@ class LiveTikTok(unittest.TestCase):
         self.assertEqual(self.publie, [])
         self.assertIn("n'est pas connecté", self.envoye[-1][1]["text"])
 
+    def test_boost_accepte_si_ping_frais_lu_au_clic(self):
+        """v12.2.10 : signal sauvegardé périmé, mais ping frais sur ntfy au moment du clic → boost accepté."""
+        self.etat["live_on"] = True
+        self.etat["live_screen_seen_t"] = __import__("time").time() - 600
+        frais = int(__import__("time").time() * 1000)
+        ligne = __import__("json").dumps({"event": "message", "message": f"PING|LIVE_SCREEN|{frais}"})
+        rep = mock.MagicMock()
+        rep.read.return_value = ligne.encode("utf-8")
+        rep.__enter__.return_value = rep
+        with mock.patch.object(ab.urllib.request, "urlopen", return_value=rep):
+            ab.live_callback(self.etat, set(), {"id": "x"}, "liveboost", "x", "2")
+        self.assertNotIn("n'est pas connecté", " ".join(t for _, t in [(0, m.get("text", "")) for _, m in self.envoye]))
+        self.assertTrue(self.etat["live_screen_seen_t"] >= frais / 1000 - 1)
+
+    def test_ecran_signal_frais_ignore_ping_ancien(self):
+        self.etat["live_screen_seen_t"] = 0
+        ancien = int((__import__("time").time() - 600) * 1000)
+        ligne = __import__("json").dumps({"event": "message", "message": f"PING|LIVE_SCREEN|{ancien}"})
+        rep = mock.MagicMock()
+        rep.read.return_value = ligne.encode("utf-8")
+        rep.__enter__.return_value = rep
+        with mock.patch.object(ab.urllib.request, "urlopen", return_value=rep):
+            self.assertFalse(ab.ecran_signal_frais(self.etat))
+        self.assertEqual(self.etat["live_screen_seen_t"], 0)
+
     def test_boost_limite_par_personne_et_prenom_apres_heartbeat(self):
         self.etat["live_on"] = True
         self.etat["live_screen_seen_t"] = __import__("time").time()
@@ -1095,10 +1120,12 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", *rel)
         return open(path, encoding="utf-8").read()
 
-    def test_bande_version_12_2_9(self):
+    def test_bande_version_12_2_10(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
-        self.assertIn("// @version      12.2.9", bande)
-        self.assertIn("const VERSION = '12.2.9';", bande)
+        self.assertIn("// @version      12.2.10", bande)
+        self.assertIn("const VERSION = '12.2.10';", bande)
+        self.assertIn('let voixUtterance = null', bande)
+        self.assertIn('voixUtterance = utterance;', bande)
 
     def test_bande_sans_phrase_d_accueil(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
