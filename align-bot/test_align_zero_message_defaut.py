@@ -19,13 +19,13 @@ SOURCE = (Path(__file__).resolve().parent / "align_bot.py").read_text(encoding="
 
 class ZeroMessageParDefaut(unittest.TestCase):
     def test_tous_les_envois_spontanes_sont_eteints_par_defaut(self):
-        # Une seule exception voulue par Adel : la question du jour (1 notification spontanée par jour).
+        # Les messages spontanés sont désactivés par défaut ; la question du jour exige un consentement individuel.
         self.assertEqual(ab.envois_spontanes_prives(),
-                         {"question_quotidienne": True, "clavier": False,
+                         {"question_quotidienne": False, "clavier": False,
                           "regles_privees": False, "relance_vip": False})
 
     def test_aucune_variable_ne_les_rallume_par_defaut(self):
-        self.assertIn('os.environ.get("ALIGN_QUESTION_QUOTIDIENNE", "1") == "1"', SOURCE)
+        self.assertIn('os.environ.get("ALIGN_QUESTION_QUOTIDIENNE", "0") == "1"', SOURCE)
         for var in ("ALIGN_ENVOI_CLAVIER_SPONTANE",
                     "ALIGN_REGLES_PRIVEES_SPONTANEES", "ALIGN_RELANCE_VIP_SPONTANEE"):
             self.assertIn(f'os.environ.get("{var}", "0") == "1"', SOURCE)
