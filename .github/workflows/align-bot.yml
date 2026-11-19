@@ -277,7 +277,8 @@ jobs:
               if payload.get("activeTimeframeFresh") is not True or active not in {"M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"}:
                   raise SystemExit("ÉCHEC: aucune unité TradingView active et fraîche pour " + symbol)
               snap = payload["snapshots"].get(active) or {}
-              # Le prix affiché sur TradingView doit être présent, positif et reçu depuis moins de 30 secondes.
+              # Le prix affiché sur TradingView doit être présent, positif et reçu depuis moins de 90 secondes
+              # (même limite que ACTIVE_MAX_AGE_MS du bridge : TradingView n'alerte qu'une fois par minute).
               try:
                   price = float(snap.get("price"))
                   price_updated_at = snap.get("updatedAt")
@@ -289,7 +290,7 @@ jobs:
                   price_age_ms = time.time() * 1000 - price_updated_ms
               except (TypeError, ValueError):
                   raise SystemExit("ÉCHEC: prix TradingView ou horodatage absent pour " + symbol)
-              if not math.isfinite(price) or price <= 0 or not math.isfinite(price_age_ms) or price_age_ms < 0 or price_age_ms > 30000:
+              if not math.isfinite(price) or price <= 0 or not math.isfinite(price_age_ms) or price_age_ms < 0 or price_age_ms > 90000:
                   raise SystemExit("ÉCHEC: prix TradingView invalide ou périmé pour " + symbol)
               robot = snap.get("robotV12") or {}
               if snap.get("fresh") is not True or not isinstance(robot, dict) or not robot:

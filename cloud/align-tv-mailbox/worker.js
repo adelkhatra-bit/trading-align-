@@ -4,7 +4,7 @@
 // align-bot/align_tv_bridge.py (BridgeStore), exécuté dans GitHub Actions.
 //
 // Stockage : un Durable Object par marché (lecture toujours à jour, contrairement
-// à KV dont le cache peut dépasser la fenêtre de fraîcheur de 30 s du bridge).
+// à KV dont le cache peut dépasser la fenêtre de fraîcheur de 90 s du bridge).
 //
 // Routes :
 //   POST /ingest/tradingview                  ← webhook TradingView, SANS jeton dans l'URL :

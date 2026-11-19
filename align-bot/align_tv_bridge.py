@@ -49,7 +49,10 @@ TIMEFRAME_MS = {
     "D1": 86_400_000,
     "W1": 604_800_000,
 }
-ACTIVE_MAX_AGE_MS = 30_000
+# TradingView ne déclenche une alerte webhook qu'une fois par minute (journal des alertes du 19/11 :
+# BTCUSD à 14:54:00, 14:55:00, 14:56:00…). Avec 30 s, chaque marché était périmé la moitié du temps
+# (bot « mode sans signal » ~50 %). 90 s = 60 s d'alerte + 10 s de relais + marge. Décision d'Adel du 19/11.
+ACTIVE_MAX_AGE_MS = 90_000
 MTF_BAR_GRACE_MS = 30_000
 MAX_FUTURE_SKEW_MS = 5_000
 MAX_BODY_BYTES = 32_768

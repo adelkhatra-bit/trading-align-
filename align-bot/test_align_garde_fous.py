@@ -100,7 +100,8 @@ class GardeFousBridge(unittest.TestCase):
 
     def test_fraicheur_non_relachee(self):
         self.assertGreater(bridge.ACTIVE_MAX_AGE_MS, 0, "fenêtre de fraîcheur nulle : le bridge rejetterait tout")
-        self.assertLessEqual(bridge.ACTIVE_MAX_AGE_MS, 30_000, "fraîcheur du prix relâchée")
+        # 90 s décidé par Adel le 19/11 (alertes TradingView 1 fois par minute). Ne jamais aller au-delà.
+        self.assertLessEqual(bridge.ACTIVE_MAX_AGE_MS, 90_000, "fraîcheur du prix relâchée")
         self.assertEqual(set(bridge.REQUIRED_TIMEFRAMES), {"M5", "M15", "H1", "H4", "D1", "W1"})
 
 
