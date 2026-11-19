@@ -73,7 +73,7 @@ def _job_names(jobs: list[dict]) -> list[str]:
 
 
 def _failed_step_names(jobs: list[dict]) -> list[str]:
-    failed = {"failure", "timed_out", "action_required"}
+    failed = {"failure", "timed_out", "action_required", "cancelled"}
     names = set()
     for job in jobs:
         job_name = str(job.get("name") or "unknown")
@@ -226,6 +226,65 @@ def failed_jobs(run_id: int) -> list[dict]:
     ]
 
 
+def cancelled_jobs(run_id: int) -> list[dict]:
+    payload = api(f"/repos/{REPO}/actions/runs/{run_id}/jobs?per_page=100")
+    return [
+        job for job in payload.get("jobs", [])
+        if job.get("conclusion") == "cancelled"
+    ]
+
+
+def cancelled_by_successor_rollover(run: dict) -> bool:
+    """A BOT cancellation is intentional only when a newer successful main validation is retiring it."""
+    if run.get("name") != BOT_WORKFLOW or run.get("head_branch") != "main":
+        return False
+    try:
+        worker_started = parse_time(run["created_at"])
+    except (KeyError, TypeError, ValueError):
+        return False
+
+    payload = api(f"/repos/{REPO}/actions/runs?branch=main&per_page=100")
+    runs = payload.get("workflow_runs", [])
+    later_validations = []
+    for candidate in runs:
+        if not (
+            candidate.get("name") == "ALIGN MTF validation"
+            and candidate.get("head_branch") == "main"
+            and candidate.get("event") == "push"
+            and candidate.get("conclusion") == "success"
+            and candidate.get("created_at")
+        ):
+            continue
+        try:
+            if parse_time(candidate["created_at"]) > worker_started:
+                later_validations.append(candidate)
+        except (TypeError, ValueError):
+            continue
+
+    for validation in later_validations:
+        validation_sha = validation.get("head_sha")
+        validation_time = parse_time(validation["created_at"])
+        for candidate in runs:
+            if not (
+                candidate.get("name") == "ALIGN worker rollover"
+                and candidate.get("head_branch") == "main"
+                and candidate.get("head_sha") == validation_sha
+                and candidate.get("created_at")
+            ):
+                continue
+            try:
+                rollover_time = parse_time(candidate["created_at"])
+            except (TypeError, ValueError):
+                continue
+            if rollover_time < validation_time:
+                continue
+            if candidate.get("status") == "in_progress":
+                return True
+            if candidate.get("status") == "completed" and candidate.get("conclusion") == "success":
+                return True
+    return False
+
+
 def transient_failure(jobs: list[dict]) -> bool:
     patterns = [re.compile(pattern, re.IGNORECASE) for pattern in TRANSIENT_PATTERNS]
     for job in jobs:
@@ -261,7 +320,26 @@ def handle_completed(run: dict) -> None:
     name = run.get("name", "")
     conclusion = run.get("conclusion")
     run_id = int(run["id"])
-    if name == "ALIGN Workflow Watchdog" or conclusion not in {"failure", "timed_out", "action_required"}:
+    if name == "ALIGN Workflow Watchdog":
+        return
+
+    if conclusion == "cancelled":
+        # Worker rollover is the only expected cancellation. A manual/stray BOT cancellation
+        # must be visible; never restart the production Telegram worker automatically.
+        if name != BOT_WORKFLOW:
+            return
+        if cancelled_by_successor_rollover(run):
+            print(f"WATCHDOG_WORKER_CANCELLED_BY_ROLLOVER run={run_id}")
+            return
+        jobs = cancelled_jobs(run_id)
+        report(
+            run,
+            "Production BOT worker was cancelled without a newer successful main validation/rollover; manual diagnosis is required. The worker was not automatically rerun.",
+            jobs,
+        )
+        return
+
+    if conclusion not in {"failure", "timed_out", "action_required"}:
         return
 
     jobs = failed_jobs(run_id)
@@ -308,7 +386,9 @@ def inspect_recent_failures() -> None:
         for run in payload.get("workflow_runs", []):
             if run.get("name") == "ALIGN Workflow Watchdog":
                 continue
-            if run.get("conclusion") not in failures:
+            if run.get("conclusion") not in failures and not (
+                run.get("name") == BOT_WORKFLOW and run.get("conclusion") == "cancelled"
+            ):
                 continue
             if parse_time(run["created_at"]) < cutoff:
                 continue
