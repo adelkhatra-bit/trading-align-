@@ -6546,13 +6546,80 @@ def cle_trade(m, tr):
     """Identité d'une position : un même trade ne doit être clôturé (bilan, résultats, apprentissage) qu'UNE fois."""
     return f"{m}|{tr.get('d')}|{round(float(tr.get('e') or 0), 2)}|{int(float(tr.get('cree') or 0))}"
 
+# Issue #556 : une mémoire (state.json) restaurée en retard après un worker tué de force ne contient pas
+# la dernière clôture → le trade est refermé et republié. Les clôtures sont donc AUSSI notées hors du
+# cache, sur la branche live-data (fichier public : empreintes SHA-256 seulement, ni prix, ni entrée).
+FERMES_FICHIER = "fermes.json"
+_FERMES_DISTANTS = {"charge": False, "h": []}
+
+
+def _fermes_distants_actifs():
+    return os.environ.get("ALIGN_FERMES_LIVE_DATA") == "1" and bool(os.environ.get("GITHUB_TOKEN"))
+
+
+def empreinte_cloture(cle):
+    return hashlib.sha256(("align-cloture|" + cle).encode()).hexdigest()[:32]
+
+
+def _lire_fermes_distants():
+    """(liste d'empreintes, sha du fichier) ; ([], None) si le fichier n'existe pas encore."""
+    try:
+        rep_ = _api_github(f"/contents/{FERMES_FICHIER}?ref={LIVE_BRANCHE}")
+    except urllib.error.HTTPError as ex:
+        if ex.code == 404:
+            return [], None
+        raise
+    data = json.loads(__import__("base64").b64decode(rep_.get("content") or "").decode() or "{}")
+    h = [str(x) for x in (data.get("h") or []) if isinstance(x, str)]
+    return h, rep_.get("sha")
+
+
+def fermes_distants():
+    if _fermes_distants_actifs() and not _FERMES_DISTANTS["charge"]:
+        try:
+            _FERMES_DISTANTS["h"], _ = _lire_fermes_distants()
+            _FERMES_DISTANTS["charge"] = True
+        except Exception as ex:
+            print("clôtures live-data (lecture)", type(ex).__name__, getattr(ex, "code", ""))
+    return _FERMES_DISTANTS["h"]
+
+
+def _ecrire_fermes_distants(empreinte):
+    """Ajoute l'empreinte au fichier live-data ; relit et réessaie si un autre écrit en même temps (409)."""
+    for _ in range(3):
+        try:
+            h, sha = _lire_fermes_distants()
+            if empreinte not in h:
+                h = (h + [empreinte])[-300:]
+            corps = {"message": "live: clôture notée", "branch": LIVE_BRANCHE,
+                     "content": __import__("base64").b64encode(json.dumps({"v": 1, "h": h}).encode()).decode()}
+            if sha:
+                corps["sha"] = sha
+            _api_github(f"/contents/{FERMES_FICHIER}", "PUT", corps)
+            _FERMES_DISTANTS["h"], _FERMES_DISTANTS["charge"] = h, True
+            return True
+        except urllib.error.HTTPError as ex:
+            if ex.code not in (409, 422):
+                print("clôtures live-data (écriture)", ex.code)
+                return False
+        except Exception as ex:
+            print("clôtures live-data (écriture)", type(ex).__name__)
+            return False
+    return False
+
+
 def deja_cloture(etat, m, tr):
-    return cle_trade(m, tr) in (etat.get("fermes") or [])
+    cle = cle_trade(m, tr)
+    if cle in (etat.get("fermes") or []):
+        return True
+    return empreinte_cloture(cle) in fermes_distants()
 
 def noter_cloture(etat, m, tr):
     f = etat.setdefault("fermes", [])
     f.append(cle_trade(m, tr))
     del f[:-300]
+    if _fermes_distants_actifs():
+        _ecrire_fermes_distants(empreinte_cloture(cle_trade(m, tr)))
 
 
 def cle_audit_trade(m, tr):
