@@ -173,7 +173,7 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertEqual(result["timeframe"], "W1")
 
     def test_rejects_stale_source_timestamp(self):
-        payload = valid_payload(now_ms=BASE_MS - 31_000)
+        payload = valid_payload(now_ms=BASE_MS - ACTIVE_MAX_AGE_MS - 1_000)
         status, result = self.store.ingest(payload, INGEST, BASE_MS)
         self.assertEqual(status, 400)
         self.assertEqual(result["error"], "stale_or_future_snapshot")
@@ -240,9 +240,17 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertEqual(data["activeTimeframeAgeMs"], 26_000)
         self.assertTrue(data["activeTimeframeFresh"])
 
-    def test_active_snapshot_expires_after_thirty_seconds(self):
+    def test_active_snapshot_stays_fresh_between_two_tradingview_alerts(self):
+        # Cas réel du 19/11 : TradingView n'alerte qu'une fois par minute, le relais relit toutes les 10 s.
+        # UT active M5 comme en production (alertes posées sur le graphique 5 min).
+        status, body = self.store.ingest(valid_payload(timeframe="M5"), INGEST, BASE_MS + 70_000)
+        self.assertEqual(status, 200, body)  # même message relayé 70 s après l'alerte : accepté
+        _, data = self.store.read("BTCUSD", BASE_MS + 70_000)
+        self.assertTrue(data["activeTimeframeFresh"])
+
+    def test_active_snapshot_expires_after_ninety_seconds(self):
         self.store.ingest(valid_payload(), INGEST, BASE_MS)
-        _, data = self.store.read("BTCUSD", BASE_MS + 31_000)
+        _, data = self.store.read("BTCUSD", BASE_MS + 91_000)
         self.assertFalse(data["ok"])
         self.assertFalse(data["activeTimeframeFresh"])
 

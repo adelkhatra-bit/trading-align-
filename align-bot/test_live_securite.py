@@ -159,7 +159,7 @@ class PageLive(unittest.TestCase):
         self.assertIn("math.isfinite(price)", bridge)
         self.assertIn("if not math.isfinite(price_updated_ms)", bridge)
         self.assertIn("not math.isfinite(price_age_ms)", bridge)
-        self.assertIn("price_age_ms > 30000", bridge)
+        self.assertIn("price_age_ms > 90000", bridge)  # = ACTIVE_MAX_AGE_MS du bridge (19/11)
         self.assertIn("prix TradingView invalide ou périmé", bridge)
         self.assertNotIn("continue-on-error: true", bridge)
 
