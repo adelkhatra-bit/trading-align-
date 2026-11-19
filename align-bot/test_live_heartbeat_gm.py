@@ -1,0 +1,35 @@
+"""v12.2.11 : le heartbeat de l'écran du live passe par GM_xmlhttpRequest (test de non-régression du transport)."""
+import os
+import unittest
+
+JS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")
+
+
+class HeartbeatGmTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        with open(JS, encoding="utf-8") as f:
+            cls.js = f.read()
+
+    def test_entete_autorise_gm_xmlhttprequest_vers_ntfy(self):
+        self.assertIn("// @grant        GM_xmlhttpRequest", self.js)
+        self.assertIn("// @connect      ntfy.sh", self.js)
+        self.assertNotIn("// @grant        none", self.js)
+
+    def test_heartbeat_et_evenements_passent_par_envoyerecran(self):
+        self.assertIn("function envoyerEcran(corps)", self.js)
+        self.assertIn("GM_xmlhttpRequest({ method: 'POST'", self.js)
+        self.assertIn("envoyerEcran('PING|LIVE_SCREEN|' + Date.now())", self.js)
+        self.assertIn("envoyerEcran(['EVT', mk, typ, d, minutes", self.js)
+
+    def test_repli_fetch_si_pas_de_gm(self):
+        self.assertIn("typeof GM_xmlhttpRequest === 'function'", self.js)
+        self.assertIn("fetch(url, { method: 'POST', body: corps", self.js)
+
+    def test_chaines_historiques_conservees(self):
+        self.assertIn("PING|LIVE_SCREEN|", self.js)
+        self.assertIn("setInterval(pingEcran, 25000)", self.js)
+
+
+if __name__ == "__main__":
+    unittest.main()
