@@ -266,11 +266,22 @@ jobs:
           token = os.environ.get("ALIGN_TV_READ_TOKEN", "").strip()
           if not base or not token:
               raise SystemExit("ÉCHEC: secrets ALIGN_TV_API_URL / ALIGN_TV_READ_TOKEN absents; bridge TradingView obligatoire, analyse Telegram bloquée.")
+          def diagnostic_bridge(symbol, payload):
+              # Diagnostic sans secret : état de chaque timeframe reçu par le bridge.
+              print("DIAG", symbol, "ok=", payload.get("ok"), "actif=", payload.get("activeTimeframe"),
+                    "actifFrais=", payload.get("activeTimeframeFresh"), "ageActifMs=", payload.get("activeTimeframeAgeMs"),
+                    "recus=", payload.get("receivedTimeframes"))
+              for tf, snap in (payload.get("snapshots") or {}).items():
+                  print("DIAG", symbol, tf, "frais=", snap.get("fresh"), "ageMs=", snap.get("ageMs"))
+              for tf in ("M5", "M15", "H1", "H4", "D1", "W1"):
+                  if tf not in (payload.get("snapshots") or {}):
+                      print("DIAG", symbol, tf, "ABSENT")
           for symbol in ("BTCUSD", "XAUUSD", "NAS100"):
               url = base + "/bridge/robot-v12/mtf?symbol=" + urllib.parse.quote(symbol)
               req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token, "User-Agent": "ALIGN-bridge-preflight"})
               with urllib.request.urlopen(req, timeout=12) as response:
                   payload = json.loads(response.read().decode("utf-8"))
+              diagnostic_bridge(symbol, payload)
               if payload.get("ok") is not True or not isinstance(payload.get("snapshots"), dict):
                   raise SystemExit("ÉCHEC: réponse bridge invalide pour " + symbol)
               active = str(payload.get("activeTimeframe") or "").upper()
