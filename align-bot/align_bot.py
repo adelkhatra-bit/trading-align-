@@ -3278,7 +3278,7 @@ def _telegram_sortant_autorise(methode, params):
     texte = str(params.get("text") or params.get("caption") or "")
     if cid and cid in actifs and methode in ("sendMessage", "sendPhoto") and _telegram_position_attendue(texte):
         return True
-    print(f"TELEGRAM_PULL_BLOCK method={methode} chat={cid or '-'}", flush=True)
+    print(f"TELEGRAM_PULL_BLOCK method={methode} chat_id_present={bool(cid)}", flush=True)
     return False
 
 
