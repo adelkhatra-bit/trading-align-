@@ -1127,6 +1127,12 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         self.assertIn('let voixUtterance = null', bande)
         self.assertIn('voixUtterance = utterance;', bande)
 
+    def test_bande_sens_suit_le_plan_reel(self):
+        """Le sens LONG/SHORT de la bannière vient du plan réel du tableau, pas de l'horloge seule."""
+        bande = self._lire(["docs", "live", "align-bande-live.user.js"])
+        self.assertIn("const sensReel = ((cel.t || '').match(/\\b(SHORT|LONG)\\b/) || [])[1];", bande)
+        self.assertIn("const vert = sensReel ? sensReel === 'LONG' : vertClignote;", bande)
+
     def test_bande_sans_phrase_d_accueil(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
         self.assertNotIn("Je commente maintenant ce que fait le marché", bande)

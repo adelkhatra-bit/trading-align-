@@ -1558,7 +1558,10 @@
       Object.assign(masque.style, { display: 'flex', left: (g / k + R.left) + 'px', top: ((top + y0) / k + R.top) + 'px', width: ((dr - g + 2) / k) + 'px',
         height: ((bas - top + 1) / k) + 'px', fontSize: Math.max(13, Math.round((bas - top + 1) / k * 0.8)) + 'px' });   // v9.7 (Adel) : même taille que les % du tableau
       // v9.6 (demande d'Adel) : la ligne CLIGNOTE vert « ▲ LONG ? » / rouge « ▼ SHORT ? » (plus vite quand une entrée approche) → impossible de deviner le sens
-      const vert = Math.floor(Date.now() / (arme ? 600 : 1200)) % 2 === 0;
+      // Correctif : le sens affiché suit le VRAI plan (ligne SHORT/LONG du tableau) ; l'alternance horaire ne sert qu'en secours.
+      const vertClignote = Math.floor(Date.now() / (arme ? 600 : 1200)) % 2 === 0;
+      const sensReel = ((cel.t || '').match(/\b(SHORT|LONG)\b/) || [])[1];
+      const vert = sensReel ? sensReel === 'LONG' : vertClignote;
       masque.classList.remove('mystere'); masque.style.background = vert ? '#1b9e4b' : '#d32f2f';
       const en = langueBande() === 'en', sens = (cel.t.match(/[▼▲]?\s*(SHORT|LONG)[^E\d]*/) || [''])[0].trim();
       masque.innerHTML = (masqueN++ % 12 < 8)
