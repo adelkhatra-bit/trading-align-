@@ -33,3 +33,10 @@ class HeartbeatGmTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CodeEcranNonAffiche(unittest.TestCase):
+    def test_menu_live_code_ecran_seulement_en_prive(self):
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "align_bot.py"), encoding="utf-8") as f:
+            src = f.read()
+        self.assertIn("if int(cid) > 0:", src)  # code écran seulement en chat privé
