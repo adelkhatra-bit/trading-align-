@@ -8,6 +8,7 @@
 // @downloadURL  https://raw.githubusercontent.com/adelkhatra-bit/trading-align-/main/docs/live/align-bande-live.user.js
 // @run-at       document-idle
 // @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
 // @connect      ntfy.sh
 // ==/UserScript==
 (function () {
@@ -688,7 +689,9 @@
     if (Math.abs(ts.barSpacing() - PREF.bar) > 0.5) ts.setBarSpacing(PREF.bar);
     if (Math.abs(ts.rightOffset() - PREF.off) > 2) { ts.scrollToRealtime(); ts.setRightOffset(PREF.off); }
   } catch (e) {} }, 3000);
-  function chart() { try { return window.TradingViewApi.activeChart(); } catch (e) { return null; } }
+  // v12.2.11 : avec @grant, le script tourne isolé : l'API TradingView de la page est lue via unsafeWindow.
+  const PAGE = (typeof unsafeWindow !== 'undefined' && unsafeWindow) ? unsafeWindow : window;
+  function chart() { try { return PAGE.TradingViewApi.activeChart(); } catch (e) { return null; } }
   function commande(sorte, valeur, prenom) {
     const c = chart(); if (!c) return;
     if (!retour) retour = { tf: c.resolution(), sym: c.symbol() };

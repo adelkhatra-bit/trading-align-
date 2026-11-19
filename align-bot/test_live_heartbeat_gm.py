@@ -26,13 +26,17 @@ class HeartbeatGmTests(unittest.TestCase):
         self.assertIn("typeof GM_xmlhttpRequest === 'function'", self.js)
         self.assertIn("fetch(url, { method: 'POST', body: corps", self.js)
 
+    def test_api_tradingview_lue_via_unsafewindow(self):
+        # Avec @grant le script est isolé : sans unsafeWindow, window.TradingViewApi est invisible et chart() renvoie null.
+        self.assertIn("// @grant        unsafeWindow", self.js)
+        self.assertIn("const PAGE = (typeof unsafeWindow !== 'undefined' && unsafeWindow) ? unsafeWindow : window;", self.js)
+        self.assertIn("return PAGE.TradingViewApi.activeChart();", self.js)
+        self.assertNotIn("return window.TradingViewApi.activeChart();", self.js)
+
     def test_chaines_historiques_conservees(self):
         self.assertIn("PING|LIVE_SCREEN|", self.js)
         self.assertIn("setInterval(pingEcran, 25000)", self.js)
 
-
-if __name__ == "__main__":
-    unittest.main()
 
 
 class CodeEcranNonAffiche(unittest.TestCase):
@@ -40,3 +44,7 @@ class CodeEcranNonAffiche(unittest.TestCase):
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "align_bot.py"), encoding="utf-8") as f:
             src = f.read()
         self.assertIn("if int(cid) > 0:", src)  # code écran seulement en chat privé
+
+
+if __name__ == "__main__":
+    unittest.main()
