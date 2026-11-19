@@ -12011,6 +12011,41 @@ ECRAN_FEINTE = {
     1: "🙅 Ne vends pas ce repli dans la panique : la tendance reste haussière tant que le dernier plus bas 15 min tient\n🧘 En LONG ? C'est le retrace attendu, le SL est là pour ça, pas de panique",
 }
 
+def ecran_signal_frais(etat):
+    """v12.2.10 : vérifie le heartbeat de l'écran du live AU MOMENT du clic.
+    Le signal sauvegardé ne vient que du dernier run (toutes les quelques minutes) : entre deux runs il paraissait périmé
+    alors que la bande envoyait ses pings. On relit ici le canal « -ecran » sur 2 min, sans consommer les événements EVT
+    (ceux-ci restent pour ecran_vers_telegram). Renvoie True si un ping frais a été vu."""
+    if not LIVE_SUJET:
+        return False
+    try:
+        url = "https://ntfy.sh/" + urllib.parse.quote(LIVE_SUJET + "-ecran") + "/json?poll=1&since=2m"
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "align-bot"}), timeout=8) as rep:
+            lignes = rep.read().decode("utf-8", "ignore").splitlines()
+    except Exception as ex:
+        print("écran signal", type(ex).__name__)
+        return False
+    maintenant = time.time()
+    vu = False
+    for l in lignes:
+        try:
+            j = json.loads(l)
+        except Exception:
+            continue
+        p = str(j.get("message") or "").split("|")
+        if len(p) < 3 or p[0] != "PING" or p[1] != "LIVE_SCREEN":
+            continue
+        try:
+            emis = float(p[2])
+            if emis > 10 ** 12:
+                emis /= 1000.0
+        except (TypeError, ValueError):
+            continue
+        if emis > 0 and maintenant - emis <= 90 and emis - maintenant <= 30:
+            etat["live_screen_seen_t"] = max(float(etat.get("live_screen_seen_t", 0) or 0), emis)
+            vu = True
+    return vu
+
 def ecran_lire():
     """Événements envoyés par la bande du live (au plus toutes les 20 s, échec = ignoré)."""
     if not LIVE_SUJET or time.time() - _ECRAN_T[0] < 20:
@@ -12437,6 +12472,7 @@ def menu_live(etat, cid):
     kb = clavier_live(etat, cid, anglais)
     texte = texte_live(etat, anglais)
     if str(cid) in {str(x) for x in proprio(etat)}:      # admin seulement : diagnostic écran + code privé
+        ecran_signal_frais(etat)   # v12.2.10 : statut admin à jour au moment de la demande
         vu_ecran = float(etat.get("live_screen_seen_t", 0) or 0)
         ecran_ok = time.time() - vu_ecran <= 90
         statut_ecran = ("🟢 Écran TradingView connecté (signal reçu)" if ecran_ok else
@@ -12507,6 +12543,7 @@ def live_callback(etat, chats, cb, choix, mk, qui):
         return True
     if choix == "liveboost":
         # Le bouton ne promet jamais un prénom à l'écran sans heartbeat récent du userscript TradingView.
+        ecran_signal_frais(etat)   # v12.2.10 : heartbeat relu au clic, pas seulement celui du dernier run
         vu_ecran = float(etat.get("live_screen_seen_t", 0) or 0)
         if time.time() - vu_ecran > 90:
             _envoi_sur(qui, text=("⚠️ The live screen is not connected. Refresh the TradingView live tab and try again."
