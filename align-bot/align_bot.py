@@ -5890,8 +5890,10 @@ def accueil_questionnaire(etat, cid):
                    [{"text": "🏆 Confirmé", "callback_data": "niveau:3"}]]}))
 
 
-def accueil_marches(etat, cid):
-    _envoi_sur(cid, text="❓ Question 2/2\n📊 Quel marché veux-tu suivre ?\n🎙 Chaque marché a sa chaîne : commentateur en direct",
+def accueil_marches(etat, cid, questionnaire=True):
+    # « Question 2/2 » seulement dans l'accueil (après la question 1/2) ; pas depuis le bouton « Mes chaînes ».
+    entete = "❓ Question 2/2\n" if questionnaire else "🎙 MES CHAÎNES\n━━━━━━━━━━━━━━━\n"
+    _envoi_sur(cid, text=entete + "📊 Quel marché veux-tu suivre ?\n🎙 Chaque marché a sa chaîne : commentateur en direct",
                reply_markup=json.dumps({"inline_keyboard": [
                    [{"text": "🟠 BTC", "callback_data": "choixcanal:BTC"}, {"text": "🥇 Gold", "callback_data": "choixcanal:GOLD"},
                     {"text": "🟣 NASDAQ", "callback_data": "choixcanal:NASDAQ"}],
@@ -7646,7 +7648,7 @@ def traiter(etat, chats, updates):
             menu_live(etat, cid)
             continue
         if bas.strip() == "🎙 mes chaînes":
-            accueil_marches(etat, cid)
+            accueil_marches(etat, cid, questionnaire=False)
             continue
         if bas.strip() in ("🏆 positions gagnantes", "❌ positions perdantes"):
             _envoi_sur(cid, text=texte_journal(etat, "gagnantes" in bas), reply_markup=boutons_menu_rapide(etat))
