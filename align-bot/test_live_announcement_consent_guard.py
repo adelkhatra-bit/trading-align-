@@ -1,5 +1,4 @@
 """Regression for consent guards on spontaneous live announcements."""
-import datetime
 import sys
 import unittest
 from pathlib import Path
@@ -11,7 +10,6 @@ import align_bot as ab
 
 class LiveAnnouncementConsentGuardTest(unittest.TestCase):
     def test_refused_paused_and_prospect_chats_receive_no_live_announcement(self):
-        day = datetime.datetime.now(ab.PARIS).strftime("%Y-%m-%d")
         state = {
             "bot_off": ["11"],
             "quiet": ["44"],
