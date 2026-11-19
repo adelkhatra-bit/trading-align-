@@ -13177,7 +13177,7 @@ def un_tour(etat, chats):
                 envoyer_analyse_a(etat, cid, marche, DERNIERS[marche], etat.get(marche, {}))
                 demandes_servies.add((index, marche))
     journal_vider_sortants(etat)
-    print(f"{len(envois)} signal(s) envoyé(s) à {len(chats)} téléphone(s)")
+    print(f"{len(envois)} message(s) préparé(s) ; {len(chats)} chat(s) en mémoire — livraisons non comptabilisées")
     sauver_etat(etat, chats)
 
 STATE_SCHEMA_VERSION = 3
