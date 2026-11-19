@@ -260,7 +260,7 @@ jobs:
           ALIGN_TV_API_URL: ${{ secrets.ALIGN_TV_API_URL || env.ALIGN_TV_API_URL_LOCAL }}
           ALIGN_TV_READ_TOKEN: ${{ secrets.ALIGN_TV_READ_TOKEN || env.ALIGN_TV_READ_TOKEN_LOCAL }}
         run: |
-          python3 - <<'PY' || { echo "ALIGN_TV_BRIDGE_PRET=0" >> "$GITHUB_OUTPUT"; echo "MODE SANS SIGNAL : bridge TradingView indisponible, aucun signal émis ; Telegram, commandes et news actifs."; }
+          python3 - <<'PY' && echo "ALIGN_TV_BRIDGE_PRET=1" >> "$GITHUB_OUTPUT" || { echo "ALIGN_TV_BRIDGE_PRET=0" >> "$GITHUB_OUTPUT"; echo "MODE SANS SIGNAL : bridge TradingView indisponible, aucun signal émis ; Telegram, commandes et news actifs."; }
           import json, math, os, time, urllib.parse, urllib.request
           base = os.environ.get("ALIGN_TV_API_URL", "").strip().rstrip("/")
           token = os.environ.get("ALIGN_TV_READ_TOKEN", "").strip()
