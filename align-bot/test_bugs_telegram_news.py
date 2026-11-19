@@ -61,6 +61,29 @@ class CalendrierInconnu(unittest.TestCase):
         self.assertEqual(ab.news_txt({"cal": {"t": now - 7 * 3600, "ev": []}}), "📰 News : calendrier indisponible")
 
 
+class PlanArrondi(unittest.TestCase):
+    """Cas réel du 18/11 : bord de zone 63803,65 (arrondi JSON) contre 63803,6475 attendu."""
+    def plan(self, signal, entry, sl, low, high):
+        robot = {"signal": signal, "entry": entry, "sl": sl, "tp1": entry + (3 if signal == "LONG" else -3) * abs(entry - sl),
+                 "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+                 "entryZoneLow": low, "entryZoneHigh": high, "entryDecision": (low + high) / 2,
+                 "entryBarTime": 900_000, "entryBarOpen": low, "entryBarHigh": high, "entryBarLow": low,
+                 "entryBarClose": (low + high) / 2, "confirmed": True}
+        r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "M5",
+                                  "snapshots": {"M5": {"fresh": True, "confirmed": True, "robotV12": robot}}}}
+        return ab.plan_indicateur(r)
+
+    def test_bord_de_zone_arrondi_accepte_comme_par_le_bridge(self):
+        # LONG : SL 63700, entrée 64114,59 → bord exact 63803,6475, envoyé arrondi 63803,64 (sous la limite)
+        p = self.plan("LONG", 64114.59, 63700.0, 63803.64, 64200.0)
+        self.assertTrue(p["available"], p.get("reason"))
+
+    def test_bord_vraiment_trop_pres_du_stop_reste_refuse(self):
+        p = self.plan("LONG", 64114.59, 63700.0, 63780.0, 64200.0)
+        self.assertFalse(p["available"])
+        self.assertIn("géométrie", p["reason"])
+
+
 class RetoursALaLigne(unittest.TestCase):
     def test_aucun_antislash_n_litteral_dans_le_code_des_messages(self):
         import io, tokenize
