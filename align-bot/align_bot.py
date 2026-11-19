@@ -25,6 +25,7 @@ SHUTDOWN_REQUESTED = threading.Event()
 CALLBACKS_ACKNOWLEDGED = set()
 # Mode Telegram « pull » : seuls les messages déclenchés par l'utilisateur ou une entrée demandée sont autorisés.
 TELEGRAM_PULL_CONTEXT = threading.local()
+TELEGRAM_LIVRES = [0]   # messages réellement acceptés par Telegram (compteur du journal)
 TELEGRAM_PULL_MODE = False  # activé par main(); les tests unitaires du wrapper restent isolés par défaut
 MARCHES = {"BTC": "XBTUSD", "GOLD": "XAUUSD", "NASDAQ": "NAS100"}  # BTC → FTMO (CFD 24/7) • GOLD → Topstep (MGC) / FTMO • NASDAQ → FX:NAS100 (TradingView)
 MIN_ALIGN, MIN_SQZ, MARGE_ATR, GAIN_MIN = 8, 4, 0.5, 1.5   # = réglages par défaut de l'indicateur ALIGN MTF PRO v24
@@ -218,17 +219,21 @@ def plan_indicateur(r):
     if direction not in (-1, 1) or min(entry, sl, tp1, zone_low, zone_high, decision) <= 0 or (tp2 is not None and tp2 <= 0):
         return {"timeframe": active_tf, "available": False, "reason": "direction ou niveaux M15 invalides"}
     risk = abs(entry - sl)
+    # Même tolérance d'arrondi que le bridge (align_tv_bridge.py) : le Pine pose le bord de zone
+    # EXACTEMENT à 25 % du risque et le JSON arrondit à 2 décimales. Sans elle, un plan accepté
+    # par le bridge était rejeté ici et le signal était perdu.
+    tol = risk * 0.001
     if direction == 1:
         geometrie_ok = (
             sl < entry < tp1 and (tp2 is None or tp2 > tp1)
             and zone_low < decision < zone_high and zone_low <= entry <= zone_high
-            and zone_low >= sl + 0.25 * risk
+            and zone_low >= sl + 0.25 * risk - tol
         )
     else:
         geometrie_ok = (
             tp1 < entry < sl and (tp2 is None or tp2 < tp1)
             and zone_low < decision < zone_high and zone_low <= entry <= zone_high
-            and zone_high <= sl - 0.25 * risk
+            and zone_high <= sl - 0.25 * risk + tol
         )
     if not geometrie_ok:
         return {"timeframe": active_tf, "available": False, "reason": "géométrie zone / entrée / SL / TP incohérente"}
@@ -3244,8 +3249,10 @@ def _telegram_file_ajouter(params):
     if len(file) >= 500:
         print(f"TELEGRAM_OUTBOX_FULL chat={cid}", flush=True)
         return False
+    prive = (bool(getattr(TELEGRAM_PULL_CONTEXT, "private", False))
+             and str(getattr(TELEGRAM_PULL_CONTEXT, "chat_id", "") or "") == cid)
     file.append({"key": cle, "chat_id": cid, "method": "sendMessage", "params": dict(params),
-                 "tries": 0, "next_t": float(TELEGRAM_RETRY_UNTIL.get(cid, 0))})
+                 "tries": 0, "next_t": float(TELEGRAM_RETRY_UNTIL.get(cid, 0)), "prive": prive})
     print(f"TELEGRAM_OUTBOX_QUEUED chat={cid} pending={len(file)}", flush=True)
     return True
 
@@ -3264,7 +3271,21 @@ def traiter_file_telegram(etat, maintenant=None, limite=20):
             item["next_t"] = maintenant + restant
             continue
         try:
-            telegram(item.get("method") or "sendMessage", **(item.get("params") or {}))
+            # Une réponse privée mise en attente après un 429 est rejouée dans SON contexte privé :
+            # sans cela, le mode pull la bloque (elle n'est plus « la réponse en cours »).
+            prec = (getattr(TELEGRAM_PULL_CONTEXT, "chat_id", ""), getattr(TELEGRAM_PULL_CONTEXT, "private", False))
+            if item.get("prive"):
+                TELEGRAM_PULL_CONTEXT.chat_id, TELEGRAM_PULL_CONTEXT.private = cid, True
+            try:
+                res_ = telegram(item.get("method") or "sendMessage", **(item.get("params") or {}))
+            finally:
+                TELEGRAM_PULL_CONTEXT.chat_id, TELEGRAM_PULL_CONTEXT.private = prec
+            if isinstance(res_, dict) and res_.get("blocked_by_pull_mode"):
+                file.remove(item)
+                print(f"TELEGRAM_OUTBOX_DROP chat={cid} reason=blocked_by_pull_mode", flush=True)
+                continue
+            if isinstance(res_, dict) and res_.get("ok") is False:
+                raise RuntimeError(str(res_.get("description") or "réponse Telegram non ok"))
         except Exception as ex:
             erreur = str(ex).lower()
             if any(x in erreur for x in ("bot was blocked", "chat not found", "user is deactivated", "chat_id is empty")):
@@ -3391,6 +3412,8 @@ def telegram(methode, **params):
         ):
             _telegram_file_ajouter(params_initiaux)
         raise
+    if methode in ("sendMessage", "sendPhoto", "copyMessage") and resultat.get("ok"):
+        TELEGRAM_LIVRES[0] += 1
     if methode in ("sendMessage", "editMessageText", "sendPhoto", "copyMessage") and resultat.get("ok"):
         payload = resultat.get("result") or {}
         texte = params.get("text") or params.get("caption")
@@ -9468,7 +9491,7 @@ def news_txt(etat, heures=4, n=2):
     """Les prochaines annonces ET discours USA (Fed, CPI, NFP…) à l'heure de Paris, avec le compte à rebours."""
     maintenant = time.time()
     cal = etat.get("cal", {})
-    if not cal.get("t"):
+    if not calendrier_connu(etat, maintenant):
         return "📰 News : calendrier indisponible"
     ev = sorted((e for e in cal.get("ev", []) if e["t"] - maintenant >= -15 * 60), key=lambda e: e["t"])
     if not ev:
@@ -9525,7 +9548,19 @@ def minutes_avant_fermeture_gold(ts=None):
     t = ts or time.time()
     return (horaires_gold(t)[0] - t) / 60
 
+CALENDRIER_MAX_AGE = 6 * 3600   # rafraîchi toutes les heures : au-delà de 6 h sans succès, il est « inconnu »
+
+
+def calendrier_connu(etat, maintenant):
+    t = (etat.get("cal") or {}).get("t") or 0
+    return bool(t) and 0 <= maintenant - t <= CALENDRIER_MAX_AGE
+
+
 def annonce_proche(etat, maintenant):
+    """Vrai si une annonce est à ±15 min, OU si le calendrier est inconnu (jamais lu ou trop ancien).
+    Règle d'Adel : zéro signal plutôt qu'un mauvais signal — « inconnu » n'est jamais « aucune news »."""
+    if not calendrier_connu(etat, maintenant):
+        return True
     return any(abs(e["t"] - maintenant) <= 15 * 60 for e in etat.get("cal", {}).get("ev", []))
 
 def _mediane(valeurs):
@@ -10886,7 +10921,7 @@ def agent(m, r, cle, ferme):
             cle.pop("ordre", None)
             cle.pop("traverse", None)
             cle["aligne"] = d
-            out.append(f"⏳ {ICONE.get(m, '')} {m} : ENTRÉES EN PAUSE\\n{pause_}\\nAucun nouveau signal avant stabilisation.")
+            out.append(f"⏳ {ICONE.get(m, '')} {m} : ENTRÉES EN PAUSE\n{pause_}\nAucun nouveau signal avant stabilisation.")
             return out
         if bloque_dw(r, d, p):
             cle["prep"] = False
@@ -10950,12 +10985,12 @@ def agent(m, r, cle, ferme):
             if last_wait != plan_tv["entry_bar_time"]:
                 cle["pine_wait_bar"] = plan_tv["entry_bar_time"]
                 out.append((
-                    f"🟡 PLAN PINE M15 — {ICONE.get(m, '')} {m}\\n{SENS[d]}\\n"
+                    f"🟡 PLAN PINE M15 — {ICONE.get(m, '')} {m}\n{SENS[d]}\n"
                     f"🎯 Entrée : {px(entry)} • SL : {px(stop)} • TP1 : {px(tp1)}"
                     + (f" • TP2 : {px(tp2)}" if tp2 is not None else "")
-                    + f"\\n🟨 Zone verte : {px(plan_tv['zone_low'])} → {px(plan_tv['zone_high'])}"
-                    + f"\\n⚪ Décision : {px(plan_tv['decision'])}"
-                    + f"\\n⏳ Attendre le retest puis la clôture {plan_tv['entry_timeframe']} validée par Pine.\\n"
+                    + f"\n🟨 Zone verte : {px(plan_tv['zone_low'])} → {px(plan_tv['zone_high'])}"
+                    + f"\n⚪ Décision : {px(plan_tv['decision'])}"
+                    + f"\n⏳ Attendre le retest puis la clôture {plan_tv['entry_timeframe']} validée par Pine.\n"
                     "Aucune entrée n'est autorisée par une simple mèche."
                     + ferme, bouton_auto(m)
                 ))
@@ -13283,7 +13318,8 @@ def un_tour(etat, chats):
                 envoyer_analyse_a(etat, cid, marche, DERNIERS[marche], etat.get(marche, {}))
                 demandes_servies.add((index, marche))
     journal_vider_sortants(etat)
-    print(f"{len(envois)} signal(s) envoyé(s) à {len(chats)} téléphone(s)")
+    # Honnête : « préparés » = messages calculés ; « livrés » = réellement acceptés par Telegram depuis le démarrage.
+    print(f"{len(envois)} signal(s) préparé(s) • {TELEGRAM_LIVRES[0]} message(s) Telegram livré(s) depuis le démarrage • {len(chats)} téléphone(s)")
     sauver_etat(etat, chats)
 
 STATE_SCHEMA_VERSION = 3
