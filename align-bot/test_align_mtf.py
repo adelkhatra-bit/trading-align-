@@ -1044,10 +1044,22 @@ class AlignMtfRulesTest(unittest.TestCase):
 
     def test_telegram_public_market_card_keeps_vip_restriction_clear(self):
         r = {"m1": [candle(1, c=67500.0)], "news": "📰 Calendrier économique"}
-        message = align_bot.texte_etat("BTC", r, {}, vip=False)
+        from unittest.mock import patch
+        with patch.object(align_bot, "TOUT_GRATUIT", False):
+            message = align_bot.texte_etat("BTC", r, {}, vip=False)
         self.assertIn("ALIGN • BTC", message)
         self.assertIn("POINT DE MARCHÉ", message)
         self.assertIn("Direction et niveaux de trading réservés aux VIP", message)
+
+    def test_public_market_card_has_no_vip_price_when_everything_is_free(self):
+        from unittest.mock import patch
+        r = {"m1": [candle(1, c=67500.0)], "news": "📰 Calendrier économique"}
+        with patch.object(align_bot, "TOUT_GRATUIT", True):
+            message = align_bot.texte_etat("BTC", r, {}, vip=False)
+        self.assertNotIn("49,90", message)
+        self.assertNotIn("réservés aux VIP", message)
+        self.assertIn("Positions gratuites", message)
+        self.assertIn("POINT DE MARCHÉ", message)
 
     def test_news_announcement_warns_40_minutes_before_once(self):
         from unittest.mock import patch
