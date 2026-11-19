@@ -31,3 +31,4 @@ tradingview-cache.json
 store/extension-runtime-state.json
 store/*.runtime.json
 store/extension-runtime-state.json
+__pycache__/
