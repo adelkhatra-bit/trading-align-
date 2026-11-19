@@ -3438,12 +3438,11 @@ def epingler(etat, cid):
     except Exception as ex:
         print("epingler", cid, ex)
 
-# Règle d'Adel (18/11) : AUCUN message privé par défaut. Une personne ne reçoit que ce qu'elle a
-# demandé (marché choisi + coach activé, ou une commande). Ces envois spontanés restent dans le code
-# mais sont éteints ; ils ne se rallument que par une variable explicite à 1.
-# Exception voulue par Adel : UNE seule notification spontanée par jour et par personne (budget partagé
-# entre la question du jour et l'annonce du live). Mettre ALIGN_QUESTION_QUOTIDIENNE=0 pour la couper.
-QUESTION_QUOTIDIENNE = os.environ.get("ALIGN_QUESTION_QUOTIDIENNE", "1") == "1"   # « tu trades aujourd'hui ? »
+# Règle d'Adel (18/11) : AUCUN message privé spontané par défaut. Une personne ne reçoit que ce qu'elle a
+# demandé (marché choisi + coach activé, ou une commande). Les envois spontanés restent désactivés.
+# La question quotidienne est désactivée par défaut ; ne l'activer que si un consentement explicite
+# individuel est implémenté et vérifié. Le budget quotidien ne remplace pas le consentement.
+QUESTION_QUOTIDIENNE = os.environ.get("ALIGN_QUESTION_QUOTIDIENNE", "0") == "1"   # « tu trades aujourd'hui ? »
 ENVOI_CLAVIER_SPONTANE = os.environ.get("ALIGN_ENVOI_CLAVIER_SPONTANE", "0") == "1"   # « nouveaux boutons »
 REGLES_PRIVEES_SPONTANEES = os.environ.get("ALIGN_REGLES_PRIVEES_SPONTANEES", "0") == "1"   # règles épinglées en privé
 RELANCE_VIP_SPONTANEE = os.environ.get("ALIGN_RELANCE_VIP_SPONTANEE", "0") == "1"   # « réservé aux VIP »
