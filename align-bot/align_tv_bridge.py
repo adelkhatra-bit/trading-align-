@@ -245,7 +245,11 @@ class BridgeStore:
         signal_direction = 1 if signal_text == "LONG" else -1 if signal_text == "SHORT" else None
         if plan_timeframe != "M15":
             return 400, {"ok": False, "error": "unsupported_plan_timeframe"}
-        has_plan = signal_direction in (-1, 1)
+        # Sans stratégie alignée, le Pine envoie entryTimeframe « UNSUPPORTED » : ce n'est pas un plan.
+        # Contrat : un plan non exploitable devient WAIT et la lecture MTF réelle reste publiée (jamais de rejet).
+        has_plan = signal_direction in (-1, 1) and expected_entry_tf is not None
+        if signal_direction in (-1, 1) and not has_plan:
+            payload = {**payload, "signal": "WAIT"}
         if has_plan:
             if expected_entry_tf is None or entry_timeframe != expected_entry_tf:
                 return 400, {"ok": False, "error": "entry_timeframe_strategy_mismatch"}

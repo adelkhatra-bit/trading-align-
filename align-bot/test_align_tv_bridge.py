@@ -190,6 +190,20 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertIsNone(robot["entry"])
         self.assertFalse(robot["confirmed"])
 
+    def test_plan_without_aligned_strategy_becomes_wait_and_keeps_mtf(self):
+        # Cas réel BTC du 19/11 : signal LONG, aucune stratégie alignée, entryTimeframe UNSUPPORTED.
+        payload = valid_payload()
+        payload["strategy"] = ""
+        payload["entryTimeframe"] = "UNSUPPORTED"
+        status, result = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 200, result)
+        status, data = self.store.read("BTCUSD", BASE_MS)
+        robot = data["snapshots"]["M1"]["robotV12"]
+        self.assertTrue(data["ok"])
+        self.assertEqual(robot["signal"], "WAIT")
+        self.assertIsNone(robot["entry"])
+        self.assertFalse(robot["confirmed"])
+
     def test_inverse_scalp_is_never_marked_confirmed(self):
         payload = valid_payload()
         payload["scalp_inverse"] = True
