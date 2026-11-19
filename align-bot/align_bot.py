@@ -129,7 +129,11 @@ def mode_sans_signal(r=None):
     Le contrôle de démarrage ne condamne plus tout le run : dès que de vraies données
     TradingView fraîches arrivent, le marché repart (jamais de données inventées)."""
     if os.environ.get("ALIGN_TV_BRIDGE_PRET", "1") != "0":
-        return False
+        # Bridge prêt au démarrage puis TOMBÉ en cours de run : ce marché repasse en mode sans signal
+        # tant que TradingView ne répond plus (aucune alerte calculée localement sans la source v25).
+        r = r or {}
+        bridge = r.get("tv_indicator_mtf")
+        return bool(r.get("require_tv_bridge")) and isinstance(bridge, dict) and bridge.get("available") is not True
     bridge = (r or {}).get("tv_indicator_mtf") or {}
     return bridge.get("available") is not True
 
