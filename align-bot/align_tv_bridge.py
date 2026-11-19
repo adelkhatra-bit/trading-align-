@@ -181,9 +181,22 @@ class BridgeStore:
         self.read_token = read_token
         self._lock = threading.RLock()
         self._symbols = {}
+        self._rejections = {}
 
     def ingest(self, payload, path_token, now_ms=None):
+        """Valide et range un snapshot. Mémorise le dernier refus par marché (diagnostic, sans secret)."""
         now_ms = int(now_ms if now_ms is not None else time.time() * 1000)
+        status, body = self._ingest(payload, path_token, now_ms)
+        symbol = _text(payload.get("symbol"), 16).upper() if isinstance(payload, dict) else ""
+        if symbol in ALLOWED_SYMBOLS and status != 401:
+            with self._lock:
+                if status >= 400:
+                    self._rejections[symbol] = {"error": _text(body.get("error"), 64), "atMs": now_ms}
+                elif status == 200:
+                    self._rejections.pop(symbol, None)
+        return status, body
+
+    def _ingest(self, payload, path_token, now_ms):
         if not hmac.compare_digest(str(path_token).encode(), self.ingest_token.encode()):
             return 401, {"ok": False, "error": "unauthorized"}
         if not isinstance(payload, dict) or payload.get("source") != SOURCE:
@@ -368,9 +381,13 @@ class BridgeStore:
             return 400, {"ok": False, "error": "unsupported_symbol"}
         with self._lock:
             state = self._symbols.get(symbol)
+            rejection = self._rejections.get(symbol)
+            last_rejection = ({"error": rejection["error"], "ageMs": max(0, now_ms - rejection["atMs"])}
+                              if rejection else None)
             if state is None:
                 return 200, {
                     "ok": False,
+                    "lastRejection": last_rejection,
                     "symbol": symbol,
                     "activeTimeframe": None,
                     "activeTimeframeFresh": False,
@@ -394,6 +411,7 @@ class BridgeStore:
         active_snapshot_fresh = snapshots.get(active_tf, {}).get("fresh") is True
         return 200, {
             "ok": active_fresh and active_snapshot_fresh and required_fresh,
+            "lastRejection": last_rejection,
             "symbol": symbol,
             "activeTimeframe": active_tf,
             "activeTimeframeFresh": active_fresh,
