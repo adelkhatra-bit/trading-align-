@@ -284,7 +284,7 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("PING|LIVE_SCREEN|", source)
         self.assertIn("setInterval(pingEcran, 25000)", source)
         self.assertIn("clearInterval(heartbeatT)", source)
-        self.assertIn("🔊 ACTIVER LE COMMENTATEUR", source)
+        self.assertIn("🔇 COACH VOCAL OFF", source)
         self.assertIn("🔊 COACH VOCAL ON", source)
         self.assertIn("voixBtn.remove()", source)
         self.assertIn("parlerLive(m)", source)
@@ -737,7 +737,7 @@ class LiveOutbox(unittest.TestCase):
         self.assertIn("derniereCoach", bande)
         self.assertIn("Date.now() - derniereTend < 40000", bande)
         self.assertIn("coachN++; derniereCoach = Date.now();", bande)
-        self.assertIn("🔊 ACTIVER LE COMMENTATEUR", bande)
+        self.assertIn("🔇 COACH VOCAL OFF", bande)
         self.assertNotIn("Le coach ALIGN est en direct", bande)  # v12.2.8 : plus de phrase d'accueil
 
     def test_ai_live_market_commentary_refreshes_every_ten_minutes(self):
@@ -1095,10 +1095,10 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", *rel)
         return open(path, encoding="utf-8").read()
 
-    def test_bande_version_12_2_8(self):
+    def test_bande_version_12_2_9(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
-        self.assertIn("// @version      12.2.8", bande)
-        self.assertIn("const VERSION = '12.2.8';", bande)
+        self.assertIn("// @version      12.2.9", bande)
+        self.assertIn("const VERSION = '12.2.9';", bande)
 
     def test_bande_sans_phrase_d_accueil(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
