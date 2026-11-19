@@ -1562,10 +1562,12 @@
       const vertClignote = Math.floor(Date.now() / (arme ? 600 : 1200)) % 2 === 0;
       const sensReel = ((cel.t || '').match(/\b(SHORT|LONG)\b/) || [])[1];
       const vert = sensReel ? sensReel === 'LONG' : vertClignote;
-      masque.classList.remove('mystere'); masque.style.background = vert ? '#1b9e4b' : '#d32f2f';
+      masque.classList.remove('mystere'); masque.style.background = !sensReel ? '#4a4a4a' : (vert ? '#1b9e4b' : '#d32f2f');   // sens inconnu : gris neutre, jamais de faux LONG / SHORT
       const en = langueBande() === 'en', sens = (cel.t.match(/[▼▲]?\s*(SHORT|LONG)[^E\d]*/) || [''])[0].trim();
       masque.innerHTML = (masqueN++ % 12 < 8)
-        ? '<span class="cle">' + (vert ? '▲' : '▼') + '</span> ' + (vert ? 'LONG ?' : 'SHORT ?') + ' • ' + (en ? 'ENTRY' : 'ENTRÉE') + ' <span class="cle">❓</span> • TP <span class="cle">❓</span> • SL <span class="cle">❓</span>'   // v9.6 : LONG vert / SHORT rouge en alternance
+        ? (sensReel
+          ? '<span class="cle">' + (vert ? '▲' : '▼') + '</span> ' + (vert ? 'LONG ?' : 'SHORT ?') + ' • ' + (en ? 'ENTRY' : 'ENTRÉE') + ' <span class="cle">❓</span> • TP <span class="cle">❓</span> • SL <span class="cle">❓</span>'
+          : (en ? 'ENTRY' : 'ENTRÉE') + ' <span class="cle">❓</span> • TP <span class="cle">❓</span> • SL <span class="cle">❓</span>')   // sens inconnu : pas de direction affichée
         : (arme ? '<span class="cle">⏳</span> ' + (en ? 'WAIT FOR CONFIRMATION • VIEW THE PLAN IN BIO' : 'ATTENDS LA CONFIRMATION • VOIR LE PLAN EN BIO')
           : '<span class="cle">🤔</span> ' + (en ? 'WANT TO KNOW IF YOU CAN GET IN? 👍 LINK IN BIO' : 'TU VEUX SAVOIR SI TU PEUX RENTRER ? 👍 LIEN EN BIO'));   // v8.3 : « vite » seulement quand le spectacle a vraiment annoncé un mouvement (pas de fake)
     } catch (e) {}
