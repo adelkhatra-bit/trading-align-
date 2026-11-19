@@ -12634,17 +12634,19 @@ def menu_live(etat, cid):
     _envoi_sur(cid, text=texte, **({"reply_markup": kb} if kb else {}))
 
 def live_annoncer_debut(etat, chats):
-    """Le propriétaire lance le live : tout le monde (VIP + gratuits) reçoit le lien."""
+    """Annonce live : exclut les prospects, refus explicites et conversations en pause."""
     vus = set()
     jour = datetime.datetime.now(PARIS).strftime("%Y-%m-%d")
     silencieux = {str(x) for x in (etat.get("quiet") or [])}
-    for cid in list(chats) + list(etat.get("prospects", [])):
+    desactives = {str(x) for x in (etat.get("bot_off") or [])}
+    prospects = {str(x) for x in (etat.get("prospects") or [])}
+    for cid in list(chats):
         cid = str(cid)
         if cid in vus:
             continue
         vus.add(cid)
-        if cid in silencieux or not notif_du_jour_libre(etat, cid, jour):
-            continue            # budget d'1 notification spontanée par jour déjà utilisé (ou « pas aujourd'hui »)
+        if cid in silencieux or cid in desactives or cid in prospects or not notif_du_jour_libre(etat, cid, jour):
+            continue            # refus/pause, prospect non abonné, ou budget spontané atteint
         marquer_notif_du_jour(etat, cid, jour)
         anglais = cid in LANG_EN
         try:
@@ -12652,7 +12654,7 @@ def live_annoncer_debut(etat, chats):
                                   if anglais else "🔴 ADEL EST EN LIVE\n📺 Le graphique ALIGN en direct (YouTube • TikTok)\n🎮 Tu peux prendre la main sur le graphique"),
                        reply_markup=clavier_live(etat, cid, anglais))
         except Exception as ex:
-            print("live annonce", cid, ex)
+            print("live annonce", type(ex).__name__)
 
 def live_callback(etat, chats, cb, choix, mk, qui):
     """Boutons du live. Renvoie True si le bouton appartenait au live."""
