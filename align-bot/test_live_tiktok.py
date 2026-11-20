@@ -670,6 +670,33 @@ class LiveOutbox(unittest.TestCase):
         self.assertTrue(result["blocked_by_pull_mode"])
         request.assert_not_called()
 
+    def test_pull_block_log_never_exposes_chat_id(self):
+        has_chat_id = hasattr(ab.TELEGRAM_PULL_CONTEXT, "chat_id")
+        has_private = hasattr(ab.TELEGRAM_PULL_CONTEXT, "private")
+        old_chat_id = getattr(ab.TELEGRAM_PULL_CONTEXT, "chat_id", None)
+        old_private = getattr(ab.TELEGRAM_PULL_CONTEXT, "private", None)
+        ab.TELEGRAM_PULL_CONTEXT.chat_id = None
+        ab.TELEGRAM_PULL_CONTEXT.private = False
+        try:
+            with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True), \
+                 mock.patch.object(ab, "DERNIER_ETAT", {}), \
+                 mock.patch("builtins.print") as output:
+                ab._telegram_sortant_autorise("sendMessage", {"chat_id": "test-chat-id", "text": "ALERT"})
+            self.assertEqual(output.call_count, 1)
+            message = output.call_args.args[0]
+            self.assertIn("TELEGRAM_PULL_BLOCK method=sendMessage", message)
+            self.assertNotIn("test-chat-id", message)
+            self.assertNotIn("chat=", message)
+        finally:
+            if has_chat_id:
+                ab.TELEGRAM_PULL_CONTEXT.chat_id = old_chat_id
+            elif hasattr(ab.TELEGRAM_PULL_CONTEXT, "chat_id"):
+                del ab.TELEGRAM_PULL_CONTEXT.chat_id
+            if has_private:
+                ab.TELEGRAM_PULL_CONTEXT.private = old_private
+            elif hasattr(ab.TELEGRAM_PULL_CONTEXT, "private"):
+                del ab.TELEGRAM_PULL_CONTEXT.private
+
     def test_blocked_position_notification_is_not_marked_as_sent(self):
         market, cid = "BTC", "user-42"
         trade = {"d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0, "ouvert_t": 100}
