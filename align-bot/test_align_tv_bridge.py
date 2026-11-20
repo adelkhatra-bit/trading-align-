@@ -120,7 +120,18 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertEqual(self.store.read("BTCUSD", BASE_MS)[1]["snapshots"], {})
         self.assertEqual(self.store.read("XAUUSD", BASE_MS)[1]["snapshots"], {})
 
-    def test_accepts_real_tradingview_tickers:
+    def test_rejects_cross_market_payloads_for_btc_and_gold(self):
+        # Le marché déclaré doit correspondre au ticker réel : aucune contamination croisée.
+        for symbol, tickerid in (("BTCUSD", "FOREXCOM:XAUUSD"), ("XAUUSD", "BINANCE:BTCUSDT")):
+            payload = valid_payload(symbol=symbol)
+            payload["tickerid"] = tickerid
+            status, result = self.store.ingest(payload, INGEST, BASE_MS)
+            self.assertEqual(status, 400, (symbol, tickerid, result))
+            self.assertEqual(result["error"], "symbol_tickerid_mismatch")
+            self.assertEqual(self.store.read("BTCUSD", BASE_MS)[1]["snapshots"], {})
+            self.assertEqual(self.store.read("XAUUSD", BASE_MS)[1]["snapshots"], {})
+
+    def test_accepts_real_tradingview_tickers(self):
         for symbol, tickerid in (("BTCUSD", "CRYPTO:BTCUSD"), ("BTCUSD", "BINANCE:BTCUSDT"),
                                  ("XAUUSD", "FOREXCOM:XAUUSD"), ("XAUUSD", "OANDA:XAUUSD"),
                                  ):
