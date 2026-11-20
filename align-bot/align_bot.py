@@ -8964,8 +8964,11 @@ def connecter_canal(etat, mcm):
     titre = chat.get("title", "")
     mk_ = next((k for k, mots in (("NASDAQ", ("nasdaq", "nas100")), ("GOLD", ("gold", "xau", " or ")), ("BTC", ("btc", "bitcoin")))
                 if any(w in f" {titre.lower()} " for w in mots)), None)
+    if mk_ == "NASDAQ":
+        # Marché retiré : ne plus enregistrer de nouvelle chaîne NASDAQ. Les anciens canaux déjà en state.json restent conservés pour les suivis historiques.
+        return
     if mk_ and "vip" not in titre.lower():
-        # Chaîne d'un seul marché (ALIGN BTC / ALIGN Gold / ALIGN NASDAQ) : commentateur en direct, sans niveaux VIP.
+        # Chaîne d'un seul marché actif (ALIGN BTC / ALIGN Gold) : commentateur en direct, sans niveaux VIP.
         if st == "administrator":
             etat.setdefault("canaux_marche", {})[mk_] = cid
             if chat.get("username"):
