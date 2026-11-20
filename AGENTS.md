@@ -5,7 +5,7 @@
 ## Scope and identity
 - This repository is the canonical project: `adelkhatra-bit/trading-align-`.
 - Production code branch: `main`. Public live-data publication branch: `live-data`.
-- Markets: BTC, GOLD, NASDAQ. Telegram bot: `@align_mtf_adel_bot`.
+- Markets: BTC and GOLD only. NASDAQ is retired from active analysis and new entries; retain legacy position-close/cleanup safeguards until all historical positions are confirmed closed. Telegram bot: `@align_mtf_adel_bot`.
 - Canonical indicator: `align-bot/pine/ALIGN_MTF_PRO_v25.pine` (TradingView title « ALIGN MTF PRO v25 (Inside) »). Other Pine files (v24*, *_PROPOSITION*) are history, never the active indicator. Before acting, every agent verifies repository, branch, PR, SHA, symbol and indicator version; if any is ambiguous or belongs to another project, it stops.
 - Apply these rules only to work explicitly identified as ALIGN/TRADING. If the account user or project context is ambiguous, ask before acting.
 - Never assume a branch name, SHA, PR state, deployment state, or runtime health. Read it from GitHub immediately before acting.
