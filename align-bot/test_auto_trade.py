@@ -59,9 +59,17 @@ class TestAutoTrade(unittest.TestCase):
 
 
 class TestSymboles(unittest.TestCase):
-    def test_nasdaq_trouve_le_nom_du_serveur(self):
+    def test_gold_trouve_le_nom_du_serveur(self):
         with unittest.mock.patch.object(at, "_api", return_value=["US100", "XAUUSD"]):
-            self.assertEqual(at.symbole({}, "c", "NASDAQ"), "US100")
+            self.assertEqual(at.symbole({}, "c", "GOLD"), "XAUUSD")
+
+    def test_nasdaq_rejete_sans_appel_api(self):
+        with unittest.mock.patch.object(at, "_api") as api:
+            result = at.executer({"auto_marches": {"NASDAQ": True}},
+                                {"marche": "NASDAQ", "sens": "LONG", "e": 1, "sl": 0, "tp": 2})
+        self.assertFalse(result[0]["ok"])
+        self.assertEqual(result[0]["raison"], "marché désactivé dans ALIGN")
+        api.assert_not_called()
 
 
 
