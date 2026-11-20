@@ -6,9 +6,20 @@
 - This repository is the canonical project: `adelkhatra-bit/trading-align-`.
 - Production code branch: `main`. Public live-data publication branch: `live-data`.
 - Markets: BTC, GOLD, NASDAQ. Telegram bot: `@align_mtf_adel_bot`.
-- Canonical indicator: `align-bot/pine/ALIGN_MTF_PRO_v25.pine` (TradingView title « ALIGN MTF PRO (Inside) »). Other Pine files (v24*, *_PROPOSITION*) are history, never the active indicator. Before acting, every agent verifies repository, branch, PR, SHA, symbol and indicator version; if any is ambiguous or belongs to another project, it stops.
+- Canonical indicator: `align-bot/pine/ALIGN_MTF_PRO_v25.pine` (TradingView title « ALIGN MTF PRO v25 (Inside) »). Other Pine files (v24*, *_PROPOSITION*) are history, never the active indicator. Before acting, every agent verifies repository, branch, PR, SHA, symbol and indicator version; if any is ambiguous or belongs to another project, it stops.
 - Apply these rules only to work explicitly identified as ALIGN/TRADING. If the account user or project context is ambiguous, ask before acting.
 - Never assume a branch name, SHA, PR state, deployment state, or runtime health. Read it from GitHub immediately before acting.
+
+## Permanent project identity lock — Claude Chrome and ALIGN
+- The authorized recovery source identified by the owner is **Claude Chrome**. Do not rename it or substitute Claude Code, VS Code, Cowork, or another tool; keep their sessions and provenance distinct.
+- The only target repository is `adelkhatra-bit/trading-align-`. `main` is the production code branch and `live-data` is only the generated public-data branch.
+- The former `trading-auto` environment, its pages, servers, workers, Puppeteer sessions, ports, and similarly named local folders are out of scope. Do not inspect their operational data, connect to their ports, reuse their files, change their processes, or delete them during ALIGN work.
+- Prove project identity from the canonical GitHub repository, exact branch and SHA, and file provenance. An open port, process name, folder name, browser tab, or old branch label is not proof.
+- Claude Chrome conversation history is a discovery index, not proof that a change reached GitHub. Verify source material and decisions in the actual source conversation, then independently confirm each claimed change in the canonical repository and commit history.
+- Never assume a `claude/*` branch is current or authoritative because of its name. Verify ancestry, base, SHA, changed files, dependencies, and tests before considering any source.
+- During recovery, do not delete old files, branches, projects, servers, or history. First create a provenance inventory (source conversation, repository, branch, SHA, paths, dependencies, tests), propose minimal extraction, and preserve a rollback point.
+- No mass merge, mass copy, broad cleanup, or replacement of the Telegram/ALIGN foundation. Preserve verified Telegram, Pine, MTF, bridge, AI, server, state, and live-overlay behavior unless a narrowly scoped change is proven necessary and explicitly approved.
+- If the Claude Chrome source conversation or exact project/branch cannot be accessed, report the missing evidence. Never fill gaps by guessing or substituting another agent's history.
 
 ## Branch and change discipline
 1. Start every task by recording repository, current default branch, source branch, target branch, PR number, exact head/base SHAs, latest relevant workflow runs, and working-tree state when available.
@@ -53,7 +64,22 @@ Before a PR is approved or merged:
 5. Verify no stable feature, animation, comment, user setting, memory, or unrelated change was lost.
 6. Confirm deployment and runtime behavior after merge when access permits.
 Never merge or deploy on a failed, missing, stale, or mismatched required check. Do not merge automatically; obtain explicit user approval for the merge.
-- Owner-approved exception (2026-11-18): the workflow `ALIGN fusion automatique contrôlée` (`.github/workflows/align-auto-merge.yml`) may merge a PR into `main` only when ALL hold on the exact head SHA: same repository (no fork), all check runs completed and green, Codex review completed for that SHA with no unresolved finding, and `mergeable_state == clean`. It pins the merge to the tested SHA and never bypasses branch protection. Any other merge still requires explicit owner approval.
 
 ## Required work report
 For each task report, concisely: issue and proven root cause; repository/branch/PR/base SHA/head SHA; files changed; minimal fix; tests and exact results; runtime checks; residual risks; and rollback plan. State explicitly what was not verified. Never claim continuous background monitoring or completed work without evidence.
+
+## Agent protocol: diagnose and propose before editing
+
+This section applies to every Copilot, Codex, and other coding agent working in this repository.
+
+1. **Read-only first.** Before editing, verify the repository, task, branch, PR, base/head SHAs, changed-file list, latest checks, and exact canonical source files.
+2. **Localize the defect.** Identify the exact file, function or block, line range, root cause, reproduction scenario, and affected behavior. Do not infer a cause from a failing workflow name alone.
+3. **Propose before changing code.** Post a concise diagnosis and minimal patch plan: exact files/lines, intended behavior, targeted regression tests, possible side effects, and rollback. Wait for explicit owner approval before writing files or commits.
+4. **No branch takeover.** Never replace, rewrite, rebase, reset, force-push, or bulk-synchronize an existing branch. Preserve every existing commit and unrelated change. Work only on the verified task branch; if it contains unrelated work or has drifted, stop and propose an isolated branch instead.
+5. **One defect, one focused change.** Do not bundle unrelated review findings or opportunistic refactors. Touch only the smallest set of files required by the proven dependency chain. Explain every additional file before changing it.
+6. **Canonical TradingView indicator — strict identity.** The only authorized active indicator is `align-bot/pine/ALIGN_MTF_PRO_v25.pine`, with title `ALIGN MTF PRO v25 (Inside)` and short title `ALIGN MTF v25`. Verify its current source and version from `main` before each change; do not rely on a hard-coded historical SHA. Keep `Animation en temps réel` enabled by default. Never substitute an older v24 file, a proposal file, or an unrelated indicator.
+7. **Zero regression.** Preserve ALIGN identity, Pine calculations, signals, Entry/SL/TP, MTF behavior, design, Claude-era v12.2 animations, AI commentary, alerts, Telegram, bridge, server, and strict separation between `main` and `live-data`. Do not modify them unless the approved task requires it and the plan names the exact scope.
+8. **Stop on uncertainty or failure.** If the canonical source, branch ownership, required access, live dependency, or expected behavior cannot be verified, report the blocker. If a test fails, stop and diagnose; do not weaken or delete tests and do not claim completion.
+9. **Evidence-based handoff.** Report the exact head SHA, changed files, minimal diff, test names/results, workflow URLs, unresolved findings, runtime checks not performed, and rollback path. Never claim an agent is running without a verifiable run, response, or commit.
+
+No agent may merge, deploy, modify secrets, restart production services, or place broker orders. All merges require explicit owner approval after diff review, required checks, and applicable runtime validation.

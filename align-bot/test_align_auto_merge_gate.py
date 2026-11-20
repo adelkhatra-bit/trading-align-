@@ -1,36 +1,52 @@
-"""Garde-fous de la porte de fusion automatique ALIGN (align-auto-merge.yml)."""
+"""Tests garantissant l'absence de fusion automatique ALIGN et la politique manuelle."""
 import re
 import unittest
 from pathlib import Path
 
-WF = (Path(__file__).resolve().parents[1] / ".github" / "workflows" / "align-auto-merge.yml").read_text(encoding="utf-8")
-BOUCLE = WF.split("for N in $PRS; do", 1)[1]
+ROOT = Path(__file__).resolve().parents[1]
+WORKFLOWS = ROOT / ".github" / "workflows"
+AUTO_MERGE = WORKFLOWS / "align-auto-merge.yml"
+AGENTS = ROOT / "AGENTS.md"
+SOURCE_OF_TRUTH = ROOT / "docs" / "ALIGN_SOURCE_DE_VERITE.md"
+
+FORBIDDEN_MERGE_PATTERNS = (
+    r"\bgh\s+pr\s+merge\b",
+    r"/pulls/[^\s\"']+/merge\b",
+    r"\benable_auto_merge\b",
+    r"enable-pull-request-automerge",
+    r"\b(?:octokit|github)\.rest\.pulls\.merge\b",
+)
 
 
 class PorteFusion(unittest.TestCase):
-    def test_fusion_automatique_desactivee_et_permissions_lecture_seule(self):
-        self.assertIn('if: false', WF)
-        self.assertIn('contents: read', WF)
-        self.assertNotIn('contents: write', WF)
-    def test_reagit_a_la_fin_des_deux_validations(self):
-        self.assertIn('workflows: ["ALIGN MTF validation", "CI Integration Tests"]', WF)
+    def test_workflow_de_fusion_automatique_absent(self):
+        self.assertFalse(AUTO_MERGE.exists(), "Le workflow de merge automatique doit être supprimé.")
 
-    def test_liste_des_pr_paginee(self):
-        self.assertRegex(WF, r'gh api --paginate "repos/\$REPO/pulls\?state=open&base=main')
+    def test_aucun_workflow_ne_declenche_de_fusion_de_pr(self):
+        workflows = list(WORKFLOWS.glob("*.yml")) + list(WORKFLOWS.glob("*.yaml"))
+        for workflow in workflows:
+            contenu = workflow.read_text(encoding="utf-8")
+            for pattern in FORBIDDEN_MERGE_PATTERNS:
+                self.assertIsNone(
+                    re.search(pattern, contenu, flags=re.IGNORECASE),
+                    f"Mécanisme de fusion automatique détecté dans {workflow.name}: {pattern}",
+                )
 
-    def test_une_seule_fusion_par_execution(self):
-        apres_fusion = BOUCLE.split("fusionnée (SHA", 1)[1].split("else", 1)[0]
-        self.assertIn("break", apres_fusion)
+    def test_regles_agents_exigent_une_approbation_manuelle(self):
+        agents = AGENTS.read_text(encoding="utf-8")
+        self.assertIn("obtain explicit user approval", agents)
+        self.assertIn("All merges require explicit owner approval", agents)
+        self.assertNotIn("Owner-approved exception", agents)
 
-    def test_fusion_epinglee_au_sha_et_conditions_strictes(self):
-        self.assertIn('-f merge_method=squash -f sha="$SHA"', WF)
-        self.assertIn('[ "$OK_CHECKS" = "true" ] && [ "$OK_CODEX" = "yes" ] && [ "$STATE" = "clean" ]', WF)
-        self.assertIn('.code_review.commit_sha == $s and .code_review.status == "completed" and .code_review.has_unresolved_findings == false', WF)
-        self.assertIn('[ "$FRESH" != "main false $SHA" ]', WF)
+    def test_source_de_verite_interdit_la_fusion_automatique(self):
+        source = SOURCE_OF_TRUTH.read_text(encoding="utf-8")
+        self.assertIn("Fusion manuelle uniquement", source)
+        self.assertNotIn("Fusion automatique : prévue", source)
 
-    def test_jamais_de_contournement(self):
-        for interdit in ("--admin", "bypass", "force", "--auto"):
-            self.assertNotRegex(WF, re.escape(interdit) + r"\b" if interdit != "force" else r"--force")
+    def test_source_de_verite_ne_publie_pas_les_statuts_des_secrets(self):
+        source = SOURCE_OF_TRUTH.read_text(encoding="utf-8")
+        self.assertNotIn("État au 18/11/2026", source)
+        self.assertNotIn("**absents**", source)
 
 
 if __name__ == "__main__":

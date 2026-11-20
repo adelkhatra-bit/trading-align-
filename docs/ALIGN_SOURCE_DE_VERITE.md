@@ -44,24 +44,22 @@ Règle : quand `ALIGN_REQUIRE_TV_BRIDGE=1`, **aucun repli** sur des niveaux calc
 
 ## 4. Fusion : qui peut fusionner quoi
 
-- Règle GitHub active sur `main` : **aucune fusion sans le contrôle `validate` vert** sur le dernier commit,
-  suppression et réécriture forcée interdites. Elle s'applique à tout le monde, IA comprises.
-- Fusion automatique : prévue par la PR #539 (`.github/workflows/align-auto-merge.yml`), **pas encore sur `main`**.
-  Une fois fusionnée, elle seule fusionne, et seulement si : dépôt identique, PR non brouillon, contrôles verts
-  sur le SHA exact, revue Codex de ce SHA sans remarque, état `clean`. D'ici là, toute fusion reste une décision du propriétaire.
-- Une PR = un sujet. Toujours partir de `main` à jour. Ne jamais réutiliser une branche d'une autre PR.
+- Le ruleset GitHub `ALIGN main - aucune fusion sans tests verts` est actif sur la branche par défaut. Son état vérifié le 20/11/2026 bloque la suppression et les mises à jour non-fast-forward, exige le contrôle `validate` et ne déclare aucun acteur de contournement. Recontrôler le ruleset dans GitHub avant chaque release.
+- **Fusion manuelle uniquement.** Aucun workflow, bot ou agent ne fusionne une PR automatiquement. Toute fusion exige l'approbation explicite du propriétaire, après revue complète du diff, validation des contrôles requis sur le SHA exact et vérification du fonctionnement réel concerné.
+- Le contrôle `validate` vert est nécessaire, mais ne prouve pas à lui seul les connexions live ni le bon fonctionnement en production.
+- Une PR = un sujet. Partir de `main` à jour ; ne jamais réutiliser une branche appartenant à une autre PR.
+## 5. Secrets (noms et rôles uniquement — jamais les valeurs ni leur état)
 
-## 5. Secrets (noms seulement — jamais les valeurs)
+| Secret | Rôle |
+|---|---|
+| `TELEGRAM_TOKEN` | Bot Telegram |
+| `GROQ_API_KEY`, `ANTHROPIC_API_KEY` | Fournisseurs IA |
+| `GEMINI_API_KEY`, `OPENAI_API_KEY` | Fournisseurs IA de secours |
+| `METAAPI_TOKEN`, `TOPSTEP_API_KEY`, `TOPSTEP_USERNAME` | Intégrations de compte, mode test |
+| `ALIGN_TV_API_URL`, `ALIGN_TV_READ_TOKEN` | Bridge TradingView |
+| `COPILOT_GITHUB_TOKEN` | Relais Copilot |
 
-| Secret | Rôle | État au 18/11/2026 |
-|---|---|---|
-| `TELEGRAM_TOKEN` | Bot Telegram | présent |
-| `GROQ_API_KEY`, `ANTHROPIC_API_KEY` | IA des commentaires | présents |
-| `GEMINI_API_KEY`, `OPENAI_API_KEY` | IA de secours | absents |
-| `METAAPI_TOKEN`, `TOPSTEP_API_KEY`, `TOPSTEP_USERNAME` | Comptes (mode test) | présents |
-| `ALIGN_TV_API_URL`, `ALIGN_TV_READ_TOKEN` | Bridge TradingView | **absents → le bot s'arrête au préflight** |
-| `COPILOT_GITHUB_TOKEN` | Relais / assignation Copilot | **absent → Copilot ne peut pas être assigné** |
-
+Ne jamais publier dans ce dépôt, les issues, les commentaires ou les logs publics la présence, l'absence, la validité ou la valeur d'un secret. Vérifier sa configuration uniquement dans l'environnement sécurisé prévu ; ne rapporter que le résultat strictement nécessaire, sans exposer sa valeur.
 ## 6. Interdits absolus
 
 - **Aucune donnée inventée, simulée ou de remplacement** à la place d'une vraie donnée de l'indicateur v25.
@@ -77,4 +75,4 @@ Règle : quand `ALIGN_REQUIRE_TV_BRIDGE=1`, **aucun repli** sur des niveaux calc
 
 Les IA qui travaillent **dans** le dépôt y sont renvoyées : Copilot par `.github/copilot-instructions.md`, Codex et Claude Code par `AGENTS.md`.
 Une conversation ChatGPT ouverte ailleurs ne le lit pas d'elle-même : colle-lui ce lien en premier message.
-Ce qui protège vraiment `main`, c'est la règle GitHub du point 4, pas ce texte.
+La protection effective de `main` repose sur le ruleset GitHub actif et sur l'approbation manuelle du propriétaire ; ce document décrit la procédure mais ne remplace pas les contrôles GitHub.
