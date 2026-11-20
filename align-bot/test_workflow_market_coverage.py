@@ -19,6 +19,8 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.assertIn('AUTO_MARCHES = ("BTC", "GOLD")', self.bot)
         self.assertIn('LIVE_CHOIX = {', self.bot)
         self.assertNotIn('"NASDAQ": ("sym"', self.bot)
+        self.assertIn('"GOLD et BTC", "GOLD and BTC"', self.bot)
+        self.assertNotIn('"GOLD et BTC", "NASDAQ, GOLD and BTC"', self.bot)
 
     def test_worker_rollover_recognizes_both_legacy_and_renamed_worker(self):
         self.assertIn("if run.get(\"name\") in {", self.rollover)

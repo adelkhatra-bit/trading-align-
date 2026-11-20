@@ -7951,7 +7951,7 @@ def recevoir_pseudo(etat, cid, pseudo):
 SESSIONS = (   # code, nom FR, nom EN, fuseau, ouverture, fermeture, jours d'ouverture, jours de fermeture, marchés concernés
     ("tokyo", "Tokyo", "Tokyo", "Asia/Tokyo", (9, 0), (15, 30), range(0, 5), range(0, 5), "BTC et GOLD", "BTC and GOLD"),
     ("londres", "Londres", "London", "Europe/London", (8, 0), (16, 30), range(0, 5), range(0, 5), "GOLD et BTC", "GOLD and BTC"),
-    ("wall", "Wall Street / Nasdaq", "Wall Street / Nasdaq", "America/New_York", (9, 30), (16, 0), range(0, 5), range(0, 5), "GOLD et BTC", "NASDAQ, GOLD and BTC"),
+    ("wall", "Wall Street / Nasdaq", "Wall Street / Nasdaq", "America/New_York", (9, 30), (16, 0), range(0, 5), range(0, 5), "GOLD et BTC", "GOLD and BTC"),
     ("gold", "Gold (CME)", "Gold (CME)", "America/Chicago", (17, 0), (16, 0), (6, 0, 1, 2, 3), range(0, 5), "GOLD", "GOLD"),
     ("btc", "BTC (bougie Daily)", "BTC (Daily candle)", "UTC", None, (0, 0), (), range(0, 7), "BTC", "BTC"),
 )
