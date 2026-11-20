@@ -25,7 +25,7 @@ class ProductionMarketCoverageTest(unittest.TestCase):
     def test_worker_rollover_recognizes_both_legacy_and_renamed_worker(self):
         self.assertIn("if run.get(\"name\") in {", self.rollover)
         self.assertIn("ALIGN MTF BOT (signaux BTC + Gold Telegram)", self.rollover)
-        self.assertIn("ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)", self.rollover)
+        self.assertIn("ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)", self.rollover)  # legacy worker drained safely
 
     def test_nasdaq_not_available_to_auto_execution(self):
         auto_trade = (Path(__file__).parent / "auto_trade.py").read_text(encoding="utf-8")
