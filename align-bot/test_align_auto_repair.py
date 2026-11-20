@@ -87,13 +87,13 @@ class RepairIssueTests(unittest.TestCase):
         target = {"sha": SHA, "run_id": 123}
         issue = {
             "number": 8, "state": "open", "user": BOT,
-            "body": f"<!-- [align-watchdog:run-123] -->\\n**Commit:** {SHA}",
+            "body": f"<!-- [align-watchdog:run-123] -->\n**Commit:** {SHA}",
         }
         self.assertEqual(repair.find_watchdog_issue_for_target([issue], target), issue)
 
     def test_does_not_reuse_user_authored_closed_or_wrong_sha_watchdog_issue(self):
         target = {"sha": SHA, "run_id": 123}
-        body = f"<!-- [align-watchdog:run-123] -->\\n**Commit:** {SHA}"
+        body = f"<!-- [align-watchdog:run-123] -->\n**Commit:** {SHA}"
         candidates = [
             {"number": 1, "state": "open", "user": USER, "body": body},
             {"number": 2, "state": "closed", "user": BOT, "body": body},
@@ -103,7 +103,7 @@ class RepairIssueTests(unittest.TestCase):
 
     def test_annotating_watchdog_issue_is_preserving_and_idempotent(self):
         target = {"sha": SHA, "run_id": 123}
-        original = "## Watchdog report\\nExisting evidence."
+        original = "## Watchdog report\nExisting evidence."
         tagged = repair.annotate_watchdog_issue_body(original, target, 1)
         self.assertTrue(tagged.startswith(original))
         self.assertIn(f"<!-- ALIGN_REPAIR_SHA={SHA} -->", tagged)
@@ -193,6 +193,21 @@ class WatchdogRepairCoordinationTests(unittest.TestCase):
         self.assertTrue(watchdog.defer_to_repair_coordinator(
             run, repair_issue_found=True, event_name="schedule",
         ))
+
+    def test_safe_transient_validation_retry_runs_before_report_deferral(self):
+        run = self.make_run(branch="main")
+        run.update({"id": 123, "run_attempt": 1})
+        with patch.object(watchdog, "EVENT_NAME", "workflow_run"):
+            with patch.object(watchdog, "failed_jobs", return_value=[{"id": 1}]):
+                with patch.object(watchdog, "transient_failure", return_value=True):
+                    with patch.object(watchdog, "api") as api:
+                        with patch.object(watchdog, "report") as report:
+                            watchdog.handle_completed(run)
+        api.assert_called_once_with(
+            f"/repos/{watchdog.REPO}/actions/runs/123/rerun-failed-jobs",
+            method="POST",
+        )
+        report.assert_not_called()
 
     def test_schedule_grace_period_backstops_missing_repair_issue(self):
         run = self.make_run(created_at="2026-11-20T13:55:00Z")

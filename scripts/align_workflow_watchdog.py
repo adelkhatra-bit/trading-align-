@@ -419,6 +419,13 @@ def handle_completed(run: dict) -> None:
     if conclusion not in {"failure", "timed_out", "action_required"}:
         return
 
+    jobs = failed_jobs(run_id)
+    attempt = int(run.get("run_attempt") or 1)
+    if name in SAFE_RETRY_WORKFLOWS and name != BOT_WORKFLOW and attempt == 1 and transient_failure(jobs):
+        api(f"/repos/{REPO}/actions/runs/{run_id}/rerun-failed-jobs", method="POST")
+        print(f"WATCHDOG_SAFE_RETRY run={run_id} workflow={name} attempt=1")
+        return
+
     if repair_coordinator_owns_failure(run):
         repair_issue = None
         if EVENT_NAME != "workflow_run":
@@ -429,13 +436,6 @@ def handle_completed(run: dict) -> None:
                 f"issue={repair_issue.get('number') if repair_issue else 'awaiting coordinator'}"
             )
             return
-
-    jobs = failed_jobs(run_id)
-    attempt = int(run.get("run_attempt") or 1)
-    if name in SAFE_RETRY_WORKFLOWS and name != BOT_WORKFLOW and attempt == 1 and transient_failure(jobs):
-        api(f"/repos/{REPO}/actions/runs/{run_id}/rerun-failed-jobs", method="POST")
-        print(f"WATCHDOG_SAFE_RETRY run={run_id} workflow={name} attempt=1")
-        return
 
     reason = (
         "The first safe retry also failed; manual diagnosis is required."
