@@ -23,6 +23,14 @@ class MetaApiRetryTests(unittest.TestCase):
         self.assertEqual(result, "ok")
         self.assertEqual(delays, [1])
 
+    def test_408_request_timeout_retried(self):
+        err = urllib.error.HTTPError("https://api.test", 408, "Request Timeout", {}, io.BytesIO(b""))
+        api = mock.Mock(side_effect=[err, "ok"])
+        delays = []
+        self.assertEqual(mc.api_read_retry(api, "GET", "acct/positions", sleep=delays.append), "ok")
+        self.assertEqual(api.call_count, 2)
+        self.assertEqual(delays, [1])
+
     def test_non_transient_http_error_not_retried(self):
         err = urllib.error.HTTPError("https://api.test", 401, "Unauthorized", {}, io.BytesIO(b""))
         api = mock.Mock(side_effect=err)
