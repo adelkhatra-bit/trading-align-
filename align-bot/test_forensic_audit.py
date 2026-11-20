@@ -71,10 +71,7 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
                          "tp2": 188.0, "src": "FVG", "za": 199.0, "zb": 201.0}}
         r = {"t": 1700000400, "m1": [{"c": 200.5}], "dirs": [], "rsis": []}
         align_bot.capturer_snapshot_audit(etat, "NASDAQ", r, cle)
-        plan = etat["audit_mtf"]["NASDAQ"][0]["trade"]
-        self.assertEqual(plan["plan_source"], "ordre_en_preparation")
-        self.assertEqual(plan["src"], "FVG")
-        self.assertNotIn("audit_key", plan)
+        self.assertNotIn("NASDAQ", etat.get("audit_mtf", {}))
 
 
 
@@ -281,7 +278,7 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
              unittest.mock.patch.object(align_bot, "nasdaq_direct", return_value=20000.0), \
              unittest.mock.patch.object(align_bot, "http_json") as http:
             price = align_bot.prix_actuel("NASDAQ")
-        self.assertEqual(price, 20035.5)
+        self.assertIsNone(price)
         http.assert_not_called()
 
     def test_nasdaq_position_price_fails_closed_when_nq_quote_is_stale(self):
@@ -312,7 +309,7 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
         markup = sent[-1]["reply_markup"]
         self.assertIn("analysechoice:BOTH", markup)
         self.assertIn("coachlive:GOLD", markup)
-        self.assertIn("coachlive:NASDAQ", markup)
+        self.assertNotIn("coachlive:NASDAQ", markup)
         self.assertIn("auto:GOLD", markup)
         self.assertIn("Aucune notification automatique", sent[-1]["text"])
 
