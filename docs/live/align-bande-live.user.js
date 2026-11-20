@@ -493,7 +493,7 @@
     "📉 Astuce : en vue 15 min, repère le dernier plus bas • s'il casse en CLÔTURE, le mouvement peut continuer • lien en bio 🎁",
     "🎯 Astuce : l'étiquette ENTRÉE = la zone que le coach surveille • on attend la clôture 15 min • lien en bio 🎁",
     "🕯 Astuce : une mèche seule ne suffit pas • c'est la CLÔTURE de la bougie 15 min qui décide • lien en bio 🎁",
-    "🔵 Astuce : ligne bleue = TP • ligne rouge = SL • le coach te dit quand ça s'approche • lien en bio 🎁",,
+    "🔵 Astuce : ligne bleue = TP • ligne rouge = SL • le coach te dit quand ça s'approche • lien en bio 🎁",
     "🔎 Pour l'analyse complète de BTC et GOLD, ouvre le lien dans la bio • le LIVE continue ici 🎙"
   ];
   EN.push(["Pour l'analyse complète de BTC et GOLD, ouvre le lien dans la bio", "For the full BTC and GOLD analysis, open the link in the bio"],
