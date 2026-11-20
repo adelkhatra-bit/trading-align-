@@ -5942,7 +5942,6 @@ def accueil_liens(etat, cid, choix):
 DESCRIPTIONS_CHAINES = {
     "BTC": "🎙 Le Bitcoin commenté en direct, à chaque clôture 15 min.\n🧑‍🏫 Coach perso + niveaux : @align_mtf_adel_bot\n⚠️ Pas un conseil financier.",
     "GOLD": "🎙 Le Gold commenté en direct, à chaque clôture 15 min.\n🧑‍🏫 Coach perso + niveaux : @align_mtf_adel_bot\n⚠️ Pas un conseil financier.",
-    "NASDAQ": "🎙 Le NASDAQ commenté en direct, à chaque clôture 15 min.\n🧑‍🏫 Coach perso + niveaux : @align_mtf_adel_bot\n⚠️ Pas un conseil financier.",
 }
 
 
@@ -11689,7 +11688,7 @@ def titres_urgents(xml, maintenant, fenetre=1800):
 
 
 def news_urgentes(etat, maintenant=None, lire=None):
-    """Toutes les 5 min : lit les titres mondiaux (Google News RSS, gratuit), une vraie IA dit s'il y a un impact sur BTC / Gold / NASDAQ.
+    """Toutes les 5 min : lit les titres mondiaux (Google News RSS, gratuit), une vraie IA dit s'il y a un impact sur BTC / Gold.
     Si oui → message « 🚨 NEWS DE DERNIÈRE MINUTE » dans les chaînes + la bande du live est COUPÉE et passe la news en priorité.
     Jamais de news inventée : rien n'est publié si l'IA ne répond pas ou si aucun titre récent."""
     maintenant = maintenant or time.time()
@@ -11709,9 +11708,9 @@ def news_urgentes(etat, maintenant=None, lire=None):
         vus.append(hashlib.md5(t.encode()).hexdigest()[:12])
     del vus[:-300]
     rep = ia(etat, "Tu es un trader senior. Voici des titres de news publiés il y a moins de 30 minutes. S'il n'y en a AUCUN qui peut faire bouger "
-                   "fortement BTC, l'or ou le NASDAQ dans l'heure, réponds exactement AUCUN. Sinon réponds en 3 lignes : "
+                   "fortement BTC ou l'or dans l'heure, réponds exactement AUCUN. Sinon réponds en 3 lignes : "
                    "ligne 1 = le titre en français très court (12 mots max) | le même en anglais ; ligne 2 = marchés touchés et sens probable "
-                   "(ex. Gold ↑ refuge, NASDAQ ↓) ; ligne 3 = conseil prudent (ex. resserrer le SL, attendre la clôture 15 min). Pas d'invention.",
+                   "(ex. Gold ↑ refuge, BTC ↑) ; ligne 3 = conseil prudent (ex. resserrer le SL, attendre la clôture 15 min). Pas d'invention.",
              {"titres": nouveaux[:8]}, cle_cache=None)
     if not rep or rep.strip().upper().startswith("AUCUN"):
         return None
