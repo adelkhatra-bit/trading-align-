@@ -10,11 +10,11 @@ AGENTS = ROOT / "AGENTS.md"
 SOURCE_OF_TRUTH = ROOT / "docs" / "ALIGN_SOURCE_DE_VERITE.md"
 
 FORBIDDEN_MERGE_PATTERNS = (
-    r"\\bgh\\s+pr\\s+merge\\b",
-    r"/pulls/[^\\s\\"']+/merge\\b",
-    r"\\benable_auto_merge\\b",
+    r"\bgh\s+pr\s+merge\b",
+    r"/pulls/[^\s\"']+/merge\b",
+    r"\benable_auto_merge\b",
     r"enable-pull-request-automerge",
-    r"\\b(?:octokit|github)\\.rest\\.pulls\\.merge\\b",
+    r"\b(?:octokit|github)\.rest\.pulls\.merge\b",
 )
 
 
