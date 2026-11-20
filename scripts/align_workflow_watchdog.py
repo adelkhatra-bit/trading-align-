@@ -39,6 +39,22 @@ TRANSIENT_PATTERNS = (
 BOT_WORKFLOW = "ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)"
 BOT_STALE_THRESHOLD_MINUTES = 370  # runtime nominal 350 min + marge, workflow timeout 355 min
 
+AUTO_REPAIR_WORKFLOW_NAMES = {
+    "ALIGN contrôle IA (manuel)",
+    "ALIGN worker rollover",
+    "ALIGN MTF validation",
+    BOT_WORKFLOW,
+    "ALIGN Workflow Watchdog",
+    "ALIGN audit des messages envoyés (manuel)",
+    "CI Integration Tests",
+    "ALIGN MetaApi vérification",
+    "ALIGN rejeu entrée sniper (manuel)",
+    "ALIGN Topstep vérification",
+    "ALIGN Copilot Issue Relay",
+}
+AUTO_REPAIR_IGNORED_PRS = {401, 448, 451}
+AUTO_REPAIR_GRACE_MINUTES = 10
+
 
 def api(path: str, method: str = "GET", payload: dict | None = None):
     data = None if payload is None else json.dumps(payload).encode("utf-8")
@@ -67,6 +83,66 @@ def existing_report(run_id: int) -> bool:
     issues = api(f"/repos/{REPO}/issues?state=all&per_page=100")
     marker = f"<!-- [align-watchdog:run-{run_id}] -->"
     return any(marker in (item.get("body") or "") for item in issues if "pull_request" not in item)
+
+def repair_coordinator_owns_failure(run: dict) -> bool:
+    """Mirror align_auto_repair.event_target so one reporter owns eligible CI failures."""
+    if run.get("name") not in AUTO_REPAIR_WORKFLOW_NAMES:
+        return False
+    if run.get("conclusion") not in {"failure", "timed_out"}:
+        return False
+    sha = str(run.get("head_sha") or "").lower()
+    if not re.fullmatch(r"[0-9a-f]{40}", sha):
+        return False
+    pr_numbers = sorted({
+        int(item["number"]) for item in (run.get("pull_requests") or [])
+        if isinstance(item, dict) and str(item.get("number", "")).isdigit()
+    })
+    if pr_numbers and any(number in AUTO_REPAIR_IGNORED_PRS for number in pr_numbers):
+        return False
+    return bool(pr_numbers) or str(run.get("head_branch") or "") == "main"
+
+
+def existing_repair_issue(run: dict) -> dict | None:
+    """Find the coordinator's SHA-level incident, including one annotated onto a watchdog issue."""
+    sha = str(run.get("head_sha") or "").lower()
+    marker = f"<!-- ALIGN_REPAIR_SHA={sha} -->"
+    for page in range(1, 11):
+        batch = api(f"/repos/{REPO}/issues?state=all&per_page=100&page={page}")
+        if not batch:
+            break
+        for item in batch:
+            if "pull_request" in item:
+                continue
+            if (item.get("user") or {}).get("login") == "github-actions[bot]" and marker in (item.get("body") or ""):
+                return item
+        if len(batch) < 100:
+            break
+    return None
+
+
+def defer_to_repair_coordinator(
+    run: dict,
+    repair_issue_found: bool = False,
+    event_name: str | None = None,
+    now: dt.datetime | None = None,
+) -> bool:
+    """Defer event-driven reports; let the 10-minute watchdog scan backstop missing coordinator reports."""
+    if not repair_coordinator_owns_failure(run):
+        return False
+    if repair_issue_found:
+        return True
+    event_name = EVENT_NAME if event_name is None else event_name
+    if event_name == "workflow_run":
+        return True
+    try:
+        started = parse_time(str(run["created_at"]))
+    except (KeyError, TypeError, ValueError):
+        return True
+    now = now or dt.datetime.now(dt.timezone.utc)
+    age_minutes = (now - started).total_seconds() / 60
+    return age_minutes < AUTO_REPAIR_GRACE_MINUTES
+
+
 
 
 def _job_names(jobs: list[dict]) -> list[str]:
@@ -342,6 +418,17 @@ def handle_completed(run: dict) -> None:
 
     if conclusion not in {"failure", "timed_out", "action_required"}:
         return
+
+    if repair_coordinator_owns_failure(run):
+        repair_issue = None
+        if EVENT_NAME != "workflow_run":
+            repair_issue = existing_repair_issue(run)
+        if defer_to_repair_coordinator(run, repair_issue_found=repair_issue is not None):
+            print(
+                f"WATCHDOG_DEFERRED_TO_AUTO_REPAIR run={run_id} "
+                f"issue={repair_issue.get('number') if repair_issue else 'awaiting coordinator'}"
+            )
+            return
 
     jobs = failed_jobs(run_id)
     attempt = int(run.get("run_attempt") or 1)

@@ -6,6 +6,15 @@ from scripts.align_auto_repair import (
     summarize_failed_jobs,
 )
 
+import importlib
+import os
+
+with patch.dict(os.environ, {
+    "GITHUB_REPOSITORY": "adelkhatra-bit/trading-align-",
+    "GITHUB_TOKEN": "test-token",
+}):
+    watchdog = importlib.import_module("scripts.align_workflow_watchdog")
+
 SHA = "1" * 40
 BOT = {"login": "github-actions[bot]"}
 USER = {"login": "adelkhatra-bit"}
@@ -73,6 +82,36 @@ class RepairIssueTests(unittest.TestCase):
         self.assertFalse(has_run_marker(issue, [{"user": USER, "body": marker}], marker))
         self.assertTrue(has_run_marker(issue, [{"user": BOT, "body": marker}], marker))
 
+
+    def test_finds_open_watchdog_issue_for_same_sha(self):
+        target = {"sha": SHA, "run_id": 123}
+        issue = {
+            "number": 8, "state": "open", "user": BOT,
+            "body": f"<!-- [align-watchdog:run-123] -->\\n**Commit:** {SHA}",
+        }
+        self.assertEqual(repair.find_watchdog_issue_for_target([issue], target), issue)
+
+    def test_does_not_reuse_user_authored_closed_or_wrong_sha_watchdog_issue(self):
+        target = {"sha": SHA, "run_id": 123}
+        body = f"<!-- [align-watchdog:run-123] -->\\n**Commit:** {SHA}"
+        candidates = [
+            {"number": 1, "state": "open", "user": USER, "body": body},
+            {"number": 2, "state": "closed", "user": BOT, "body": body},
+            {"number": 3, "state": "open", "user": BOT, "body": body.replace(SHA, "2" * 40)},
+        ]
+        self.assertIsNone(repair.find_watchdog_issue_for_target(candidates, target))
+
+    def test_annotating_watchdog_issue_is_preserving_and_idempotent(self):
+        target = {"sha": SHA, "run_id": 123}
+        original = "## Watchdog report\\nExisting evidence."
+        tagged = repair.annotate_watchdog_issue_body(original, target, 1)
+        self.assertTrue(tagged.startswith(original))
+        self.assertIn(f"<!-- ALIGN_REPAIR_SHA={SHA} -->", tagged)
+        self.assertIn("<!-- ALIGN_REPAIR_ATTEMPT=1 -->", tagged)
+        self.assertIn("<!-- ALIGN_REPAIR_RUN=123 -->", tagged)
+        self.assertEqual(repair.annotate_watchdog_issue_body(tagged, target, 1), tagged)
+
+
     def test_issue_body_contains_evidence_and_guardrails(self):
         target = {
             "sha": SHA, "head_branch": "main", "pr_numbers": [],
@@ -111,6 +150,60 @@ class RepairIssueTests(unittest.TestCase):
             {"name": "test", "conclusion": "failure", "html_url": "https://evil.invalid/logs", "steps": []},
         ]})
         self.assertNotIn("evil.invalid", summary)
+
+
+
+class WatchdogRepairCoordinationTests(unittest.TestCase):
+    def make_run(self, *, name="ALIGN MTF validation", branch="main", prs=None, created_at="2026-11-20T10:00:00Z", conclusion="failure"):
+        return {
+            "name": name,
+            "conclusion": conclusion,
+            "head_sha": SHA,
+            "head_branch": branch,
+            "pull_requests": prs or [],
+            "created_at": created_at,
+        }
+
+    def test_repair_coordinator_owns_main_and_linked_pr_failures(self):
+        self.assertTrue(watchdog.repair_coordinator_owns_failure(self.make_run(branch="main")))
+        self.assertTrue(watchdog.repair_coordinator_owns_failure(self.make_run(
+            branch="fix/test", prs=[{"number": 627}],
+        )))
+
+    def test_repair_coordinator_does_not_own_ignored_or_unlinked_pr_failures(self):
+        self.assertFalse(watchdog.repair_coordinator_owns_failure(self.make_run(
+            branch="fix/test", prs=[{"number": 401}],
+        )))
+        self.assertFalse(watchdog.repair_coordinator_owns_failure(self.make_run(branch="fix/unlinked")))
+        self.assertFalse(watchdog.repair_coordinator_owns_failure(self.make_run(
+            branch="main", conclusion="success",
+        )))
+        self.assertFalse(watchdog.repair_coordinator_owns_failure(self.make_run(
+            name="pages build and deployment",
+        )))
+
+    def test_watchdog_defers_event_failure_to_repair_coordinator(self):
+        run = self.make_run(created_at="2026-11-20T13:59:00Z")
+        self.assertTrue(watchdog.defer_to_repair_coordinator(
+            run, repair_issue_found=False, event_name="workflow_run",
+        ))
+
+    def test_watchdog_defers_when_repair_issue_already_exists(self):
+        run = self.make_run(created_at="2026-11-20T10:00:00Z")
+        self.assertTrue(watchdog.defer_to_repair_coordinator(
+            run, repair_issue_found=True, event_name="schedule",
+        ))
+
+    def test_schedule_grace_period_backstops_missing_repair_issue(self):
+        run = self.make_run(created_at="2026-11-20T13:55:00Z")
+        before_grace = watchdog.dt.datetime.fromisoformat("2026-11-20T14:00:00+00:00")
+        after_grace = watchdog.dt.datetime.fromisoformat("2026-11-20T14:11:00+00:00")
+        self.assertTrue(watchdog.defer_to_repair_coordinator(
+            run, event_name="schedule", now=before_grace,
+        ))
+        self.assertFalse(watchdog.defer_to_repair_coordinator(
+            run, event_name="schedule", now=after_grace,
+        ))
 
 
 class CopilotAssignmentGateTests(unittest.TestCase):
