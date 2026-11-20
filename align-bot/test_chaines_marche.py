@@ -24,7 +24,7 @@ class PreparerChaines(unittest.TestCase):
         for c in (-1, -2):
             self.assertIn(("setChatDescription", c), self.appels)
         self.assertNotIn(("setChatDescription", -3), self.appels)
-        self.assertNotIn("desc_ok", etat["canal_live"]["NASDAQ"])
+        self.assertNotIn("desc_ok", etat.get("canal_live", {}).get("NASDAQ", {}))
         self.appels.clear()
         ab.preparer_chaines(etat)                       # déjà fait : rien n'est renvoyé
         self.assertEqual(self.appels, [])
