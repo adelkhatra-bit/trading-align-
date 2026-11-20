@@ -27,7 +27,7 @@ CALLBACKS_ACKNOWLEDGED = set()
 TELEGRAM_PULL_CONTEXT = threading.local()
 TELEGRAM_LIVRES = [0]   # messages réellement acceptés par Telegram (compteur du journal)
 TELEGRAM_PULL_MODE = False  # activé par main(); les tests unitaires du wrapper restent isolés par défaut
-MARCHES = {"BTC": "XBTUSD", "GOLD": "XAUUSD", "NASDAQ": "NAS100"}  # BTC → FTMO (CFD 24/7) • GOLD → Topstep (MGC) / FTMO • NASDAQ → FX:NAS100 (TradingView)
+MARCHES = {"BTC": "XBTUSD", "GOLD": "XAUUSD"}  # Périmètre opérationnel ALIGN : BTC + GOLD uniquement
 MIN_ALIGN, MIN_SQZ, MARGE_ATR, GAIN_MIN = 8, 4, 0.5, 1.5   # = réglages par défaut de l'indicateur ALIGN MTF PRO v24
 # Décision trader : gain/risque minimum 1:2 pour AUTORISER une entrée (sinon ATTENTE). GAIN_MIN reste celui de l'indicateur (parité Pine).
 RR_MIN_ENTREE = 2.0
@@ -7785,7 +7785,7 @@ def traiter(etat, chats, updates):
     TELEGRAM_PULL_CONTEXT.chat_id = None
     TELEGRAM_PULL_CONTEXT.private = False
     return demandes
-AUTO_MARCHES = ("BTC", "GOLD", "NASDAQ")
+AUTO_MARCHES = ("BTC", "GOLD")
 
 
 def commande_auto(etat, cid, txt):
