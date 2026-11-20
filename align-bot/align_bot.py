@@ -5787,7 +5787,7 @@ def flash_commentateur(m, r, cle):
 LOGO_URL = "https://raw.githubusercontent.com/adelkhatra-bit/trading-align-/main/docs/live/logo_align.jpg"
 BOT_LIEN = "https://t.me/align_mtf_adel_bot"
 # Liens d'invitation des chaînes gratuites par marché (créées par Adel le 14/11) — jamais la chaîne VIP
-LIENS_CHAINES = {"BTC": "https://t.me/+udAxidycXfdmN2Jk", "GOLD": "https://t.me/+BI-VaNlUBmM1N2E0", "NASDAQ": "https://t.me/+E-Im5stFZtZjNjI0"}
+LIENS_CHAINES = {"BTC": "https://t.me/+udAxidycXfdmN2Jk", "GOLD": "https://t.me/+BI-VaNlUBmM1N2E0"}
 
 
 def photo_canal(cid):
