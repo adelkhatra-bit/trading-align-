@@ -31,3 +31,7 @@ tradingview-cache.json
 store/extension-runtime-state.json
 store/*.runtime.json
 store/extension-runtime-state.json
+
+# Python bytecode/cache artifacts must never be published
+__pycache__/
+*.py[cod]
