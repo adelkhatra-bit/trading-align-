@@ -3445,7 +3445,7 @@ def telegram(methode, **params):
 # ───────── Boutons et jauge ─────────
 # Décision d'Adel (15/11) : bouton « 🧩 Indicateur TradingView » retiré tant que l'indicateur n'est pas vendu (INDICATEUR_EN_VENTE=1 pour le remettre)
 INDICATEUR_EN_VENTE = os.environ.get("INDICATEUR_EN_VENTE", "0") == "1"
-CLAVIER = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}, ],
+CLAVIER = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}],
                                    [{"text": "📊 Faire une analyse"}, {"text": "📡 Mes marchés"}, {"text": "🎙 Mes chaînes"}],
                                    [{"text": "🤖 Mon bot"}, {"text": "📈 Mes résultats"}, {"text": "📸 Partager mon gain"}],
                                    ([{"text": "🧩 Indicateur TradingView"}] if INDICATEUR_EN_VENTE else []) + [{"text": "🌐 English"}],
@@ -5921,8 +5921,7 @@ def accueil_marches(etat, cid, questionnaire=True):
     entete = "❓ Question 2/2\n" if questionnaire else "🎙 MES CHAÎNES\n━━━━━━━━━━━━━━━\n"
     _envoi_sur(cid, text=entete + "📊 Quel marché veux-tu suivre ?\n🎙 Chaque marché a sa chaîne : commentateur en direct",
                reply_markup=json.dumps({"inline_keyboard": [
-                   [{"text": "🟠 BTC", "callback_data": "choixcanal:BTC"}, {"text": "🥇 Gold", "callback_data": "choixcanal:GOLD"},
-                    ],
+                   [{"text": "🟠 BTC", "callback_data": "choixcanal:BTC"}, {"text": "🥇 Gold", "callback_data": "choixcanal:GOLD"}],
                    [{"text": "🔥 Les 2", "callback_data": "choixcanal:BOTH"}]]}))
 
 
@@ -7757,8 +7756,7 @@ def traiter(etat, chats, updates):
                        reply_markup=json.dumps({"inline_keyboard": [
                            [{"text": "🥇 GOLD", "callback_data": "analysechoice:GOLD"}],
                            [{"text": "🟠 BTC", "callback_data": "analysechoice:BTC"}],
-                           [{"text": "🟣 NASDAQ", "callback_data": "analysechoice:NASDAQ"}],
-                           [{"text": "📊 Mes marchés", "callback_data": "analysechoice:BOTH"}]
+                                                      [{"text": "📊 Mes marchés", "callback_data": "analysechoice:BOTH"}]
                        ]}))
         elif "analyse" in txt or "etat" in txt:
             md_ = marche_demande(txt)
@@ -11470,8 +11468,7 @@ def _menu_analyse_rapide(cid):
                reply_markup=json.dumps({"inline_keyboard": [
                    [{"text": "🥇 GOLD", "callback_data": "analysechoice:GOLD"}],
                    [{"text": "🟠 BTC", "callback_data": "analysechoice:BTC"}],
-                   [{"text": "💠 NASDAQ", "callback_data": "analysechoice:NASDAQ"}],
-                   [{"text": "📡 Mes marchés cochés", "callback_data": "analysechoice:BOTH"}]
+                                      [{"text": "📡 Mes marchés cochés", "callback_data": "analysechoice:BOTH"}]
                ]}))
 
 
