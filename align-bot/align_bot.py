@@ -3463,7 +3463,7 @@ AVERTISSEMENT = ("ℹ️ Ce sont MES positions personnelles, partagées à titre
 MINI_AVERT = "ℹ️ Analyse indicative : décision et ordre sous ta responsabilité."
 REGLES = ("📌 RÈGLES — ALIGN Signaux\n"
           "━━━━━━━━━━━━\n"
-          "📡 Marchés : 🟠 BTC (BTCUSD) • 🥇 GOLD (XAUUSD) • 💠 NASDAQ (NAS100)\n"
+          "📡 Marchés : 🟠 BTC (BTCUSD) • 🥇 GOLD (XAUUSD)\n"
           "👉 Choisis les tiens : bouton 📡 Mes marchés (tu ne reçois que ceux cochés)\n"
           "━━━━━━━━━━━━\n"
           "1️⃣ Ce sont MES positions perso, ma vision du marché\n"
@@ -4271,8 +4271,8 @@ def menu_suivi(etat, cid):
     texte = ("🎯 CHOOSE THE MARKETS TO FOLLOW\nSelect BTC, GOLD or both. You'll be alerted when an entry is confirmed."
              if anglais else
              "🎯 CHOISIS LES MARCHÉS À SUIVRE\nSélectionne BTC, GOLD ou les deux. Je t'alerterai lorsqu'un point d'entrée sera confirmé.")
-    labels = ["🟠 BTC", "🥇 GOLD", "💠 NASDAQ", "🟠 BTC + 🥇 GOLD"]
-    choix = ["BTC", "GOLD", "NASDAQ", "BOTH"]
+    labels = ["🟠 BTC", "🥇 GOLD", "🟠 BTC + 🥇 GOLD"]
+    choix = ["BTC", "GOLD", "BOTH"]
     lignes = [[{"text": label, "callback_data": f"followmarket:{market}"}]
               for label, market in zip(labels, choix)]
     _envoi_sur(cid, text=texte, reply_markup=json.dumps({"inline_keyboard": lignes}))
@@ -5907,7 +5907,7 @@ def doublon_chaine(etat, cid, texte):
 
 def accueil_questionnaire(etat, cid):
     """Accueil : le niveau de l'utilisateur, puis le marché qu'il veut suivre (sa chaîne)."""
-    _envoi_sur(cid, text="👋 BIENVENUE DANS ALIGN\n━━━━━━━━━━━━━━━\n🎙 Une chaîne par marché : BTC • Gold • NASDAQ\n"
+    _envoi_sur(cid, text="👋 BIENVENUE DANS ALIGN\n━━━━━━━━━━━━━━━\n🎙 Une chaîne par marché : BTC • Gold\n"
                          "🧑‍🏫 Ici : ton coach perso (entrées, ta position)\n🔴 Et le live du graphique\n━━━━━━━━━━━━━━━\n"
                          "❓ Question 1/2\n🎓 Ton niveau en trading ?",
                reply_markup=json.dumps({"inline_keyboard": [
@@ -5923,7 +5923,7 @@ def accueil_marches(etat, cid, questionnaire=True):
                reply_markup=json.dumps({"inline_keyboard": [
                    [{"text": "🟠 BTC", "callback_data": "choixcanal:BTC"}, {"text": "🥇 Gold", "callback_data": "choixcanal:GOLD"},
                     ],
-                   [{"text": "🔥 Les 3", "callback_data": "choixcanal:BOTH"}]]}))
+                   [{"text": "🔥 Les 2", "callback_data": "choixcanal:BOTH"}]]}))
 
 
 def accueil_liens(etat, cid, choix):
@@ -12600,7 +12600,7 @@ def texte_live(etat, anglais=False):
                 f"⏪ Then the chart goes back to Adel's view automatically\n⭐ {PRIX_MAIN_STARS} Stars\n👇 Choose")
     return ("🔴 LIVE EN COURS\n📺 Le graphique d'Adel, en direct\n━━━━━━━━━━━━━━━\n"
             "🎮 PRENDS LA MAIN SUR LE GRAPHIQUE\n"
-            "1️⃣ Ligne marchés : BTC • Gold • NASDAQ\n"
+            "1️⃣ Ligne marchés : BTC • Gold\n"
             "2️⃣ Ligne unités : 1 min • 5 min • 15 min • 1h\n"
             f"⏱ Durée : {LIVE_DUREE_MAIN} s, puis retour à la vue d'Adel\n📸 Le temps de ta capture\n⭐ Prix : {PRIX_MAIN_STARS} Stars (≈ 0,50 €)\n"
             "━━━━━━━━━━━━━━━\n🎙 Commentateur : je commente chaque clôture du marché choisi\n🚀 Booster : ton prénom à l'écran (gratuit)\n"
