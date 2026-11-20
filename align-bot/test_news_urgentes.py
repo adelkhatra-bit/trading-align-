@@ -82,5 +82,21 @@ class News(unittest.TestCase):
                  unittest.mock.patch.object(ab, "live_publier", lambda t: self.fail("bande")):
                 self.assertIsNone(ab.news_urgentes({}, T, lire=lambda u: rss("Missile attack hits port", 300)))
 
+    def test_titre_non_marque_vu_si_ia_echoue_et_reessaie(self):
+        etat, appels, bande = {}, [], []
+        invalide = "réponse IA invalide"
+        valide = reponse(markets=["BTC"])
+        def ia_mock(*args, **kwargs):
+            appels.append(1)
+            return invalide if len(appels) == 1 else valide
+        with unittest.mock.patch.object(ab, "ia", ia_mock), \
+             unittest.mock.patch.object(ab, "TOKEN", ""), \
+             unittest.mock.patch.object(ab, "live_publier", lambda t: bande.append(t)), \
+             unittest.mock.patch.object(ab, "_envoi_sur", lambda *a, **k: None):
+            self.assertIsNone(ab.news_urgentes(etat, T, lire=lambda u: rss("Missile attack hits port", 300)))
+            self.assertIsNotNone(ab.news_urgentes(etat, T + 400, lire=lambda u: rss("Missile attack hits port", 300)))
+        self.assertEqual(len(appels), 2)
+        self.assertEqual(len(bande), 1)
+
 if __name__ == "__main__":
     unittest.main()
