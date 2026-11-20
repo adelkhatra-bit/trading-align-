@@ -27,7 +27,7 @@ class SuiviMarchesTest(unittest.TestCase):
         t = ab.texte_suivi(self.e, "42")
         self.assertIn("JE SURVEILLE POUR TOI", t)
         self.assertIn("🥇 GOLD : ⏳", t)
-        self.assertIn("💠 NASDAQ : ⏳", t)
+        self.assertNotIn("NASDAQ", t)
         self.assertIn("🟠 BTC : ⬜ non suivi", t)
 
     def test_ou_en_est_avec_vraies_donnees(self):
@@ -39,13 +39,13 @@ class SuiviMarchesTest(unittest.TestCase):
 
     def test_trois_marches(self):
         ab.selectionner_marches_suivi(self.e, "42", "ALL")
-        self.assertEqual(ab.texte_suivi(self.e, "42").count("⏳"), 3)
+        self.assertEqual(ab.texte_suivi(self.e, "42").count("⏳"), 2)
 
     def test_valider_affiche_le_bloc(self):
         ab.selectionner_marches_suivi(self.e, "42", ["GOLD", "NASDAQ"])
         self.assertTrue(ab.valider_et_suivre_marches(self.e, "42", 42))
         txt = [kw.get("text", "") for m, kw in self.envois if m == "sendMessage"][-1]
-        self.assertIn("Suivi activé : GOLD + NASDAQ", txt)
+        self.assertIn("Suivi activé : GOLD", txt)
         self.assertIn("JE SURVEILLE POUR TOI", txt)
 
     def test_case_cochee_edite_le_meme_message(self):
@@ -56,9 +56,9 @@ class SuiviMarchesTest(unittest.TestCase):
         self.assertEqual(methode, "editMessageText")
         self.assertEqual(kw["message_id"], 99)
         textes = [l[0]["text"] for l in json.loads(kw["reply_markup"])["inline_keyboard"]]
-        self.assertIn("✅ 💠 NASDAQ", textes)
+        self.assertNotIn("NASDAQ", textes)
         self.assertIn("⬜ Tout recevoir", textes)
-        self.assertIn("Cochés en ce moment : 🥇 GOLD + 💠 NASDAQ", kw["text"])
+        self.assertIn("Cochés en ce moment : 🥇 GOLD", kw["text"])
 
     def test_tout_recevoir_coche_seulement_si_tout(self):
         ab.selectionner_marches_suivi(self.e, "42", "ALL")

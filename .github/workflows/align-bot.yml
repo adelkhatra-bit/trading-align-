@@ -1,4 +1,4 @@
-name: ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)
+name: ALIGN MTF BOT (signaux BTC + Gold Telegram)
 # Release trigger after verified cleanup of the previous production worker.
 
 on:
@@ -128,10 +128,8 @@ jobs:
                       report["telegram_offset_present"] = state.get("offset") is not None
                       report["btc_open_trade"] = bool((state.get("BTC") or {}).get("trade"))
                       report["gold_open_trade"] = bool((state.get("GOLD") or {}).get("trade"))
-                      report["nasdaq_open_trade"] = bool((state.get("NASDAQ") or {}).get("trade"))
                       report["btc_auto_follow_count"] = len((state.get("auto") or {}).get("BTC", []))
                       report["gold_auto_follow_count"] = len((state.get("auto") or {}).get("GOLD", []))
-                      report["nasdaq_auto_follow_count"] = len((state.get("auto") or {}).get("NASDAQ", []))
               except Exception as exc:
                   report["state_json_valid"] = False
                   report["parse_error"] = type(exc).__name__
@@ -251,7 +249,7 @@ jobs:
           echo "Bridge local prêt (127.0.0.1:4100) ; dernier relevé du relais :"
           tail -n 1 "$RUNNER_TEMP/align_relais.log" || true
 
-      - name: Vérifier le bridge TradingView ROBOT V12 (BTC + GOLD + NASDAQ)
+      - name: Vérifier le bridge TradingView ROBOT V12 (BTC + GOLD)
         id: bridge
         # Contrôle strict et inchangé des données TradingView/ROBOT V12. S'il échoue : MODE SANS SIGNAL.
         # Aucun signal n'est émis (ALIGN_REQUIRE_TV_BRIDGE=1 : le bot refuse tout plan sans bridge),
@@ -267,7 +265,7 @@ jobs:
           token = os.environ.get("ALIGN_TV_READ_TOKEN", "").strip()
           if not base or not token:
               raise SystemExit("ÉCHEC: secrets ALIGN_TV_API_URL / ALIGN_TV_READ_TOKEN absents; bridge TradingView obligatoire, analyse Telegram bloquée.")
-          for symbol in ("BTCUSD", "XAUUSD", "NAS100"):
+          for symbol in ("BTCUSD", "XAUUSD"):
               url = base + "/bridge/robot-v12/mtf?symbol=" + urllib.parse.quote(symbol)
               req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token, "User-Agent": "ALIGN-bridge-preflight"})
               with urllib.request.urlopen(req, timeout=12) as response:
@@ -316,7 +314,7 @@ jobs:
             echo "MODE SANS SIGNAL : bridge TradingView indisponible, aucun signal émis ; Telegram, commandes et news actifs."
           fi
 
-      - name: Analyse BTC + Gold + NASDAQ et envoi Telegram
+      - name: Analyse BTC + Gold et envoi Telegram
         env:
           ALIGN_AI_HEALTHY_PROVIDER: ${{ steps.ia_preflight.outputs.provider }}
           ALIGN_REQUIRE_TV_BRIDGE: "1"

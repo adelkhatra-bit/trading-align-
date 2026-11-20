@@ -27,7 +27,8 @@ CALLBACKS_ACKNOWLEDGED = set()
 TELEGRAM_PULL_CONTEXT = threading.local()
 TELEGRAM_LIVRES = [0]   # messages réellement acceptés par Telegram (compteur du journal)
 TELEGRAM_PULL_MODE = False  # activé par main(); les tests unitaires du wrapper restent isolés par défaut
-MARCHES = {"BTC": "XBTUSD", "GOLD": "XAUUSD", "NASDAQ": "NAS100"}  # BTC → FTMO (CFD 24/7) • GOLD → Topstep (MGC) / FTMO • NASDAQ → FX:NAS100 (TradingView)
+MARCHES = {"BTC": "XBTUSD", "GOLD": "XAUUSD"}  # Périmètre opérationnel ALIGN : BTC + GOLD uniquement
+MARCHES_HISTORIQUES = (*MARCHES, "NASDAQ")  # Conservé uniquement pour nettoyer/terminer les suivis d'anciennes positions
 MIN_ALIGN, MIN_SQZ, MARGE_ATR, GAIN_MIN = 8, 4, 0.5, 1.5   # = réglages par défaut de l'indicateur ALIGN MTF PRO v24
 # Décision trader : gain/risque minimum 1:2 pour AUTORISER une entrée (sinon ATTENTE). GAIN_MIN reste celui de l'indicateur (parité Pine).
 RR_MIN_ENTREE = 2.0
@@ -2732,7 +2733,7 @@ TRAD.update({
     "✅ RETOURNEMENT CONFIRMÉ :": "✅ REVERSAL CONFIRMED:", "petites unités contre le plan": "small timeframes against the plan", ": le retournement se prépare": ": a reversal is building",
 })
 _CLES = sorted(TRAD, key=len, reverse=True)
-BOUTONS_FR = ["🤖 Mon bot", "📸 Partager mon gain", "🟠 Analyse BTC", "🥇 Analyse Gold", "💠 Analyse Nasdaq", "✅ Je suis rentré", "🚪 Je suis sorti", "📈 Mes résultats",
+BOUTONS_FR = ["🤖 Mon bot", "📸 Partager mon gain", "🟠 Analyse BTC", "🥇 Analyse Gold", "✅ Je suis rentré", "🚪 Je suis sorti", "📈 Mes résultats",
               "🧩 Indicateur TradingView", "💎 Devenir VIP", "📡 Mes marchés", "❌ Non", "🎙 Mes chaînes"]
 INVERSE = {TRAD[b]: b for b in BOUTONS_FR}        # bouton anglais reçu → même action qu'en français
 
@@ -3445,7 +3446,7 @@ def telegram(methode, **params):
 # ───────── Boutons et jauge ─────────
 # Décision d'Adel (15/11) : bouton « 🧩 Indicateur TradingView » retiré tant que l'indicateur n'est pas vendu (INDICATEUR_EN_VENTE=1 pour le remettre)
 INDICATEUR_EN_VENTE = os.environ.get("INDICATEUR_EN_VENTE", "0") == "1"
-CLAVIER = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}, {"text": "💠 Analyse Nasdaq"}],
+CLAVIER = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}],
                                    [{"text": "📊 Faire une analyse"}, {"text": "📡 Mes marchés"}, {"text": "🎙 Mes chaînes"}],
                                    [{"text": "🤖 Mon bot"}, {"text": "📈 Mes résultats"}, {"text": "📸 Partager mon gain"}],
                                    ([{"text": "🧩 Indicateur TradingView"}] if INDICATEUR_EN_VENTE else []) + [{"text": "🌐 English"}],
@@ -3453,7 +3454,7 @@ CLAVIER = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "�
                       "resize_keyboard": True, "is_persistent": True, "input_field_placeholder": "Choisis une action ALIGN"})
 # Bot gratuit = accueil / inscriptions : peu de boutons ; « 🎙 Mes chaînes » donne le lien de la chaîne du marché + le coach.
 # Les boutons qui vendent (VIP, Live) restent tout en bas, comme épinglés.
-CLAVIER_VISITEUR = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}, {"text": "💠 Analyse Nasdaq"}],
+CLAVIER_VISITEUR = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}, ],
                                             [{"text": "🎙 Mes chaînes"}, {"text": "🤖 Mon bot"}, {"text": "🌐 English"}],
                                             [{"text": "💎 Devenir VIP"}, {"text": "🔴 Live"}]],
                                "resize_keyboard": True, "is_persistent": True, "input_field_placeholder": "Choisis une action ALIGN"})
@@ -3463,7 +3464,7 @@ AVERTISSEMENT = ("ℹ️ Ce sont MES positions personnelles, partagées à titre
 MINI_AVERT = "ℹ️ Analyse indicative : décision et ordre sous ta responsabilité."
 REGLES = ("📌 RÈGLES — ALIGN Signaux\n"
           "━━━━━━━━━━━━\n"
-          "📡 Marchés : 🟠 BTC (BTCUSD) • 🥇 GOLD (XAUUSD) • 💠 NASDAQ (NAS100)\n"
+          "📡 Marchés : 🟠 BTC (BTCUSD) • 🥇 GOLD (XAUUSD)\n"
           "👉 Choisis les tiens : bouton 📡 Mes marchés (tu ne reçois que ceux cochés)\n"
           "━━━━━━━━━━━━\n"
           "1️⃣ Ce sont MES positions perso, ma vision du marché\n"
@@ -4271,8 +4272,8 @@ def menu_suivi(etat, cid):
     texte = ("🎯 CHOOSE THE MARKETS TO FOLLOW\nSelect BTC, GOLD or both. You'll be alerted when an entry is confirmed."
              if anglais else
              "🎯 CHOISIS LES MARCHÉS À SUIVRE\nSélectionne BTC, GOLD ou les deux. Je t'alerterai lorsqu'un point d'entrée sera confirmé.")
-    labels = ["🟠 BTC", "🥇 GOLD", "💠 NASDAQ", "🟠 BTC + 🥇 GOLD"]
-    choix = ["BTC", "GOLD", "NASDAQ", "BOTH"]
+    labels = ["🟠 BTC", "🥇 GOLD", "🟠 BTC + 🥇 GOLD"]
+    choix = ["BTC", "GOLD", "BOTH"]
     lignes = [[{"text": label, "callback_data": f"followmarket:{market}"}]
               for label, market in zip(labels, choix)]
     _envoi_sur(cid, text=texte, reply_markup=json.dumps({"inline_keyboard": lignes}))
@@ -5251,14 +5252,14 @@ def stats_bot(etat, cid):
     return etat.setdefault("stats_bot", {}).setdefault(cid, {"arrets": 0, "auto": 0})
 
 def en_position(etat, cid):
-    return [m for m in MARCHES if isinstance(((etat.get(m) or {}).get("trade") or {}).get("qui", {}).get(str(cid)), dict)
+    return [m for m in MARCHES_HISTORIQUES if isinstance(((etat.get(m) or {}).get("trade") or {}).get("qui", {}).get(str(cid)), dict)
             and not etat[m]["trade"]["qui"][str(cid)].get("fini")]
 
 
 def retirer_suivi_positions(etat, cid):
-    """Retire uniquement cet utilisateur des suivis de positions encore ouvertes."""
+    """Retire uniquement cet utilisateur des suivis de positions encore ouvertes, y compris les positions historiques NASDAQ."""
     cid = str(cid)
-    for marche in MARCHES:
+    for marche in MARCHES_HISTORIQUES:
         trade = (etat.get(marche) or {}).get("trade")
         abonnes = trade.get("qui") if isinstance(trade, dict) else None
         if isinstance(abonnes, dict):
@@ -5907,7 +5908,7 @@ def doublon_chaine(etat, cid, texte):
 
 def accueil_questionnaire(etat, cid):
     """Accueil : le niveau de l'utilisateur, puis le marché qu'il veut suivre (sa chaîne)."""
-    _envoi_sur(cid, text="👋 BIENVENUE DANS ALIGN\n━━━━━━━━━━━━━━━\n🎙 Une chaîne par marché : BTC • Gold • NASDAQ\n"
+    _envoi_sur(cid, text="👋 BIENVENUE DANS ALIGN\n━━━━━━━━━━━━━━━\n🎙 Une chaîne par marché : BTC • Gold\n"
                          "🧑‍🏫 Ici : ton coach perso (entrées, ta position)\n🔴 Et le live du graphique\n━━━━━━━━━━━━━━━\n"
                          "❓ Question 1/2\n🎓 Ton niveau en trading ?",
                reply_markup=json.dumps({"inline_keyboard": [
@@ -5921,9 +5922,8 @@ def accueil_marches(etat, cid, questionnaire=True):
     entete = "❓ Question 2/2\n" if questionnaire else "🎙 MES CHAÎNES\n━━━━━━━━━━━━━━━\n"
     _envoi_sur(cid, text=entete + "📊 Quel marché veux-tu suivre ?\n🎙 Chaque marché a sa chaîne : commentateur en direct",
                reply_markup=json.dumps({"inline_keyboard": [
-                   [{"text": "🟠 BTC", "callback_data": "choixcanal:BTC"}, {"text": "🥇 Gold", "callback_data": "choixcanal:GOLD"},
-                    {"text": "🟣 NASDAQ", "callback_data": "choixcanal:NASDAQ"}],
-                   [{"text": "🔥 Les 3", "callback_data": "choixcanal:BOTH"}]]}))
+                   [{"text": "🟠 BTC", "callback_data": "choixcanal:BTC"}, {"text": "🥇 Gold", "callback_data": "choixcanal:GOLD"}],
+                   [{"text": "🔥 Les 2", "callback_data": "choixcanal:BOTH"}]]}))
 
 
 def accueil_liens(etat, cid, choix):
@@ -6259,6 +6259,8 @@ def envoyer_analyse(cid, etat=None, mq=None):
 
 def prix_actuel(m):
     """Dernier prix utilisable pour figer une entrée/sortie, dans la même échelle que les bougies du marché."""
+    if m not in MARCHES:
+        return None
     try:
         symbole = MARCHES[m]
         if symbole == "XAUUSD":
@@ -6693,6 +6695,8 @@ def cle_audit_trade(m, tr):
 
 def capturer_snapshot_audit(etat, m, r, cle, messages=None):
     """Journal forensique horodaté : décision, raisons de blocage, bougies et état Pine par UT."""
+    if m not in MARCHES:
+        return
     try:
         decision_ts = int(r.get("decision_ts") or time.time())
         m5 = r.get("b5") or []
@@ -7757,8 +7761,7 @@ def traiter(etat, chats, updates):
                        reply_markup=json.dumps({"inline_keyboard": [
                            [{"text": "🥇 GOLD", "callback_data": "analysechoice:GOLD"}],
                            [{"text": "🟠 BTC", "callback_data": "analysechoice:BTC"}],
-                           [{"text": "🟣 NASDAQ", "callback_data": "analysechoice:NASDAQ"}],
-                           [{"text": "📊 Mes marchés", "callback_data": "analysechoice:BOTH"}]
+                                                      [{"text": "📊 Mes marchés", "callback_data": "analysechoice:BOTH"}]
                        ]}))
         elif "analyse" in txt or "etat" in txt:
             md_ = marche_demande(txt)
@@ -7785,7 +7788,7 @@ def traiter(etat, chats, updates):
     TELEGRAM_PULL_CONTEXT.chat_id = None
     TELEGRAM_PULL_CONTEXT.private = False
     return demandes
-AUTO_MARCHES = ("BTC", "GOLD", "NASDAQ")
+AUTO_MARCHES = ("BTC", "GOLD")
 
 
 def commande_auto(etat, cid, txt):
@@ -7948,7 +7951,7 @@ def recevoir_pseudo(etat, cid, pseudo):
 SESSIONS = (   # code, nom FR, nom EN, fuseau, ouverture, fermeture, jours d'ouverture, jours de fermeture, marchés concernés
     ("tokyo", "Tokyo", "Tokyo", "Asia/Tokyo", (9, 0), (15, 30), range(0, 5), range(0, 5), "BTC et GOLD", "BTC and GOLD"),
     ("londres", "Londres", "London", "Europe/London", (8, 0), (16, 30), range(0, 5), range(0, 5), "GOLD et BTC", "GOLD and BTC"),
-    ("wall", "Wall Street / Nasdaq", "Wall Street / Nasdaq", "America/New_York", (9, 30), (16, 0), range(0, 5), range(0, 5), "NASDAQ, GOLD et BTC", "NASDAQ, GOLD and BTC"),
+    ("wall", "Wall Street / Nasdaq", "Wall Street / Nasdaq", "America/New_York", (9, 30), (16, 0), range(0, 5), range(0, 5), "GOLD et BTC", "GOLD and BTC"),
     ("gold", "Gold (CME)", "Gold (CME)", "America/Chicago", (17, 0), (16, 0), (6, 0, 1, 2, 3), range(0, 5), "GOLD", "GOLD"),
     ("btc", "BTC (bougie Daily)", "BTC (Daily candle)", "UTC", None, (0, 0), (), range(0, 7), "BTC", "BTC"),
 )
@@ -11470,8 +11473,7 @@ def _menu_analyse_rapide(cid):
                reply_markup=json.dumps({"inline_keyboard": [
                    [{"text": "🥇 GOLD", "callback_data": "analysechoice:GOLD"}],
                    [{"text": "🟠 BTC", "callback_data": "analysechoice:BTC"}],
-                   [{"text": "💠 NASDAQ", "callback_data": "analysechoice:NASDAQ"}],
-                   [{"text": "📡 Mes marchés cochés", "callback_data": "analysechoice:BOTH"}]
+                                      [{"text": "📡 Mes marchés cochés", "callback_data": "analysechoice:BOTH"}]
                ]}))
 
 
@@ -11562,7 +11564,7 @@ LIVE_DUREE_MAIN = 15
 LIVE_BOOST_PAUSE = 120                                                 # 1 boost / personne / 2 min
 LIVE_CHOIX = {"1": ("tf", "1", "⏱ 1 min"), "5": ("tf", "5", "⏱ 5 min"), "15": ("tf", "15", "⏱ 15 min"),
               "60": ("tf", "60", "⏱ 1 h"), "BTC": ("sym", "CRYPTO:BTCUSD", "🟠 BTC"),
-              "GOLD": ("sym", "FOREXCOM:XAUUSD", "🥇 Gold"), "NASDAQ": ("sym", "FX:NAS100", "💠 NASDAQ")}
+              "GOLD": ("sym", "FOREXCOM:XAUUSD", "🥇 Gold")}
 _LIVE_BOOSTS = {}
 _LIVE_DERNIER = {}
 
@@ -11958,6 +11960,8 @@ def commentaires_live_de_secours(donnees):
     """Commentaires de marché factuels si le fournisseur IA est indisponible ou renvoie une réponse invalide."""
     lignes = []
     for marche, c in (donnees or {}).get("marches", {}).items():
+        if marche not in MARCHES:
+            continue
         biais = c.get("biais_plan", "neutre")
         if biais == "haussier":
             direction, direction_en = "Le biais reste haussier", "The bias remains bullish"
@@ -12052,7 +12056,7 @@ def live_phrases_ia(etat, maintenant, derniers=None):
     h = datetime.datetime.fromtimestamp(maintenant, PARIS).hour
     moment = "nuit" if h < 7 else "matin" if h < 12 else "après-midi" if h < 18 else "soirée"
     consigne = (
-        "Tu es le commentateur technique en direct d'un live de trading BTC, GOLD et NASDAQ. "
+        "Tu es le commentateur technique en direct d'un live de trading BTC et GOLD. "
         "Tu dois animer la bande du live en expliquant ce que les données montrent réellement, pas en inventant un scénario. "
         "Pour CHAQUE marché fourni, écris exactement 2 phrases courtes en français et leur traduction anglaise. "
         "Format exact : MARCHÉ | phrase française | phrase anglaise. "
@@ -12076,7 +12080,7 @@ def live_phrases_ia(etat, maintenant, derniers=None):
     paires = phrases_bande_par_marche(brut)
     # Une réponse IA partielle ne doit pas faire taire les autres marchés : compléter chaque marché
     # présent dans les données avec une lecture factuelle locale, sans fabriquer de contexte absent.
-    marches_disponibles = set(donnees.get("marches", {}))
+    marches_disponibles = set(donnees.get("marches", {})) & set(MARCHES)
     paires = {m: v for m, v in paires.items() if m in marches_disponibles}
     secours = phrases_bande_par_marche(commentaires_live_de_secours(donnees))
     for marche in marches_disponibles:
@@ -12600,7 +12604,7 @@ def texte_live(etat, anglais=False):
                 f"⏪ Then the chart goes back to Adel's view automatically\n⭐ {PRIX_MAIN_STARS} Stars\n👇 Choose")
     return ("🔴 LIVE EN COURS\n📺 Le graphique d'Adel, en direct\n━━━━━━━━━━━━━━━\n"
             "🎮 PRENDS LA MAIN SUR LE GRAPHIQUE\n"
-            "1️⃣ Ligne marchés : BTC • Gold • NASDAQ\n"
+            "1️⃣ Ligne marchés : BTC • Gold\n"
             "2️⃣ Ligne unités : 1 min • 5 min • 15 min • 1h\n"
             f"⏱ Durée : {LIVE_DUREE_MAIN} s, puis retour à la vue d'Adel\n📸 Le temps de ta capture\n⭐ Prix : {PRIX_MAIN_STARS} Stars (≈ 0,50 €)\n"
             "━━━━━━━━━━━━━━━\n🎙 Commentateur : je commente chaque clôture du marché choisi\n🚀 Booster : ton prénom à l'écran (gratuit)\n"
@@ -12608,13 +12612,13 @@ def texte_live(etat, anglais=False):
 
 def clavier_live(etat, cid, anglais=False):
     # Parcours d'Adel : 1) choisir le marché  2) être coaché  3) « je veux la prochaine position ».
-    lignes = [[{"text": LIVE_CHOIX[k][2], "callback_data": f"livemkt:{k}"} for k in ("BTC", "GOLD", "NASDAQ")]]
+    lignes = [[{"text": LIVE_CHOIX[k][2], "callback_data": f"livemkt:{k}"} for k in ("BTC", "GOLD")]]
     if live_actif(etat):
         lignes.append([{"text": "📺 Watch the live" if anglais else "📺 Regarder le live", "url": LIVE_LIEN}])
         lignes.append([{"text": "🚀 Boost the live" if anglais else "🚀 Booster le live", "callback_data": "liveboost:x"}])
-        lignes.append([{"text": LIVE_CHOIX[k][2], "callback_data": f"livemain:{k}"} for k in ("BTC", "GOLD", "NASDAQ")])
+        lignes.append([{"text": LIVE_CHOIX[k][2], "callback_data": f"livemain:{k}"} for k in ("BTC", "GOLD")])
         lignes.append([{"text": LIVE_CHOIX[k][2], "callback_data": f"livemain:{k}"} for k in ("1", "5", "15", "60")])
-        lignes.append([{"text": f"🎙 Coach {k}", "callback_data": f"coachlive:{k}"} for k in ("BTC", "GOLD", "NASDAQ")])
+        lignes.append([{"text": f"🎙 Coach {k}", "callback_data": f"coachlive:{k}"} for k in ("BTC", "GOLD")])
         lignes.append([{"text": "🔎 Faire une analyse" if not anglais else "🔎 Research markets",
                         "callback_data": "analysechoice:BOTH"}])
         lignes.append([{"text": "🎯 Chercher une position" if not anglais else "🎯 Find a position",

@@ -22,7 +22,7 @@ PERTE_POSITION_MAX = 75.0      # demande d'Adel : 70-80 $ par position
 PERTE_JOUR_MAX = 150.0
 MARGE_PLANCHER = 100.0
 SL_ELARGI = 1.25
-SYMBOLES = {"NASDAQ": "MNQ", "GOLD": "MGC", "BTC": "MBT"}   # mêmes marchés que le graphique TradingView
+SYMBOLES = {"GOLD": "MGC", "BTC": "MBT"}   # marchés ALIGN actifs : GOLD + BTC
 
 REEL = os.environ.get("TOPSTEP_REEL", "0") == "1"
 COMPTE = os.environ.get("TOPSTEP_COMPTE", "")                 # id du compte à trader (ex. 29250754)
@@ -107,6 +107,8 @@ def garde_fou(etat, solde):
 
 
 def contrat(jeton, m):
+    if m not in SYMBOLES:
+        return None
     cs = _api("/Contract/search", {"live": False, "searchText": SYMBOLES[m]}, jeton).get("contracts") or []
     return next((c for c in cs if c.get("activeContract", True)), cs[0] if cs else None)
 
@@ -114,6 +116,8 @@ def contrat(jeton, m):
 def executer(etat, signal, journal=print):
     """signal = {marche, sens, e, sl, tp}. Une position = 1 micro-contrat avec SL et TP posés tout de suite."""
     m = signal["marche"]
+    if m not in SYMBOLES:
+        return {"ok": False, "raison": "marché désactivé dans ALIGN"}
     if m not in {k for k, v in (etat.get("auto_marches") or {}).items() if v}:
         return {"ok": False, "raison": f"{m} éteint dans l'admin"}
     if phase() != "ouvert":
@@ -245,14 +249,15 @@ def tout_fermer(journal=print):
 # Le graphique TradingView (CFD : BTCUSD / XAUUSD / NAS100) et les futures Topstep (MBT / MGC / MNQ) n'ont pas
 # le même prix (écart de base). Le bot lit le VRAI dernier prix du micro-contrat et décale les niveaux du plan
 # du même écart : l'utilisateur qui a choisi « Topstep » reçoit des niveaux directement utilisables.
-TICKS = {"NASDAQ": 0.25, "GOLD": 0.1, "BTC": 5.0}
-VALEUR_TICK = {"NASDAQ": 0.5, "GOLD": 1.0, "BTC": 0.5}   # $ par tick pour 1 micro-contrat (MNQ / MGC / MBT)
+TICKS = {"GOLD": 0.1, "BTC": 5.0}
+VALEUR_TICK = {"GOLD": 1.0, "BTC": 0.5}   # $ par tick pour 1 micro-contrat (MNQ / MGC / MBT)
 RISQUE_MAX_CONSEILLE = 100.0                              # règle d'Adel (15/11) : jamais plus de 100 $ de SL par position (compte 100K)
 
 
 def risque_dollars(m, e, sl, contrats=1):
-    """Perte en $ si le SL est touché, pour N micro-contrats."""
-    return abs(e - sl) / TICKS.get(m, 1) * VALEUR_TICK.get(m, 1) * contrats
+    if m not in SYMBOLES:
+        return 0.0
+    return abs(e - sl) / TICKS[m] * VALEUR_TICK[m] * contrats
 _CACHE_PRIX = {}
 
 
@@ -289,7 +294,7 @@ def arrondi_tick(v, tick):
 
 def niveaux_futures(m, prix_graphique, niveaux, prix_fut):
     """Décale chaque niveau {nom: prix TradingView} de l'écart futures − graphique, arrondi au tick du contrat."""
-    if not prix_fut or not prix_graphique:
+    if m not in SYMBOLES or not prix_fut or not prix_graphique:
         return None
     ecart = prix_fut - prix_graphique
     tick = TICKS.get(m, 0.01)

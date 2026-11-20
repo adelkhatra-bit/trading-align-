@@ -27,8 +27,7 @@ SL_ELARGI = 1.25              # demande d'Adel : SL plus large, au-delà de la m
 
 # Mêmes marchés que le graphique TradingView d'Adel (CRYPTO:BTCUSD, FOREXCOM:XAUUSD, FX:NAS100).
 # Le nom exact sur le serveur MT5 FundedNext est retrouvé tout seul dans cette liste.
-SYMBOLES = {"BTC": ["BTCUSD", "BTCUSD.", "BTCUSDm"], "GOLD": ["XAUUSD", "XAUUSD.", "GOLD"],
-            "NASDAQ": ["NDX100", "NAS100", "US100", "USTEC", "NDX100."]}
+SYMBOLES = {"BTC": ["BTCUSD", "BTCUSD.", "BTCUSDm"], "GOLD": ["XAUUSD", "XAUUSD.", "GOLD"]}
 
 TOKEN = os.environ.get("METAAPI_TOKEN", "")
 RISQUE_CONTRE = 60.0   # demande d'Adel (16/11) : contre-tendance pris par le bot, mais jamais plus de 60 $ de risque
@@ -101,6 +100,8 @@ def sl_elargi(e, sl):
 
 def symbole(etat, compte, m):
     """Nom du marché sur le serveur MT5 (mémorisé après la 1re recherche)."""
+    if m not in SYMBOLES:
+        raise ValueError("Marché désactivé dans ALIGN")
     cache = etat.setdefault("auto_symboles", {}).setdefault(compte, {})
     if m not in cache:
         dispo = set(_api("GET", f"{compte}/symbols") or [])
@@ -144,6 +145,8 @@ def niveaux_mt5(signal, prix):
 def executer(etat, signal, journal=print):
     """signal = {marche, sens: 'LONG'|'SHORT', e, sl, tp}. Renvoie la liste des résultats par compte."""
     m = signal["marche"]
+    if m not in SYMBOLES:
+        return [{"compte": None, "ok": False, "raison": "marché désactivé dans ALIGN"}]
     if m not in marches_actifs(etat):
         return [{"compte": None, "ok": False, "raison": f"{m} éteint dans l'admin"}]
     if not TOKEN or not COMPTES:

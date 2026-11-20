@@ -119,7 +119,7 @@ class FibonacciCommentateurLive(unittest.TestCase):
             "NASDAQ | Le marché attend une confirmation des unités longues | The market awaits higher timeframe confirmation"
         )
         result = ab.phrases_bande_par_marche(brut)
-        self.assertEqual(set(result), {"BTC", "GOLD", "NASDAQ"})
+        self.assertEqual(set(result), {"BTC", "GOLD"})
         self.assertEqual(len(result["BTC"]), 1)
         self.assertNotIn("BTC", ab.phrases_bande_par_marche(
             "BTC | Le retracement est à 68 % | The retracement is 68 %"

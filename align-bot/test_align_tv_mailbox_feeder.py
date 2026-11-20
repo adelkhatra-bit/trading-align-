@@ -35,9 +35,9 @@ class MailboxFeederTests(unittest.TestCase):
     def test_mailbox_network_error_never_fabricates_data(self):
         def boom(_):
             raise OSError("down")
-        res = feeder.relay_once(boom, self._ingest, symbols=("NAS100",))
-        self.assertEqual(res["NAS100"], "mailbox_error:OSError")
-        self.assertFalse(self.store.read("NAS100", now_ms=BASE_MS)[1]["ok"])
+        res = feeder.relay_once(boom, self._ingest, symbols=("BTCUSD",))
+        self.assertEqual(res["BTCUSD"], "mailbox_error:OSError")
+        self.assertFalse(self.store.read("BTCUSD", now_ms=BASE_MS)[1]["ok"])
 
     def test_mailbox_auth_failure_is_reported_not_called_empty(self):
         res = feeder.relay_once(lambda s: {"ok": False, "error": "unauthorized", "_http_status": 401},
@@ -55,7 +55,7 @@ class MailboxFeederTests(unittest.TestCase):
 
     def test_one_shot_failure_is_detected_but_empty_is_not(self):
         self.assertFalse(feeder.relay_failed({"BTCUSD": "ok", "XAUUSD": "empty"}))
-        self.assertTrue(feeder.relay_failed({"BTCUSD": "ok", "NAS100": "mailbox_http_401"}))
+        self.assertTrue(feeder.relay_failed({"BTCUSD": "ok", "XAUUSD": "mailbox_http_401"}))
         self.assertTrue(feeder.relay_failed({"BTCUSD": "ingest_error:URLError"}))
         self.assertTrue(feeder.relay_failed({"BTCUSD": "rejected:stale_or_future_snapshot"}))
 
