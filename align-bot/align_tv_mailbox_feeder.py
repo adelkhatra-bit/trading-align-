@@ -16,7 +16,7 @@ import sys
 import time
 import urllib.request
 
-SYMBOLS = ("BTCUSD", "XAUUSD", "NAS100")
+SYMBOLS = ("BTCUSD", "XAUUSD")
 DEFAULT_MAILBOX_URL = "https://align-tv-mailbox.adel-khatra.workers.dev"
 _LABEL_LECTURE = b"align-tv-mailbox-read-v1"
 
