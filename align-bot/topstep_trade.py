@@ -249,8 +249,8 @@ def tout_fermer(journal=print):
 # Le graphique TradingView (CFD : BTCUSD / XAUUSD / NAS100) et les futures Topstep (MBT / MGC / MNQ) n'ont pas
 # le même prix (écart de base). Le bot lit le VRAI dernier prix du micro-contrat et décale les niveaux du plan
 # du même écart : l'utilisateur qui a choisi « Topstep » reçoit des niveaux directement utilisables.
-TICKS = {"NASDAQ": 0.25, "GOLD": 0.1, "BTC": 5.0}
-VALEUR_TICK = {"NASDAQ": 0.5, "GOLD": 1.0, "BTC": 0.5}   # $ par tick pour 1 micro-contrat (MNQ / MGC / MBT)
+TICKS = {"GOLD": 0.1, "BTC": 5.0}
+VALEUR_TICK = {"GOLD": 1.0, "BTC": 0.5}   # $ par tick pour 1 micro-contrat (MNQ / MGC / MBT)
 RISQUE_MAX_CONSEILLE = 100.0                              # règle d'Adel (15/11) : jamais plus de 100 $ de SL par position (compte 100K)
 
 
@@ -293,7 +293,7 @@ def arrondi_tick(v, tick):
 
 def niveaux_futures(m, prix_graphique, niveaux, prix_fut):
     """Décale chaque niveau {nom: prix TradingView} de l'écart futures − graphique, arrondi au tick du contrat."""
-    if not prix_fut or not prix_graphique:
+    if m not in SYMBOLES or not prix_fut or not prix_graphique:
         return None
     ecart = prix_fut - prix_graphique
     tick = TICKS.get(m, 0.01)
