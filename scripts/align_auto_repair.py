@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Failure-to-issue coordinator for ALIGN. It never assigns agents or changes code."""
+"""Failure evidence coordinator for ALIGN; reports only, with optional guarded Copilot assignment."""
 from __future__ import annotations
 
 import json
@@ -85,7 +85,9 @@ def summarize_failed_jobs(jobs_payload: dict) -> str:
             if step.get("conclusion") in {"failure", "timed_out"}
         ]
         suffix = "; étapes en échec : " + ", ".join(failed_steps[:8]) if failed_steps else ""
-        lines.append(f"- {job.get('name') or 'job'}{suffix}")
+        job_url = str(job.get("html_url") or "")
+        link = f" — logs du job : {job_url}" if job_url.startswith("https://github.com/") else ""
+        lines.append(f"- {job.get('name') or 'job'}{suffix}{link}")
     return "\n".join(lines) if lines else "- Échec du workflow signalé par GitHub; détail des jobs indisponible."
 
 
@@ -243,7 +245,7 @@ def repair_issue_body(target: dict, failure_summary: str, attempt: int) -> str:
 3. Exécuter les tests ciblés puis la suite de régression concernée.
 4. Ne jamais merger ni déployer. Ne modifier ni Pine, ni le design, ni les animations, ni les signaux ou le trading sans mission explicite.
 5. Préserver `live-data/live.json` et ne jamais afficher de secrets.
-6. Un seul agent à la fois; maximum deux tentatives sur ce SHA. Si les preuves manquent, rendre un rapport et attendre l'humain.
+6. Vérifier le SHA exact avant toute analyse; ne jamais diagnostiquer une autre branche ou version par confusion.\n7. Établir la provenance du fichier réellement exécuté (version, chemin, appelant, branche et SHA) avant de proposer un raccordement. Ne pas remplacer un module par une copie d'une autre version.\n8. Un seul agent à la fois; maximum deux tentatives sur ce SHA. Après deux échecs, ou si la cause n'est pas prouvée, arrêter et fournir un diagnostic factuel.\n9. Les liens de logs des jobs échoués sont fournis ci-dessous lorsqu'ils sont disponibles; ne pas inventer des logs manquants.
 
 L'assignation à Copilot cloud agent reste manuelle par défaut. Aucun agent n'est lancé par ce workflow.
  
