@@ -5427,8 +5427,8 @@ def regler_plateforme(etat, cid, choix):
     if choix not in PLATEFORMES:
         return menu_plateforme(etat, cid)
     etat.setdefault("plateforme", {})[str(cid)] = choix
-    _envoi_sur(cid, text={"topstep": "🏦 PRIX TOPSTEP UNIQUEMENT\n📈 À chaque entrée : les niveaux au vrai prix du contrat Topstep\n🟣 NASDAQ = MNQ • 🥇 GOLD = MGC • 🟠 BTC = MBT",
-                          "deux": "🔀 LES DEUX\n📺 Les prix du graphique (FTMO / FundedNext)\n🏦 + les prix Topstep (MNQ / MGC / MBT)",
+    _envoi_sur(cid, text={"topstep": "🏦 PRIX TOPSTEP UNIQUEMENT\n📈 À chaque entrée : les niveaux au vrai prix du contrat Topstep\n🥇 GOLD = MGC • 🟠 BTC = MBT",
+                          "deux": "🔀 LES DEUX\n📺 Les prix du graphique (FTMO / FundedNext)\n🏦 + les prix Topstep (MGC / MBT)",
                           "tv": "📺 PRIX FTMO / FUNDEDNEXT\n📈 Tu reçois les niveaux du graphique TradingView"}[choix]
                           + "\n⚠️ Ceci n'est pas un conseil en investissement (DYOR)")
 
