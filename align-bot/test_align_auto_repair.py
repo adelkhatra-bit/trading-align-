@@ -93,17 +93,24 @@ class RepairIssueTests(unittest.TestCase):
         self.assertIn("timed", summary)
         self.assertIn("stalled", summary)
 
-    def test_failed_job_summary_lists_failed_steps_only(self):
+    def test_failed_job_summary_lists_failed_steps_only_and_links_job_logs(self):
         summary = summarize_failed_jobs({"jobs": [
-            {"name": "test", "conclusion": "failure", "steps": [
+            {"name": "test", "conclusion": "failure", "html_url": "https://github.com/adelkhatra-bit/trading-align-/actions/runs/1/job/2", "steps": [
                 {"name": "setup", "conclusion": "success"},
                 {"name": "MTF regression", "conclusion": "failure"},
             ]},
             {"name": "lint", "conclusion": "success", "steps": []},
         ]})
         self.assertIn("MTF regression", summary)
+        self.assertIn("https://github.com/adelkhatra-bit/trading-align-/actions/runs/1/job/2", summary)
         self.assertNotIn("setup", summary)
         self.assertNotIn("lint", summary)
+
+    def test_untrusted_non_github_job_url_is_not_linked(self):
+        summary = summarize_failed_jobs({"jobs": [
+            {"name": "test", "conclusion": "failure", "html_url": "https://evil.invalid/logs", "steps": []},
+        ]})
+        self.assertNotIn("evil.invalid", summary)
 
 
 class CopilotAssignmentGateTests(unittest.TestCase):
