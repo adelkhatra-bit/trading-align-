@@ -205,7 +205,9 @@ jobs:
                   raise SystemExit("ÉCHEC: webhook Telegram actif et suppression impossible; le polling ne peut pas démarrer.")
               print("TELEGRAM_WEBHOOK_REMOVED pending_updates_preserved=true")
               verified = appel("getWebhookInfo")
-              if verified is not None and (not verified.get("ok") or (verified.get("result") or {}).get("url", "").strip()):
+              if verified is None:
+                  avertir("getWebhookInfo sans réponse après suppression du webhook : réception Telegram non vérifiée.")
+              if not verified.get("ok") or (verified.get("result") or {}).get("url", "").strip():
                   raise SystemExit("ÉCHEC: le webhook Telegram est toujours actif après suppression.")
           print("TELEGRAM_API_OK bot=@" + payload["result"].get("username", "unknown"))
           print("TELEGRAM_RECEIVE_MODE=polling webhook=none")
