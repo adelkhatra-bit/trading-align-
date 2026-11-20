@@ -240,14 +240,10 @@ class BridgeStore:
             if bar_age < -MAX_FUTURE_SKEW_MS:
                 return 400, {"ok": False, "error": "future_mtf_bar", "timeframe": tf}
             max_bar_age = TIMEFRAME_MS[tf] + MTF_BAR_GRACE_MS
-            if bar_age > max_bar_age:
-                return 400, {
-                    "ok": False,
-                    "error": "stale_mtf_bar",
-                    "timeframe": tf,
-                    "ageMs": bar_age,
-                    "maxAgeMs": max_bar_age,
-                }
+            # A valid but old MTF candle is stored with its real timestamp and marked stale
+            # by read(). Rejecting it at ingest prevented the bridge from refreshing its
+            # active snapshot and caused noisy repeated stale_mtf_bar relay errors.
+            # Staleness still makes the aggregate bridge unhealthy and blocks all signals.
             normalized_mtf[tf] = {"direction": direction, "rsi": rsi, "barTime": bar_time}
 
         plan_timeframe = _text(payload.get("planTimeframe"), 8).upper()
