@@ -2732,7 +2732,7 @@ TRAD.update({
     "✅ RETOURNEMENT CONFIRMÉ :": "✅ REVERSAL CONFIRMED:", "petites unités contre le plan": "small timeframes against the plan", ": le retournement se prépare": ": a reversal is building",
 })
 _CLES = sorted(TRAD, key=len, reverse=True)
-BOUTONS_FR = ["🤖 Mon bot", "📸 Partager mon gain", "🟠 Analyse BTC", "🥇 Analyse Gold", "💠 Analyse Nasdaq", "✅ Je suis rentré", "🚪 Je suis sorti", "📈 Mes résultats",
+BOUTONS_FR = ["🤖 Mon bot", "📸 Partager mon gain", "🟠 Analyse BTC", "🥇 Analyse Gold", "✅ Je suis rentré", "🚪 Je suis sorti", "📈 Mes résultats",
               "🧩 Indicateur TradingView", "💎 Devenir VIP", "📡 Mes marchés", "❌ Non", "🎙 Mes chaînes"]
 INVERSE = {TRAD[b]: b for b in BOUTONS_FR}        # bouton anglais reçu → même action qu'en français
 
@@ -3445,7 +3445,7 @@ def telegram(methode, **params):
 # ───────── Boutons et jauge ─────────
 # Décision d'Adel (15/11) : bouton « 🧩 Indicateur TradingView » retiré tant que l'indicateur n'est pas vendu (INDICATEUR_EN_VENTE=1 pour le remettre)
 INDICATEUR_EN_VENTE = os.environ.get("INDICATEUR_EN_VENTE", "0") == "1"
-CLAVIER = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}, {"text": "💠 Analyse Nasdaq"}],
+CLAVIER = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}, ],
                                    [{"text": "📊 Faire une analyse"}, {"text": "📡 Mes marchés"}, {"text": "🎙 Mes chaînes"}],
                                    [{"text": "🤖 Mon bot"}, {"text": "📈 Mes résultats"}, {"text": "📸 Partager mon gain"}],
                                    ([{"text": "🧩 Indicateur TradingView"}] if INDICATEUR_EN_VENTE else []) + [{"text": "🌐 English"}],
@@ -3453,7 +3453,7 @@ CLAVIER = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "�
                       "resize_keyboard": True, "is_persistent": True, "input_field_placeholder": "Choisis une action ALIGN"})
 # Bot gratuit = accueil / inscriptions : peu de boutons ; « 🎙 Mes chaînes » donne le lien de la chaîne du marché + le coach.
 # Les boutons qui vendent (VIP, Live) restent tout en bas, comme épinglés.
-CLAVIER_VISITEUR = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}, {"text": "💠 Analyse Nasdaq"}],
+CLAVIER_VISITEUR = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}, ],
                                             [{"text": "🎙 Mes chaînes"}, {"text": "🤖 Mon bot"}, {"text": "🌐 English"}],
                                             [{"text": "💎 Devenir VIP"}, {"text": "🔴 Live"}]],
                                "resize_keyboard": True, "is_persistent": True, "input_field_placeholder": "Choisis une action ALIGN"})
@@ -5922,7 +5922,7 @@ def accueil_marches(etat, cid, questionnaire=True):
     _envoi_sur(cid, text=entete + "📊 Quel marché veux-tu suivre ?\n🎙 Chaque marché a sa chaîne : commentateur en direct",
                reply_markup=json.dumps({"inline_keyboard": [
                    [{"text": "🟠 BTC", "callback_data": "choixcanal:BTC"}, {"text": "🥇 Gold", "callback_data": "choixcanal:GOLD"},
-                    {"text": "🟣 NASDAQ", "callback_data": "choixcanal:NASDAQ"}],
+                    ],
                    [{"text": "🔥 Les 3", "callback_data": "choixcanal:BOTH"}]]}))
 
 
@@ -12608,13 +12608,13 @@ def texte_live(etat, anglais=False):
 
 def clavier_live(etat, cid, anglais=False):
     # Parcours d'Adel : 1) choisir le marché  2) être coaché  3) « je veux la prochaine position ».
-    lignes = [[{"text": LIVE_CHOIX[k][2], "callback_data": f"livemkt:{k}"} for k in ("BTC", "GOLD", "NASDAQ")]]
+    lignes = [[{"text": LIVE_CHOIX[k][2], "callback_data": f"livemkt:{k}"} for k in ("BTC", "GOLD")]]
     if live_actif(etat):
         lignes.append([{"text": "📺 Watch the live" if anglais else "📺 Regarder le live", "url": LIVE_LIEN}])
         lignes.append([{"text": "🚀 Boost the live" if anglais else "🚀 Booster le live", "callback_data": "liveboost:x"}])
-        lignes.append([{"text": LIVE_CHOIX[k][2], "callback_data": f"livemain:{k}"} for k in ("BTC", "GOLD", "NASDAQ")])
+        lignes.append([{"text": LIVE_CHOIX[k][2], "callback_data": f"livemain:{k}"} for k in ("BTC", "GOLD")])
         lignes.append([{"text": LIVE_CHOIX[k][2], "callback_data": f"livemain:{k}"} for k in ("1", "5", "15", "60")])
-        lignes.append([{"text": f"🎙 Coach {k}", "callback_data": f"coachlive:{k}"} for k in ("BTC", "GOLD", "NASDAQ")])
+        lignes.append([{"text": f"🎙 Coach {k}", "callback_data": f"coachlive:{k}"} for k in ("BTC", "GOLD")])
         lignes.append([{"text": "🔎 Faire une analyse" if not anglais else "🔎 Research markets",
                         "callback_data": "analysechoice:BOTH"}])
         lignes.append([{"text": "🎯 Chercher une position" if not anglais else "🎯 Find a position",
