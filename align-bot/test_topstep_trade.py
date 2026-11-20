@@ -64,6 +64,14 @@ class TestRisque(unittest.TestCase):
         r = ts.executer({}, {"marche": "GOLD", "sens": "LONG", "e": 1, "sl": 0, "tp": 2})
         self.assertFalse(r["ok"])
 
+    def test_nasdaq_rejete_avant_toute_connexion(self):
+        with unittest.mock.patch.object(ts, "connexion") as connect:
+            r = ts.executer({"auto_marches": {"NASDAQ": True}},
+                           {"marche": "NASDAQ", "sens": "LONG", "e": 1, "sl": 0, "tp": 2})
+        self.assertFalse(r["ok"])
+        self.assertEqual(r["raison"], "marché désactivé dans ALIGN")
+        connect.assert_not_called()
+
 
 class TestGestion(unittest.TestCase):
     """Topstep : un micro-contrat ; TP1 protège à BE, TP2 clôture."""
