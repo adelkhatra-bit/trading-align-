@@ -11562,7 +11562,7 @@ LIVE_DUREE_MAIN = 15
 LIVE_BOOST_PAUSE = 120                                                 # 1 boost / personne / 2 min
 LIVE_CHOIX = {"1": ("tf", "1", "⏱ 1 min"), "5": ("tf", "5", "⏱ 5 min"), "15": ("tf", "15", "⏱ 15 min"),
               "60": ("tf", "60", "⏱ 1 h"), "BTC": ("sym", "CRYPTO:BTCUSD", "🟠 BTC"),
-              "GOLD": ("sym", "FOREXCOM:XAUUSD", "🥇 Gold"), "NASDAQ": ("sym", "FX:NAS100", "💠 NASDAQ")}
+              "GOLD": ("sym", "FOREXCOM:XAUUSD", "🥇 Gold")}
 _LIVE_BOOSTS = {}
 _LIVE_DERNIER = {}
 
