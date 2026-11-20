@@ -5244,6 +5244,19 @@ def en_position(etat, cid):
     return [m for m in MARCHES if isinstance(((etat.get(m) or {}).get("trade") or {}).get("qui", {}).get(str(cid)), dict)
             and not etat[m]["trade"]["qui"][str(cid)].get("fini")]
 
+
+def retirer_suivi_positions(etat, cid):
+    """Retire uniquement cet utilisateur des suivis de positions encore ouvertes."""
+    cid = str(cid)
+    for marche in MARCHES:
+        trade = (etat.get(marche) or {}).get("trade")
+        abonnes = trade.get("qui") if isinstance(trade, dict) else None
+        if isinstance(abonnes, dict):
+            for identifiant in list(abonnes):
+                if str(identifiant) == cid:
+                    abonnes.pop(identifiant, None)
+
+
 SON_PIECE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "son_piece.mp3")
 
 def envoyer_son_piece(cid):
@@ -7079,6 +7092,7 @@ def traiter(etat, chats, updates):
                             abonnements[:] = [x for x in abonnements if str(x) != qui]
                     for marche in MARCHES:
                         activer_coach_live(etat, qui, marche, False)
+                    retirer_suivi_positions(etat, qui)
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="Bien noté")
                     continue
                 if mk == "yes":
@@ -7115,11 +7129,12 @@ def traiter(etat, chats, updates):
                         etat["bot_off"].append(qui)
                     purger_messages_en_attente(etat, qui)
                     etat["coach_pending"] = [x for x in etat.get("coach_pending", []) if str(x) != qui]
+                    retirer_suivi_positions(etat, qui)
                 continue
             if live_callback(etat, chats, cb, choix, mk, qui):
                 continue
             if choix == "quiet":
-                # Refus persistant : aucun nouveau signal, rappel ou nouveau suivi coach ; les positions déjà ouvertes restent suivies.
+                # Refus persistant : aucun signal, rappel, suivi coach ni notification de position pour cet utilisateur.
                 silencieux = etat.get("quiet")
                 if not isinstance(silencieux, list):
                     silencieux = []
@@ -7136,6 +7151,7 @@ def traiter(etat, chats, updates):
                         abonnements[:] = [x for x in abonnements if str(x) != qui]
                 for marche in MARCHES:
                     activer_coach_live(etat, qui, marche, False)
+                retirer_suivi_positions(etat, qui)
                 try:
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="Bien noté")
                 except Exception:
