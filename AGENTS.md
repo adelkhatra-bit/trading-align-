@@ -50,7 +50,7 @@ For relevant changes, verify:
 A green workflow is not proof that the live system works. Clearly distinguish automated tests, connectivity checks, and real end-to-end verification.
 
 ## Trading and safety constraints
-- Markets: BTC, GOLD, NASDAQ. Respect the documented multi-timeframe strategy and do not invent a signal when confirmation is absent. Avoid entries in the middle of a range.
+- Markets: BTC and GOLD only. NASDAQ is retired from active analysis and new entries; preserve legacy close/cleanup protections until historical positions are resolved. Respect the documented multi-timeframe strategy and do not invent a signal when confirmation is absent. Avoid entries in the middle of a range.
 - Never place real broker orders or enable auto-trading.
 - TopStep constraint: maximum one open position and exactly one micro-contract.
 - Keep credentials in GitHub Secrets or the approved secret manager. Never print, copy into files, commit, or expose secret values. Report only whether required secrets are present/usable, never their values.
