@@ -350,10 +350,10 @@ class WatchdogCancelledWorkerTests(unittest.TestCase):
 
 
 class WatchdogStaleRuntimeThresholdTests(unittest.TestCase):
-    class FixedNow:
+    class FixedNow(dt.datetime):
         @classmethod
         def now(cls, tz=None):
-            return dt.datetime(2026, 11, 20, 14, 0, tzinfo=dt.timezone.utc)
+            return cls(2026, 11, 20, 14, 0, tzinfo=dt.timezone.utc)
 
     def _bot_run(self, age_minutes):
         started = self.FixedNow.now() - dt.timedelta(minutes=age_minutes)
