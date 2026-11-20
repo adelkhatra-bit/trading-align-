@@ -20,7 +20,7 @@ class TestNiveaux(unittest.TestCase):
         gold = {"d": 1, "e": 4000.0, "sl": 3995.0, "tp1": 4100.0, "tp2": 4200.0}
         t = ab.texte_prix_topstep("GOLD", gold, 4000.0, 4120.0)
         self.assertIn("PRIX TOPSTEP", t); self.assertIn("MGC", t)
-        self.assertIn("4120", t); self.assertIn("4070", t); self.assertIn("4220", t)
+        self.assertIn("4120", t); self.assertIn("4115", t); self.assertIn("4220", t)
         self.assertIn("DYOR", t)
         self.assertIn("Risque 1 micro-contrat ≈ 50 $", t)
         self.assertNotIn("trop large", t)
@@ -45,7 +45,7 @@ class TestEnvoi(unittest.TestCase):
         with unittest.mock.patch.object(ab, "_envoi_sur", lambda *a, **k: self.fail("envoi")), \
              unittest.mock.patch.object(ab, "marche_autorise", lambda e, c, m: True), \
              unittest.mock.patch.object(ts, "prix_futures", lambda m: None):
-            self.assertEqual(ab.prix_topstep_inscrits(etat, "NASDAQ", TR, 20000.0), 0)
+            self.assertEqual(ab.prix_topstep_inscrits(etat, "GOLD", {"d": 1, "e": 4000.0, "sl": 3995.0, "tp1": 4100.0, "tp2": 4200.0}, 4000.0), 0)
 
     def test_choix_enregistre(self):
         etat = {}
