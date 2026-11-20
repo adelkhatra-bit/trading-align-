@@ -245,7 +245,10 @@ def repair_issue_body(target: dict, failure_summary: str, attempt: int) -> str:
 3. Exécuter les tests ciblés puis la suite de régression concernée.
 4. Ne jamais merger ni déployer. Ne modifier ni Pine, ni le design, ni les animations, ni les signaux ou le trading sans mission explicite.
 5. Préserver `live-data/live.json` et ne jamais afficher de secrets.
-6. Vérifier le SHA exact avant toute analyse; ne jamais diagnostiquer une autre branche ou version par confusion.\n7. Établir la provenance du fichier réellement exécuté (version, chemin, appelant, branche et SHA) avant de proposer un raccordement. Ne pas remplacer un module par une copie d'une autre version.\n8. Un seul agent à la fois; maximum deux tentatives sur ce SHA. Après deux échecs, ou si la cause n'est pas prouvée, arrêter et fournir un diagnostic factuel.\n9. Les liens de logs des jobs échoués sont fournis ci-dessous lorsqu'ils sont disponibles; ne pas inventer des logs manquants.
+6. Vérifier le SHA exact avant toute analyse; ne jamais diagnostiquer une autre branche ou version par confusion.
+7. Établir la provenance du fichier réellement exécuté (version, chemin, appelant, branche et SHA) avant de proposer un raccordement. Ne pas remplacer un module par une copie d'une autre version.
+8. Un seul agent à la fois; maximum deux tentatives sur ce SHA. Après deux échecs, ou si la cause n'est pas prouvée, arrêter et fournir un diagnostic factuel.
+9. Les liens de logs des jobs échoués sont fournis ci-dessous lorsqu'ils sont disponibles; ne pas inventer des logs manquants.
 
 L'assignation à Copilot cloud agent reste manuelle par défaut. Aucun agent n'est lancé par ce workflow.
  
