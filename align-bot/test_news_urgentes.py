@@ -74,5 +74,13 @@ class News(unittest.TestCase):
         self.assertIn("JSON strict", capt[0][0])
 
 
+    def test_champs_extra_et_enum_invalide_refuses(self):
+        extra = json.dumps({"decision": "ALERTE", "idx": 0, "markets": ["BTC"], "impact": "HIGH", "direction": "BULLISH", "extra": "texte libre"})
+        for bad in (extra, reponse(direction="LONG"), reponse(impact="CRITICAL")):
+            with unittest.mock.patch.object(ab, "ia", lambda *a, _bad=bad, **k: _bad), \
+                 unittest.mock.patch.object(ab, "TOKEN", "x"), unittest.mock.patch.object(ab, "_envoi_sur", lambda *a, **k: self.fail("Telegram")), \
+                 unittest.mock.patch.object(ab, "live_publier", lambda t: self.fail("bande")):
+                self.assertIsNone(ab.news_urgentes({}, T, lire=lambda u: rss("Missile attack hits port", 300)))
+
 if __name__ == "__main__":
     unittest.main()
