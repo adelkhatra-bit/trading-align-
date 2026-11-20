@@ -44,6 +44,9 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.assertIn('LIENS_CHAINES = {"BTC":', bot)
         self.assertNotIn('"NASDAQ": "https://t.me/', bot)
         self.assertNotIn('"NASDAQ": "🎙', bot)
+        channel_attach = bot[bot.index("def connecter_canal("):bot.index("\ndef ", bot.index("def connecter_canal(") + 5)]
+        self.assertIn('if mk_ == "NASDAQ":', channel_attach)
+        self.assertIn("ne plus enregistrer de nouvelle chaîne NASDAQ", channel_attach)
         self.assertIn('for m in ("BTC", "GOLD")', metaapi)
         self.assertNotIn('"NASDAQ"', metaapi)
 
