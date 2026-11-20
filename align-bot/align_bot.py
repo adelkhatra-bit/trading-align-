@@ -11956,6 +11956,8 @@ def commentaires_live_de_secours(donnees):
     """Commentaires de marché factuels si le fournisseur IA est indisponible ou renvoie une réponse invalide."""
     lignes = []
     for marche, c in (donnees or {}).get("marches", {}).items():
+        if marche not in MARCHES:
+            continue
         biais = c.get("biais_plan", "neutre")
         if biais == "haussier":
             direction, direction_en = "Le biais reste haussier", "The bias remains bullish"
@@ -12074,7 +12076,7 @@ def live_phrases_ia(etat, maintenant, derniers=None):
     paires = phrases_bande_par_marche(brut)
     # Une réponse IA partielle ne doit pas faire taire les autres marchés : compléter chaque marché
     # présent dans les données avec une lecture factuelle locale, sans fabriquer de contexte absent.
-    marches_disponibles = set(donnees.get("marches", {}))
+    marches_disponibles = set(donnees.get("marches", {})) & set(MARCHES)
     paires = {m: v for m, v in paires.items() if m in marches_disponibles}
     secours = phrases_bande_par_marche(commentaires_live_de_secours(donnees))
     for marche in marches_disponibles:
