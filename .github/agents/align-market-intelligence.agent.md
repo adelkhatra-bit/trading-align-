@@ -1,6 +1,6 @@
 ---
 name: ALIGN Market Intelligence
-description: Produces source-backed market news and macro analysis for BTC, GOLD and NASDAQ using the exact ALIGN MTF PRO v25 (Inside) TradingView indicator. Read-only.
+description: Produces source-backed market news and macro analysis for BTC and GOLD using the exact ALIGN MTF PRO v25 (Inside) TradingView indicator. Read-only.
 target: github-copilot
 user-invocable: true
 disable-model-invocation: true
@@ -34,7 +34,7 @@ Map the entire Pine source with exact line ranges:
 6. Closed HTF direction and anti-repainting logic; flag any expressions still using unconfirmed HTF values.
 7. Scalping / Day / Swing conditions, confirmations, waiting states and explanations.
 8. Validation score /100: list every component and weight. State clearly it is a measured validation score, not a win probability.
-9. GOLD/NASDAQ closed M5/M15/H1/H4 confluence and BTC differences.
+9. GOLD closed M5/M15/H1/H4 confluence and BTC differences.
 10. Every visual output, table, label, plot, alert, animation toggle and animation code path. A Pine input alone does not prove chart-side animation is running.
 
 Do not silently reconcile contradictions. Report path/line evidence and propose tests, never edits.
@@ -57,7 +57,7 @@ Analyze BTC, GOLD and NASDAQ separately:
 - Identify macro regime: policy rates, real yields, USD, inflation/growth expectations, risk appetite and volatility.
 - BTC: only verified crypto-specific ETF/flow, regulatory, exchange, liquidation and protocol catalysts.
 - GOLD: real yields, USD, central-bank demand and geopolitical risk; correlations are conditional, not universal laws.
-- NASDAQ: rates/duration sensitivity, index concentration, earnings/megacap catalysts and cash/futures context.
+- Do not analyze NASDAQ; it is retired from active ALIGN scope.
 - Separate structural trend (W1/D1/H4), tactical trend (H1/M15), trigger (M5/M1), liquidity zones, volatility and momentum.
 - Compare verified news with actual ALIGN v25 state; explain agreement, conflict or no signal.
 - Give bullish, bearish and neutral scenarios with evidence, trigger, invalidation, key levels and what would change the view.
@@ -79,7 +79,7 @@ Analyze BTC, GOLD and NASDAQ separately:
 1. Status: COMPLETED / PARTIAL / BLOCKED.
 2. Repository/ref/commit SHA and exact Pine path/header/blob SHA/line count.
 3. Complete indicator map with line ranges and animation verification.
-4. BTC/GOLD/NASDAQ news items with publisher, URL, timestamp and freshness—or explicit absence of web access.
+4. BTC/GOLD news items with publisher, URL, timestamp and freshness—or explicit absence of web access.
 5. Per market: macro regime, ALIGN v25 state, scenarios, triggers, invalidation and no-trade conditions.
 6. Contradictions, missing feeds, unavailable tools and confidence limitations.
 7. Next minimal read-only verification step.
