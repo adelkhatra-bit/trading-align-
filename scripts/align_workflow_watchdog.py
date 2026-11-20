@@ -359,21 +359,20 @@ def handle_completed(run: dict) -> None:
 
 def inspect_stale_runs() -> None:
     now = dt.datetime.now(dt.timezone.utc)
-    for branch in ("main", "live-data"):
-        query = urllib.parse.urlencode({"branch": branch, "status": "in_progress", "per_page": 100})
-        payload = api(f"/repos/{REPO}/actions/runs?{query}")
-        for run in payload.get("workflow_runs", []):
-            name = run.get("name", "")
-            if name == "ALIGN Workflow Watchdog":
-                continue
-            age_minutes = (now - parse_time(run["created_at"])).total_seconds() / 60
-            threshold = 350 if name == BOT_WORKFLOW else 20
-            if age_minutes >= threshold:
-                report(
-                    run,
-                    f"Run has remained in progress for {age_minutes:.1f} minutes "
-                    f"(watchdog threshold: {threshold} minutes). It was not cancelled.",
-                )
+    query = urllib.parse.urlencode({"status": "in_progress", "per_page": 100})
+    payload = api(f"/repos/{REPO}/actions/runs?{query}")
+    for run in payload.get("workflow_runs", []):
+        name = run.get("name", "")
+        if name == "ALIGN Workflow Watchdog":
+            continue
+        age_minutes = (now - parse_time(run["created_at"])).total_seconds() / 60
+        threshold = 350 if name == BOT_WORKFLOW else 20
+        if age_minutes >= threshold:
+            report(
+                run,
+                f"Run has remained in progress for {age_minutes:.1f} minutes "
+                f"(watchdog threshold: {threshold} minutes). It was not cancelled.",
+            )
 
 
 def inspect_recent_failures() -> None:
@@ -400,9 +399,8 @@ def main() -> int:
         with open(EVENT_PATH, encoding="utf-8") as handle:
             event = json.load(handle)
         run = event.get("workflow_run") or {}
-        if run.get("head_branch") not in {"main", "live-data"}:
-            print("WATCHDOG_SKIP branch outside production/publication scope")
-            return 0
+        # Les échecs de PR et de branches de correction sont aussi diagnostiqués.
+        # Le watchdog lui-même reste exclu dans handle_completed().
         handle_completed(run)
     else:
         inspect_stale_runs()
