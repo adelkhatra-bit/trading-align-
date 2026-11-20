@@ -3,7 +3,7 @@ import os, sys, time, urllib.error
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import auto_trade as at
 
-TRANSIENT_HTTP = {429, 500, 502, 503, 504}
+TRANSIENT_HTTP = {408, 429, 500, 502, 503, 504}
 
 
 def api_read_retry(api, method, path, attempts=3, sleep=time.sleep):
@@ -15,7 +15,7 @@ def api_read_retry(api, method, path, attempts=3, sleep=time.sleep):
             if exc.code not in TRANSIENT_HTTP or attempt + 1 >= attempts:
                 raise
             print(f"METAAPI_RETRY HTTP {exc.code} tentative {attempt + 1}/{attempts}", flush=True)
-        except (urllib.error.URLError, TimeoutError) as exc:
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
             if attempt + 1 >= attempts:
                 raise
             print(f"METAAPI_RETRY réseau tentative {attempt + 1}/{attempts}: {exc}", flush=True)
