@@ -3907,7 +3907,7 @@ def ligne_sources(etat, cle_cache):
     src = (etat.get("ia_sources") or {}).get(cle_cache) or []
     return ("\n🔎 Sources : " + ", ".join(src[:4])) if src else ""
 
-def ia(etat, consigne, donnees, cle_cache=None, duree=600, premium=False, recherche=False):
+def ia(etat, consigne, donnees, cle_cache=None, duree=600, premium=False, recherche=False, prefer_paid=False):
     """Commentaire court d'une vraie IA. Ordre : Gemini -> Groq -> IA sans clé -> (payants) -> Claude en dernier recours.
     premium = moment clé VIP (seul cas où Claude peut être appelé) ; recherche = Google Search (analyse « En savoir plus » et news seulement).
     Compteurs par jour, intervalle minimal, pause croissante après échec, cache : jamais de boucle d'appels. '' si tout est tombé."""
@@ -3927,7 +3927,10 @@ def ia(etat, consigne, donnees, cle_cache=None, duree=600, premium=False, recher
     par_jour = etat.setdefault("ia_fournisseur_jour", {})
     claude_t = etat.setdefault("ia_claude_t", {})
     ordre = list(IA_FOURNISSEURS)
-    if recherche:                                       # la recherche Google gratuite n'existe que sur Gemini 3.8 : on l'essaie d'abord
+    if premium and prefer_paid and not recherche:
+        # Le commentateur live utilise le Claude API déjà configuré ; plafonds et repli restent inchangés.
+        ordre.sort(key=lambda f: 0 if f[0] == "Anthropic" else 1)
+    elif recherche:                                       # la recherche Google gratuite n'existe que sur Gemini 3.8 : on l'essaie d'abord
         ordre.sort(key=lambda f: 0 if f[0] == "Gemini 3.8" else 1)
     for nom, url, modele, cle, besoin_cle in ordre:
         if besoin_cle and not cle:
@@ -11710,7 +11713,7 @@ def live_bande(etat, texte, cle=None, pause=60, toujours=False):
         _LIVE_DERNIER[cle] = time.time()
     return live_publier(texte)
 
-# ───── v8.5 « SPECTACLE » (demande d'Adel 15/11) : IA gratuite + agenda (discours, annonces, ouvertures) sur la bande ─────
+# ───── v8.5 « SPECTACLE » : commentaire Claude prioritaire avec quotas + repli IA gratuit ; agenda sur la bande ─────
 LIVE_IA_INTERVALLE = max(120, min(300, int(os.environ.get("LIVE_IA_INTERVALLE", "180"))))  # commentaires IA toutes les 2 à 5 minutes
 _INTERDIT_BANDE = re.compile(r"\d|telegram|entr[ée]e|\bSL\b|\bTP\d?\b|\bstop\b|€|\$|%", re.I)
 # Heures locales des places : ZoneInfo applique automatiquement les changements d'heure.
@@ -12011,7 +12014,7 @@ def commentaires_live_de_secours(donnees):
 
 
 def live_phrases_ia(etat, maintenant, derniers=None):
-    """Génère des commentaires IA par marché depuis les analyses en mémoire, sans nouvel appel de données."""
+    """Génère les commentaires live depuis les données en mémoire ; Claude prioritaire, quotas/cache actifs, repli gratuit."""
     if not live_actif(etat) or maintenant - etat.get("live_ia_t", 0) < LIVE_IA_INTERVALLE:
         return False
     etat["live_ia_t"] = maintenant
@@ -12043,7 +12046,7 @@ def live_phrases_ia(etat, maintenant, derniers=None):
         "Si une donnée est absente, ne l'invente pas. Moment du live : " + moment + ". "
         "Réponds uniquement avec les lignes demandées, sans titre ni introduction."
     )
-    brut = ia(etat, consigne, donnees)
+    brut = ia(etat, consigne, donnees, cle_cache="live_commentary", duree=LIVE_IA_INTERVALLE, premium=True, prefer_paid=True)
     paires = phrases_bande_par_marche(brut)
     # Une réponse IA partielle ne doit pas faire taire les autres marchés : compléter chaque marché
     # présent dans les données avec une lecture factuelle locale, sans fabriquer de contexte absent.
