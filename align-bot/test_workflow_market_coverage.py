@@ -39,8 +39,10 @@ class ProductionMarketCoverageTest(unittest.TestCase):
     def test_active_metaapi_and_public_market_channels_are_btc_gold_only(self):
         bot = self.bot
         metaapi = (Path(__file__).parent / "metaapi_check.py").read_text(encoding="utf-8")
-        self.assertIn('for m, pair in MARCHES.items()', bot)
+        self.assertIn('MARCHES = {"BTC": "XBTUSD", "GOLD": "XAUUSD"}', bot)
         self.assertIn('MARCHES_HISTORIQUES = (*MARCHES, "NASDAQ")', bot)
+        self.assertIn('for nom_marche, pair in MARCHES.items():', bot)
+        self.assertIn('for marche in MARCHES:', bot)
         self.assertIn('LIENS_CHAINES = {"BTC":', bot)
         self.assertNotIn('"NASDAQ": "https://t.me/', bot)
         self.assertNotIn('"NASDAQ": "🎙', bot)
