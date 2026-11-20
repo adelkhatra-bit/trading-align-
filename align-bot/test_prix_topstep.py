@@ -61,7 +61,7 @@ class TestEnvoi(unittest.TestCase):
         with unittest.mock.patch.object(ab, "_envoi_sur", lambda cid, **k: envoyes.append(cid)), \
              unittest.mock.patch.object(ab, "marche_autorise", lambda e, c, m: True), \
              unittest.mock.patch.object(ts, "prix_futures", lambda m: 20120.0):
-            ab.prix_topstep_inscrits(etat, "NASDAQ", TR, 20000.0)
+            ab.prix_topstep_inscrits(etat, "GOLD", {"d": 1, "e": 4000.0, "sl": 3995.0, "tp1": 4100.0, "tp2": 4200.0}, 4000.0)
         self.assertEqual(sorted(envoyes), ["111", "333"])
 
     def test_menu_trois_choix(self):
