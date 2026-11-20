@@ -5966,7 +5966,7 @@ def preparer_chaines(etat):
 
 
 def notifier_canal_marche(etat, m, r, cle):
-    """Chaîne du marché (ALIGN BTC / Gold / NASDAQ) : la carte commentateur à chaque clôture 15 min + les flashs, sans niveaux VIP."""
+    """Chaîne du marché (ALIGN BTC / Gold) : la carte commentateur à chaque clôture 15 min + les flashs, sans niveaux VIP."""
     canal = (etat.get("canaux_marche") or {}).get(m)
     bars = (r.get("b15") or [])[:-1]
     if not canal or not bars:
@@ -6941,7 +6941,7 @@ def publier_resultat(etat, m, tr, sortie, motif, gain):
            f"📏 {'+' if gain > 0 else '-'}{pips_txt(m, sortie - tr['e'])}\n"
            f"📈 Résultat : {gain:+.2f} %\n⏱ Durée : {duree // 60} h {duree % 60:02d}\n"
            + ("📸 Tu étais dedans ? Partage ta capture : bouton 📸 Partager mon gain dans ton coach" if gain > 0 else "🛡 SL respecté, risque maîtrisé"))
-    # ALIGN Résultats fusionné dans la chaîne du marché (choix d'Adel) : la carte part dans ALIGN BTC / Gold / NASDAQ, avec son
+    # ALIGN Résultats fusionné dans la chaîne du marché (choix d'Adel) : la carte part dans ALIGN BTC / Gold, avec son
     cible = (etat.get("canaux_marche") or {}).get(m) or etat.get("canal_preuves")
     if cible:
         tete = ("🎆 TP TOUCHÉ ! 🥳 Encaisse et souris\n" if gain > 0 else "😤 STOP TOUCHÉ · 💪 On va se refaire\n")
@@ -8814,7 +8814,7 @@ def refuser(etat, cid):
     _envoi_sur(cid, text="👋 ALIGN Signaux — BTC + Gold\n⬆️⬇️ Les positions arrivent ici en direct", reply_markup=CLAVIER_VISITEUR)
     kw = {"reply_markup": bouton_payer(etat)} if etat.get("lien") else {}
     _envoi_sur(cid, text=("👋 Bienvenue sur ALIGN Gratuit 🎁\n"
-                          "🟠 BTC • 🥇 GOLD • 💠 NASDAQ\n\n"
+                          "🟠 BTC • 🥇 GOLD\n\n"
                           "🎁 1 POSITION PROPOSÉE CHAQUE JOUR\n"
                           "🙋 Tu choisis de la prendre ou non\n"
                           "🕯 Expliquée en bougies (vue 15 min) + coach jusqu'au TP\n"
@@ -9876,7 +9876,7 @@ def texte_scalp(m, si, dp, anglais=False):
 
 def lecture_tp1(r, d):
     """Au TP1 : le marché continue vers le TP2 ou peut revenir vers l'entrée ? Lecture des vraies unités (1 → 15 min),
-    du RSI 5 min / 15 min / 1 h et des compressions. Même logique pour BTC, Gold et NASDAQ (unités relatives, pas de prix fixes)."""
+    du RSI 5 min / 15 min / 1 h et des compressions. Même logique pour BTC et Gold (unités relatives, pas de prix fixes)."""
     dirs = list(r.get("dirs") or [])[:5]
     rsis = list(r.get("rsis") or [])
     sqzs = list(r.get("sqzs") or [])[:5]
@@ -10816,7 +10816,7 @@ def alerte_extreme_due(cle, d, t):
     return True
 
 # ───────── Pips + SL qui apprend tout seul ─────────
-# 1 pip : BTC = 1 $, GOLD = 0,10 $, NASDAQ = 1 point (convention des brokers CFD)
+# 1 pip : BTC = 1 $, GOLD = 0,10 $ (convention des brokers CFD)
 APRES_SL_DUREE = 6 * 3600          # on regarde 6 h après un stop si le marché est allé au TP1 quand même
 
 def pips(m, ecart):
@@ -10836,7 +10836,7 @@ def marge_sl_apprise(cle, atr):
     return min(marge, 0.5 * float(atr)) if atr else marge
 
 def appliquer_marge_sl(m, cle, tr, r):
-    """Nouveau trade : le SL est reculé de la marge apprise (BTC, Gold, NASDAQ séparés : chaque marché apprend seul).
+    """Nouveau trade : le SL est reculé de la marge apprise (BTC et Gold : chaque marché apprend seul).
     Retourne False (et ne modifie rien) si, après reculement, le gain/risque passe sous RR_MIN_ENTREE : l'entrée est alors annulée."""
     marge = marge_sl_apprise(cle, r.get("atr") or 0)
     if marge <= 0:
