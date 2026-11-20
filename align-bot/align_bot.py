@@ -11705,6 +11705,7 @@ def news_urgentes(etat, maintenant=None, lire=None):
     injection = re.compile(r"\b(?:ignore|disregard|override|forget)\s+(?:all\s+)?(?:previous|prior|above|these)?\s*(?:instructions|rules|prompts?)\b|\bsystem\s+prompt\b|\b(?:reveal|expose)\s+(?:secrets?|credentials?)\b|\bsend\s+(?:to\s+)?(?:all\s+channels|telegram|messages?)\b", re.I)
     vus = etat.setdefault("news_urg_vus", [])
     nouveaux = []
+    digests_en_attente = []
     for titre in titres_urgents(xml, maintenant):
         titre = re.sub(r"[\x00-\x1f\x7f]+", " ", str(titre))
         titre = re.sub(r"<[^>]*>", " ", titre)
@@ -11713,10 +11714,9 @@ def news_urgentes(etat, maintenant=None, lire=None):
         if not titre or injection.search(titre):
             continue
         digest = hashlib.md5(titre.encode()).hexdigest()[:12]
-        if digest not in vus:
+        if digest not in vus and digest not in digests_en_attente:
             nouveaux.append(titre)
-            vus.append(digest)
-    del vus[:-300]
+            digests_en_attente.append(digest)
     if not nouveaux:
         return None
     payload = {"titres": [{"idx": i, "titre": t} for i, t in enumerate(nouveaux[:8])]}
@@ -11741,6 +11741,8 @@ def news_urgentes(etat, maintenant=None, lire=None):
     if not isinstance(resultat, dict) or set(resultat) != cles:
         return None
     if resultat.get("decision") == "AUCUN":
+        vus.extend(digests_en_attente)
+        del vus[:-300]
         return None
     if resultat.get("decision") != "ALERTE":
         return None
@@ -11756,6 +11758,8 @@ def news_urgentes(etat, maintenant=None, lire=None):
     direction = resultat.get("direction")
     if impact not in ("HIGH", "MEDIUM", "LOW") or direction not in ("BULLISH", "BEARISH", "MIXED", "NEUTRAL"):
         return None
+    vus.extend(digests_en_attente)
+    del vus[:-300]
     titre = payload["titres"][idx]["titre"]
     libelles = {"BTC": "BTC", "GOLD": "Gold"}
     marches = " + ".join(libelles[m] for m in markets)
