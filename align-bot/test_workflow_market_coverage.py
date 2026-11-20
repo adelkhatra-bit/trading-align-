@@ -17,10 +17,11 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.assertNotIn('report["nasdaq_auto_follow_count"]', self.workflow)
         self.assertIn('MARCHES = {"BTC": "XBTUSD", "GOLD": "XAUUSD"}', self.bot)
         self.assertIn('AUTO_MARCHES = ("BTC", "GOLD")', self.bot)
+        self.assertIn('LIVE_CHOIX = {', self.bot)
+        self.assertNotIn('"NASDAQ": ("sym"', self.bot)
 
     def test_worker_rollover_recognizes_both_legacy_and_renamed_worker(self):
         self.assertIn("if run.get(\"name\") in {", self.rollover)
-        self.assertIn("ALIGN MTF BOT (signaux BTC + Gold Telegram)", self.rollover)
         self.assertIn("ALIGN MTF BOT (signaux BTC + Gold Telegram)", self.rollover)
         self.assertIn("ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)", self.rollover)
 
