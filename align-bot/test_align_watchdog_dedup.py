@@ -1,3 +1,4 @@
+import datetime as dt
 import os
 import unittest
 from unittest.mock import patch
@@ -345,6 +346,42 @@ class WatchdogCancelledWorkerTests(unittest.TestCase):
         ]}
         with patch.object(watchdog, "api", return_value=runs):
             self.assertFalse(watchdog.cancelled_by_successor_rollover(worker))
+
+
+
+class WatchdogStaleRuntimeThresholdTests(unittest.TestCase):
+    class FixedNow(dt.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 11, 20, 14, 0, tzinfo=dt.timezone.utc)
+
+    def _bot_run(self, age_minutes):
+        started = self.FixedNow.now() - dt.timedelta(minutes=age_minutes)
+        item = run(44700000001, workflow=watchdog.BOT_WORKFLOW)
+        item["created_at"] = started.isoformat()
+        return item
+
+    def test_bot_at_expected_350_min_runtime_is_not_reported_as_stale(self):
+        runs = {"workflow_runs": [self._bot_run(350)]}
+        with (
+            patch.object(watchdog.dt, "datetime", self.FixedNow),
+            patch.object(watchdog, "api", side_effect=[runs, [], []]),
+            patch.object(watchdog, "report") as report,
+        ):
+            watchdog.inspect_stale_runs()
+        report.assert_not_called()
+
+    def test_bot_past_timeout_plus_grace_is_reported_as_stale(self):
+        runs = {"workflow_runs": [self._bot_run(371)]}
+        with (
+            patch.object(watchdog.dt, "datetime", self.FixedNow),
+            patch.object(watchdog, "api", side_effect=[runs, [], []]),
+            patch.object(watchdog, "report") as report,
+        ):
+            watchdog.inspect_stale_runs()
+        report.assert_called_once()
+        self.assertIn("threshold: 370 minutes", report.call_args.args[1])
+
 
 
 if __name__ == "__main__":
