@@ -20,7 +20,7 @@ concurrency:
   # Un seul worker de production. Sur push, ce workflow ne démarre qu'après
   # le succès du workflow de validation indépendant.
   group: align-bot
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   validate:
@@ -31,6 +31,7 @@ jobs:
     needs: validate
     if: >-
       always() &&
+      github.ref == 'refs/heads/main' &&
       (
         (github.event_name == 'workflow_run' &&
          github.event.workflow_run.conclusion == 'success' &&
