@@ -185,7 +185,7 @@ class PageLive(unittest.TestCase):
         wf = (RACINE / ".github" / "workflows" / "align-bot.yml").read_text(encoding="utf-8")
         bot = (RACINE / "align-bot" / "align_bot.py").read_text(encoding="utf-8")
         self.assertNotIn("continue-on-error: true", wf.split("Vérifier une connexion IA réelle", 1)[1].split("Vérifier le bridge TradingView", 1)[0])
-        bridge = wf.split("Vérifier le bridge TradingView", 1)[1].split("Analyse BTC + Gold + NASDAQ", 1)[0]
+        bridge = wf.split("Vérifier le bridge TradingView", 1)[1].split("Analyse BTC + Gold", 1)[0]
         self.assertNotIn("continue-on-error: true", bridge)
         self.assertIn("raise SystemExit", bridge)
         self.assertIn("ALIGN_TV_API_URL", bridge)
