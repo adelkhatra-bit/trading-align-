@@ -9,15 +9,17 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.rollover = (root / ".github" / "workflows" / "align-bot-rollover.yml").read_text(encoding="utf-8")
         self.bot = (Path(__file__).parent / "align_bot.py").read_text(encoding="utf-8")
 
-    def test_nasdaq_is_in_worker_bridge_preflight_and_live_analysis(self):
-        self.assertIn('for symbol in ("BTCUSD", "XAUUSD", "NAS100")', self.workflow)
-        self.assertIn("Analyse BTC + Gold + NASDAQ et envoi Telegram", self.workflow)
-        self.assertIn('report["nasdaq_open_trade"]', self.workflow)
-        self.assertIn('report["nasdaq_auto_follow_count"]', self.workflow)
+    def test_worker_operational_scope_is_btc_and_gold_only(self):
+        self.assertIn('for symbol in ("BTCUSD", "XAUUSD")', self.workflow)
+        self.assertIn("Analyse BTC + Gold et envoi Telegram", self.workflow)
+        self.assertNotIn("NAS100", self.workflow)
+        self.assertNotIn('report["nasdaq_open_trade"]', self.workflow)
+        self.assertNotIn('report["nasdaq_auto_follow_count"]', self.workflow)
         self.assertIn('"NASDAQ"', self.bot)
 
     def test_worker_rollover_recognizes_both_legacy_and_renamed_worker(self):
         self.assertIn("if run.get(\"name\") in {", self.rollover)
+        self.assertIn("ALIGN MTF BOT (signaux BTC + Gold Telegram)", self.rollover)
         self.assertIn("ALIGN MTF BOT (signaux BTC + Gold Telegram)", self.rollover)
         self.assertIn("ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)", self.rollover)
 
