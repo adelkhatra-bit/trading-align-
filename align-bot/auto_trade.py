@@ -25,7 +25,7 @@ REPLI_RACHAT = 0.4           # on rachète quand le prix a reculé de 40 % du ch
 POSITIONS_MAX = 4            # 1 entrée + jusqu'à 3 rachats, toujours dans le même sens
 SL_ELARGI = 1.25              # demande d'Adel : SL plus large, au-delà de la mèche
 
-# Mêmes marchés que le graphique TradingView d'Adel (CRYPTO:BTCUSD, FOREXCOM:XAUUSD, FX:NAS100).
+# Marchés ALIGN actifs du graphique TradingView : BTCUSD et XAUUSD.
 # Le nom exact sur le serveur MT5 FundedNext est retrouvé tout seul dans cette liste.
 SYMBOLES = {"BTC": ["BTCUSD", "BTCUSD.", "BTCUSDm"], "GOLD": ["XAUUSD", "XAUUSD.", "GOLD"]}
 
