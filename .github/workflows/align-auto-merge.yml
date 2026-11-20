@@ -20,10 +20,10 @@ on:
     types: [completed]
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+  pull-requests: read
   checks: read
-  actions: write
+  actions: read
 
 concurrency:
   group: align-auto-merge
@@ -31,8 +31,9 @@ concurrency:
 
 jobs:
   merge:
-    name: ALIGN fusion automatique
-    if: github.event_name != 'issue_comment' || github.event.issue.pull_request != null
+    name: ALIGN fusion automatique — désactivée
+    # Aucune fusion automatique : autorisation humaine explicite requise.
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Évaluer et fusionner les PR conformes
