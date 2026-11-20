@@ -24,7 +24,7 @@ This service is isolated from the legacy `server.js`/port 4000 and from the `tra
 8. When `ALIGN_REQUIRE_TV_BRIDGE=1` (the default for production markets), ROBOT V12 does not fall back to the local Python-generated entry levels. It uses the Pine M15 Entry/SL/TP1/TP2 only after the validated trigger. Existing open-trade follow-up remains unchanged; no broker order is sent by the bridge.
 9. The bot's existing news pause, Daily/Weekly extreme, risk/reward and risk-memory filters remain mandatory vetoes. These checks can block a Pine signal but do not rewrite its price levels.
 6. GitHub Actions reads `GET /bridge/robot-v12/mtf?symbol=...` using `ALIGN_TV_READ_TOKEN`. It blocks the bot if the active price or required M5/M15/H1/H4/D1/W1 snapshots are missing or stale.
-7. The existing bot displays the indicator plan in Telegram separately from its own safety verdict. Once the existing bot run completes successfully, its publisher updates `live-data/live.json`; the ALIGN live band continues to read that file. The live band/userscript is not changed here.
+7. The existing bot displays the indicator plan in Telegram separately from its own safety verdict. Once the existing bot run completes successfully, its publisher updates `live-data/live.json`; the ALIGN live band continues to read that file. The live band/userscript keeps its established animations and design; market labels and prompts expose BTC and GOLD only.
 
 ## Local service
 
