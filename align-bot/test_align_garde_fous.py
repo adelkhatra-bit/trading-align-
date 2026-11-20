@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 WF = ROOT / ".github" / "workflows"
 
 CRITIQUES = {
-    "align-bot.yml": "ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)",
+    "align-bot.yml": "ALIGN MTF BOT (signaux BTC + Gold Telegram)",
     "align-bot-validation.yml": "ALIGN MTF validation",
     "align-workflow-watchdog.yml": "ALIGN Workflow Watchdog",
     "align-auto-repair.yml": "ALIGN Coordinateur de réparation automatique",
@@ -89,7 +89,7 @@ class GardeFousWorkflows(unittest.TestCase):
 class GardeFousBridge(unittest.TestCase):
     def test_source_et_marches_canoniques(self):
         self.assertEqual(bridge.SOURCE, "ALIGN_MTF_PRO_V25")
-        self.assertEqual(bridge.ALLOWED_SYMBOLS, {"BTCUSD", "XAUUSD", "NAS100"})
+        self.assertEqual(bridge.ALLOWED_SYMBOLS, {"BTCUSD", "XAUUSD"})
 
     def test_port_dedie_et_ports_interdits(self):
         self.assertTrue({3000, 4000, 5001} <= bridge.FORBIDDEN_PORTS, "anciens ports réautorisés")
