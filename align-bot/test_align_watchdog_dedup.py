@@ -374,7 +374,7 @@ class WatchdogStaleRuntimeThresholdTests(unittest.TestCase):
     def test_bot_past_timeout_plus_grace_is_reported_as_stale(self):
         runs = {"workflow_runs": [self._bot_run(371)]}
         with (
-            patch.object(watchdog.dt.datetime, "now", self.FixedNow.now),
+            patch.object(watchdog.dt, "datetime", self.FixedNow),
             patch.object(watchdog, "api", side_effect=[runs, [], []]),
             patch.object(watchdog, "report") as report,
         ):
