@@ -257,7 +257,7 @@ RISQUE_MAX_CONSEILLE = 100.0                              # règle d'Adel (15/11
 def risque_dollars(m, e, sl, contrats=1):
     if m not in SYMBOLES:
         return 0.0
-    return abs(e - sl) / TICKS[m] * VALEUR_TICK[m] * contratos
+    return abs(e - sl) / TICKS[m] * VALEUR_TICK[m] * contrats
 _CACHE_PRIX = {}
 
 
