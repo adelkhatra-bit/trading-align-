@@ -63,7 +63,7 @@
 /* Données publiques (niveau gratuit seulement) écrites par le bot sur la branche live-data : aucun prix, aucun niveau, aucun jeton. */
 var SOURCE = "https://raw.githubusercontent.com/adelkhatra-bit/trading-align-/live-data/live.json";
 var BOT = "@align_mtf_adel_bot";
-var ICONES = { BTC: "🟠", GOLD: "🥇", NASDAQ: "💠" };
+var ICONES = { BTC: "🟠", GOLD: "🥇" };
 var BIAIS = { haussier: "haussier", baissier: "baissier", indecis: "indécis" };
 var ETATS = { calme: "Marché calme", preparation: "En préparation", entree: "Entrée en cours", ferme: "Marché fermé", perime: "Données en pause" };
 var donnees = null, vu = 0, recents = [], tour = 0;
@@ -173,7 +173,7 @@ if (demo) {
   donnees = { maj: Math.floor(Date.now() / 1000), bot: BOT, marches: [
     { m: "BTC", etat: "calme", biais: "indecis", ut: 5, seuil: 8, profil: "aucun" },
     { m: "GOLD", etat: "preparation", biais: "baissier", ut: 6, seuil: 8, profil: "INTRADAY" },
-    { m: "NASDAQ", etat: "ferme", biais: "haussier", ut: 7, seuil: 8, profil: "SWING" }] };
+  ] };
   rendre();
 } else { charger(); setInterval(charger, 30000); }
 setInterval(rendre, 15000);
