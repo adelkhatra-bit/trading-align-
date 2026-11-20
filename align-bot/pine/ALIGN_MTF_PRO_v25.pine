@@ -23,7 +23,7 @@ pos = posTxt == "En bas à droite" ? position.bottom_right : posTxt == "En bas �
 // ═════════ BRIDGE ALIGN (optionnel, sans modification visuelle) ═════════
 grpBridge = "Bridge ALIGN (optionnel)"
 bridgeEnabled = input.bool(false, "Envoyer les snapshots au ROBOT V12", group=grpBridge)
-bridgeMarket = input.string("BTCUSD", "Marché ALIGN", options=["BTCUSD", "XAUUSD", "NAS100"], group=grpBridge)
+bridgeMarket = input.string("BTCUSD", "Marché ALIGN", options=["BTCUSD", "XAUUSD"], group=grpBridge)
 
 // ═════════ ÉTAT DE CHAQUE UNITÉ DE TEMPS ═════════
 // Tendance : +1 (prix > EMA20 > EMA50) / -1 / 0  •  Compression : Bollinger dans Keltner  •  RSI
@@ -241,14 +241,14 @@ if barstate.isconfirmed
         dirStable := dirBrut
     else if dirBrut == 0 and nz(d15Fermee) != dirStable and nz(d60Fermee) != dirStable
         dirStable := 0
-// GOLD/NASDAQ : aucune direction de trade tant que les clôtures M5, M15, H1 et H4 ne concordent pas.
+// GOLD : aucune direction de trade tant que les clôtures M5, M15, H1 et H4 ne concordent pas.
 tickerUpper = str.upper(syminfo.ticker)
-isGoldNasdaq = str.contains(tickerUpper, "XAU") or str.contains(tickerUpper, "GOLD") or
-               str.contains(tickerUpper, "NAS") or str.contains(tickerUpper, "NQ") or
-               str.contains(tickerUpper, "US100") or str.contains(tickerUpper, "USTEC")
-gnConfluence = dirStable != 0 and nz(d5Fermee) == dirStable and nz(d15Fermee) == dirStable and
-               nz(d60Fermee) == dirStable and nz(d240Fermee) == dirStable
-dirPlan = isGoldNasdaq and not gnConfluence ? 0 : dirStable
+isBtc = str.contains(tickerUpper, "BTC") or str.contains(tickerUpper, "XBT")
+isGold = str.contains(tickerUpper, "XAU") or str.contains(tickerUpper, "GOLD")
+isSupportedMarket = isBtc or isGold
+goldConfluence = dirStable != 0 and nz(d5Fermee) == dirStable and nz(d15Fermee) == dirStable and
+                 nz(d60Fermee) == dirStable and nz(d240Fermee) == dirStable
+dirPlan = not isSupportedMarket or (isGold and not goldConfluence) ? 0 : dirStable
 // ═════════ STRATÉGIES SCALPING / DAY / SWING : règles d'alignement multi-UT ═════════
 // SWING : W1/D1 contexte • H4 retracement (ou aligné) • H1 confirmation de reprise
 // DAY : H4 contexte • H1 direction • M15 retracement • M5 déclenchement
@@ -256,10 +256,10 @@ dirPlan = isGoldNasdaq and not gnConfluence ? 0 : dirStable
 dP  = dirPlan
 uW  = nz(dW) == dP
 uD  = nz(dD) == dP
-d4Strat = isGoldNasdaq ? nz(d240Fermee) : nz(d240)
-d1hStrat = isGoldNasdaq ? nz(d60Fermee) : nz(d60)
-d15Strat = isGoldNasdaq ? nz(d15Fermee) : nz(d15)
-d5Strat = isGoldNasdaq ? nz(d5Fermee) : nz(d5)
+d4Strat = isGold ? nz(d240Fermee) : nz(d240)
+d1hStrat = isGold ? nz(d60Fermee) : nz(d60)
+d15Strat = isGold ? nz(d15Fermee) : nz(d15)
+d5Strat = isGold ? nz(d5Fermee) : nz(d5)
 u4  = d4Strat == dP
 u1h = d1hStrat == dP
 u15 = d15Strat == dP
@@ -365,8 +365,8 @@ var int dernierB = -100
 // Entrées uniquement dans le sens des grosses UT (2h, 4h, Daily)
 sigHaut0 = ((fortHaut or explHaut) and longT >= 1) or (zoneHaut and longT >= 0)
 sigBas0  = ((fortBas or explBas) and longT <= -1) or (zoneBas and longT <= 0)
-sigHaut = sigHaut0 and bar_index - dernierH > 12 and (not isGoldNasdaq or (gnConfluence and dirStable == 1))
-sigBas  = sigBas0 and bar_index - dernierB > 12 and (not isGoldNasdaq or (gnConfluence and dirStable == -1))
+sigHaut = isSupportedMarket and sigHaut0 and bar_index - dernierH > 12 and (not isGold or (goldConfluence and dirStable == 1))
+sigBas  = isSupportedMarket and sigBas0 and bar_index - dernierB > 12 and (not isGold or (goldConfluence and dirStable == -1))
 if sigHaut
     dernierH := bar_index
 if sigBas
@@ -614,7 +614,7 @@ bridgeTfSeconds = timeframe.in_seconds()
 bridgeTf = bridgeTfSeconds == 60 ? "M1" : bridgeTfSeconds == 300 ? "M5" : bridgeTfSeconds == 900 ? "M15" : bridgeTfSeconds == 1800 ? "M30" : bridgeTfSeconds == 3600 ? "H1" : bridgeTfSeconds == 7200 ? "H2" : bridgeTfSeconds == 14400 ? "H4" : bridgeTfSeconds == 86400 ? "D1" : bridgeTfSeconds == 604800 ? "W1" : "UNSUPPORTED"
 bridgePlanValid = dirPlan != 0 and not na(ent) and not na(sl) and not na(tp1) and not na(tp2)
 bridgeSignal = bridgePlanValid ? (dirPlan == 1 ? "LONG" : "SHORT") : "WAIT"
-bridgeClosedMtfOk = isGoldNasdaq ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan)
+bridgeClosedMtfOk = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan)
 bridgeConfirmed = bridgePlanValid and etatS == "CONFIRMÉ" and scoreV >= 75 and bridgeClosedMtfOk
 bridgeZone = zoneBas ? "SUPPORT" : zoneHaut ? "RESISTANCE" : "PLAN"
 
@@ -636,7 +636,7 @@ bridgeTimeW1 = request.security(syminfo.tickerid, "W", time)
 bridgePayload = '{"source":"ALIGN_MTF_PRO_V25","symbol":"' + bridgeMarket + '","tickerid":"' + syminfo.tickerid + '","timeframe":"' + bridgeTf + '","planTimeframe":"M15","entryTimeframe":"' + (strat == "SWING" ? "H1" : strat == "DAY" ? "M5" : strat == "SCALPING" ? "M1" : "UNSUPPORTED") + '","entryZoneLow":' + f_align_v25_json_num(bridgePlanValid ? zBas : na) + ',"entryZoneHigh":' + f_align_v25_json_num(bridgePlanValid ? zHaut : na) + ',"entryDecision":' + f_align_v25_json_num(bridgePlanValid ? (zBas + zHaut) / 2 : na) + ',"entryBarTime":' + f_align_v25_json_int(bridgeEntryTimeSafe) + ',"entryBarOpen":' + f_align_v25_json_num(bridgeEntryOpen) + ',"entryBarHigh":' + f_align_v25_json_num(bridgeEntryHigh) + ',"entryBarLow":' + f_align_v25_json_num(bridgeEntryLow) + ',"entryBarClose":' + f_align_v25_json_num(bridgeEntryClose) + ',"price":' + f_align_v25_json_num(close) + ',"timestamp":' + str.tostring(timenow) + ',"candle_time":' + str.tostring(time) + ',"confirmed":' + str.tostring(bridgeConfirmed) + ',"candle_confirmed":' + str.tostring(barstate.isconfirmed) + ',"bar_confirmed":' + str.tostring(barstate.isconfirmed) + ',"signal":"' + bridgeSignal + '","verdict":"' + decisionS + '","entry":' + f_align_v25_json_num(bridgePlanValid ? ent : na) + ',"sl":' + f_align_v25_json_num(bridgePlanValid ? sl : na) + ',"tp1":' + f_align_v25_json_num(bridgePlanValid ? tp1 : na) + ',"tp2":' + f_align_v25_json_num(bridgePlanValid ? tp2 : na) + ',"rrRatio":' + f_align_v25_json_num(rr) + ',"macro_bull":' + str.tostring(bull) + ',"macro_bear":' + str.tostring(bear) + ',"long_score":' + str.tostring(dirPlan == 1 ? scoreV : 0) + ',"short_score":' + str.tostring(dirPlan == -1 ? scoreV : 0) + ',"scalp_inverse":false,"strategy":"' + strat + '","anticipation":"' + (retHaut ? "HAUSSIER" : retBas ? "BAISSIER" : "AUCUNE") + '","zone_proche":"' + bridgeZone + '","volume":"' + (volOk ? "OK" : "INDISPONIBLE") + '","rsi_etat":"' + (rsiOB >= 3 ? "SURACHAT" : rsiOS >= 3 ? "SURVENTE" : "NORMAL") + '","rsi_1m":' + f_align_v25_json_num(r1) + ',"rsi_5m":' + f_align_v25_json_num(r5) + ',"rsi_15m":' + f_align_v25_json_num(r15) + ',"rsi_60m":' + f_align_v25_json_num(r60) + ',"lecture_1m":' + f_align_v25_json_dir(d1) + ',"lecture_5m":' + f_align_v25_json_dir(nz(d5Fermee)) + ',"lecture_15m":' + f_align_v25_json_dir(nz(d15Fermee)) + ',"lecture_60m":' + f_align_v25_json_dir(nz(d60Fermee)) + ',"mtf":{"M1":{"direction":' + f_align_v25_json_int(d1) + ',"rsi":' + f_align_v25_json_num(r1) + ',"bar_time":' + str.tostring(nz(bridgeTimeM1, 0)) + '},"M5":{"direction":' + f_align_v25_json_int(d5Strat) + ',"rsi":' + f_align_v25_json_num(r5) + ',"bar_time":' + str.tostring(nz(bridgeTimeM5, 0)) + '},"M15":{"direction":' + f_align_v25_json_int(d15Strat) + ',"rsi":' + f_align_v25_json_num(r15) + ',"bar_time":' + str.tostring(nz(bridgeTimeM15, 0)) + '},"M30":{"direction":' + f_align_v25_json_int(d30) + ',"rsi":' + f_align_v25_json_num(r30) + ',"bar_time":' + str.tostring(nz(bridgeTimeM30, 0)) + '},"H1":{"direction":' + f_align_v25_json_int(d1hStrat) + ',"rsi":' + f_align_v25_json_num(r60) + ',"bar_time":' + str.tostring(nz(bridgeTimeH1, 0)) + '},"H2":{"direction":' + f_align_v25_json_int(d120) + ',"rsi":' + f_align_v25_json_num(r120) + ',"bar_time":' + str.tostring(nz(bridgeTimeH2, 0)) + '},"H4":{"direction":' + f_align_v25_json_int(d4Strat) + ',"rsi":' + f_align_v25_json_num(r240) + ',"bar_time":' + str.tostring(nz(bridgeTimeH4, 0)) + '},"D1":{"direction":' + f_align_v25_json_int(dD) + ',"rsi":' + f_align_v25_json_num(rD) + ',"bar_time":' + str.tostring(nz(bridgeTimeD1, 0)) + '},"W1":{"direction":' + f_align_v25_json_int(dW) + ',"rsi":' + f_align_v25_json_num(rW) + ',"bar_time":' + str.tostring(nz(bridgeTimeW1, 0)) + '}}}'
 
 varip int lastBridgeSent = na
-bridgeDue = bridgeEnabled and bridgeTf != "UNSUPPORTED" and barstate.isrealtime and (na(lastBridgeSent) or timenow - lastBridgeSent >= 20000)
+bridgeDue = bridgeEnabled and isSupportedMarket and bridgeTf != "UNSUPPORTED" and barstate.isrealtime and (na(lastBridgeSent) or timenow - lastBridgeSent >= 20000)
 if bridgeDue
     lastBridgeSent := timenow
     alert(bridgePayload, alert.freq_all)

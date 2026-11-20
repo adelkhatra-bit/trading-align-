@@ -1,4 +1,4 @@
-"""Vérifie que le compte FundedNext répond via MetaApi (AUCUN ordre) : solde, équité, symboles BTC / GOLD / NASDAQ, prix."""
+"""Vérifie que le compte FundedNext répond via MetaApi (AUCUN ordre) : solde, équité, symboles BTC / GOLD, prix."""
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import auto_trade as at
@@ -12,7 +12,7 @@ def main():
         info = at._api("GET", f"{c}/account-information")
         print(f"METAAPI_COMPTE {c} solde={info.get('balance')} equite={info.get('equity')} levier={info.get('leverage')} plateforme={info.get('platform')}")
         etat = {}
-        for m in ("BTC", "GOLD", "NASDAQ"):
+        for m in ("BTC", "GOLD"):
             try:
                 sym = at.symbole(etat, c, m)
                 p = at._api("GET", f"{c}/symbols/{sym}/current-price")

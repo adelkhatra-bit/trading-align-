@@ -3,11 +3,11 @@ import hashlib
 import unittest
 
 PINE = Path(__file__).parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
-BASELINE_GIT_BLOB_SHA = "35d3bd3ba5a7ddb48f469184e602ab96c424aa59"  # v25 : ancienne base b49cb3ff… + suppression demandée par Adel du point ENTRÉE (ligne + étiquette) ; rien d'autre ne change
+BASELINE_GIT_BLOB_SHA = "578c0a1f58c03e658c42c91aeeca37e865e31e7c"  # v25 : ancienne base b49cb3ff… + suppression demandée par Adel du point ENTRÉE (ligne + étiquette) ; rien d'autre ne change
 SETTINGS_BLOCK = """// ═════════ BRIDGE ALIGN (optionnel, sans modification visuelle) ═════════
 grpBridge = "Bridge ALIGN (optionnel)"
 bridgeEnabled = input.bool(false, "Envoyer les snapshots au ROBOT V12", group=grpBridge)
-bridgeMarket = input.string("BTCUSD", "Marché ALIGN", options=["BTCUSD", "XAUUSD", "NAS100"], group=grpBridge)
+bridgeMarket = input.string("BTCUSD", "Marché ALIGN", options=["BTCUSD", "XAUUSD"], group=grpBridge)
 
 """
 EXPORT_MARKER = "// ═════════ BRIDGE ALIGN — export structuré du Pine v25 (sans toucher aux signaux/visuels) ═════════"
@@ -35,6 +35,15 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         git_blob = hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
         self.assertEqual(git_blob, BASELINE_GIT_BLOB_SHA)
 
+    def test_only_btc_and_gold_are_supported_for_signals_and_bridge(self):
+        self.assertIn('options=["BTCUSD", "XAUUSD"]', self.source)
+        self.assertNotIn("NAS100", self.source)
+        self.assertIn("isBtc = str.contains(tickerUpper, \"BTC\") or str.contains(tickerUpper, \"XBT\")", self.source)
+        self.assertIn("isGold = str.contains(tickerUpper, \"XAU\") or str.contains(tickerUpper, \"GOLD\")", self.source)
+        self.assertIn("isSupportedMarket = isBtc or isGold", self.source)
+        self.assertIn("dirPlan = not isSupportedMarket or (isGold and not goldConfluence) ? 0 : dirStable", self.source)
+        self.assertIn("bridgeDue = bridgeEnabled and isSupportedMarket", self.source)
+
     def test_existing_human_alerts_are_preserved_and_bridge_is_opt_in(self):
         self.assertIn('alert(syminfo.ticker + " " + nomSigH', self.source)
         self.assertIn('alert(syminfo.ticker + " " + nomSigB', self.source)
@@ -57,7 +66,7 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
 
     def test_robot_v12_exports_closed_mtf_directions_for_entry_confirmation(self):
         self.assertIn(
-            "bridgeClosedMtfOk = isGoldNasdaq ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan)",
+            "bridgeClosedMtfOk = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan)",
             self.source,
         )
         self.assertIn(

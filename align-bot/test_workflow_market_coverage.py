@@ -25,7 +25,7 @@ class ProductionMarketCoverageTest(unittest.TestCase):
     def test_worker_rollover_recognizes_both_legacy_and_renamed_worker(self):
         self.assertIn("if run.get(\"name\") in {", self.rollover)
         self.assertIn("ALIGN MTF BOT (signaux BTC + Gold Telegram)", self.rollover)
-        self.assertIn("ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)", self.rollover)
+        self.assertIn("ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)", self.rollover)  # legacy worker drained safely
 
     def test_nasdaq_not_available_to_auto_execution(self):
         auto_trade = (Path(__file__).parent / "auto_trade.py").read_text(encoding="utf-8")
@@ -35,6 +35,29 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.assertNotIn('"NASDAQ"', symbol_map)
         self.assertIn('if m not in SYMBOLES:', auto_trade)
         self.assertIn('if m not in SYMBOLES:', topstep)
+
+    def test_active_metaapi_and_public_market_channels_are_btc_gold_only(self):
+        bot = self.bot
+        metaapi = (Path(__file__).parent / "metaapi_check.py").read_text(encoding="utf-8")
+        self.assertIn('MARCHES = {"BTC": "XBTUSD", "GOLD": "XAUUSD"}', bot)
+        self.assertIn('MARCHES_HISTORIQUES = (*MARCHES, "NASDAQ")', bot)
+        self.assertIn('for nom_marche, pair in MARCHES.items():', bot)
+        self.assertIn('for marche in MARCHES:', bot)
+        self.assertIn('LIENS_CHAINES = {"BTC":', bot)
+        self.assertNotIn('"NASDAQ": "https://t.me/', bot)
+        self.assertNotIn('"NASDAQ": "🎙', bot)
+        channel_attach = bot[bot.index("def connecter_canal("):bot.index("\ndef ", bot.index("def connecter_canal(") + 5)]
+        self.assertIn('if mk_ == "NASDAQ":', channel_attach)
+        self.assertIn("ne plus enregistrer de nouvelle chaîne NASDAQ", channel_attach)
+        self.assertIn('for m in ("BTC", "GOLD")', metaapi)
+        self.assertNotIn('"NASDAQ"', metaapi)
+
+    def test_news_ai_scope_is_btc_and_gold_only(self):
+        start = self.bot.index("def news_urgentes(")
+        end = self.bot.index("\ndef ", start + 5)
+        block = self.bot[start:end]
+        self.assertIn("BTC / Gold", block)
+        self.assertNotIn("NASDAQ", block)
 
     def test_bridge_requires_fresh_m5_m15_h1_h4_daily_and_weekly(self):
         for timeframe in ("M5", "M15", "H1", "H4", "D1", "W1"):
