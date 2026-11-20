@@ -34,5 +34,5 @@ ok(s === 200 && b.payload.price === 2400, "GOLD lu après webhook TradingView");
 ok(s === 400 && b.error === "symbol_tickerid_mismatch", "marché mélangé refusé (NAS100 déclaré BTCUSD)");
 [s, b] = await call("GET", "/mailbox?symbol=BTCUSD", undefined, { authorization: "Bearer " + env.ALIGN_TV_MAILBOX_TOKEN });
 ok(s === 200 && b.payload.price === 64000, "boîte BTC non polluée");
-[s] = await call("POST", "/ingest/" + env.ALIGN_TV_INGEST_TOKEN, '{"source":"ALIGN_MTF_PRO_V25","symbol":"NAS100","price":27000}');
+[s, b] = await call("POST", "/ingest/" + env.ALIGN_TV_INGEST_TOKEN, '{"source":"ALIGN_MTF_PRO_V25","symbol":"NAS100","price":27000}');
 ok(s === 400 && b.error === "unsupported_symbol", "symbole NASDAQ refusé explicitement");
