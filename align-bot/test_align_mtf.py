@@ -2410,7 +2410,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
         self.assertIn("L'IA ALIGN EN DIRECT", a[0])
         self.assertEqual(b, [])
 
-    def test_nasdaq_market_is_removed_and_legacy_preferences_are_filtered(selfself):
+    def test_nasdaq_market_is_removed_and_legacy_preferences_are_filtered(self):
         self.assertNotIn("NASDAQ", align_bot.MARCHES)
         self.assertEqual(align_bot.marche_demande("💠 Analyse Nasdaq"), "NASDAQ")
         etat = {"marches_par_chat": {"7": ["GOLD", "NASDAQ"]}}
