@@ -255,7 +255,7 @@ RISQUE_MAX_CONSEILLE = 100.0                              # règle d'Adel (15/11
 
 
 def risque_dollars(m, e, sl, contrats=1):
-    """Perte en $ si le SL est touché, pour N micro-contrats."""
+    """Perte en $ si le SL est touché, pour N micro-contrats des marchés ALIGN actifs."""
     return abs(e - sl) / TICKS.get(m, 1) * VALEUR_TICK.get(m, 1) * contrats
 _CACHE_PRIX = {}
 
