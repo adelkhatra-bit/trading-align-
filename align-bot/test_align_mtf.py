@@ -2466,7 +2466,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
         self.assertNotIn("BTC", align_bot.filtrer_texte_par_marches(texte, {"GOLD"}))
         self.assertIn("DOLLAR", align_bot.filtrer_texte_par_marches(texte, {"GOLD"}))
 
-    def test_market_selection_menu_exposes_three_real_callbacks(self):
+    def test_market_selection_menu_exposes_active_callbacks(self):
         from unittest.mock import patch
         with patch.object(align_bot, "_envoi_sur") as send:
             align_bot.menu_marches({}, "101")
@@ -2508,7 +2508,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
             self.assertIn("Everything", labels[-2])
             self.assertIn("Confirm & follow", labels[-1])
             self.assertIn("GOLD", labels[1])
-            self.assertEqual(len(labels), 5)
+            self.assertEqual(len(labels), 4)
         finally:
             align_bot.LANG_EN.clear()
             align_bot.LANG_EN.update(old)
