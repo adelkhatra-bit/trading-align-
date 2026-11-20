@@ -12123,9 +12123,9 @@ def live_agenda(etat, maintenant):
         t = int(heure_locale.replace(hour=hh, minute=mm, second=0, microsecond=0).timestamp())
         reste = t - maintenant
         if 14 * 60 < reste <= 16 * 60:
-            texte = f"🔔 OUVERTURE {nom} DANS 15 MIN • ça peut secouer BTC • GOLD • NASDAQ • prépare-toi 👉 lien en bio"
+            texte = f"🔔 OUVERTURE {nom} DANS 15 MIN • ça peut secouer BTC • GOLD • prépare-toi 👉 lien en bio"
         elif 0 <= -reste <= 3 * 60:
-            texte = f"🔔 {nom} EST OUVERT ! le volume arrive sur BTC • GOLD • NASDAQ • ça monte ou ça descend ? dis-le en commentaire 👇"
+            texte = f"🔔 {nom} EST OUVERT ! le volume arrive sur BTC • GOLD • ça monte ou ça descend ? dis-le en commentaire 👇"
         else:
             continue
         n += bool(live_bande(etat, texte, f"ses{nom}{t}{reste > 0}", 3600))
@@ -12139,7 +12139,7 @@ def live_agenda(etat, maintenant):
         titre = re.sub(r"\s+", " ", re.sub(r"\d", "", e.get("titre", ""))).strip()
         quoi = "🎤 DISCOURS" if any(k in e.get("titre", "") for k in MOTS_DISCOURS) else "📰 ANNONCE"
         if 14 * 60 < reste <= 16 * 60:
-            texte = f"{quoi} USA DANS 15 MIN : {titre} • BTC • GOLD • NASDAQ peuvent s'emballer ⚡ • le détail en temps réel 👉 lien en bio"
+            texte = f"{quoi} USA DANS 15 MIN : {titre} • BTC • GOLD peuvent s'emballer ⚡ • le détail en temps réel 👉 lien en bio"
         elif 0 <= -reste <= 3 * 60:
             texte = f"🔴 EN DIRECT : {quoi} {titre} • ça peut bouger très fort, reste concentré 👀 • l'analyse en direct 👉 lien en bio"
         else:
