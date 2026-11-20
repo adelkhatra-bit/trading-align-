@@ -7947,7 +7947,7 @@ def recevoir_pseudo(etat, cid, pseudo):
 SESSIONS = (   # code, nom FR, nom EN, fuseau, ouverture, fermeture, jours d'ouverture, jours de fermeture, marchés concernés
     ("tokyo", "Tokyo", "Tokyo", "Asia/Tokyo", (9, 0), (15, 30), range(0, 5), range(0, 5), "BTC et GOLD", "BTC and GOLD"),
     ("londres", "Londres", "London", "Europe/London", (8, 0), (16, 30), range(0, 5), range(0, 5), "GOLD et BTC", "GOLD and BTC"),
-    ("wall", "Wall Street / Nasdaq", "Wall Street / Nasdaq", "America/New_York", (9, 30), (16, 0), range(0, 5), range(0, 5), "NASDAQ, GOLD et BTC", "NASDAQ, GOLD and BTC"),
+    ("wall", "Wall Street / Nasdaq", "Wall Street / Nasdaq", "America/New_York", (9, 30), (16, 0), range(0, 5), range(0, 5), "GOLD et BTC", "NASDAQ, GOLD and BTC"),
     ("gold", "Gold (CME)", "Gold (CME)", "America/Chicago", (17, 0), (16, 0), (6, 0, 1, 2, 3), range(0, 5), "GOLD", "GOLD"),
     ("btc", "BTC (bougie Daily)", "BTC (Daily candle)", "UTC", None, (0, 0), (), range(0, 7), "BTC", "BTC"),
 )
@@ -12050,7 +12050,7 @@ def live_phrases_ia(etat, maintenant, derniers=None):
     h = datetime.datetime.fromtimestamp(maintenant, PARIS).hour
     moment = "nuit" if h < 7 else "matin" if h < 12 else "après-midi" if h < 18 else "soirée"
     consigne = (
-        "Tu es le commentateur technique en direct d'un live de trading BTC, GOLD et NASDAQ. "
+        "Tu es le commentateur technique en direct d'un live de trading BTC et GOLD. "
         "Tu dois animer la bande du live en expliquant ce que les données montrent réellement, pas en inventant un scénario. "
         "Pour CHAQUE marché fourni, écris exactement 2 phrases courtes en français et leur traduction anglaise. "
         "Format exact : MARCHÉ | phrase française | phrase anglaise. "
