@@ -3927,11 +3927,21 @@ def ia(etat, consigne, donnees, cle_cache=None, duree=600, premium=False, recher
     par_jour = etat.setdefault("ia_fournisseur_jour", {})
     claude_t = etat.setdefault("ia_claude_t", {})
     ordre = list(IA_FOURNISSEURS)
+    # Le préflight du même run a confirmé qu'un fournisseur répond ; retire seulement son cooldown.
+    # Les plafonds journaliers et intervalles restent inchangés.
+    sain = os.environ.get("ALIGN_AI_HEALTHY_PROVIDER", "").strip()
+    marque_saine = f"{os.environ.get('GITHUB_RUN_ID', 'local')}:{sain}"
+    if sain and any(f[0] == sain for f in IA_FOURNISSEURS) and etat.get("ia_preflight_marker") != marque_saine:
+        etat.setdefault("ia_pause", {}).pop(sain, None)
+        etat.setdefault("ia_echecs", {}).pop(sain, None)
+        etat["ia_preflight_marker"] = marque_saine
     if premium and prefer_paid and not recherche:
         # Le commentateur live utilise le Claude API déjà configuré ; plafonds et repli restent inchangés.
         ordre.sort(key=lambda f: 0 if f[0] == "Anthropic" else 1)
     elif recherche:                                       # la recherche Google gratuite n'existe que sur Gemini 3.8 : on l'essaie d'abord
         ordre.sort(key=lambda f: 0 if f[0] == "Gemini 3.8" else 1)
+    elif sain and any(f[0] == sain for f in IA_FOURNISSEURS):
+        ordre.sort(key=lambda f: 0 if f[0] == sain else 1)  # fournisseur confirmé en premier
     for nom, url, modele, cle, besoin_cle in ordre:
         if besoin_cle and not cle:
             continue
