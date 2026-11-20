@@ -8,6 +8,10 @@ BOUCLE = WF.split("for N in $PRS; do", 1)[1]
 
 
 class PorteFusion(unittest.TestCase):
+    def test_fusion_automatique_desactivee_et_permissions_lecture_seule(self):
+        self.assertIn('if: false', WF)
+        self.assertIn('contents: read', WF)
+        self.assertNotIn('contents: write', WF)
     def test_reagit_a_la_fin_des_deux_validations(self):
         self.assertIn('workflows: ["ALIGN MTF validation", "CI Integration Tests"]', WF)
 
