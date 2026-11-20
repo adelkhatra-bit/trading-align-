@@ -52,7 +52,7 @@ Prioritize primary sources:
 For each news item capture headline, publisher, direct URL, publication timestamp/timezone, event timestamp if different, market affected, verified fact vs interpretation, source quality and independent corroboration. Never invent headlines, quotes, prices, event times or sources.
 
 ## Professional market-analysis framework
-Analyze BTC, GOLD and NASDAQ separately:
+Analyze BTC and GOLD separately:
 - Establish current session, liquidity, holidays, cash/futures hours and relevant opens.
 - Identify macro regime: policy rates, real yields, USD, inflation/growth expectations, risk appetite and volatility.
 - BTC: only verified crypto-specific ETF/flow, regulatory, exchange, liquidation and protocol catalysts.
