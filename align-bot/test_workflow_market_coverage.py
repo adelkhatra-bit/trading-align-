@@ -15,13 +15,22 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.assertNotIn("NAS100", self.workflow)
         self.assertNotIn('report["nasdaq_open_trade"]', self.workflow)
         self.assertNotIn('report["nasdaq_auto_follow_count"]', self.workflow)
-        self.assertIn('"NASDAQ"', self.bot)
+        self.assertIn('MARCHES = {"BTC": "XBTUSD", "GOLD": "XAUUSD"}', self.bot)
+        self.assertIn('AUTO_MARCHES = ("BTC", "GOLD")', self.bot)
 
     def test_worker_rollover_recognizes_both_legacy_and_renamed_worker(self):
         self.assertIn("if run.get(\"name\") in {", self.rollover)
         self.assertIn("ALIGN MTF BOT (signaux BTC + Gold Telegram)", self.rollover)
         self.assertIn("ALIGN MTF BOT (signaux BTC + Gold Telegram)", self.rollover)
         self.assertIn("ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)", self.rollover)
+
+    def test_nasdaq_not_available_to_auto_execution(self):
+        auto_trade = (Path(__file__).parent / "auto_trade.py").read_text(encoding="utf-8")
+        topstep = (Path(__file__).parent / "topstep_trade.py").read_text(encoding="utf-8")
+        self.assertNotIn('"NASDAQ":', auto_trade)
+        self.assertNotIn('"NASDAQ":', topstep)
+        self.assertIn('if m not in SYMBOLES:', auto_trade)
+        self.assertIn('if m not in SYMBOLES:', topstep)
 
     def test_bridge_requires_fresh_m5_m15_h1_h4_daily_and_weekly(self):
         for timeframe in ("M5", "M15", "H1", "H4", "D1", "W1"):
