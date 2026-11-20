@@ -18,7 +18,7 @@
   // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
-    '🟢 LIVE ALIGN 24/7 • BTC • GOLD • NASDAQ',
+    '🟢 LIVE ALIGN 24/7 • BTC • GOLD',
     '👉 ABONNE-TOI • PARTAGE • TAPOTE L\'ÉCRAN',
     '🔗 LIEN EN BIO : COACH EN DIRECT',
     '📲 CONNECTÉ AU MARCHÉ EN TEMPS RÉEL DEPUIS TON PORTABLE • chaque bougie expliquée en direct • lien en bio 🎁',
@@ -364,7 +364,7 @@
       if (!c || typeof c.symbol !== 'function' || typeof c.resolution !== 'function') return '';
       const s = String(c.symbol() || ''), r = String(c.resolution() || '');
       if (!s || !r) return '';
-      const m = /BTC/i.test(s) ? '🟠 BTC' : /XAU|GOLD/i.test(s) ? '🥇 GOLD' : /NAS|NQ|US100/i.test(s) ? '🟣 NASDAQ' : s.split(':').pop();
+      const m = /BTC/i.test(s) ? '🟠 BTC' : /XAU|GOLD/i.test(s) ? '🥇 GOLD' : s.split(':').pop();
       const u = /^\d+$/.test(r) ? (+r >= 60 ? (+r / 60) + 'H' : r + ' MIN') : r === 'D' || r === '1D' ? '1 JOUR' : r;
       return '📺 VUE : ' + m + ' • ' + u;
     } catch (e) {
@@ -494,15 +494,15 @@
     "🎯 Astuce : l'étiquette ENTRÉE = la zone que le coach surveille • on attend la clôture 15 min • lien en bio 🎁",
     "🕯 Astuce : une mèche seule ne suffit pas • c'est la CLÔTURE de la bougie 15 min qui décide • lien en bio 🎁",
     "🔵 Astuce : ligne bleue = TP • ligne rouge = SL • le coach te dit quand ça s'approche • lien en bio 🎁",,
-    "🔎 Pour l'analyse complète de BTC, GOLD et NASDAQ, ouvre le lien dans la bio • le LIVE continue ici 🎙"
+    "🔎 Pour l'analyse complète de BTC et GOLD, ouvre le lien dans la bio • le LIVE continue ici 🎙"
   ];
-  EN.push(["Pour l'analyse complète de BTC, GOLD et NASDAQ, ouvre le lien dans la bio", "For the full BTC, GOLD and NASDAQ analysis, open the link in the bio"],
+  EN.push(["Pour l'analyse complète de BTC et GOLD, ouvre le lien dans la bio", "For the full BTC and GOLD analysis, open the link in the bio"],
           ["Tu veux savoir si le feu vert est confirmé ? Ouvre le lien dans la bio pour voir le plan complet.", "Want to know if the green light is confirmed? Open the link in the bio to see the full plan."]);
   // v8.5 (demande d'Adel) : phrases inventées par l'IA gratuite du bot (FR | EN), toujours nouvelles, jamais de prix
   const HAUT_TABLEAU = 3.4;   // hauteur du tableau des unités ≈ 3,4 × la ligne du bas
   // v8.5 (constat d'Adel) : la bande ne dit « ça encaisse / vous êtes rentrés ? » QUE si le bot a vraiment donné la position (Telegram)
   const botPos = {};
-  function cleMarche(t) { const x = String(t || '').match(/BTC|GOLD|XAU|NASDAQ|NAS/i); return x ? x[0].toUpperCase().replace('XAU', 'GOLD').replace(/^NAS$/, 'NASDAQ') : ''; }
+  function cleMarche(t) { const x = String(t || '').match(/BTC|GOLD|XAU/i); return x ? x[0].toUpperCase().replace('XAU', 'GOLD') : ''; }
   function botSuivi(t) {
     const k = cleMarche(t); if (!k) return;
     if (/ENTRE EN POSITION|POSITION ALIGN CONFIRMÉE/i.test(t)) botPos[k] = Date.now();
@@ -573,8 +573,8 @@
   COACH.anim.push('📺 {m} : mets le graphique sur ta télé, ton PC ou ton mobile et patiente 😌 • le coach est avec toi • regarde le spectacle, partage • lien en bio la team 🙏', '🍿 {m} : installe-toi bien, le spectacle continue 🎬 • tapote, commente, partage • les infos avant tout le monde : lien en bio');
   EN.push([' : mets le graphique sur ta télé, ton PC ou ton mobile et patiente 😌 • le coach est avec toi • regarde le spectacle, partage • lien en bio la team 🙏', ': put the chart on your TV, PC or phone and be patient 😌 • the coach is with you • enjoy the show, share • link in bio team 🙏'], [' : installe-toi bien, le spectacle continue 🎬 • tapote, commente, partage • les infos avant tout le monde : lien en bio', ': get comfy, the show goes on 🎬 • tap, comment, share • the info before everyone: link in bio']);
   // v9.0 (demande d'Adel) : le spectateur voit la stratégie un moment, puis on l'invite à changer de marché / d'unité de temps (payant) : jamais de prix
-  COACH.anim.push('🔁 {m} : tu préfères regarder le BTC, le GOLD ou le NASDAQ ? une autre unité de temps ? 👉 connecte-toi : lien en bio 😉', '👀 {m} : regarde bien la stratégie en entier… tu veux un autre marché ou une autre unité de temps ? 🔓 c\'est dans le lien en bio');
-  EN.push([' : tu préfères regarder le BTC, le GOLD ou le NASDAQ ? une autre unité de temps ? 👉 connecte-toi : lien en bio 😉', ': would you rather watch BTC, GOLD or NASDAQ? another timeframe? 👉 log in: link in bio 😉'], [' : regarde bien la stratégie en entier… tu veux un autre marché ou une autre unité de temps ? 🔓 c\'est dans le lien en bio', ': watch the whole strategy… want another market or another timeframe? 🔓 it\'s in the link in bio']);
+  COACH.anim.push('🔁 {m} : tu préfères regarder le BTC ou le GOLD ? une autre unité de temps ? 👉 connecte-toi : lien en bio 😉', '👀 {m} : regarde bien la stratégie en entier… tu veux l\'autre marché ou une autre unité de temps ? 🔓 c\'est dans le lien en bio');
+  EN.push([' : tu préfères regarder le BTC ou le GOLD ? une autre unité de temps ? 👉 connecte-toi : lien en bio 😉', ': would you rather watch BTC or GOLD? another timeframe? 👉 log in: link in bio 😉'], [' : regarde bien la stratégie en entier… tu veux l\'autre marché ou une autre unité de temps ? 🔓 c\'est dans le lien en bio', ': watch the whole strategy… want the other market or another timeframe? 🔓 it\'s in the link in bio']);
   COACH.humour = ["😂 {m} bouge moins que mon prof de maths le lundi matin… mais attention, ça va se réveiller 👀", "🤣 {m} : si tu tapotes pas, je mets la musique encore plus fort 🔊😄", "😎 {m} : moi je bois mon café, le marché prépare son coup… et toi tu fais quoi ? dis-le en commentaire 👇", "🫡 {m} : salut aux nouveaux qui arrivent ! installe-toi, regarde le spectacle, et tapote pour dire bonjour 👋", "🧐 {m} : je vois quelque chose se préparer… mais je le dis qu'à ceux qui sont dans la bio 😏", "💪 {m} : la team est là ? écris « PRÉSENT » en commentaire, je compte 👀"];
   EN.push([" bouge moins que mon prof de maths le lundi matin… mais attention, ça va se réveiller 👀", " moves less than my maths teacher on Monday morning… but careful, it's about to wake up 👀"], [" : si tu tapotes pas, je mets la musique encore plus fort 🔊😄", " if you don't tap, I turn the music up even louder 🔊😄"], [" : moi je bois mon café, le marché prépare son coup… et toi tu fais quoi ? dis-le en commentaire 👇", " I'm sipping my coffee, the market is plotting… what are you doing? tell me in the comments 👇"], [" : salut aux nouveaux qui arrivent ! installe-toi, regarde le spectacle, et tapote pour dire bonjour 👋", " hi to the newcomers! sit back, enjoy the show, and tap to say hello 👋"], [" : je vois quelque chose se préparer… mais je le dis qu'à ceux qui sont dans la bio 😏", " I can see something brewing… but I only tell those in the bio 😏"], [" : la team est là ? écris « PRÉSENT » en commentaire, je compte 👀", " is the team here? write « PRESENT » in the comments, I'm counting 👀"]);
   // v9.2 (demande d'Adel) : un vrai animateur qui prend le temps de parler aux abonnés quand le marché hésite
@@ -610,7 +610,7 @@
         iaPool = propres(donnees);
       } else if (donnees && typeof donnees === 'object') {
         iaPools = {};
-        ['BTC', 'GOLD', 'NASDAQ'].forEach(m => { iaPools[m] = propres(donnees[m]); });
+        ['BTC', 'GOLD'].forEach(m => { iaPools[m] = propres(donnees[m]); });
         iaPool = iaPools[codeMarche()] || [];
       } else return;
       iaN = 0;
@@ -926,7 +926,7 @@
 
   function nomMarche() {
     const s = String((chart() && chart().symbol()) || '');
-    return /BTC/i.test(s) ? '🟠 BTC' : /XAU|GOLD/i.test(s) ? '🥇 GOLD' : /NAS|NQ|US100/i.test(s) ? '🟣 NASDAQ' : '📊 ' + s.split(':').pop();
+    return /BTC/i.test(s) ? '🟠 BTC' : /XAU|GOLD/i.test(s) ? '🥇 GOLD' : '📊 ' + s.split(':').pop();
   }
   function barres(n) {
     try {
@@ -1116,7 +1116,7 @@
     dernierShow = Date.now(); montrer(txt, false, 1, undefined, false, source); return true;
   }
   // v5.9 : chaque événement vu à l'écran part aussi au bot → message détaillé dans la chaîne Telegram du marché
-  function codeMarche() { const s = String((chart() && chart().symbol()) || ''); return /BTC/i.test(s) ? 'BTC' : /XAU|GOLD/i.test(s) ? 'GOLD' : /NAS|NQ|US100/i.test(s) ? 'NASDAQ' : ''; }
+  function codeMarche() { const s = String((chart() && chart().symbol()) || ''); return /BTC/i.test(s) ? 'BTC' : /XAU|GOLD/i.test(s) ? 'GOLD' : ''; }
   function versBot(typ, d, minutes, ligne) {
     const mk = codeMarche(); if (!mk) return;
     envoyerEcran(['EVT', mk, typ, d, minutes || '', ligne || ''].join('|'));
