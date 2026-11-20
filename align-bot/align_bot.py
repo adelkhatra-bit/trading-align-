@@ -3341,7 +3341,7 @@ def _telegram_sortant_autorise(methode, params):
     chaines.discard("")
     if cid and cid in chaines and methode in ("sendMessage", "sendPhoto") and _telegram_position_attendue(texte):
         return True
-    print(f"TELEGRAM_PULL_BLOCK method={methode} chat={cid or '-'}", flush=True)
+    print(f"TELEGRAM_PULL_BLOCK method={methode}", flush=True)
     return False
 
 
