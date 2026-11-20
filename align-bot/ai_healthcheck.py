@@ -24,7 +24,7 @@ def write_summary(status, provider, attempts):
     output = os.environ.get("GITHUB_OUTPUT")
     if output:
         with open(output, "a", encoding="utf-8") as f:
-            f.write(f"provider={provider or ''}\\n")
+            f.write(f"provider={provider or ''}\n")
 
 messages = [
     {"role": "system", "content": align_bot.IA_REGLES},
