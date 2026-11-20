@@ -29,7 +29,7 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         auto_trade = (Path(__file__).parent / "auto_trade.py").read_text(encoding="utf-8")
         topstep = (Path(__file__).parent / "topstep_trade.py").read_text(encoding="utf-8")
         self.assertNotIn('"NASDAQ":', auto_trade)
-        self.assertNotIn('"NASDAQ":', topstep)
+        self.assertEqual(topstep.split("SYMBOLES =", 1)[1].split("\\n", 1)[0], '{ "GOLD": "MGC", "BTC": "MBT"}')
         self.assertIn('if m not in SYMBOLES:', auto_trade)
         self.assertIn('if m not in SYMBOLES:', topstep)
 
