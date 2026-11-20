@@ -3,11 +3,11 @@ import hashlib
 import unittest
 
 PINE = Path(__file__).parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
-BASELINE_GIT_BLOB_SHA = "35d3bd3ba5a7ddb48f469184e602ab96c424aa59"  # v25 : ancienne base b49cb3ff… + suppression demandée par Adel du point ENTRÉE (ligne + étiquette) ; rien d'autre ne change
+BASELINE_GIT_BLOB_SHA = "TO_BE_RECALCULATED"  # v25 : ancienne base b49cb3ff… + suppression demandée par Adel du point ENTRÉE (ligne + étiquette) ; rien d'autre ne change
 SETTINGS_BLOCK = """// ═════════ BRIDGE ALIGN (optionnel, sans modification visuelle) ═════════
 grpBridge = "Bridge ALIGN (optionnel)"
 bridgeEnabled = input.bool(false, "Envoyer les snapshots au ROBOT V12", group=grpBridge)
-bridgeMarket = input.string("BTCUSD", "Marché ALIGN", options=["BTCUSD", "XAUUSD", "NAS100"], group=grpBridge)
+bridgeMarket = input.string("BTCUSD", "Marché ALIGN", options=["BTCUSD", "XAUUSD"], group=grpBridge)
 
 """
 EXPORT_MARKER = "// ═════════ BRIDGE ALIGN — export structuré du Pine v25 (sans toucher aux signaux/visuels) ═════════"
@@ -57,7 +57,7 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
 
     def test_robot_v12_exports_closed_mtf_directions_for_entry_confirmation(self):
         self.assertIn(
-            "bridgeClosedMtfOk = isGoldNasdaq ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan)",
+            "bridgeClosedMtfOk = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan)",
             self.source,
         )
         self.assertIn(
