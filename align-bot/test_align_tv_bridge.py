@@ -254,7 +254,7 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertFalse(data["ok"])
         self.assertFalse(data["activeTimeframeFresh"])
 
-    def test_rejects_stale_m5_h1_d1_and_w1_bars_even_in_a_recent_payload(self):
+    def test_stale_mtf_bars_are_preserved_but_block_bridge_signals(self):
         for tf in ("M5", "H1", "D1", "W1"):
             with self.subTest(timeframe=tf):
                 payload = valid_payload()
@@ -262,9 +262,12 @@ class BridgeStoreTests(unittest.TestCase):
                     BASE_MS - TIMEFRAME_MS[tf] - MTF_BAR_GRACE_MS - 1
                 )
                 status, result = self.store.ingest(payload, INGEST, BASE_MS)
-                self.assertEqual(status, 400)
-                self.assertEqual(result["error"], "stale_mtf_bar")
-                self.assertEqual(result["timeframe"], tf)
+                self.assertEqual(status, 200, result)
+                self.assertTrue(result["accepted"])
+                _, data = self.store.read("BTCUSD", BASE_MS)
+                self.assertFalse(data["ok"])
+                self.assertFalse(data["snapshots"][tf]["fresh"])
+                self.assertEqual(data["snapshots"][tf]["barTime"], payload["mtf"][tf]["bar_time"])
 
     def test_accepts_h1_bar_near_its_expected_close(self):
         payload = valid_payload()
