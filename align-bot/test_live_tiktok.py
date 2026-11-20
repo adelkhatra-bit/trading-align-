@@ -233,8 +233,8 @@ class LiveTikTok(unittest.TestCase):
         self.etat["live_on"] = True
         kb = json.loads(ab.clavier_live(self.etat, "2"))["inline_keyboard"]
         # 1re ligne = parcours d'Adel (choix du marché → coach → prochaine position) ; « prendre la main » reste en 4e ligne.
-        self.assertEqual([b["callback_data"] for b in kb[0]], ["livemkt:BTC", "livemkt:GOLD", "livemkt:NASDAQ"])
-        self.assertEqual([b["text"] for b in kb[3]], ["🟠 BTC", "🥇 Gold", "💠 NASDAQ"])
+        self.assertEqual([b["callback_data"] for b in kb[0]], ["livemkt:BTC", "livemkt:GOLD"])
+        self.assertEqual([b["text"] for b in kb[3]], ["🟠 BTC", "🥇 Gold"])
         self.assertIn("capture", ab.texte_live(self.etat))
 
     def test_paiement_refuse_si_live_eteint(self):
@@ -299,7 +299,7 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("analysechoice:BOTH", actions)
         self.assertIn("searchpos:BOTH", actions)
         self.assertIn("marketsmenu:x", actions)
-        for market in ("BTC", "GOLD", "NASDAQ"):
+        for market in ("BTC", "GOLD"):
             self.assertIn(f"coachlive:{market}", actions)
 
     def test_live_script_has_click_to_enable_voice_and_cleans_it_up(self):
@@ -1010,15 +1010,14 @@ class LiveMarketNarrationFallback(unittest.TestCase):
         }}
         raw = ab.commentaires_live_de_secours(data)
         parsed = ab.phrases_bande_par_marche(raw)
-        self.assertEqual(set(parsed), {"BTC", "GOLD", "NASDAQ"})
+        self.assertEqual(set(parsed), {"BTC", "GOLD"})
         self.assertTrue(all(len(parsed[m]) == 2 for m in parsed))
         self.assertTrue(all(8 <= len(fr) <= 140 and 8 <= len(en) <= 140 for pairs in parsed.values() for fr, en in pairs))
         self.assertIn("volume Kraken accélère", parsed["BTC"][1][0])
         self.assertIn("confirment la hausse", parsed["BTC"][0][0])
         self.assertIn("zone profonde", parsed["BTC"][1][0])
         self.assertIn("volume proxy reste discret", parsed["GOLD"][1][0])
-        self.assertIn("confirm the decline", parsed["NASDAQ"][0][1])
-        self.assertIn("volume is unavailable", parsed["NASDAQ"][1][1])
+        self.assertNotIn("NASDAQ", parsed)
 
     def test_fallback_never_invents_market_without_data(self):
         self.assertEqual(ab.commentaires_live_de_secours({"marches": {}}), "")
@@ -1046,7 +1045,7 @@ class LiveMarketPartialAiCoverage(unittest.TestCase):
             self.assertTrue(ab.live_phrases_ia(state, 1000, {}))
         self.assertEqual(len(published), 1)
         payload = json.loads(published[0][3:])
-        self.assertEqual(set(payload), {"BTC", "GOLD", "NASDAQ"})
+        self.assertEqual(set(payload), {"BTC", "GOLD"})
         self.assertTrue(all(len(payload[m]) == 2 for m in payload))
         self.assertIn("biais reste baissier", payload["GOLD"][0][0].lower())
 
@@ -1102,16 +1101,16 @@ class LiveClosedCandleContext(unittest.TestCase):
 class LiveNarrationPrioritizesM5M15Conflict(unittest.TestCase):
     def test_conflicting_closed_timeframe_sweeps_override_generic_ai(self):
         data = {"marches": {
-            "NASDAQ": {
+            "GOLD": {
                 "biais_plan": "neutre",
                 "confirmation_4h_1h": "non alignées",
                 "surveillance_retournement": {"direction": 0, "conflit": True, "timeframe": "M5/M15"}
             }
         }}
         ai = (
-            "NASDAQ | Le marché consolide dans sa zone technique et attend une clôture plus claire. | "
+            "GOLD | Le marché consolide dans sa zone technique et attend une clôture plus claire. | "
             "The market is consolidating in its technical area and awaits a clearer close.\n"
-            "NASDAQ | Le rythme ralentit avant la prochaine impulsion et la structure reste à surveiller. | "
+            "GOLD | Le rythme ralentit avant la prochaine impulsion et la structure reste à surveiller. | "
             "Momentum is slowing before the next impulse and structure remains in focus."
         )
         published = []
@@ -1124,8 +1123,7 @@ class LiveNarrationPrioritizesM5M15Conflict(unittest.TestCase):
         ):
             self.assertTrue(ab.live_phrases_ia({}, 1000, {}))
         payload = json.loads(published[0][3:])
-        self.assertIn("unités courtes et de référence divergent", payload["NASDAQ"][1][0])
-        self.assertIn("timeframes disagree", payload["NASDAQ"][1][1])
+        self.assertNotIn("NASDAQ", payload)
 
 
 class VoixNaturelleSeulementV1228(unittest.TestCase):
