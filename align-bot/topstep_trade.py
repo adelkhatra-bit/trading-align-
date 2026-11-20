@@ -22,7 +22,7 @@ PERTE_POSITION_MAX = 75.0      # demande d'Adel : 70-80 $ par position
 PERTE_JOUR_MAX = 150.0
 MARGE_PLANCHER = 100.0
 SL_ELARGI = 1.25
-SYMBOLES = {"NASDAQ": "MNQ", "GOLD": "MGC", "BTC": "MBT"}   # mêmes marchés que le graphique TradingView
+SYMBOLES = {"GOLD": "MGC", "BTC": "MBT"}   # marchés ALIGN actifs : GOLD + BTC
 
 REEL = os.environ.get("TOPSTEP_REEL", "0") == "1"
 COMPTE = os.environ.get("TOPSTEP_COMPTE", "")                 # id du compte à trader (ex. 29250754)
@@ -107,6 +107,8 @@ def garde_fou(etat, solde):
 
 
 def contrat(jeton, m):
+    if m not in SYMBOLES:
+        return None
     cs = _api("/Contract/search", {"live": False, "searchText": SYMBOLES[m]}, jeton).get("contracts") or []
     return next((c for c in cs if c.get("activeContract", True)), cs[0] if cs else None)
 
@@ -114,6 +116,8 @@ def contrat(jeton, m):
 def executer(etat, signal, journal=print):
     """signal = {marche, sens, e, sl, tp}. Une position = 1 micro-contrat avec SL et TP posés tout de suite."""
     m = signal["marche"]
+    if m not in SYMBOLES:
+        return {"ok": False, "raison": "marché désactivé dans ALIGN"}
     if m not in {k for k, v in (etat.get("auto_marches") or {}).items() if v}:
         return {"ok": False, "raison": f"{m} éteint dans l'admin"}
     if phase() != "ouvert":
