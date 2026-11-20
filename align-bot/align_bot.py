@@ -28,6 +28,7 @@ TELEGRAM_PULL_CONTEXT = threading.local()
 TELEGRAM_LIVRES = [0]   # messages réellement acceptés par Telegram (compteur du journal)
 TELEGRAM_PULL_MODE = False  # activé par main(); les tests unitaires du wrapper restent isolés par défaut
 MARCHES = {"BTC": "XBTUSD", "GOLD": "XAUUSD"}  # Périmètre opérationnel ALIGN : BTC + GOLD uniquement
+MARCHES_HISTORIQUES = (*MARCHES, "NASDAQ")  # Conservé uniquement pour nettoyer/terminer les suivis d'anciennes positions
 MIN_ALIGN, MIN_SQZ, MARGE_ATR, GAIN_MIN = 8, 4, 0.5, 1.5   # = réglages par défaut de l'indicateur ALIGN MTF PRO v24
 # Décision trader : gain/risque minimum 1:2 pour AUTORISER une entrée (sinon ATTENTE). GAIN_MIN reste celui de l'indicateur (parité Pine).
 RR_MIN_ENTREE = 2.0
@@ -5251,14 +5252,14 @@ def stats_bot(etat, cid):
     return etat.setdefault("stats_bot", {}).setdefault(cid, {"arrets": 0, "auto": 0})
 
 def en_position(etat, cid):
-    return [m for m in MARCHES if isinstance(((etat.get(m) or {}).get("trade") or {}).get("qui", {}).get(str(cid)), dict)
+    return [m for m in MARCHES_HISTORIQUES if isinstance(((etat.get(m) or {}).get("trade") or {}).get("qui", {}).get(str(cid)), dict)
             and not etat[m]["trade"]["qui"][str(cid)].get("fini")]
 
 
 def retirer_suivi_positions(etat, cid):
-    """Retire uniquement cet utilisateur des suivis de positions encore ouvertes."""
+    """Retire uniquement cet utilisateur des suivis de positions encore ouvertes, y compris les positions historiques NASDAQ."""
     cid = str(cid)
-    for marche in MARCHES:
+    for marche in MARCHES_HISTORIQUES:
         trade = (etat.get(marche) or {}).get("trade")
         abonnes = trade.get("qui") if isinstance(trade, dict) else None
         if isinstance(abonnes, dict):
