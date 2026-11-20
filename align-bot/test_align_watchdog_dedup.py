@@ -1,3 +1,4 @@
+import datetime as dt
 import os
 import unittest
 from unittest.mock import patch
@@ -363,7 +364,7 @@ class WatchdogStaleRuntimeThresholdTests(unittest.TestCase):
     def test_bot_at_expected_350_min_runtime_is_not_reported_as_stale(self):
         runs = {"workflow_runs": [self._bot_run(350)]}
         with (
-            patch.object(watchdog.dt.datetime, "now", self.FixedNow.now),
+            patch.object(watchdog.dt, "datetime", self.FixedNow),
             patch.object(watchdog, "api", side_effect=[runs, [], []]),
             patch.object(watchdog, "report") as report,
         ):
