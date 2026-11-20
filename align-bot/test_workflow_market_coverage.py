@@ -36,6 +36,24 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.assertIn('if m not in SYMBOLES:', auto_trade)
         self.assertIn('if m not in SYMBOLES:', topstep)
 
+    def test_active_metaapi_and_public_market_channels_are_btc_gold_only(self):
+        bot = self.bot
+        metaapi = (Path(__file__).parent / "metaapi_check.py").read_text(encoding="utf-8")
+        self.assertIn('for m, pair in MARCHES.items()', bot)
+        self.assertIn('MARCHES_HISTORIQUES = (*MARCHES, "NASDAQ")', bot)
+        self.assertIn('LIENS_CHAINES = {"BTC":', bot)
+        self.assertNotIn('"NASDAQ": "https://t.me/', bot)
+        self.assertNotIn('"NASDAQ": "🎙', bot)
+        self.assertIn('for m in ("BTC", "GOLD")', metaapi)
+        self.assertNotIn('"NASDAQ"', metaapi)
+
+    def test_news_ai_scope_is_btc_and_gold_only(self):
+        start = self.bot.index("def news_urgentes(")
+        end = self.bot.index("\ndef ", start + 5)
+        block = self.bot[start:end]
+        self.assertIn("BTC / Gold", block)
+        self.assertNotIn("NASDAQ", block)
+
     def test_bridge_requires_fresh_m5_m15_h1_h4_daily_and_weekly(self):
         for timeframe in ("M5", "M15", "H1", "H4", "D1", "W1"):
             self.assertIn(f'"{timeframe}"', self.workflow)
