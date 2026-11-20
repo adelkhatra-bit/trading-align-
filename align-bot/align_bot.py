@@ -6259,6 +6259,8 @@ def envoyer_analyse(cid, etat=None, mq=None):
 
 def prix_actuel(m):
     """Dernier prix utilisable pour figer une entrée/sortie, dans la même échelle que les bougies du marché."""
+    if m not in MARCHES:
+        return None
     try:
         symbole = MARCHES[m]
         if symbole == "XAUUSD":
@@ -6693,6 +6695,8 @@ def cle_audit_trade(m, tr):
 
 def capturer_snapshot_audit(etat, m, r, cle, messages=None):
     """Journal forensique horodaté : décision, raisons de blocage, bougies et état Pine par UT."""
+    if m not in MARCHES:
+        return
     try:
         decision_ts = int(r.get("decision_ts") or time.time())
         m5 = r.get("b5") or []
