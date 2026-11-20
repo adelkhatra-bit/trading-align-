@@ -37,6 +37,7 @@ TRANSIENT_PATTERNS = (
     r"rate limit exceeded",
 )
 BOT_WORKFLOW = "ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)"
+BOT_STALE_THRESHOLD_MINUTES = 370  # runtime nominal 350 min + marge, workflow timeout 355 min
 
 
 def api(path: str, method: str = "GET", payload: dict | None = None):
@@ -366,7 +367,7 @@ def inspect_stale_runs() -> None:
         if name == "ALIGN Workflow Watchdog":
             continue
         age_minutes = (now - parse_time(run["created_at"])).total_seconds() / 60
-        threshold = 350 if name == BOT_WORKFLOW else 20
+        threshold = BOT_STALE_THRESHOLD_MINUTES if name == BOT_WORKFLOW else 20
         if age_minutes >= threshold:
             report(
                 run,
