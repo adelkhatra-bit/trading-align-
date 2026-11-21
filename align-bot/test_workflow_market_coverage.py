@@ -46,7 +46,7 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         bot = self.bot
         metaapi = (Path(__file__).parent / "metaapi_check.py").read_text(encoding="utf-8")
         self.assertIn('MARCHES = {"BTC": "XBTUSD", "GOLD": "XAUUSD"}', bot)
-        self.assertIn('MARCHES_HISTORIQUES = (*MARCHES, "NASDAQ")', bot)
+        self.assertIn("MARCHES_HISTORIQUES = tuple(MARCHES)", bot)
         self.assertIn('for nom_marche, pair in MARCHES.items():', bot)
         self.assertIn('for marche in MARCHES:', bot)
         self.assertIn('LIENS_CHAINES = {"BTC":', bot)
