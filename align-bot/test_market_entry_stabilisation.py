@@ -29,11 +29,9 @@ class MarketEntryStabilisationTests(unittest.TestCase):
         self.assertIn("réouverture CME", reason)
         self.assertIn("15 min", reason)
 
-    def test_nasdaq_cash_open_has_a_minimum_wait_before_any_new_entry(self):
+    def test_retired_nasdaq_has_no_entry_session_or_signal(self):
         now = datetime.datetime(2026, 11, 16, 9, 35, tzinfo=ZoneInfo("America/New_York")).timestamp()
-        reason = align_bot.pause_entree_marche("NASDAQ", {"b5": []}, {}, now)
-        self.assertIn("ouverture de New York", reason)
-        self.assertIn("20 min", reason)
+        self.assertIsNone(align_bot.pause_entree_marche("NASDAQ", {"b5": []}, {}, now))
 
     def test_btc_is_not_blocked_by_gold_or_nasdaq_session_open(self):
         now = datetime.datetime(2026, 11, 16, 9, 35, tzinfo=ZoneInfo("America/New_York")).timestamp()
