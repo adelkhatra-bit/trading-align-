@@ -80,6 +80,8 @@ class MigrationMarchesBtcGoldOnlyTest(unittest.TestCase):
             "canaux_marche": {"NASDAQ": "-1009", "BTC": "-1001"},
             "liens_marche": {"NASDAQ": "https://t.me/old_nasdaq", "GOLD": "https://t.me/gold"},
             "veille_cloture": {"NASDAQ": {"43": {"expire": 9999999999}}},
+            "canal_live": {"NASDAQ": {"message_id": 100}, "GOLD": {"message_id": 200}},
+            "pause_auto": {"NASDAQ": 9999999999, "GOLD": 0},
         }
 
         self.assertTrue(ab.migrer_scope_marches_btc_gold_only(etat))
@@ -90,7 +92,7 @@ class MigrationMarchesBtcGoldOnlyTest(unittest.TestCase):
         self.assertEqual(etat["archives_marches_retirees"]["NASDAQ"][0]["state"]["trade"], legacy_trade)
         self.assertTrue(etat["archives_marches_retirees"]["NASDAQ"][0]["open_trade"])
         self.assertEqual(etat["marches_par_chat"], {"42": ["GOLD"], "43": [], "44": "BOTH"})
-        for key in ("auto", "auto_marches", "coach_live", "canaux_marche", "liens_marche", "veille_cloture"):
+        for key in ("auto", "auto_marches", "coach_live", "canaux_marche", "canal_live", "liens_marche", "veille_cloture", "pause_auto"):
             self.assertNotIn("NASDAQ", etat.get(key, {}))
         self.assertEqual(ab.marches_choisis(etat, "43"), set())
         self.assertEqual(ab.marches_choisis(etat, "44"), {"BTC", "GOLD"})
