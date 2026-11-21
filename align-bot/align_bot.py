@@ -525,7 +525,7 @@ def directions_cloturees(series):
 
 def donnees_mtf_fraiches(m, r, now_ts=None):
     """Refuse une entrée si le marché n'est pas actif ou si les données GOLD sont périmées."""
-    if m not in MARCHES:
+    if m is not None and m not in MARCHES:
         return False
     if m != "GOLD":
         return True
@@ -547,7 +547,7 @@ def donnees_mtf_fraiches(m, r, now_ts=None):
 
 def direction_confirmee_marche(m, dirs, d, contexte=None, now_ts=None):
     """Filtre d'entrée : GOLD exige quatre clôtures concordantes, un prix live frais et aucun déplacement marqué contre le sens."""
-    if m not in MARCHES:
+    if m is not None and m not in MARCHES:
         return 0
     if d not in (1, -1):
         return 0
@@ -595,7 +595,7 @@ def direction_confirmee_marche(m, dirs, d, contexte=None, now_ts=None):
 
 def direction_plan_autorisee(m, d, dirs, contexte=None):
     """Le plan affiché suit les garde-fous des marchés actifs."""
-    if m not in MARCHES:
+    if m is not None and m not in MARCHES:
         return 0
     if m == "GOLD":
         return d if direction_confirmee_marche(m, dirs, d, contexte) == d else 0
@@ -1336,6 +1336,10 @@ def directions_pour_strategie(r):
 def profil_strategie(r):
     """Classe le setup ; GOLD utilisent exclusivement les quatre dernières clôtures MTF."""
     market = r.get("market")
+    if market is not None and market not in MARCHES:
+        return {"mode": "ATTENTE", "direction": 0, "horizon": "aucune position sur un marché retiré",
+                "contexte": "Marché retiré — seuls BTC et GOLD sont actifs",
+                "m5_aligne": False, "contre_tendance": False, "statut": "MARCHÉ RETIRÉ"}
     D = directions_pour_strategie(r)
     if market == "GOLD":
         indices_mtf = (2, 4, 7, 9)  # M5, M15, H1, H4
@@ -1557,6 +1561,8 @@ def strategie_alignement(dirs, d, dW=0, market=None):
     SWING : W1/D1 contexte, H4 retracement ou aligné, H1 confirmation.
     DAY : H4 contexte, H1 direction, M15 retracement, M5 déclenchement.
     SCALPING : H1 contexte, M15 direction, M5 structure, M1 déclenchement."""
+    if market is not None and market not in MARCHES:
+        return "", "EN ATTENTE", "Marché retiré — seuls BTC et GOLD sont actifs"
     if not d:
         return "", "AUCUNE", "Pas de direction exploitable"
     D = list(dirs or []) + [0] * 11
@@ -1712,6 +1718,9 @@ def lecture_unite_active(r):
 
 def strategie_mtf(r):
     """H4/H1 = fond, M15 = préparation, M5 = timing ; profil scalp/intraday/swing explicite."""
+    market = r.get("market")
+    if market is not None and market not in MARCHES:
+        return ["⛔ Marché retiré — seuls BTC et GOLD sont disponibles."]
     fl = lambda x: "🟢⬆️" if x == 1 else "🔴⬇️" if x == -1 else "🟠➖"
     D = directions_pour_strategie(r)
     d5, d15, d1h, d4h, dD = D[2], D[4], D[7], D[9], D[10]
@@ -1751,6 +1760,8 @@ def strategie_mtf(r):
 def bloque_dw(r, d, prix=None):
     """Daily / Weekly : pas de short tout en bas, pas de long tout en haut.
     Avec « prix » : on juge le point d'entrée du repli (acheter plus bas n'est plus « tout en haut »)."""
+    if r.get("market") is not None and r.get("market") not in MARCHES:
+        return True
     if prix is None:
         posD, posW = r["posD"], r["posW"]
     else:
@@ -8242,6 +8253,7 @@ def radar_entree_sl(r, d, za=None, zb=None):
 def texte_radar(props, derniers, vip=True, anglais=False, now=None, intro=None):
     """Texte du RADAR, construit uniquement à partir des vraies données (classer_marches + plan figé de l'indicateur).
     Gratuit : marché favori, sens et état — jamais l'entrée, le SL ni le TP (réservés aux VIP)."""
+    props = [p for p in (props or []) if isinstance(p, dict) and p.get("m") in MARCHES]
     if not props:
         return None
     now = time.time() if now is None else now
@@ -11783,6 +11795,8 @@ MOTS_DISCOURS = ("Speaks", "Speech", "Powell", "Testifies", "Press Conference", 
 
 def progression_fibonacci_live(r, market=None):
     """Lecture Fibonacci interne du commentateur : bougies déjà chargées, aucune requête réseau ni affichage graphique."""
+    if market is not None and market not in MARCHES:
+        return {}
     prix = (r.get("m1") or [{}])[-1].get("c") or r.get("prix")
     if prix is None:
         return {}
