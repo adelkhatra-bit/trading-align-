@@ -287,6 +287,28 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertFalse(data["ok"])
         self.assertFalse(data["activeTimeframeFresh"])
 
+    def test_closed_m5_m15_bars_allow_webhook_delivery_delay_but_not_old_data(self):
+        # TradingView sends the last CLOSED lower-timeframe bar on a higher chart.
+        # The webhook may arrive up to 60 s later and the mailbox relay polls every 10 s.
+        payload = valid_payload()
+        for tf in ("M5", "M15"):
+            payload["mtf"][tf]["bar_time"] = BASE_MS - TIMEFRAME_MS[tf] - 80_000
+
+        status, result = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 200, result)
+        self.assertTrue(result["accepted"])
+
+        _, fresh = self.store.read("BTCUSD", BASE_MS)
+        self.assertTrue(fresh["snapshots"]["M5"]["fresh"])
+        self.assertTrue(fresh["snapshots"]["M15"]["fresh"])
+        self.assertTrue(fresh["ok"])
+
+        # Once the same closed bars exceed the 90 s delivery window, they are stale.
+        _, expired = self.store.read("BTCUSD", BASE_MS + 11_000)
+        self.assertFalse(expired["snapshots"]["M5"]["fresh"])
+        self.assertFalse(expired["snapshots"]["M15"]["fresh"])
+        self.assertFalse(expired["ok"])
+
     def test_stale_mtf_bars_are_preserved_but_block_bridge_signals(self):
         for tf in ("M5", "H1", "D1", "W1"):
             with self.subTest(timeframe=tf):

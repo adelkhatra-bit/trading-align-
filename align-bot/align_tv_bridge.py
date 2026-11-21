@@ -52,7 +52,9 @@ TIMEFRAME_MS = {
 # BTCUSD à 14:54:00, 14:55:00, 14:56:00…). Avec 30 s, chaque marché était périmé la moitié du temps
 # (bot « mode sans signal » ~50 %). 90 s = 60 s d'alerte + 10 s de relais + marge. Décision d'Adel du 19/11.
 ACTIVE_MAX_AGE_MS = 90_000
-MTF_BAR_GRACE_MS = 30_000
+# Pine publishes the last closed lower-timeframe candle when the chart is higher. TradingView webhooks can be throttled to ~60 s and the mailbox relay polls every 10 s; allow up to 90 s after that candle closes, without refreshing its bar timestamp.
+MTF_BAR_GRACE_MS = 90_000
+ENTRY_BAR_GRACE_MS = 30_000
 MAX_FUTURE_SKEW_MS = 5_000
 MAX_BODY_BYTES = 32_768
 TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
@@ -299,7 +301,7 @@ class BridgeStore:
             entry_bar_age = now_ms - entry_bar_time
             # Le Pine envoie l'heure d'OUVERTURE de la dernière bougie CLÔTURÉE (time[1]) :
             # son âge va donc jusqu'à 2 UT (18/11 : SWING H1 refusé à 1 h 35 alors que valide).
-            if entry_bar_age < -MAX_FUTURE_SKEW_MS or entry_bar_age > 2 * entry_tf_ms + MTF_BAR_GRACE_MS:
+            if entry_bar_age < -MAX_FUTURE_SKEW_MS or entry_bar_age > 2 * entry_tf_ms + ENTRY_BAR_GRACE_MS:
                 return 400, {"ok": False, "error": "stale_or_future_entry_trigger_candle"}
             if not (entry_bar_low <= min(entry_bar_open, entry_bar_close) <= max(entry_bar_open, entry_bar_close) <= entry_bar_high):
                 return 400, {"ok": False, "error": "invalid_entry_trigger_ohlc"}
