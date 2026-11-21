@@ -148,9 +148,10 @@ jobs:
           retention-days: 1
 
       - name: Vérifier la connexion à Telegram sans envoyer de message
-        # Un simple délai réseau (read timeout sur getMe, vu aux runs 732-736) ne doit JAMAIS tuer le worker :
-        # 3 essais espacés de 15 s (timeout 60 s) ; si Telegram ne répond toujours pas → avertissement seulement,
-        # le bot a ses propres reprises réseau. Seul un secret absent ou un refus explicite de l'API reste bloquant.
+        # Préflight fail-closed : après 3 essais espacés de 15 s (timeout 60 s),
+        # toute API Telegram non vérifiée bloque le worker. Ne pas démarrer en polling
+        # si getMe/getWebhookInfo échoue ou si un webhook ne peut pas être retiré et revérifié.
+        # Aucun message utilisateur n'est envoyé par ce contrôle.
         working-directory: align-bot
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
