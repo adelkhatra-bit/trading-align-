@@ -33,6 +33,10 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.assertIn('"GOLD et BTC", "GOLD and BTC"', self.bot)
         self.assertNotIn('"GOLD et BTC", "NASDAQ, GOLD and BTC"', self.bot)
 
+    def test_worker_cycle_exception_emits_bounded_traceback(self):
+        self.assertIn("traceback.print_exc(limit=8)", self.bot)
+        self.assertIn('print("tour", ex, flush=True)', self.bot)
+
     def test_worker_rollover_recognizes_both_legacy_and_renamed_worker(self):
         self.assertIn("if run.get(\"name\") in {", self.rollover)
         self.assertIn("ALIGN MTF BOT (signaux BTC + Gold Telegram)", self.rollover)
