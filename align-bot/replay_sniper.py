@@ -16,6 +16,9 @@ p.add_argument("--marche", default="GOLD")
 p.add_argument("--heures", type=float, default=8)
 p.add_argument("--fenetre", action="store_true", help="imprime aussi les bougies M1/M3 (journal très long)")
 a = p.parse_args()
+MARCHE_PAIRS = {"GOLD": "XAUUSD", "BTC": "XBTUSD"}
+if a.marche not in MARCHE_PAIRS or a.pair != MARCHE_PAIRS[a.marche]:
+    p.error("--marche et --pair doivent correspondre à BTC/XBTUSD ou GOLD/XAUUSD")
 S = dict(m1=ab.bougies(a.pair, 1), m5=ab.bougies(a.pair, 5), m15=ab.bougies(a.pair, 15), m30=ab.bougies(a.pair, 30), h1=ab.bougies(a.pair, 60),
          h4=ab.bougies(a.pair, 240), d1=ab.bougies(a.pair, 1440), w1=ab.bougies(a.pair, 10080))
 fin = S["m1"][-1]["t"]
