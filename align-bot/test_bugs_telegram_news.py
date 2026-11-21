@@ -9,6 +9,55 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import align_bot as ab
 
 
+class TelegramPullAuthorization(unittest.TestCase):
+    def setUp(self):
+        self.old_mode = ab.TELEGRAM_PULL_MODE
+        self.old_chat = getattr(ab.TELEGRAM_PULL_CONTEXT, "chat_id", None)
+        self.old_private = getattr(ab.TELEGRAM_PULL_CONTEXT, "private", False)
+        self.old_state = ab.DERNIER_ETAT
+        ab.TELEGRAM_PULL_MODE = True
+        ab.DERNIER_ETAT = None
+
+    def tearDown(self):
+        ab.TELEGRAM_PULL_MODE = self.old_mode
+        ab.TELEGRAM_PULL_CONTEXT.chat_id = self.old_chat
+        ab.TELEGRAM_PULL_CONTEXT.private = self.old_private
+        ab.DERNIER_ETAT = self.old_state
+
+    def test_private_reply_allowed_only_for_requesting_chat(self):
+        ab.TELEGRAM_PULL_CONTEXT.chat_id = "42"
+        ab.TELEGRAM_PULL_CONTEXT.private = True
+        self.assertTrue(ab._telegram_sortant_autorise(
+            "sendMessage", {"chat_id": "42", "text": "Réponse à ta demande"}
+        ))
+        self.assertFalse(ab._telegram_sortant_autorise(
+            "sendMessage", {"chat_id": "43", "text": "Réponse à ta demande"}
+        ))
+
+    def test_unsolicited_status_message_remains_blocked(self):
+        ab.TELEGRAM_PULL_CONTEXT.chat_id = None
+        ab.TELEGRAM_PULL_CONTEXT.private = False
+        self.assertFalse(ab._telegram_sortant_autorise(
+            "sendMessage", {"chat_id": "42", "text": "Statut du marché"}
+        ))
+
+
+    def test_validated_entry_only_reaches_requested_user_and_configured_market_channel(self):
+        ab.TELEGRAM_PULL_CONTEXT.chat_id = None
+        ab.TELEGRAM_PULL_CONTEXT.private = False
+        state = {
+            "recherche_positions_active": ["42"],
+            "canaux_marche": {"BTC": "-100123"},
+        }
+        entry = "J'ENTRE MAINTENANT — BTC"
+        with mock.patch.object(ab, "DERNIER_ETAT", state):
+            self.assertTrue(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "42", "text": entry}))
+            self.assertTrue(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "-100123", "text": entry}))
+            self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "43", "text": entry}))
+            self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "-100999", "text": entry}))
+            self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "-100123", "text": "Point de marché BTC"}))
+
+
 class FileTelegram(unittest.TestCase):
     def item(self, prive):
         return {"key": "k", "chat_id": "42", "method": "sendMessage", "prive": prive,

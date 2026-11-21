@@ -63,12 +63,9 @@ class RetournementParMarche(unittest.TestCase):
         msg = ab.retournement_marche("BTC", r, {})
         self.assertIn("le 1h a suivi", msg)
 
-    def test_nasdaq_demande_du_volume_et_ne_donne_pas_de_position_inverse(self):
+    def test_retired_nasdaq_reversal_is_rejected(self):
         self.assertIsNone(ab.retournement_marche("NASDAQ", r_(LONG_GOLD, vol_dernier=100), {}))
-        t = ab.retournement_marche("NASDAQ", r_(LONG_GOLD, vol_dernier=500), {})
-        self.assertIn("RETOURNEMENT EN OBSERVATION", t)
-        self.assertIn("PAS DE POSITION", t)
-        self.assertNotIn("Entrée ≈", t)
+        self.assertIsNone(ab.retournement_marche("NASDAQ", r_(LONG_GOLD, vol_dernier=500), {}))
 
     def test_short_symetrique_reste_une_observation(self):
         t = ab.retournement_marche("GOLD", r_([-x for x in LONG_GOLD]), {})

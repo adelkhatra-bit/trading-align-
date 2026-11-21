@@ -44,7 +44,7 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
         self.assertIsNotNone(etat["audit_mtf"]["GOLD"][-1]["t"])
 
 
-    def test_gold_and_nasdaq_reversal_watch_remains_available(self):
+    def test_gold_reversal_watch_remains_available(self):
         # M5/M15 turn bullish while H1/H4 remain bearish: observation only.
         now = int(time.time())
         dirs = [0] * 11
@@ -57,7 +57,7 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
         b5 = [{"t": now - 300 * (7 - i), "h": 101.0, "l": 98.0} for i in range(7)]
         r = {"dirs": dirs, "dirs_cloturees": dirs.copy(), "b5": b5, "b15": b15, "b15_long": b15,
              "b1h": b1, "b4h": b4, "m1": [{"t": now - 30, "c": 100.0}], "t": now}
-        for market in ("GOLD", "NASDAQ"):
+        for market in ("GOLD",):
             cle = {}
             alert = align_bot.retournement_marche(market, r, cle)
             self.assertIsNotNone(alert, market)
@@ -84,7 +84,7 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
             "atr": 1.0, "b15": [{"t": 900, "c": 100.0}],
             "b5": [{"t": 900, "o": 100.0, "h": 101.0, "l": 99.0, "c": 100.0}]
         }
-        for market in ("GOLD", "NASDAQ"):
+        for market in ("GOLD",):
             trade = {"d": -1, "e": 100.0, "sl": 102.0, "tp1": 96.0, "tp2": 94.0,
                      "statut": "entree", "cree": 1000, "encore": 1, "be_dit": True}
             cle = {"trade": trade}
@@ -101,7 +101,7 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
                 out = align_bot.agent(market, r, cle, "")
             watch.assert_called_once_with(market, r, cle)
             self.assertTrue(any(alert in str(item) for item in out), market)
-
+        self.assertEqual(align_bot.agent("NASDAQ", r, {}, ""), [])
 
 
     def test_reversal_observation_is_forwarded_to_live_banner(self):
@@ -270,29 +270,17 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
 
 
 
-    def test_nasdaq_position_price_uses_fresh_adjusted_nq_quote_not_kraken(self):
-        now = align_bot.time.time()
-        with unittest.mock.patch.dict(align_bot._CACHE, {
-                 "nq_live": (now, 20000.0), "ecart_ndx": 35.5
-             }, clear=False), \
-             unittest.mock.patch.object(align_bot, "nasdaq_direct", return_value=20000.0), \
-             unittest.mock.patch.object(align_bot, "http_json") as http:
-            price = align_bot.prix_actuel("NASDAQ")
-        self.assertIsNone(price)
+    def test_retired_nasdaq_price_is_never_requested(self):
+        with unittest.mock.patch.object(align_bot, "http_json") as http:
+            self.assertIsNone(align_bot.prix_actuel("NASDAQ"))
         http.assert_not_called()
 
-    def test_nasdaq_position_price_fails_closed_when_nq_quote_is_stale(self):
-        now = align_bot.time.time()
-        with unittest.mock.patch.dict(align_bot._CACHE, {
-                 "nq_live": (now - 30, 20000.0), "ecart_ndx": 35.5
-             }, clear=False), \
-             unittest.mock.patch.object(align_bot, "nasdaq_direct", return_value=20000.0), \
-             unittest.mock.patch.object(align_bot, "http_json") as http:
-            price = align_bot.prix_actuel("NASDAQ")
-        self.assertIsNone(price)
+    def test_retired_nasdaq_price_does_not_fall_back_to_any_feed(self):
+        with unittest.mock.patch.object(align_bot, "http_json") as http, \
+             unittest.mock.patch.object(align_bot, "or_spot") as gold:
+            self.assertIsNone(align_bot.prix_actuel("NASDAQ"))
         http.assert_not_called()
-
-
+        gold.assert_not_called()
 
     def test_new_subscriber_market_selection_does_not_enable_push_alerts(self):
         etat = {"coach_pending": ["new-user"],

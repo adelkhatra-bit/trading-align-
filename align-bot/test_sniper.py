@@ -6,12 +6,13 @@ pic à 3997,6 sous le dernier plus haut M5, chute vers 3978). Le rejeu sur les V
 (workflow sniper-replay.yml) : ce fichier ne prétend pas être du réel."""
 import json
 import unittest
+import time
 from unittest.mock import patch
 
 import align_bot as ab
 from test_parite_pine import jeu_simule
 
-T0 = 1_800_000_000 // 900 * 900 - 6 * 3600
+T0 = (int(time.time()) // 60 - 285) * 60  # bougies M1 alignées, scénario terminé à la minute courante
 PTS = [(0, 3960), (30, 3980), (60, 3990), (120, 3996.0), (122, 3998.2), (124, 3996.0), (150, 3984), (163, 3996.0), (165, 3997.9), (167, 3996.0), (185, 3988),
        (193, 3995.0), (195, 3996.9), (197, 3995.0), (205, 3990), (215, 3993.3), (225, 3995.0), (229, 3995.8), (231, 3996.0), (233, 3995.2), (236, 3994.0),
        (240, 3992.0), (285, 3978.0)]     # structure M5 (3998,2) > M3 (3997,9) > M1 (3996,9), entrée dans la zone par le bas vers la minute 215, pic ~3997,6, chute
@@ -46,8 +47,10 @@ def r_at(m1all, k, long=False, **kw):
     niveaux = [(3985.0, "15m"), (3979.5, "1h"), (3960.0, "4h")]
     if long:
         niveaux = [(2 * piv - v, n) for v, n in niveaux]
-    r = dict(dirPlan=1 if long else -1, bull=10 if long else 1, bear=1 if long else 10, sens=1 if long else -1, dirs=[1 if long else -1] * 11, strat="SWING",
+    r = dict(market="BTC", dirPlan=1 if long else -1, bull=10 if long else 1, bear=1 if long else 10, sens=1 if long else -1, dirs=[1 if long else -1] * 11, strat="SWING",
              atr=6.0, atr3=1.8, atr5=2.6, m1=m1, b3=b3, b5=f(b5), b15=f(b15), zone_pine=dict(za=z[0], zb=z[1], zmil=(z[0] + z[1]) / 2), niveaux=niveaux,
+             b1h=[dict(t=now - 7200, o=100, h=101, l=99, c=100), dict(t=now - 3600, o=100, h=101, l=99, c=100)],
+             b4h=[dict(t=now - 28800, o=100, h=101, l=99, c=100), dict(t=now - 14400, o=100, h=101, l=99, c=100)],
              plan=dict(d=1 if long else -1, e=(2 * piv - 4012.79) if long else 4012.79, sl=(2 * piv - 4019.86) if long else 4019.86,
                        tp1=(2 * piv - 3895.54) if long else 3895.54, tp2=(2 * piv - 3850.0) if long else 3850.0), prix=m1[-1]["c"])
     r.update(kw)
@@ -55,10 +58,13 @@ def r_at(m1all, k, long=False, **kw):
 
 
 def premiere_proposition(m1all, long=False, debut=205, fin=284, **kw):
+    refus = {}
     for k in range(debut, fin):
-        sn = ab.entree_sniper(r_at(m1all, k, long, **kw))
+        sn, raison = ab._sniper(r_at(m1all, k, long, **kw))
         if sn:
             return k, sn
+        refus[raison] = refus.get(raison, 0) + 1
+    print("SNIPER_TEST_REFUSALS", sorted(refus.items(), key=lambda item: (-item[1], str(item[0])))[:8])
     return None, None
 
 

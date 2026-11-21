@@ -5,11 +5,21 @@ on:
   workflow_dispatch:
     inputs:
       pair:
-        description: "Paire (XAUUSD, XBTUSD, NAS100)"
-        default: "XAUUSD"
+        description: "Paire de données du marché ALIGN"
+        type: choice
+        options:
+          - XAUUSD
+          - XBTUSD
+        default: XAUUSD
+        required: true
       marche:
-        description: "Nom du marché (GOLD, BTC, NASDAQ)"
-        default: "GOLD"
+        description: "Marché ALIGN"
+        type: choice
+        options:
+          - GOLD
+          - BTC
+        default: GOLD
+        required: true
       heures:
         description: "Fenêtre rejouée, en heures"
         default: "8"

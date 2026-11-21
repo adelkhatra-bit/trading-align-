@@ -42,9 +42,9 @@ class DirectionSafety(unittest.TestCase):
         self.assertIsNone(ab.entree_retest("GOLD", retest_r(0), {}))
         self.assertIn("ENTRÉE POSSIBLE SUR RETEST : LONG", ab.entree_retest("GOLD", retest_r(1), {}))
 
-    def test_nasdaq_retest_requires_h4_confirmation(self):
+    def test_retired_nasdaq_retest_is_rejected(self):
         self.assertIsNone(ab.entree_retest("NASDAQ", retest_r(0), {}))
-        self.assertIn("ENTRÉE POSSIBLE SUR RETEST : LONG", ab.entree_retest("NASDAQ", retest_r(1), {}))
+        self.assertIsNone(ab.entree_retest("NASDAQ", retest_r(1), {}))
 
     def test_btc_retest_rule_is_unchanged(self):
         with mock.patch.object(ab, "objectifs", side_effect=AssertionError("BTC must keep its historical retest path")):
@@ -59,7 +59,7 @@ class DirectionSafety(unittest.TestCase):
         self.assertFalse(cle.get("retest_vu"))
 
     def test_sniper_requires_both_h1_and_h4_for_gold_nasdaq(self):
-        for market in ("GOLD", "NASDAQ"):
+        for market in ("GOLD",):
             for h1, h4 in ((1, 0), (0, 1), (-1, -1), (1, -1)):
                 dirs = [0] * 11
                 dirs[7], dirs[9] = h1, h4
@@ -70,7 +70,7 @@ class DirectionSafety(unittest.TestCase):
         self.assertNotIn("CONFLUENCE_H1_H4", reason_btc)
 
     def test_every_gold_nasdaq_strategy_requires_h1_and_h4_same_direction(self):
-        for market in ("GOLD", "NASDAQ"):
+        for market in ("GOLD",):
             for h1, h4 in ((1, 0), (0, 1), (-1, -1), (1, -1), (-1, 1)):
                 dirs = [1, 1, 1, 0, 1, 0, 0, h1, 0, h4, 1]
                 strat, status, reason = ab.strategie_alignement(dirs, 1, 1, market)
@@ -81,6 +81,7 @@ class DirectionSafety(unittest.TestCase):
             strat, status, _ = ab.strategie_alignement(dirs, 1, 1, market)
             self.assertEqual(strat, "SWING")
             self.assertEqual(status, "CONFIRMÉ")
+        self.assertEqual(ab.strategie_alignement([1] * 11, 1, 1, "NASDAQ")[0], "")
 
     def test_btc_keeps_its_existing_scalping_rule(self):
         dirs = [1, 1, 1, 0, 1, 0, 0, 0, 0, -1, 0]
@@ -94,7 +95,7 @@ class DirectionSafety(unittest.TestCase):
         dirs = [0] * 11
         dirs[7], dirs[9] = -1, -1
         r = dict(b15_long=bars, dirs=dirs, t=50000)
-        for market in ("GOLD", "NASDAQ"):
+        for market in ("GOLD",):
             msg = ab.radar_climax(market, r, {})
             self.assertIn("RADAR CLIMAX — SURVEILLANCE", msg)
             self.assertIn("Pas de position", msg)
@@ -102,7 +103,7 @@ class DirectionSafety(unittest.TestCase):
             self.assertNotIn("prenable", msg)
 
     def test_gold_nasdaq_reversal_is_observation_only_btc_keeps_legacy(self):
-        for market in ("GOLD", "NASDAQ"):
+        for market in ("GOLD",):
             msg = ab.retournement_marche(market, reversal_r(LONG_GOLD, 500), {})
             self.assertIn("RETOURNEMENT EN OBSERVATION", msg)
             self.assertIn("PAS DE POSITION", msg)
@@ -111,6 +112,7 @@ class DirectionSafety(unittest.TestCase):
             self.assertIsNone(ab.retournement_marche(market, reversal_r([1,1,1,0,1,0,0,1,0,1,0]), {}))
         msg_btc = ab.retournement_marche("BTC", reversal_r(LONG_BTC), {})
         self.assertIn("Cible 1", msg_btc)
+        self.assertIsNone(ab.retournement_marche("NASDAQ", reversal_r(LONG_GOLD, 500), {}))
 
     def test_manual_telegram_analysis_assigns_market_before_sniper(self):
         result = {"dirs": [0] * 11, "dirPlan": 0}
@@ -136,7 +138,7 @@ class DirectionSafety(unittest.TestCase):
         now = int(time.time())
         bars = [candle(now - 900, c=98), candle(now - 600, c=99),
                 candle(now - 300, c=101), candle(now, c=102)]
-        for market in ("GOLD", "NASDAQ"):
+        for market in ("GOLD",):
             for h4, expected in ((0, False), (1, True)):
                 dirs = [0, 0, 1, 0, 1, 0, 0, 1, 0, h4, 1]
                 r = dict(comp=0, dirs=dirs, dirs_cloturees=dirs,
@@ -157,7 +159,7 @@ class DirectionSafety(unittest.TestCase):
         r = dict(comp=0, dirs=[0,0,1,0,1,0,0,1,0,1,1],
                  sniper=None, dirPlan=1, strat="", zone_pine=None)
         fake_si = dict(d=-1, e=100.0)
-        for market in ("GOLD", "NASDAQ"):
+        for market in ("GOLD",):
             with mock.patch.object(ab, "etat_marche_hb", return_value=("ouvert", None)), \
                  mock.patch.object(ab, "hb_etat_surveille", return_value={"d": 1, "n": 9}), \
                  mock.patch.object(ab, "scalp_inverse", return_value=fake_si) as inverse, \

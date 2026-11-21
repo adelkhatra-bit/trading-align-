@@ -2363,7 +2363,7 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
         self.assertEqual(set(btc), {"-1000", "101", "303"})
         self.assertEqual(set(gold), {"-1000", "202", "303"})
         nasdaq = align_bot.destinataires_message(state, chats, "💠 NASDAQ — SIGNAL\\nPrix 20000")
-        self.assertEqual(nasdaq, ["-1000"])
+        self.assertEqual(nasdaq, [])
         self.assertEqual(align_bot.destinataires_message(state, {"999"}, "🥇 GOLD — X"), ["-1000"])   # pas de choix = rien en double
         state.pop("canal")
         self.assertEqual(set(align_bot.destinataires_message(state, chats, "🟠 BTC — SIGNAL EN ATTENTE\\nPrix 70000")), {"101", "303"})
