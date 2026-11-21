@@ -3,6 +3,7 @@ import unittest.mock
 import datetime
 import json
 import os
+from pathlib import Path
 import re
 import sys
 import unittest
@@ -35,7 +36,7 @@ class LiveTikTok(unittest.TestCase):
             x.stop()
 
     def test_bot_and_tradingview_userscript_share_one_live_channel(self):
-        bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
+        bande = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")).read_text(encoding="utf-8")
         match = re.search(r"""const SUJET = [\'"]([^\'"]+)[\'"];""", bande)
         self.assertIsNotNone(match, "sujet canonique absent du userscript")
         self.assertEqual(_LIVE_SUJET_PRODUCTION, match.group(1))
@@ -128,28 +129,28 @@ class LiveTikTok(unittest.TestCase):
             self.assertNotIn(mot, self.publie[0])
 
     def test_reinjection_arrete_tous_les_animateurs_periodiques(self):
-        bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
+        bande = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")).read_text(encoding="utf-8")
         stop = bande[bande.index("stop() { vivant = false;"):]
         for timer in ("coachT", "iaT", "astuceT", "regardT", "chronoT", "coeurT", "posT", "masqueT", "etiqT", "heartbeatT"):
             self.assertIn(f"clearInterval({timer})", stop, f"timer non arrêté lors de la réinjection : {timer}")
 
     def test_jamais_le_mot_telegram_a_l_ecran(self):
-        src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "align_bot.py"), encoding="utf-8").read()
+        src = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "align_bot.py")).read_text(encoding="utf-8")
         for ligne in src.splitlines():
             if ("live_bande(" in ligne or "live_publier(" in ligne) and '"' in ligne:
                 self.assertNotIn("Telegram", ligne, ligne)
-        bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
+        bande = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")).read_text(encoding="utf-8")
         self.assertNotIn("sur Telegram", bande)
 
     def test_masquage_ne_depend_pas_de_conteneurs_dialogue_caches(self):
-        bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
+        bande = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")).read_text(encoding="utf-8")
         self.assertIn("const overlayVisible = el =>", bande)
         self.assertIn("const overlayOuvert = Array.from(document.querySelectorAll", bande)
         self.assertIn(".some(overlayVisible)", bande)
         self.assertNotIn("classList.toggle('align-cache', !!document.querySelector", bande)
 
     def test_position_confirmee_declenche_spectacle_visuel(self):
-        bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
+        bande = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")).read_text(encoding="utf-8")
         self.assertIn("if (/POSITION ALIGN CONFIRMÉE|ENTRE EN POSITION/i.test(txt)) { feuArtifice(", bande)
         self.assertIn("POSITION ALIGN CONFIRMÉE/i.test(txt))", bande)
 
@@ -311,7 +312,7 @@ class LiveTikTok(unittest.TestCase):
 
     def test_live_script_has_click_to_enable_voice_and_cleans_it_up(self):
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")
-        source = open(path, encoding="utf-8").read()
+        source = Path(path).read_text(encoding="utf-8")
         self.assertIn("speechSynthesis.speak(utterance)", source)
         self.assertIn("PING|LIVE_SCREEN|", source)
         self.assertIn("setInterval(pingEcran, 25000)", source)
@@ -345,7 +346,7 @@ class CartesRelieesAuGraphique(unittest.TestCase):
         self.assertIn("chart ZONE", en)
         self.assertIn("CLOSE BELOW", en)
         self.assertIn("red line", en)
-        src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "align_bot.py"), encoding="utf-8").read()
+        src = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "align_bot.py")).read_text(encoding="utf-8")
         self.assertIn("CLÔTURE SOUS l'étiquette « ENTRÉE »", src)
         self.assertIn("REJOINT LA TEAM ALIGN", src)
 
@@ -375,7 +376,7 @@ class LectureTP1(unittest.TestCase):
 
 class CartesCouleursGraphique(unittest.TestCase):
     def test_cartes_parlent_des_lignes(self):
-        src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "align_bot.py"), encoding="utf-8").read()
+        src = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "align_bot.py")).read_text(encoding="utf-8")
         for mot in ("(étiquette ENTRÉE)", "(ligne rouge)", "(ligne bleue)", "🔒 SL protégé", "🟨 Entrée {px(tr['e'])} • 🛑 SL"):
             self.assertIn(mot, src)
         self.assertIn("(red line)", ab.traduire("🛑 SL : 1 (ligne rouge)"))
@@ -758,19 +759,19 @@ class LiveOutbox(unittest.TestCase):
 
 
     def test_entry_price_mask_is_not_hidden_on_transient_canvas_read_miss(self):
-        bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
+        bande = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")).read_text(encoding="utf-8")
         self.assertIn("const cel = celluleSens(); if (!cel) return;", bande)
         self.assertNotIn("if (!cel) { masque.style.display = 'none'; return; }", bande)
 
     def test_live_overlay_reads_consumption_percent_from_fvg_and_order_block_boxes(self):
-        bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
+        bande = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")).read_text(encoding="utf-8")
         self.assertIn("function texteZone(t, m)", bande)
         self.assertIn("consommée|consommé", bande)
         self.assertIn("'% de zone consommée'", bande)
         self.assertIn("' • ' + consommation", bande)
 
     def test_market_narration_keeps_forming_candle_anticipation_and_closed_candle_validation(self):
-        bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
+        bande = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")).read_text(encoding="utf-8")
         # Bougie en cours : anticipation provisoire conservée (jamais une autorisation d'entrée).
         self.assertIn("const cur = B[B.length - 1], prev = B.slice(-21, -1);", bande)
         self.assertIn("chasseSousSupport", bande)
@@ -787,7 +788,7 @@ class LiveOutbox(unittest.TestCase):
         self.assertLess(bande.index("else if (chasseSousSupport) lecture"), bande.index("else if (dFond > 0 && dRecent < 0) lecture"))
 
     def test_market_narration_is_factual_and_runs_independently_of_generic_coach(self):
-        bande = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js"), encoding="utf-8").read()
+        bande = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")).read_text(encoding="utf-8")
         self.assertIn("function commentaireMarcheEnDirect(B, moyR, moyV, m)", bande)
         self.assertIn("The recent trend still points higher", bande)
         self.assertIn("The market is ranging", bande)
@@ -1152,7 +1153,7 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
 
     def _lire(self, rel):
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", *rel)
-        return open(path, encoding="utf-8").read()
+        return Path(path).read_text(encoding="utf-8")
 
     def test_bande_version_12_2_13_voice_recovery_and_sync(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
