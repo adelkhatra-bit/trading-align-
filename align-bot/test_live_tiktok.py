@@ -1170,6 +1170,7 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         self.assertIn("let dernierCommentaireIA = null", bande)
         self.assertIn("market: source === 'ia' ? codeMarche() : ''", bande)
         self.assertIn("items[i].replayEN = commentaireEN", bande)
+        self.assertIn("if (dureeFR > 0 && attente.replayEN && attente.replayEN.anglaisTraduit) parlerLive(attente.replayEN, true)", bande)
         self.assertIn("dernierCommentaireIA = { fr: m, en: m.replayEN || null, market: m.market || '' }", bande)
         self.assertIn("const dureeFR = dernier.fr ? parlerLive(dernier.fr, true) : 0", bande)
         self.assertIn("if (dureeFR > 0 && dernier.en && dernier.en.anglaisTraduit) parlerLive(dernier.en, true)", bande)
