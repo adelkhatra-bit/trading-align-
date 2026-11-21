@@ -1178,7 +1178,9 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         # plus aucun repli sur "dansLangue[0]" (= voix robot) ; sans voix naturelle, on ne parle pas
         self.assertNotIn("utterance.voice = dansLangue[0]", bande)
         self.assertNotIn("dansLangue[0]", bande)
-        self.assertIn("if (!v) return 0;", bande)
+        self.assertIn("if (!v) {", bande)
+        self.assertIn("if (!anglais && voixActive) voixEnAttente = item;", bande)
+        self.assertIn("return 0;   // aucune voix naturelle disponible : silence plutôt qu'une voix robot", bande)
         self.assertIn("utterance.voice = v;", bande)
 
     def test_bande_off_coupe_toute_la_parole(self):
