@@ -281,6 +281,7 @@
     try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
   });
   let voixActive = voixEtatInitial, voixDerniere = 0, voixTexte = '', voixDerniereFR = 0, voixTexteEN = '';
+  let dernierCommentaireIA = null;  // dernier commentaire réellement affiché, pas un texte d'accueil
   // v12.2.7 : voix la plus humaine disponible (gratuite, intégrée au navigateur / à Windows)
   const VOIX_NATURELLES = /natural|neural|online|premium|enhanced|google|denise|vivienne|henri|eloise|remy|amélie|amelie|hortense|audrey|julie|charlotte|pierre|paul|thomas|jenny|aria|guy|samantha|ava|david|mark|hazel|zira/i;
   let voixEnAttente = null;  // commentaire FR gardé si les voix du navigateur arrivent après le premier message
@@ -288,7 +289,7 @@
   function voixSurVoixChangees() {
     rafraichirVoix();
     const attente = voixEnAttente; voixEnAttente = null;
-    if (voixActive && attente) parlerLive(attente);
+    if (voixActive && attente) parlerLive(attente, true);
   }
   if ('speechSynthesis' in window) {
     try { window.speechSynthesis.addEventListener('voiceschanged', voixSurVoixChangees); } catch (e) {}
@@ -312,8 +313,11 @@
       window.speechSynthesis.resume();
       voixBtn.textContent = '🔊 COACH VOCAL ON';
       voixBtn.setAttribute('aria-pressed', 'true');
-      // v12.2.8 (demande d'Adel) : pas de phrase d'accueil. Seul le commentaire du marché parle.
+      // Pas de phrase d'accueil : relire uniquement le dernier commentaire IA déjà affiché,
+      // et seulement s'il correspond toujours au marché actuellement observé.
       voixDerniere = Date.now();
+      const dernier = dernierCommentaireIA;
+      if (dernier && (!dernier.market || dernier.market === codeMarche())) parlerLive(dernier, true);
     } else {
       try { window.speechSynthesis.cancel(); } catch (e) {}   // v12.2.8 : OFF coupe tout ce qui est en file
       voixEnAttente = null;
@@ -335,15 +339,15 @@
       }
     } catch (e) {}
   }
-  function parlerLive(item) {
+  function parlerLive(item, forcer = false) {
     if (!voixActive || !item || (item.source !== 'ia' && item.source !== 'marche') ||!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return 0;
     // v12.2.7 (règle d'Adel) : chaque info est dite en FRANÇAIS, puis la même en ANGLAIS, jamais mélangées.
     const anglais = !!item.en;
     if (anglais && item.source === 'marche' && !item.anglaisTraduit) return 0;  // une bulle non traduite reste silencieuse en EN
     const maintenant = Date.now();
     const suiteAnglaise = anglais && maintenant - voixDerniereFR < 60000;   // l'anglais suit le français qu'on vient de dire
-    if (anglais && !suiteAnglaise) return 0;                                // pas d'anglais orphelin
-    if (!anglais && maintenant - voixDerniere < 12000) return 0;            // pas de mitraillette vocale
+    if (anglais && !suiteAnglaise && !forcer) return 0;                     // pas d'anglais orphelin, sauf relecture explicite
+    if (!anglais && maintenant - voixDerniere < 12000 && !forcer) return 0; // pas de mitraillette vocale
     let phrase = String(item.texte || '').replace(/^🇫🇷\s*|^🇬🇧\s*/, '')
       .replace(/⚠️ Ceci n'est pas un conseil en investissement[^•]*/gi, '')
       .replace(/https?:\/\/\S+/g, '')
@@ -353,7 +357,7 @@
     // jamais le commentaire de marché lui-même ; s'il ne reste rien de réel, on ne dit rien.
     const NON_MARCHE = /lien (en|dans la) bio|link in (the )?bio|spectacle|tapote|tap the screen|tap on the screen|partage|share (the|this) (live|stream|video)|share it|DYOR|do your own research|fais tes propres recherches|conseil en investissement|financial advice|investment advice|risque (élevé |eleve )?de perte|high risk of (capital )?loss|risk of loss|\brisques?\b|\brisks?\b|perte en capital|capital loss/i;
     phrase = phrase.split(/\s*•\s*/).filter(m => m && !NON_MARCHE.test(m)).join(' • ').trim();
-    if (phrase.length < 12 || phrase === (anglais ? voixTexteEN : voixTexte)) return 0;
+    if (phrase.length < 12 || (!forcer && phrase === (anglais ? voixTexteEN : voixTexte))) return 0;
     // v12.2.6 : jamais de phrase coupée au milieu : on ne lit qu'une phrase complète
     if (phrase.length > 220) {
       const coupe = phrase.slice(0, 220).match(/^.*[.!?…]/);
@@ -496,7 +500,7 @@
     // v12.2.8 : plus de « risque de perte » ajouté à chaque info : la mention légale reste seulement dans le pied de bande
     // v7.3 (règle d'Adel, 15/11) : chaque info passe 2 fois en français PUIS 2 fois en anglais
     const traductionEN = enAnglais(texte), anglaisTraduit = traductionEN !== texte;
-    const nPass = Math.max(4, 2 * (fois || 1)), items = []; for (let i = 0; i < nPass; i++) items.push({ texte: (i >= nPass / 2 ? '🇬🇧 ' : '🇫🇷 ') + plateforme(i >= nPass / 2 ? traductionEN : texte), bulle, g, en: i >= nPass / 2, anglaisTraduit, source: source || 'live' });   // v12.2.12 : garde la preuve de traduction pour ne pas vocaliser du français avec une voix EN
+    const nPass = Math.max(4, 2 * (fois || 1)), items = []; for (let i = 0; i < nPass; i++) items.push({ texte: (i >= nPass / 2 ? '🇬🇧 ' : '🇫🇷 ') + plateforme(i >= nPass / 2 ? traductionEN : texte), bulle, g, en: i >= nPass / 2, anglaisTraduit, source: source || 'live', market: source === 'ia' ? codeMarche() : '' });   // v12.2.12 : garde la preuve de traduction pour ne pas vocaliser du français avec une voix EN
     if (devant) { file.splice(0, file.length, ...items, ...file.filter(m => m.g && m.g !== 'proche')); couper(); }   // v7.5 : clic sur une zone = la bande en parle TOUT DE SUITE
     else if (urgent) { let k = 0; while (k < file.length && file[k].g && file[k].g !== 'proche') k++; file.splice(k, 0, ...items); }
     else file.push(...items);
@@ -508,6 +512,7 @@
     if (occupe || !file.length) return;
     occupe = true;
     const m = file.shift();
+    if (m.source === 'ia') dernierCommentaireIA = m;
     flash.innerHTML = '<span>' + esc(m.texte) + '</span>';   // le message défile vite (lisible sur téléphone, même si TikTok coupe les bords)
     flash.className = 'flash' + (m.g ? ' ' + m.g : m.bulle ? ' bulle' : '') + (m.en ? ' en' : '');
     bande.classList.add('on');
