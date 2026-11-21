@@ -290,12 +290,27 @@ jobs:
               req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token, "User-Agent": "ALIGN-bridge-preflight"})
               with urllib.request.urlopen(req, timeout=12) as response:
                   payload = json.loads(response.read().decode("utf-8"))
+              snapshots = payload.get("snapshots") if isinstance(payload.get("snapshots"), dict) else {}
+              required = ("M5", "M15", "H1", "H4", "D1", "W1")
+              def get_tf(tf):
+                  return snapshots.get(tf) or snapshots.get(tf.lower()) or {}
+              stale = [tf for tf in required if get_tf(tf).get("fresh") is not True]
+              ages = [f"{tf}={get_tf(tf).get('ageMs', 'unknown')}ms" for tf in stale]
+              rejection = payload.get("lastRejection") if isinstance(payload.get("lastRejection"), dict) else {}
+              rejection_text = str(rejection.get("error") or "none")
               if payload.get("ok") is not True or not isinstance(payload.get("snapshots"), dict):
-                  raise SystemExit("ÉCHEC: réponse bridge invalide pour " + symbol)
+                  active_hint = str(payload.get("activeTimeframe") or "none")
+                  active_age = payload.get("activeTimeframeAgeMs")
+                  raise SystemExit(
+                      "ÉCHEC: bridge invalide pour " + symbol
+                      + "; active=" + active_hint + "; active_age_ms=" + str(active_age)
+                      + "; UT_périmées=" + (",".join(ages) if ages else "none")
+                      + "; last_rejection=" + rejection_text
+                  )
               active = str(payload.get("activeTimeframe") or "").upper()
               if payload.get("activeTimeframeFresh") is not True or active not in {"M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"}:
                   raise SystemExit("ÉCHEC: aucune unité TradingView active et fraîche pour " + symbol)
-              snap = payload["snapshots"].get(active) or {}
+              snap = snapshots.get(active) or {}
               # Le prix affiché sur TradingView doit être présent, positif et reçu depuis moins de 90 secondes
               # (même limite que ACTIVE_MAX_AGE_MS du bridge : TradingView n'alerte qu'une fois par minute).
               try:
@@ -318,13 +333,8 @@ jobs:
               if not any(v not in (None, "") for v in directions):
                   raise SystemExit("ÉCHEC: aucune lecture MTF ROBOT V12 exploitable pour " + symbol)
               # Les UT supérieures doivent être présentes et fraîches, sans assimiler une UT à une autre.
-              required = ("M5", "M15", "H1", "H4", "D1", "W1")
-              snapshots = payload["snapshots"]
-              def get_tf(tf):
-                  return snapshots.get(tf) or snapshots.get(tf.lower()) or {}
-              stale = [tf for tf in required if get_tf(tf).get("fresh") is not True]
               if stale:
-                  raise SystemExit("ÉCHEC: snapshots TradingView absents/périmés pour " + symbol + " : " + ",".join(stale))
+                  raise SystemExit("ÉCHEC: snapshots TradingView absents/périmés pour " + symbol + " : " + ",".join(ages))
               print(f"BRIDGE_CONFIRMED symbol={symbol} active={active} age_ms={payload.get('activeTimeframeAgeMs')} received={','.join(payload.get('receivedTimeframes', []))} required_fresh={','.join(required)} fresh_snapshot=true robot_v12=true")
           PY
           then
