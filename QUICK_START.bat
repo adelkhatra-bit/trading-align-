@@ -21,7 +21,7 @@ echo ✅ Services arrêtés
 REM Lancer Node.js (Studio)
 echo.
 echo 🟢 Lancement Studio (port 4000)
-start "Studio Server" cmd /k "set BROKER_MODE=live && set SAFE_MODE=0 && node server.js"
+start "Studio Server" cmd /k "set BROKER_MODE=paper && set SAFE_MODE=1 && node server.js"
 timeout /t 2 /nobreak
 
 echo.
