@@ -2,7 +2,7 @@
 """ALIGN MTF BOT — même logique que l'indicateur TradingView ALIGN MTF PRO.
 Prix gratuits : BTC = Kraken XBTUSD, Gold = XAUUSD spot (bougies COMEX Yahoo recalées sur le prix spot Swissquote).
 Tourne toutes les 5 minutes (GitHub Actions). Aucune dépendance externe."""
-import json, unicodedata, os, re, time, hashlib, urllib.request, urllib.error, urllib.parse, datetime, threading, queue, signal, email.utils, math
+import json, unicodedata, os, re, time, hashlib, urllib.request, urllib.error, urllib.parse, datetime, threading, queue, signal, email.utils, math, traceback
 from zoneinfo import ZoneInfo
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -13635,7 +13635,8 @@ def main():
         try:
             un_tour(etat, chats)
         except Exception as ex:
-            print("tour", ex)
+            print("tour", ex, flush=True)
+            traceback.print_exc(limit=8)
         if SHUTDOWN_REQUESTED.is_set():
             break
         prochain = time.time() + PAUSE_SEC
