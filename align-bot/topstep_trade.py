@@ -1,4 +1,4 @@
-"""ALIGN — exécution automatique sur Topstep (API TopstepX / ProjectX), micro-contrats MNQ / MGC / MBT.
+"""ALIGN — calcul et simulation Topstep (API TopstepX / ProjectX), micro-contrats MNQ / MGC / MBT ; aucun ordre réel.
 
 Différences voulues par Adel (15/11) avec FundedNext :
   • Topstep = futures : TOUTES les positions sont fermées 1 h AVANT la limite Topstep (15 h 10 heure de Chicago),
@@ -7,7 +7,7 @@ Différences voulues par Adel (15/11) avec FundedNext :
   • FundedNext (MT5, auto_trade.py) peut garder les positions plus longtemps.
 
 Sécurité (codée en dur) : 1 micro-contrat, perte max 75 $ par position, arrêt à -150 $ dans la journée,
-arrêt définitif si le solde passe sous le plancher du compte + 100 $. Mode TEST par défaut (TOPSTEP_REEL=1 pour le réel).
+arrêt définitif si le solde passe sous le plancher du compte + 100 $. Exécution réelle désactivée ; TOPSTEP_REEL ne peut pas l'activer.
 """
 import json, os, time, datetime, urllib.request
 from zoneinfo import ZoneInfo
@@ -24,7 +24,7 @@ MARGE_PLANCHER = 100.0
 SL_ELARGI = 1.25
 SYMBOLES = {"GOLD": "MGC", "BTC": "MBT"}   # marchés ALIGN actifs : GOLD + BTC
 
-REEL = os.environ.get("TOPSTEP_REEL", "0") == "1"
+REEL = False  # Verrou ALIGN : aucune activation par variable d’environnement.
 COMPTE = os.environ.get("TOPSTEP_COMPTE", "")                 # id du compte à trader (ex. 29250754)
 PLANCHER = float(os.environ.get("TOPSTEP_PLANCHER", "0") or 0)  # limite de perte max du compte (MLL)
 
