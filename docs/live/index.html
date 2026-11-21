@@ -61,12 +61,39 @@
 </div>
 <script>
 /* Données publiques (niveau gratuit seulement) écrites par le bot sur la branche live-data : aucun prix, aucun niveau, aucun jeton. */
-var SOURCE = "https://raw.githubusercontent.com/adelkhatra-bit/trading-auto/live-data/live.json";
+var SOURCE = "https://raw.githubusercontent.com/adelkhatra-bit/trading-align-/live-data/live.json";
 var BOT = "@align_mtf_adel_bot";
-var ICONES = { BTC: "🟠", GOLD: "🥇", NASDAQ: "💠" };
+var ICONES = { BTC: "🟠", GOLD: "🥇" };
 var BIAIS = { haussier: "haussier", baissier: "baissier", indecis: "indécis" };
 var ETATS = { calme: "Marché calme", preparation: "En préparation", entree: "Entrée en cours", ferme: "Marché fermé", perime: "Données en pause" };
 var donnees = null, vu = 0, recents = [], tour = 0;
+// Sync mouth movement with the TradingView browser voice, via a dedicated ntfy event channel.
+var voixEventSource = null, voixHoteActif = 't', voixStopTimer = null;
+function arreterVoixOverlay() {
+  if (voixStopTimer) { clearTimeout(voixStopTimer); voixStopTimer = null; }
+  document.getElementById('av-t').classList.remove('parle');
+  document.getElementById('av-l').classList.remove('parle');
+}
+function ecouterVoixOverlay() {
+  try { if (voixEventSource) voixEventSource.close(); } catch (e) {}
+  voixEventSource = new EventSource('https://ntfy.sh/align-live-2a4bccafd9548d93-voix/sse');
+  voixEventSource.onmessage = function (e) {
+    try {
+      var data = JSON.parse(e.data);
+      if (data.event !== 'message' || typeof data.message !== 'string') return;
+      var parts = data.message.split('|');
+      if (parts.length < 4 || parts[0] !== 'ALIGN_VOICE') return;
+      if (parts[1] === 'START') {
+        arreterVoixOverlay();
+        voixHoteActif = voixHoteActif === 't' ? 'l' : 't';
+        document.getElementById('av-' + voixHoteActif).classList.add('parle');
+        voixStopTimer = setTimeout(arreterVoixOverlay, 30000);
+      } else if (parts[1] === 'STOP') arreterVoixOverlay();
+    } catch (err) { arreterVoixOverlay(); }
+  };
+  voixEventSource.onerror = function () { arreterVoixOverlay(); };
+}
+ecouterVoixOverlay();
 
 function echelle() {
   var s = Math.min(window.innerWidth / 1080, window.innerHeight / 1920);
@@ -145,9 +172,8 @@ var DIALOGUES = {
 function parler(qui, texte) {
   var bulle = document.getElementById("b-" + qui), av = document.getElementById("av-" + qui);
   var autre = qui === "t" ? "l" : "t";
-  document.getElementById("b-" + autre).classList.remove("visible"); document.getElementById("av-" + autre).classList.remove("parle");
-  bulle.innerHTML = "<small>" + (qui === "t" ? "Thomas" : "Leïla") + "</small>" + texte; bulle.classList.add("visible"); av.classList.add("parle");
-  setTimeout(function () { av.classList.remove("parle"); }, Math.min(6000, 1200 + texte.length * 45));
+  document.getElementById("b-" + autre).classList.remove("visible");
+  bulle.innerHTML = "<small>" + (qui === "t" ? "Thomas" : "Leïla") + "</small>" + texte; bulle.classList.add("visible");
 }
 function echange() {
   tour++;
@@ -173,7 +199,7 @@ if (demo) {
   donnees = { maj: Math.floor(Date.now() / 1000), bot: BOT, marches: [
     { m: "BTC", etat: "calme", biais: "indecis", ut: 5, seuil: 8, profil: "aucun" },
     { m: "GOLD", etat: "preparation", biais: "baissier", ut: 6, seuil: 8, profil: "INTRADAY" },
-    { m: "NASDAQ", etat: "ferme", biais: "haussier", ut: 7, seuil: 8, profil: "SWING" }] };
+  ] };
   rendre();
 } else { charger(); setInterval(charger, 30000); }
 setInterval(rendre, 15000);
