@@ -3754,14 +3754,17 @@ class PineOnlyEntryGateTests(unittest.TestCase):
         ]
         bars.append(candle(21 * 900, o=100.0, h=101.0, l=97.0, c=100.5, v=400))
         out = []
+        stale_local_order = {"e": 100.0, "sl": 97.0, "tp1": 123.45, "n1": "ancien TP local"}
         align_bot.manipulation(out, "BTC", {
             "b15": bars, "atr": 1.0, "t": 20_000,
             "annonce": False, "confirme": 1, "require_tv_bridge": True,
-        }, {})
+        }, {"ordre": stale_local_order})
         message = "\n".join(out)
         self.assertIn("aucun Entry/SL local", message)
         self.assertNotIn("Point d'entrée visé", message)
         self.assertNotIn("SL un peu", message)
+        self.assertNotIn("123,45", message)
+        self.assertNotIn("TP visé", message)
 
     def test_required_bridge_waits_for_pine_closed_entry_trigger(self):
         from unittest.mock import patch
