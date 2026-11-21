@@ -9,7 +9,7 @@ os.environ.setdefault("GITHUB_TOKEN", "test-token")
 from scripts import align_workflow_watchdog as watchdog
 
 
-def run(run_id, workflow="ALIGN Copilot Issue Relay", branch="main"):
+def run(run_id, workflow="ALIGN MTF validation", branch="main"):
     return {
         "id": run_id,
         "name": workflow,
@@ -20,7 +20,7 @@ def run(run_id, workflow="ALIGN Copilot Issue Relay", branch="main"):
     }
 
 
-def failed_job(name="relay", step="Verify Copilot credentials only when work is pending"):
+def failed_job(name="relay", step="Validate workflow event"):
     return {
         "name": name,
         "conclusion": "failure",
@@ -39,12 +39,12 @@ class WatchdogBlockerDedupTests(unittest.TestCase):
             "\n".join([
                 "<!-- [align-watchdog:run-44261555540] -->",
                 "## ALIGN workflow watchdog report",
-                "**Workflow:** ALIGN Copilot Issue Relay",
+                "**Workflow:** ALIGN MTF validation",
                 "**Branch:** main",
                 "### Jobs",
                 "- **relay** — failure",
                 "### Failed steps",
-                "- relay::Verify Copilot credentials only when work is pending",
+                "- relay::Validate workflow event",
             ]),
         )
         with patch.object(watchdog, "api", side_effect=[[], [legacy]]) as api_mock:
@@ -62,7 +62,7 @@ class WatchdogBlockerDedupTests(unittest.TestCase):
             498,
             "\n".join([
                 "## ALIGN workflow watchdog report",
-                "**Workflow:** ALIGN Copilot Issue Relay",
+                "**Workflow:** ALIGN MTF validation",
                 "**Branch:** main",
                 "### Jobs",
                 "- **relay** — failure",
@@ -83,7 +83,7 @@ class WatchdogBlockerDedupTests(unittest.TestCase):
             "\\n".join([
                 "<!-- [align-watchdog:run-44265635694] -->",
                 "## ALIGN workflow watchdog report",
-                "**Workflow:** ALIGN Copilot Issue Relay",
+                "**Workflow:** ALIGN MTF validation",
                 "**Branch:** main",
                 "### Jobs",
                 "- **relay** — failure",
@@ -110,7 +110,7 @@ class WatchdogBlockerDedupTests(unittest.TestCase):
             "\\n".join([
                 "<!-- [align-watchdog:run-44265635695] -->",
                 "## ALIGN workflow watchdog report",
-                "**Workflow:** ALIGN Copilot Issue Relay",
+                "**Workflow:** ALIGN MTF validation",
                 "**Branch:** main",
                 "### Jobs",
                 "- **relay** — failure",
@@ -122,7 +122,7 @@ class WatchdogBlockerDedupTests(unittest.TestCase):
             side_effect=[
                 [],
                 [legacy],
-                {"jobs": [failed_job(step="Install Copilot CLI")]},
+                {"jobs": [failed_job(step="Prepare validation dependencies")]},
                 {"number": 505},
             ],
         ) as api_mock:
@@ -139,12 +139,12 @@ class WatchdogBlockerDedupTests(unittest.TestCase):
             498,
             "\n".join([
                 "## ALIGN workflow watchdog report",
-                "**Workflow:** ALIGN Copilot Issue Relay",
+                "**Workflow:** ALIGN MTF validation",
                 "**Branch:** main",
                 "### Jobs",
                 "- **relay** — failure",
                 "### Failed steps",
-                "- relay::Install Copilot CLI",
+                "- relay::Prepare validation dependencies",
             ]),
         )
         with patch.object(watchdog, "api", side_effect=[[], [legacy], {"number": 504}]) as api_mock:
@@ -163,8 +163,8 @@ class WatchdogBlockerDedupTests(unittest.TestCase):
         self.assertEqual(first, second)
 
     def test_different_failed_step_has_a_distinct_fingerprint(self):
-        first = watchdog.blocker_fingerprint(run(1), [failed_job(step="Verify Copilot credentials")])
-        second = watchdog.blocker_fingerprint(run(2), [failed_job(step="Install Copilot CLI")])
+        first = watchdog.blocker_fingerprint(run(1), [failed_job(step="Validate workflow event")])
+        second = watchdog.blocker_fingerprint(run(2), [failed_job(step="Prepare validation dependencies")])
         self.assertNotEqual(first, second)
 
     def test_different_failed_job_creates_a_separate_issue(self):
@@ -172,7 +172,7 @@ class WatchdogBlockerDedupTests(unittest.TestCase):
             492,
             "\n".join([
                 "<!-- [align-watchdog:run-44249111410] -->",
-                "**Workflow:** ALIGN Copilot Issue Relay",
+                "**Workflow:** ALIGN MTF validation",
                 "**Branch:** main",
                 "### Jobs",
                 "- **validate** — failure",
@@ -196,7 +196,7 @@ class WatchdogBlockerDedupTests(unittest.TestCase):
         closed = issue(
             498,
             "\n".join([
-                "**Workflow:** ALIGN Copilot Issue Relay",
+                "**Workflow:** ALIGN MTF validation",
                 "**Branch:** main",
                 "### Jobs",
                 "- **relay** — failure",
@@ -219,12 +219,12 @@ class WatchdogDedupHardeningTests(unittest.TestCase):
             700,
             "\n".join([
                 "<!-- [align-watchdog:run-1] -->",
-                "**Workflow:** ALIGN Copilot Issue Relay",
+                "**Workflow:** ALIGN MTF validation",
                 "**Branch:** main",
                 "### Jobs",
                 "- **relay** — failure",
                 "### Failed steps",
-                "- relay::Verify Copilot credentials only when work is pending",
+                "- relay::Validate workflow event",
             ]),
         )
 

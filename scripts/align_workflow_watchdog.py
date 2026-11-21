@@ -52,7 +52,6 @@ AUTO_REPAIR_WORKFLOW_NAMES = {
     "ALIGN MetaApi vérification",
     "ALIGN rejeu entrée sniper (manuel)",
     "ALIGN Topstep vérification",
-    "ALIGN Copilot Issue Relay",
 }
 AUTO_REPAIR_IGNORED_PRS = {401, 448, 451}
 AUTO_REPAIR_GRACE_MINUTES = 10

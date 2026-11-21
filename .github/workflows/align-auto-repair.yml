@@ -12,7 +12,6 @@ on:
       - ALIGN MetaApi vérification
       - ALIGN rejeu entrée sniper (manuel)
       - ALIGN Topstep vérification
-      - ALIGN Copilot Issue Relay
     types: [completed]
 
 permissions:
@@ -49,6 +48,5 @@ jobs:
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
         run: python scripts/align_auto_repair.py

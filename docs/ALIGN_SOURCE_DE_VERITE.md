@@ -1,6 +1,6 @@
 # ALIGN — source de vérité unique (à lire AVANT toute action)
 
-Ce fichier s'adresse à toute IA (Claude Code, Codex, Copilot, ChatGPT) et à tout humain.
+Ce fichier définit la source de vérité du projet pour les mainteneurs humains et les outils explicitement autorisés.
 Si une information ci-dessous contredit ce que tu crois savoir : **ce fichier gagne**.
 Si l'**identité du projet** est ambiguë (autre dépôt, autre branche de production, autre indicateur, autre projet) : **arrête-toi et demande**. Une tâche de maintenance ALIGN normale (test, workflow, bot) se traite normalement.
 
@@ -57,7 +57,6 @@ Règle : quand `ALIGN_REQUIRE_TV_BRIDGE=1`, **aucun repli** sur des niveaux calc
 | `GEMINI_API_KEY`, `OPENAI_API_KEY` | Fournisseurs IA de secours |
 | `METAAPI_TOKEN`, `TOPSTEP_API_KEY`, `TOPSTEP_USERNAME` | Intégrations de compte, mode test |
 | `ALIGN_TV_API_URL`, `ALIGN_TV_READ_TOKEN` | Bridge TradingView |
-| `COPILOT_GITHUB_TOKEN` | Relais Copilot |
 
 Ne jamais publier dans ce dépôt, les issues, les commentaires ou les logs publics la présence, l'absence, la validité ou la valeur d'un secret. Vérifier sa configuration uniquement dans l'environnement sécurisé prévu ; ne rapporter que le résultat strictement nécessaire, sans exposer sa valeur.
 ## 6. Interdits absolus
@@ -69,10 +68,11 @@ Ne jamais publier dans ce dépôt, les issues, les commentaires ou les logs publ
 - Aucun ordre broker réel ; `AUTO_TRADE` et `TOPSTEP_REEL` restent à `0` tant que le propriétaire ne dit pas « réel ».
 - Ne jamais afficher, copier ou committer la valeur d'un secret.
 - Ne jamais modifier le design, les animations ou l'indicateur sans demande explicite.
-- Ne jamais supprimer un fichier, une branche ou une PR d'un autre agent.
+- Ne jamais supprimer un fichier, une branche ou une PR contenant du travail non int?gr? ou dont la provenance n'est pas ?tablie.
 
-## 7. Limite honnête
+## 7. Accès et automatisation de code
 
-Les IA qui travaillent **dans** le dépôt y sont renvoyées : Copilot par `.github/copilot-instructions.md`, Codex et Claude Code par `AGENTS.md`.
-Une conversation ChatGPT ouverte ailleurs ne le lit pas d'elle-même : colle-lui ce lien en premier message.
-La protection effective de `main` repose sur le ruleset GitHub actif et sur l'approbation manuelle du propriétaire ; ce document décrit la procédure mais ne remplace pas les contrôles GitHub.
+- Les relais Copilot CLI/cloud-agent, les profils GitHub Copilot personnalisés et l'assignation automatique d'agents de code sont retirés du périmètre actif ALIGN. Les signalements de panne restent des rapports destinés à un mainteneur humain.
+- Les clés GROQ/ANTHROPIC/GEMINI/OPENAI restent des fournisseurs IA runtime du BOT pour les commentaires de marché, avec plafond journalier et repli interne. Elles ne donnent aucun accès d'écriture au dépôt.
+- Le dépôt étant public, les fichiers restent lisibles par des services IA externes. Le code du dépôt ne peut pas interdire cette lecture ; cela nécessite de rendre le dépôt privé et de contrôler séparément les permissions GitHub. Ce changement de visibilité n'est pas effectué ici car il peut impacter Pages et la publication publique `live-data`.
+- Le ruleset actif de `main` exige `validate` et aucun acteur ne peut le contourner ; les merges restent soumis à la revue humaine et à l'autorisation du propriétaire.
