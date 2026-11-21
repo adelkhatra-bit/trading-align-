@@ -4595,14 +4595,9 @@ def entree_retest(m, r, cle):
     return None
 
 def radar_climax(m, r, cle):
+    """RADAR RETOURNEMENT — BTC conserve le comportement historique ; GOLD reste en surveillance si H1/H4 ne confirment pas."""
     if m not in MARCHES:
         return None
-    """RADAR RETOURNEMENT (validé par Adel le 15/11, « oui radar ») — le LONG raté 62 → 65,5 k BTC :
-    1) volume climax : une des 4 dernières bougies 15 min CLÔTURÉES a un volume ≥ 3 × la moyenne des 40 d'avant (épuisement) ;
-    2) balayage : une de ces bougies est passée sous le plus bas (sur le plus haut) des 20 bougies d'avant, puis la clôture est revenue au-dessus ;
-    3) confirmation : la dernière clôture 15 min repasse au-dessus (au-dessous) de l'EMA9.
-    → BTC conserve l'alerte historique ; GOLD restent en surveillance si H1 et H4 ne confirment pas le même sens.
-    Une alerte par sens toutes les 2 h ; mémorise l'heure (radar_t) pour ne pas envoyer « FEINTE » juste après."""
     # 16/11 : le radar lisait « b15 » coupé à 30 bougies alors qu'il en faut 66 → il ne se déclenchait JAMAIS en réel (LONG raté).
     dirs = (r.get("dirs_cloturees") or r.get("dirs") or []) if m == "GOLD" else (r.get("dirs") or [])
     b = (r.get("b15_long") or r.get("b15") or [])[:-1]  # la dernière est en formation
@@ -4675,12 +4670,9 @@ def radar_climax(m, r, cle):
     return None
 
 def retournement_marche(m, r, cle):
+    """v71 = Pine « RETOURNEMENT PAR MARCHÉ » : GOLD surveillé sur les clôtures MTF ; BTC conserve sa règle historique."""
     if m not in MARCHES:
         return None
-    """v71 = Pine « RETOURNEMENT PAR MARCHÉ » (mesuré sur 60 jours de bougies 5 min) :
-    GOLD : M5/M15 contre H1/H4 = observation uniquement, jamais une position avant confirmation des quatre clôtures.
-    BTC conserve sa règle historique : M5 + M15 + H1 contre H4, avec les cibles et le SL existants.
-    Une alerte par nouveau sens, jamais deux fois de suite."""
     dirs = r.get("dirs_cloturees") or r.get("dirs") or []
     def bougies_terminees(key, fallback=None):
         bars = list(r.get(key) or (r.get(fallback) if fallback else []) or [])
