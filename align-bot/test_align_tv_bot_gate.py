@@ -7,12 +7,12 @@ WORKFLOW_SOURCE = pathlib.Path(__file__).resolve().parents[1].joinpath(".github"
 
 
 class TradingViewBridgeGateTests(unittest.TestCase):
-    def test_invalid_bridge_shortens_bot_run_but_keeps_final_failure_gate(self):
-        # Guard the exact fail-fast expression: bridge invalid -> 120s, valid -> normal 21000s.
-        self.assertRegex(
-            WORKFLOW_SOURCE,
-            r"DUREE_SEC:\s*\$\{\{\s*steps\.bridge\.outputs\.ALIGN_TV_BRIDGE_PRET\s*==\s*'0'\s*&&\s*'120'\s*\|\|\s*'21000'\s*\}\}",
-        )
+    def test_bridge_failure_keeps_telegram_worker_alive_but_signals_fail_closed(self):
+        # The poller and private user commands must remain available for the full worker cycle.
+        self.assertRegex(WORKFLOW_SOURCE, r"DUREE_SEC:\s*\"21000\"")
+        self.assertIn('ALIGN_TV_BRIDGE_PRET: ${{ steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == \'0\' && \'0\' || \'1\' }}', WORKFLOW_SOURCE)
+        self.assertIn('ALIGN_REQUIRE_TV_BRIDGE: "1"', WORKFLOW_SOURCE)
+        # A missing bridge must still fail the workflow's final health gate.
         self.assertRegex(
             WORKFLOW_SOURCE,
             r"if:\s*\$\{\{\s*always\(\)\s*&&\s*steps\.bridge\.outputs\.ALIGN_TV_BRIDGE_PRET\s*==\s*'0'\s*\}\}",
