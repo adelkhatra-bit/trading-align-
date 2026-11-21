@@ -30,6 +30,27 @@ class SuiviMarchesTest(unittest.TestCase):
         self.assertNotIn("NASDAQ", t)
         self.assertIn("🟠 BTC : ⬜ non suivi", t)
 
+    def test_ancien_bouton_nasdaq_est_refuse_et_remplace_par_menu_btc_gold(self):
+        update = {
+            "update_id": 910,
+            "callback_query": {
+                "id": "old-nasdaq-button",
+                "data": "markets:NASDAQ",
+                "from": {"id": 42, "first_name": "Test"},
+                "message": {"message_id": 99, "chat": {"id": 42, "type": "private"}},
+            },
+        }
+        ab.traiter(self.e, {"42"}, [update])
+        answers = [kw.get("text", "") for method, kw in self.envois if method == "answerCallbackQuery"]
+        edits = [kw for method, kw in self.envois if method == "editMessageText"]
+        self.assertTrue(any("NASDAQ retiré" in value for value in answers))
+        self.assertEqual(len(edits), 1)
+        self.assertEqual(edits[0]["message_id"], 99)
+        labels = [row[0]["text"] for row in json.loads(edits[0]["reply_markup"])["inline_keyboard"]]
+        self.assertTrue(any("BTC" in label for label in labels))
+        self.assertTrue(any("GOLD" in label for label in labels))
+        self.assertFalse(any("NASDAQ" in label for label in labels))
+
     def test_ou_en_est_avec_vraies_donnees(self):
         ab.selectionner_marches_suivi(self.e, "42", ["GOLD"])
         with mock.patch.object(ab, "DERNIERS", {"GOLD": {"prix": 3975.2, "dirPlan": -1, "bear": 11, "strat": "SWING", "atr": 5}}), \
