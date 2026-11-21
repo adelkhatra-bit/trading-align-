@@ -289,7 +289,10 @@
   function voixSurVoixChangees() {
     rafraichirVoix();
     const attente = voixEnAttente; voixEnAttente = null;
-    if (voixActive && attente) parlerLive(attente, true);
+    if (voixActive && attente) {
+      const dureeFR = parlerLive(attente, true);
+      if (dureeFR > 0 && attente.replayEN && attente.replayEN.anglaisTraduit) parlerLive(attente.replayEN, true);
+    }
   }
   if ('speechSynthesis' in window) {
     try { window.speechSynthesis.addEventListener('voiceschanged', voixSurVoixChangees); } catch (e) {}
