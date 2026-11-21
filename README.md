@@ -55,11 +55,9 @@ FILE_BEARER_TOKEN=            # Si ACCESS_METHOD=token
 PORT=4000
 NODE_ENV=development
 
-# Trading
-BROKER_MODE=paper             # paper | live
-BROKER_ENDPOINT=https://api.broker.com/trade
-BROKER_API_KEY=
-BROKER_API_SECRET=
+# Trading — ALIGN PAPER ONLY
+BROKER_MODE=paper
+# L'exécution broker réelle est désactivée dans ALIGN.
 
 # Portefeuille
 ACCOUNT_BALANCE=100000
@@ -114,8 +112,8 @@ curl -X POST http://127.0.0.1:4000/trade \
   -H "Content-Type: application/json" \
   -d '{"symbol":"EUR/USD", "type":"LONG", "quantity":1, "entryPrice":1.087}'
 
-# Basculer broker mode
-curl -X POST http://127.0.0.1:4000/broker-mode?mode=live
+# Vérifier le mode papier (toute demande live est refusée)
+curl http://127.0.0.1:4000/broker-mode
 
 # Info mode broker
 curl http://127.0.0.1:4000/broker-mode
@@ -219,7 +217,7 @@ Etapes:
 5. **Risk** : calculatePositionSize() pour best opportunity
 6. **Frontend** : Affiche recommandation + meilleure opportunité
 7. **Execute** : User clique "Execute Trade" → POST /trade
-8. **Broker** : Ordre routé papier/live selon BROKER_MODE
+8. **Broker** : simulation papier uniquement ; aucune requête d'ordre réel n'est envoyée
 
 ## KPIs & Métriques
 
@@ -249,8 +247,6 @@ Ajouter en **Settings → Secrets and variables → Actions**:
 ```
 NAME              | VALUE
 FILE_BEARER_TOKEN | <token>
-BROKER_API_KEY    | <key>
-BROKER_API_SECRET | <secret>
 TEST_FILE_URL     | https://example.com/test-file
 ```
 
