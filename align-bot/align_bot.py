@@ -3294,15 +3294,15 @@ def _telegram_sortant_autorise(methode, params):
     prive = bool(getattr(TELEGRAM_PULL_CONTEXT, "private", False))
     if cid and prive and cid == contexte:
         return True
+    etat = DERNIER_ETAT or {}
+    actifs = {str(x) for x in etat.get("recherche_positions_active", [])}
+    texte = str(params.get("text") or params.get("caption") or "")
     # Autorisation strictement scoped : la classification news ouvre seulement
     # un sendMessage vers le canal actif explicitement choisi, pour un titre NEWS.
     news_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "news_chat_id", "") or "")
     if (cid and cid == news_chat and methode == "sendMessage"
             and texte.startswith("🚨 NEWS DE DERNIÈRE MINUTE")):
         return True
-    etat = DERNIER_ETAT or {}
-    actifs = {str(x) for x in etat.get("recherche_positions_active", [])}
-    texte = str(params.get("text") or params.get("caption") or "")
     if cid and cid in actifs and methode in ("sendMessage", "sendPhoto") and _telegram_position_attendue(texte):
         return True
     # Règle d'Adel (18/11) : chaînes silencieuses SAUF une ENTRÉE validée, et Telegram reste le lieu où l'on
