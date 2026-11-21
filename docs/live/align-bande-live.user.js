@@ -289,7 +289,7 @@
   function voixSurVoixChangees() {
     rafraichirVoix();
     const attente = voixEnAttente; voixEnAttente = null;
-    if (voixActive && attente) {
+    if (voixActive && attente && (attente.source !== 'ia' || (attente.market && attente.market === codeMarche()))) {
       const dureeFR = parlerLive(attente, true);
       if (dureeFR > 0 && attente.replayEN && attente.replayEN.anglaisTraduit) parlerLive(attente.replayEN, true);
     }
@@ -319,7 +319,7 @@
       // Pas de phrase d'accueil : relire le dernier commentaire IA affiché, dans la langue FR puis EN.
       voixDerniere = Date.now();
       const dernier = dernierCommentaireIA;
-      if (dernier && (!dernier.market || dernier.market === codeMarche())) {
+      if (dernier && dernier.market && dernier.market === codeMarche()) {
         const dureeFR = dernier.fr ? parlerLive(dernier.fr, true) : 0;
         if (dureeFR > 0 && dernier.en && dernier.en.anglaisTraduit) parlerLive(dernier.en, true);
       }
