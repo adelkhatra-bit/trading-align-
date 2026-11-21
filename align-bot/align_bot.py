@@ -10592,13 +10592,18 @@ def manipulation(out, m, r, cle):
         l.append("🧘 Tu es en position : reste cool, ton SL est en place" if tr["d"] == dm else
                  "⚠️ C'est CONTRE ta position : ne bouge pas ton SL, je surveille")
     elif r["confirme"] == dm:
-        mid = (niv + meche) / 2
-        l += [f"✅ Dans le sens de la tendance : {SENS[dm]}",
-              f"🎯 Point d'entrée visé : retour vers ≈ {px(niv)} ({'ancien plus bas' if dm == 1 else 'ancien plus haut'} 15 min)",
-              f"⭐ Encore mieux : milieu de la mèche ≈ {px(mid)}",
-              f"🛑 SL un peu {'SOUS' if dm == 1 else 'AU-DESSUS de'} la mèche ≈ {px(meche - dm * 0.2 * a)} • bougie 15 min de {heure(x['t'])}",
-              "⏳ Patience : j'entre seulement sur une mèche de rejet + CLÔTURE 5 min",
-              "🔔 Je t'envoie 🟢 J'ENTRE MAINTENANT au bon moment"]
+        if r.get("require_tv_bridge"):
+            l += [f"✅ Dans le sens du biais local : {SENS[dm]}",
+                  "⛔ Aucun Entry/SL local n'est publié : j'attends le déclencheur et les niveaux confirmés par Pine v25.",
+                  "⏳ Le rejet et la clôture de l'unité de déclenchement doivent être validés par le bridge TradingView."]
+        else:
+            mid = (niv + meche) / 2
+            l += [f"✅ Dans le sens de la tendance : {SENS[dm]}",
+                  f"🎯 Point d'entrée visé : retour vers ≈ {px(niv)} ({'ancien plus bas' if dm == 1 else 'ancien plus haut'} 15 min)",
+                  f"⭐ Encore mieux : milieu de la mèche ≈ {px(mid)}",
+                  f"🛑 SL un peu {'SOUS' if dm == 1 else 'AU-DESSUS de'} la mèche ≈ {px(meche - dm * 0.2 * a)} • bougie 15 min de {heure(x['t'])}",
+                  "⏳ Patience : j'entre seulement sur une mèche de rejet + CLÔTURE 5 min",
+                  "🔔 Je t'envoie 🟢 J'ENTRE MAINTENANT au bon moment"]
     elif r["confirme"] == -dm:
         l += [f"⚠️ CONTRE la tendance de fond ({SENS[-dm]})",
               f"⛔ Pas de {SENS[dm]} tant que 15 min / 1 h / 4 h ne se retournent pas",
@@ -10934,6 +10939,7 @@ def agent(m, r, cle, ferme):
     # Mode sans signal (bridge TradingView non branché) : AUCUNE alerte calculée localement
     # (manipulation, niveaux, FVG, radar, retournement, retest, après-SL) — seule la source v25 parle.
     # Une position déjà ouverte reste suivie jusqu'à sa clôture ; aucune nouvelle info de marché.
+    require_tv = bool(r.get("require_tv_bridge"))
     sans_signal = mode_sans_signal(r)
     if sans_signal and not tr:
         cause = (r.get("tv_indicator_mtf") or {}).get("detail") or (r.get("tv_indicator_mtf") or {}).get("reason") or "inconnue"
@@ -10944,34 +10950,39 @@ def agent(m, r, cle, ferme):
             manipulation(out, m, r, cle)
             meche_suspecte(out, m, r, cle)
             niveaux_cles(out, m, r, cle)
-            resistance_fvg(out, m, r, cle)              # v7.2 : résistance / support / FVG touché → chaîne + indice live
+            resistance_fvg(out, m, r, cle)              # contexte de zones uniquement, jamais une entrée
         except Exception as ex:
             print("manipulation", ex)
         try:
             suivre_apres_sl(out, m, r, cle, hi, lo)
         except Exception as ex:
             print("après SL", ex)
-        try:
-            re_ = reprise_entree(m, r, cle) if not tr else None   # après « COUPE ET REPRENDS » : retour à l'entrée → on reprend
-            if re_:
-                out.append(re_)
-            er_ = entree_retest(m, r, cle) if not tr else None   # résistance cassée qui devient support (règle d'Adel)
-            if er_:
-                out.append(er_)
-            rc_ = radar_climax(m, r, cle)                 # radar retournement (volume climax + balayage + EMA9)
-            if rc_ and not tr:
-                out.append(rc_)
-        except Exception as ex:
-            print("radar_climax", ex)
-        try:
-            rv_ = retournement_marche(m, r, cle)  # surveillance active aussi pendant les positions GOLD : alerte uniquement, aucune clôture automatique
-            if rv_ and not (tr and tr.get("d") == (1 if "LONG" in rv_.split("\n")[0] else -1)):
-                out.append(rv_)
-        except Exception as ex:
-            print("retournement_marche", ex)
+        # Les stratégies locales qui proposent une entrée/SL/TP sont désactivées lorsque
+        # Pine v25 est la source obligatoire. Elles restent disponibles hors de ce mode.
+        if not require_tv:
+            try:
+                re_ = reprise_entree(m, r, cle) if not tr else None
+                if re_:
+                    out.append(re_)
+                er_ = entree_retest(m, r, cle) if not tr else None
+                if er_:
+                    out.append(er_)
+                rc_ = radar_climax(m, r, cle)
+                if rc_ and not tr:
+                    out.append(rc_)
+            except Exception as ex:
+                print("radar_climax", ex)
+        # Le retournement GOLD reste une observation sans niveaux ; le retournement BTC
+        # historique contient des Entry/SL/cibles locaux et est donc bloqué en mode Pine.
+        if not require_tv or m == "GOLD":
+            try:
+                rv_ = retournement_marche(m, r, cle)
+                if rv_ and not (tr and tr.get("d") == (1 if "LONG" in rv_.split("\n")[0] else -1)):
+                    out.append(rv_)
+            except Exception as ex:
+                print("retournement_marche", ex)
 
     # ── Bridge Pine obligatoire : aucun fallback de niveaux locaux ──
-    require_tv = bool(r.get("require_tv_bridge"))
     if require_tv and not tr:
         if r.get("fermeture"):
             return out
