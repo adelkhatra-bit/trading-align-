@@ -2417,7 +2417,8 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
 
     def test_nasdaq_market_is_removed_and_legacy_preferences_are_filtered(self):
         self.assertNotIn("NASDAQ", align_bot.MARCHES)
-        self.assertEqual(align_bot.marche_demande("💠 Analyse Nasdaq"), "NASDAQ")
+        self.assertTrue(align_bot.marche_retiree_demande("💠 Analyse Nasdaq"))
+        self.assertIsNone(align_bot.marche_demande("💠 Analyse Nasdaq"))
         etat = {"marches_par_chat": {"7": ["GOLD", "NASDAQ"]}}
         self.assertFalse(align_bot.marche_autorise(etat, "7", "NASDAQ"))
         self.assertEqual(align_bot.marches_choisis(etat, "7"), {"GOLD"})
