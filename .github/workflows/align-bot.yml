@@ -69,7 +69,6 @@ jobs:
       - name: Attendre la fin de l'ancien worker (sa sauvegarde de mémoire)
         # Sans cette attente, le nouveau worker restaurait une mémoire PÉRIMÉE (celle de la dernière fin de bloc) pendant que l'ancien
         # sauvegardait encore : envois oubliés (doublons), marchés cochés perdus, suivis de position perdus.
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
@@ -88,12 +87,12 @@ jobs:
               try:
                   vieux = autres()
               except Exception as ex:
-                  print("WORKER_WAIT lecture impossible", type(ex).__name__); break
+                  raise SystemExit(f"WORKER_WAIT lecture impossible : {type(ex).__name__} ; arrêt préventif pour protéger la mémoire") from ex
               if not vieux:
                   print(f"WORKER_WAIT ancien worker terminé après {int(time.time() - debut)} s"); break
               print(f"WORKER_WAIT en attente de {vieux} ({int(time.time() - debut)} s)"); time.sleep(5)
           else:
-              print("WORKER_WAIT délai de 240 s atteint : on continue")
+              raise SystemExit("WORKER_WAIT délai de 240 s atteint : arrêt préventif, mémoire non garantie")
           PY
 
       - name: Récupérer la mémoire du robot
