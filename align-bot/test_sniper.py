@@ -172,7 +172,7 @@ class MessagesEtRegles(unittest.TestCase):
         self.assertIn("zone 3993,28–4012,79", fr[0])
         self.assertIn("SL Pine 4020 • TP1 Pine 3970 • TP2 Pine 3895,54", fr[1])
         self.assertIn("rejet M1/M3", fr[2])
-        self.assertEqual(ev[0]["entree"], "4000,5")
+        self.assertEqual(ev[0]["entree"], "4000,50")
         self.assertEqual((ev[0]["sl"], ev[0]["tp1"], ev[0]["tp"]), ("4020", "3970", "3895,54"))
         self.assertIn("Pine-confirmed sniper entry", en[0]); self.assertIn("sell", en[0]); self.assertNotIn("vente", " ".join(en))
         self.assertEqual(len({" ".join(ab.texte_pine({"al_rot": {"p:sniper:GOLD": k}}, ev[0])) for k in (-1, 0, 1)}), 3)
