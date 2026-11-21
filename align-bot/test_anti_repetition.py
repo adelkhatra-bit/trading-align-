@@ -342,7 +342,8 @@ class CoachDeConcentration(unittest.TestCase):
         self.assertIn("🎯 FOCUS : 🟠 BTC", txt.split("\n")[0])
         self.assertIn("LONG", txt); self.assertIn("73010", txt); self.assertIn("73400", txt)                    # zone visée
         self.assertIn("ATR 15 min", txt); self.assertIn("J'attends : clôture 1h au-dessus de 73205", txt)       # unité à surveiller
-        self.assertIn("GOLD", txt); self.assertIn("en approche", txt); self.assertIn("NASDAQ", txt); self.assertIn("loin de la zone", txt)
+        self.assertIn("GOLD", txt); self.assertIn("en approche", txt)
+        self.assertNotIn("NASDAQ", txt)
 
     def test_message_gratuit_sans_zone_ni_niveaux(self):
         txt = ab.texte_radar(self.classer(), self.derniers(), False)
