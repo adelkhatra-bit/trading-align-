@@ -10613,7 +10613,8 @@ def manipulation(out, m, r, cle):
               "✅ Validé quand 15 min + 1 h + 4 h vont dans le même sens",
               "🔔 Je te préviens dès que c'est bon"]
     if not tr:
-        l.append(statut_txt(0 if r["confirme"] == dm else -1, cle.get("ordre") if r["confirme"] == dm else None).strip())
+        ordre_statut = None if r.get("require_tv_bridge") else (cle.get("ordre") if r["confirme"] == dm else None)
+        l.append(statut_txt(0 if r["confirme"] == dm else -1, ordre_statut).strip())
     out.append(("\n".join(l), bouton_auto(m)) if not tr else "\n".join(l))
 
 def statut_position(tr, p):
