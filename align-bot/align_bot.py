@@ -1297,6 +1297,11 @@ def cme_ouvert(ts):
         return False
     return ct.hour != 16
 
+def symboles_bridge_obligatoires(ts=None):
+    """BTC est continu ; le bridge GOLD n'est obligatoire que pendant la session CME utilisée par ALIGN."""
+    maintenant = time.time() if ts is None else float(ts)
+    return ("BTCUSD", "XAUUSD") if cme_ouvert(maintenant) else ("BTCUSD",)
+
 def barre(r):
     s = ""
     for d, q, rv in zip(r["dirs"], r["sqzs"], r["rsis"]):
