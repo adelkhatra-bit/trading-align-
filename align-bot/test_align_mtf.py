@@ -343,6 +343,11 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertEqual(align_bot.marche_demande("Analyse BTC"), "BTC")
         self.assertIsNone(align_bot.marche_demande("Analyse BTC et Gold"))
         self.assertIsNone(align_bot.marche_demande("Analyse Bitcoin + XAUUSD"))
+        self.assertTrue(align_bot.marche_retiree_demande("Analyse Nasdaq"))
+        self.assertTrue(align_bot.marche_retiree_demande("Analyse NAS100"))
+        self.assertTrue(align_bot.marche_retiree_demande("Analyse NQ"))
+        self.assertIsNone(align_bot.marche_demande("Analyse Nasdaq"))
+        self.assertIsNone(align_bot.marche_demande("Analyse BTC et Nasdaq"))
 
     def test_next_candle_close_is_strictly_in_the_future(self):
         self.assertEqual(align_bot.prochaine_cloture(601, 300), 900)
@@ -2412,7 +2417,8 @@ class AlignTelegramMarketPreferencesTest(unittest.TestCase):
 
     def test_nasdaq_market_is_removed_and_legacy_preferences_are_filtered(self):
         self.assertNotIn("NASDAQ", align_bot.MARCHES)
-        self.assertEqual(align_bot.marche_demande("💠 Analyse Nasdaq"), "NASDAQ")
+        self.assertTrue(align_bot.marche_retiree_demande("💠 Analyse Nasdaq"))
+        self.assertIsNone(align_bot.marche_demande("💠 Analyse Nasdaq"))
         etat = {"marches_par_chat": {"7": ["GOLD", "NASDAQ"]}}
         self.assertFalse(align_bot.marche_autorise(etat, "7", "NASDAQ"))
         self.assertEqual(align_bot.marches_choisis(etat, "7"), {"GOLD"})

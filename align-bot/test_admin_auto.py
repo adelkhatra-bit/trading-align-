@@ -19,6 +19,15 @@ class AdminAuto(unittest.TestCase):
         self.assertNotIn("auto:BTC", cb)     # jamais le même bouton que le « Coach : préviens-moi » des abonnés
         self.assertIn("TEST", vus[-1]["text"])
 
+    def test_nasdaq_auto_command_is_rejected_without_state_change(self):
+        vus = []
+        etat = {"auto_marches": {"BTC": True, "GOLD": False}}
+        with unittest.mock.patch.object(ab, "_envoi_sur", lambda c, **k: vus.append(k)):
+            ab.commande_auto(etat, 1, "/auto_nasdaq")
+        self.assertEqual(etat["auto_marches"], {"BTC": True, "GOLD": False})
+        self.assertIn("retiré", vus[0]["text"].lower())
+        self.assertEqual(len(vus), 1)
+
     def test_bouton_admin_dans_mon_bot_pour_le_proprio_seulement(self):
         vus = []
         with unittest.mock.patch.object(ab, "_envoi_sur", lambda c, **k: vus.append(k)), \
