@@ -27,7 +27,7 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.assertIn('report["nasdaq_active_root_key"] = "NASDAQ" in state', self.workflow)
         self.assertIn('report["nasdaq_archive_count"]', self.workflow)
         self.assertIn('report["nasdaq_preference_count"]', self.workflow)
-        self.assertIn('"canal_live", "liens_marche", "veille_cloture", "pause_auto"', self.workflow)
+        self.assertIn('"canal_live", "liens_marche", "veille_cloture", "pause_auto"', self.bot)
         self.assertIn('LIVE_CHOIX = {', self.bot)
         self.assertNotIn('"NASDAQ": ("sym"', self.bot)
         self.assertIn('"GOLD et BTC", "GOLD and BTC"', self.bot)
