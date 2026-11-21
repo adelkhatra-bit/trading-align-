@@ -343,6 +343,11 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertEqual(align_bot.marche_demande("Analyse BTC"), "BTC")
         self.assertIsNone(align_bot.marche_demande("Analyse BTC et Gold"))
         self.assertIsNone(align_bot.marche_demande("Analyse Bitcoin + XAUUSD"))
+        self.assertTrue(align_bot.marche_retiree_demande("Analyse Nasdaq"))
+        self.assertTrue(align_bot.marche_retiree_demande("Analyse NAS100"))
+        self.assertTrue(align_bot.marche_retiree_demande("Analyse NQ"))
+        self.assertIsNone(align_bot.marche_demande("Analyse Nasdaq"))
+        self.assertIsNone(align_bot.marche_demande("Analyse BTC et Nasdaq"))
 
     def test_next_candle_close_is_strictly_in_the_future(self):
         self.assertEqual(align_bot.prochaine_cloture(601, 300), 900)
