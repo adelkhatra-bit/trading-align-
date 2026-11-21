@@ -41,6 +41,25 @@ class TradingViewBridgeGateTests(unittest.TestCase):
         self.assertIn('"; UT_périmées="', WORKFLOW_SOURCE)
         self.assertIn('"; last_rejection=" + rejection_text', WORKFLOW_SOURCE)
 
+    def test_bridge_failure_detail_reports_age_of_each_stale_timeframe(self):
+        detail = ab.detail_bridge_invalide({
+            "activeTimeframe": "M5",
+            "activeTimeframeFresh": True,
+            "activeTimeframeAgeMs": 59000,
+            "snapshots": {
+                "M5": {"fresh": False, "ageMs": 421000},
+                "M15": {"fresh": True, "ageMs": 210000},
+                "H1": {"fresh": True, "ageMs": 1200000},
+                "H4": {"fresh": True, "ageMs": 7200000},
+                "D1": {"fresh": True, "ageMs": 30000000},
+                "W1": {"fresh": True, "ageMs": 100000000},
+            },
+            "lastRejection": {"error": "stale_or_future_entry_trigger_candle", "ageMs": 1000},
+        })
+        self.assertIn("UT active M5 fraîche (59 s)", detail)
+        self.assertIn("UT périmées M5 (421 s)", detail)
+        self.assertIn("dernier envoi refusé : stale_or_future_entry_trigger_candle", detail)
+
     def test_signal_paths_require_tradingview_bridge_by_default(self):
         # Both production analysis paths must fail closed until the Pine v25 bridge is live.
         gate = 'os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "1") == "1"'
