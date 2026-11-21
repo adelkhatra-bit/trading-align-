@@ -7,13 +7,13 @@ import unittest
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parent
 WORKFLOW = REPO / ".github" / "workflows" / "align-bot.yml"
-SERVER = REPO.parent / "server.js"
-BROKER_ADAPTER = REPO.parent / "trading" / "broker-adapter.js"
-ENV_EXAMPLE = REPO.parent / ".env.example"
+SERVER = REPO / "server.js"
+BROKER_ADAPTER = REPO / "trading" / "broker-adapter.js"
+ENV_EXAMPLE = REPO / ".env.example"
 STARTUP_FILES = (
-    REPO.parent / "START.bat",
-    REPO.parent / "START_COMPLETE.bat",
-    REPO.parent / "QUICK_START.bat",
+    REPO / "START.bat",
+    REPO / "START_COMPLETE.bat",
+    REPO / "QUICK_START.bat",
 )
 
 
@@ -65,7 +65,7 @@ adapter.placeOrder({symbol: 'BTCUSD', direction: 'BUY', quantity: 1})
 """
         result = subprocess.run(
             [node, "-e", script, str(BROKER_ADAPTER)],
-            cwd=str(REPO.parent),
+            cwd=str(REPO),
             capture_output=True,
             text=True,
             timeout=15,
