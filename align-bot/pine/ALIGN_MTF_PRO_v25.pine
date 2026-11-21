@@ -22,7 +22,7 @@ pos = posTxt == "En bas à droite" ? position.bottom_right : posTxt == "En bas �
 
 // ═════════ BRIDGE ALIGN (optionnel, sans modification visuelle) ═════════
 grpBridge = "Bridge ALIGN (optionnel)"
-bridgeEnabled = input.bool(false, "Envoyer les snapshots au ROBOT V12", group=grpBridge)
+bridgeEnabled = input.bool(true, "Envoyer les snapshots au ROBOT V12", group=grpBridge)
 bridgeMarket = input.string("BTCUSD", "Marché ALIGN", options=["BTCUSD", "XAUUSD"], group=grpBridge)
 
 // ═════════ ÉTAT DE CHAQUE UNITÉ DE TEMPS ═════════
