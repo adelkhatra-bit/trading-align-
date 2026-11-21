@@ -172,7 +172,7 @@ var DIALOGUES = {
 function parler(qui, texte) {
   var bulle = document.getElementById("b-" + qui), av = document.getElementById("av-" + qui);
   var autre = qui === "t" ? "l" : "t";
-  document.getElementById("b-" + autre).classList.remove("visible"); document.getElementById("av-" + autre).classList.remove("parle");
+  document.getElementById("b-" + autre).classList.remove("visible");
   bulle.innerHTML = "<small>" + (qui === "t" ? "Thomas" : "Leïla") + "</small>" + texte; bulle.classList.add("visible");
 }
 function echange() {
