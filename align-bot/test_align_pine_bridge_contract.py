@@ -6,7 +6,7 @@ PINE = Path(__file__).parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
 BASELINE_GIT_BLOB_SHA = "578c0a1f58c03e658c42c91aeeca37e865e31e7c"  # v25 : ancienne base b49cb3ff… + suppression demandée par Adel du point ENTRÉE (ligne + étiquette) ; rien d'autre ne change
 SETTINGS_BLOCK = """// ═════════ BRIDGE ALIGN (optionnel, sans modification visuelle) ═════════
 grpBridge = "Bridge ALIGN (optionnel)"
-bridgeEnabled = input.bool(false, "Envoyer les snapshots au ROBOT V12", group=grpBridge)
+bridgeEnabled = input.bool(true, "Envoyer les snapshots au ROBOT V12", group=grpBridge)
 bridgeMarket = input.string("BTCUSD", "Marché ALIGN", options=["BTCUSD", "XAUUSD"], group=grpBridge)
 
 """
@@ -44,10 +44,10 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertIn("dirPlan = not isSupportedMarket or (isGold and not goldConfluence) ? 0 : dirStable", self.source)
         self.assertIn("bridgeDue = bridgeEnabled and isSupportedMarket", self.source)
 
-    def test_existing_human_alerts_are_preserved_and_bridge_is_opt_in(self):
+    def test_existing_human_alerts_are_preserved_and_bridge_exports_by_default(self):
         self.assertIn('alert(syminfo.ticker + " " + nomSigH', self.source)
         self.assertIn('alert(syminfo.ticker + " " + nomSigB', self.source)
-        self.assertIn('bridgeEnabled = input.bool(false, "Envoyer les snapshots au ROBOT V12"', self.source)
+        self.assertIn('bridgeEnabled = input.bool(true, "Envoyer les snapshots au ROBOT V12"', self.source)
         self.assertIn('alert(bridgePayload, alert.freq_all)', self.source)
         self.assertIn('"source":"ALIGN_MTF_PRO_V25"', self.source)
 
