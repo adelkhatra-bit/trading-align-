@@ -317,11 +317,24 @@
     } else {
       try { window.speechSynthesis.cancel(); } catch (e) {}   // v12.2.8 : OFF coupe tout ce qui est en file
       voixEnAttente = null;
+      signalVoix('STOP', 'fr');
       voixBtn.textContent = '🔇 COACH VOCAL OFF';
       voixBtn.setAttribute('aria-pressed', 'false');
     }
   });
   let voixUtterance = null;   // v12.2.10 : référence vivante de la phrase en cours (anti ramasse-miettes)
+  // v12.2.13 : signal minimal de synchronisation voix vers ALIGN LIVE (aucun texte vocal transmis).
+  function signalVoix(action, lang) {
+    const message = 'ALIGN_VOICE|' + action + '|' + (lang || 'fr') + '|' + Date.now();
+    const url = 'https://ntfy.sh/' + SUJET + '-voix';
+    try {
+      if (typeof GM_xmlhttpRequest === 'function') {
+        GM_xmlhttpRequest({ method: 'POST', url, data: message, timeout: 5000, onerror: () => {}, ontimeout: () => {} });
+      } else {
+        fetch(url, { method: 'POST', body: message, keepalive: true }).catch(() => {});
+      }
+    } catch (e) {}
+  }
   function parlerLive(item) {
     if (!voixActive || !item || (item.source !== 'ia' && item.source !== 'marche') ||!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return 0;
     // v12.2.7 (règle d'Adel) : chaque info est dite en FRANÇAIS, puis la même en ANGLAIS, jamais mélangées.
@@ -363,7 +376,8 @@
       // v12.2.10 : Chrome coupe la lecture (2-3 mots) si l'objet utterance est ramassé par le ramasse-miettes :
       // on garde une référence jusqu'à la fin de la phrase.
       voixUtterance = utterance;
-      utterance.onend = utterance.onerror = () => { if (voixUtterance === utterance) voixUtterance = null; };
+      utterance.onstart = () => signalVoix('START', anglais ? 'en' : 'fr');
+      utterance.onend = utterance.onerror = () => { signalVoix('STOP', anglais ? 'en' : 'fr'); if (voixUtterance === utterance) voixUtterance = null; };
       window.speechSynthesis.speak(utterance);
       if (anglais) { voixTexteEN = phrase; voixDerniereFR = 0; }
       else { voixTexte = phrase; voixDerniereFR = maintenant; }
