@@ -86,7 +86,11 @@ def detail_bridge_invalide(payload):
         if absents:
             morceaux.append("UT absentes " + ",".join(absents))
         if perimes:
-            morceaux.append("UT périmées " + ",".join(perimes))
+            ages = []
+            for tf in perimes:
+                age = (snaps.get(tf) or {}).get("ageMs")
+                ages.append(f"{tf} ({round(age / 1000)} s)" if isinstance(age, (int, float)) else tf)
+            morceaux.append("UT périmées " + ",".join(ages))
     rejet = payload.get("lastRejection")
     if isinstance(rejet, dict) and rejet.get("error"):
         age = rejet.get("ageMs")
