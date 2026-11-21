@@ -128,10 +128,10 @@ class EvenementsPine(unittest.TestCase):
 
     def test_squeeze_overload_then_release(self):
         etat = {}
-        self.lance(etat, "NASDAQ", self.r(comp=2))
-        self.assertEqual(self.kinds(self.lance(etat, "NASDAQ", self.r(comp=4), self.NOW + 30)), ["surcharge"])
-        self.assertEqual(self.lance(etat, "NASDAQ", self.r(comp=5), self.NOW + 60), [])
-        self.assertEqual(self.kinds(self.lance(etat, "NASDAQ", self.r(comp=1), self.NOW + 90)), ["relache"])
+        self.lance(etat, "BTC", self.r(comp=2))
+        self.assertEqual(self.kinds(self.lance(etat, "BTC", self.r(comp=4), self.NOW + 30)), ["surcharge"])
+        self.assertEqual(self.lance(etat, "BTC", self.r(comp=5), self.NOW + 60), [])
+        self.assertEqual(self.kinds(self.lance(etat, "BTC", self.r(comp=1), self.NOW + 90)), ["relache"])
 
     def test_impulsion_on_last_closed_15m_candle_once(self):
         etat, r = {}, self.r()
@@ -174,8 +174,8 @@ class EvenementsPine(unittest.TestCase):
 
     def test_rising_alignment_below_threshold_is_silent(self):
         etat = {}
-        self.lance(etat, "NASDAQ", self.r(bull=4))
-        self.assertEqual(self.lance(etat, "NASDAQ", self.r(bull=6), self.NOW + 700), [])          # « l'alignement monte (6/11) » : déjà dans le RADAR
+        self.lance(etat, "BTC", self.r(bull=4))
+        self.assertEqual(self.lance(etat, "BTC", self.r(bull=6), self.NOW + 700), [])          # « l'alignement monte (6/11) » : déjà dans le RADAR
 
     def test_closed_or_stale_market_never_alerts(self):
         etat = {}
@@ -193,8 +193,8 @@ class EvenementsPine(unittest.TestCase):
         self.assertLessEqual(len(msg), 4); self.assertTrue(msg[0].startswith("⚡ 4 infos"))
         self.assertEqual(ab.regrouper_alertes(blocs[:1]), blocs[0][:4])
 
-    def test_phrasing_never_repeats_consecutively_fr_en_three_markets(self):
-        for m in ("BTC", "GOLD", "NASDAQ"):
+    def test_phrasing_never_repeats_consecutively_fr_en_active_markets(self):
+        for m in ("BTC", "GOLD"):
             etat, vus = {}, []
             for _ in range(4):
                 ev = dict(kind="surcharge", m=m, ic=ab.ICONE[m], seuil=8, n=5, c=4)
