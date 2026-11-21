@@ -37,6 +37,9 @@ class TradingViewBridgeGateTests(unittest.TestCase):
         self.assertIn("for symbol in required_symbols:", WORKFLOW_SOURCE)
         self.assertIn("BRIDGE_SESSION_CLOSED symbol=XAUUSD", WORKFLOW_SOURCE)
         self.assertIn('ALIGN_REQUIRE_TV_BRIDGE: "1"', WORKFLOW_SOURCE)
+        self.assertIn('"; active_age_ms=" + str(active_age)', WORKFLOW_SOURCE)
+        self.assertIn('"; UT_périmées="', WORKFLOW_SOURCE)
+        self.assertIn('"; last_rejection=" + rejection_text', WORKFLOW_SOURCE)
 
     def test_signal_paths_require_tradingview_bridge_by_default(self):
         # Both production analysis paths must fail closed until the Pine v25 bridge is live.
