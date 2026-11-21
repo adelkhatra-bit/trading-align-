@@ -3759,7 +3759,7 @@ class PineOnlyEntryGateTests(unittest.TestCase):
             "b15": bars, "atr": 1.0, "t": 20_000,
             "annonce": False, "confirme": 1, "require_tv_bridge": True,
         }, {"ordre": stale_local_order})
-        message = "\n".join(out)
+        message = "\n".join(str(item[0] if isinstance(item, tuple) else item) for item in out)
         self.assertIn("aucun Entry/SL local", message)
         self.assertNotIn("Point d'entrée visé", message)
         self.assertNotIn("SL un peu", message)
