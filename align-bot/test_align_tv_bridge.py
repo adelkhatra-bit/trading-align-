@@ -86,24 +86,24 @@ class BridgeStoreTests(unittest.TestCase):
     def setUp(self):
         self.store = BridgeStore(INGEST, READ)
 
-    def test_pine_bridge_uses_native_timeframe_clock_for_bar_timestamps(self):
+    def test_pine_bridge_uses_latest_intrabar_clock_for_bar_timestamps(self):
         pine_path = Path(__file__).resolve().parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
         pine = pine_path.read_text(encoding="utf-8")
         expected = {
-            "bridgeTimeM1": 'time("1")',
-            "bridgeTimeM5": 'time("5")',
-            "bridgeTimeM15": 'time("15")',
-            "bridgeTimeM30": 'time("30")',
-            "bridgeTimeH1": 'time("60")',
-            "bridgeTimeH2": 'time("120")',
-            "bridgeTimeH4": 'time("240")',
-            "bridgeTimeD1": 'time("D")',
-            "bridgeTimeW1": 'time("W")',
+            "bridgeTimeM1": 'request.security(syminfo.tickerid, "1", time, lookahead=barmerge.lookahead_off)',
+            "bridgeTimeM5": 'request.security(syminfo.tickerid, "5", time, lookahead=barmerge.lookahead_off)',
+            "bridgeTimeM15": 'request.security(syminfo.tickerid, "15", time, lookahead=barmerge.lookahead_off)',
+            "bridgeTimeM30": 'request.security(syminfo.tickerid, "30", time, lookahead=barmerge.lookahead_off)',
+            "bridgeTimeH1": 'request.security(syminfo.tickerid, "60", time, lookahead=barmerge.lookahead_off)',
+            "bridgeTimeH2": 'request.security(syminfo.tickerid, "120", time, lookahead=barmerge.lookahead_off)',
+            "bridgeTimeH4": 'request.security(syminfo.tickerid, "240", time, lookahead=barmerge.lookahead_off)',
+            "bridgeTimeD1": 'request.security(syminfo.tickerid, "D", time, lookahead=barmerge.lookahead_off)',
+            "bridgeTimeW1": 'request.security(syminfo.tickerid, "W", time, lookahead=barmerge.lookahead_off)',
         }
         for variable, expression in expected.items():
             with self.subTest(timeframe=variable):
                 self.assertIn(f"{variable} = {expression}", pine)
-                self.assertNotIn(f"{variable} = request.security", pine)
+                self.assertNotIn(f"{variable} = time(", pine)
 
     def test_accepts_snapshot_and_exposes_workflow_contract(self):
         status, result = self.store.ingest(valid_payload(), INGEST, BASE_MS)
