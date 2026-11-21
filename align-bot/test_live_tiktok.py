@@ -1155,15 +1155,30 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", *rel)
         return Path(path).read_text(encoding="utf-8")
 
-    def test_bande_version_12_2_13_voice_recovery_and_sync(self):
+    def test_bande_version_12_2_14_voice_recovery_and_sync(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
-        self.assertIn("// @version      12.2.13", bande)
-        self.assertIn("const VERSION = '12.2.13';", bande)
+        self.assertIn("// @version      12.2.14", bande)
+        self.assertIn("const VERSION = '12.2.14';", bande)
         self.assertIn('let voixUtterance = null', bande)
         self.assertIn('voixUtterance = utterance;', bande)
         self.assertIn("voiceschanged", bande)
         self.assertIn("voixEnAttente = item", bande)
         self.assertIn("bulle ? 'marche' : 'live'", bande)
+
+    def test_voice_button_replays_last_visible_ai_comment_in_french_then_english(self):
+        bande = self._lire(["docs", "live", "align-bande-live.user.js"])
+        self.assertIn("let dernierCommentaireIA = null", bande)
+        self.assertIn("market: source === 'ia' ? codeMarche() : ''", bande)
+        self.assertIn("if (dernier && dernier.market && dernier.market === codeMarche())", bande)
+        self.assertIn("attente.source !== 'ia' || (attente.market && attente.market === codeMarche())", bande)
+        self.assertIn("items[i].replayEN = commentaireEN", bande)
+        self.assertIn("if (dureeFR > 0 && attente.replayEN && attente.replayEN.anglaisTraduit) parlerLive(attente.replayEN, true)", bande)
+        self.assertIn("dernierCommentaireIA = { fr: m, en: m.replayEN || null, market: m.market || '' }", bande)
+        self.assertIn("const dureeFR = dernier.fr ? parlerLive(dernier.fr, true) : 0", bande)
+        self.assertIn("if (dureeFR > 0 && dernier.en && dernier.en.anglaisTraduit) parlerLive(dernier.en, true)", bande)
+        self.assertIn("function parlerLive(item, forcer = false)", bande)
+        self.assertNotIn("Le coach ALIGN est en direct", bande)
+        self.assertNotIn("I am now commenting on market action", bande)
 
     def test_bande_sens_suit_le_plan_reel(self):
         """Le sens LONG/SHORT de la bannière vient du plan réel du tableau, pas de l'horloge seule."""
