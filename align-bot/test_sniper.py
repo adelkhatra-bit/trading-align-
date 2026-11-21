@@ -78,8 +78,9 @@ class Cascade(unittest.TestCase):
         self.assertGreaterEqual(sn["rr"], ab.GAIN_MIN); self.assertGreater(sn["rr_plan"], sn["rr"])
         res = ab.simuler_sniper(sn, self.M1[k + 1:])
         self.assertEqual(res["etat"], "TP1"); self.assertGreater(res["pnl"], 8)
-        print(f"SNIPER_SIMULE minute {k} prix {self.M1[k]['c']:.2f} → vente {sn['e']:.2f} ({sn['src']}, rejet {'+'.join(sn['rejets'])}) SL {sn['sl']:.2f} "
-              f"TP1 {sn['tp1']:.2f} ({sn['n1']}) TP plan {sn['tp2']:.2f} R/R {sn['rr']:.1f} (plan {sn['rr_plan']:.1f}) → {res['etat']} {res['pnl']:+.1f} pts")
+        print((f"SNIPER_SIMULE minute {k} prix {self.M1[k]['c']:.2f} → vente {sn['e']:.2f} ({sn['src']}, rejet {'+'.join(sn['rejets'])}) SL {sn['sl']:.2f} "
+                f"TP1 {sn['tp1']:.2f} ({sn['n1']}) TP plan {sn['tp2']:.2f} R/R {sn['rr']:.1f} (plan {sn['rr_plan']:.1f}) → {res['etat']} {res['pnl']:+.1f} pts")
+              .encode("ascii", "backslashreplace").decode("ascii"))
 
     def test_plan_entry_4012_was_never_reachable_but_sniper_is(self):
         tous = ab.simuler_sniper(dict(d=-1, e=4012.79, sl=4019.86, tp1=3895.54, t=self.M1[0]["t"], marche=False), self.M1)
@@ -216,7 +217,7 @@ class PropositionPineV25(unittest.TestCase):
 
     def test_v24_untouched_and_diff_has_no_design_change(self):
         import hashlib
-        v24 = (self.RACINE / "ALIGN_MTF_PRO_v24.pine").read_bytes()
+        v24 = (self.RACINE / "ALIGN_MTF_PRO_v24.pine").read_bytes().replace(b"\r\n", b"\n")
         self.assertEqual(hashlib.sha256(v24).hexdigest(), "0f1216cbb261eaaa3e019524071b67777cbecd0f5d10689cedf5727a06921085")      # empreinte du v24 publié (#134) : jamais modifié
         diff = (self.RACINE / "PROPOSITION_v25_sniper.diff").read_text(encoding="utf-8").splitlines()
         modifs = [l[1:] for l in diff if l[:1] in "+-" and not l.startswith(("+++", "---"))]
