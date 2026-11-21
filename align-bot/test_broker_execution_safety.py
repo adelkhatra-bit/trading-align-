@@ -1,7 +1,9 @@
 """Safety regression: ALIGN must never send real broker orders."""
 from pathlib import Path
+import os
 import shutil
 import subprocess
+import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parent
@@ -81,6 +83,27 @@ adapter.placeOrder({symbol: 'BTCUSD', direction: 'BUY', quantity: 1})
                 self.assertIn("SAFE_MODE=1", source)
                 self.assertNotIn("BROKER_MODE=live", source)
                 self.assertNotIn("SAFE_MODE=0", source)
+
+    def test_environment_switches_cannot_enable_topstep_or_metaapi_orders(self):
+        script = r"""
+import os, sys
+os.environ["TOPSTEP_REEL"] = "1"
+os.environ["AUTO_TRADE"] = "1"
+sys.path.insert(0, sys.argv[1])
+import topstep_trade, auto_trade
+assert topstep_trade.REEL is False, "TOPSTEP_REEL must never enable live orders"
+assert auto_trade.REEL is False, "AUTO_TRADE must never enable live orders"
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", script, str(REPO / "align-bot")],
+            cwd=str(REPO),
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+            env={**os.environ, "TOPSTEP_REEL": "1", "AUTO_TRADE": "1"},
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_env_example_is_paper_only(self):
         source = ENV_EXAMPLE.read_text(encoding="utf-8")
