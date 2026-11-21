@@ -15,7 +15,7 @@ taskkill /F /IM node.exe >nul 2>&1
 timeout /t 1 >nul
 
 echo [1/2] Démarrage Node.js Studio Server (port 4000)...
-start "Trading-Auto-Studio-4000" cmd /k "cd /d %%~dp0 && set BROKER_MODE=live && set SAFE_MODE=0 && node server.js"
+start "Trading-Auto-Studio-4000" cmd /k "cd /d %%~dp0 && set BROKER_MODE=paper && set SAFE_MODE=1 && node server.js"
 
 timeout /t 2 >nul
 

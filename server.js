@@ -7,8 +7,9 @@ const fs      = require('fs');
 const os      = require('os');
 const { spawn, execSync } = require('child_process');
 const PORT    = Number(process.env.PORT || 4000);
-if (!process.env.BROKER_MODE) process.env.BROKER_MODE = 'live';
-if (!process.env.SAFE_MODE) process.env.SAFE_MODE = '0';
+// ALIGN: real broker execution is disabled unconditionally in this server.
+process.env.BROKER_MODE = 'paper';
+if (!process.env.SAFE_MODE) process.env.SAFE_MODE = '1';
 const SAFE_MODE = process.env.SAFE_MODE !== '0';
 
 // ─── TRADINGVIEW LIVE INGESTION ─────────────────────────────────────────────
@@ -2971,12 +2972,12 @@ app.post('/trade', (req, res) => {
 });
 
 // ─── BROKER MODE ──────────────────────────────────────────────────────────────
-app.get('/broker-mode', (req, res) => res.json({ ok: true, mode: process.env.BROKER_MODE || 'live' }));
+app.get('/broker-mode', (_req, res) => res.json({ ok: true, mode: 'paper', liveExecutionEnabled: false }));
 app.post('/broker-mode', (req, res) => {
   const m = (req.body?.mode || '').toLowerCase();
-  if (!['paper','live'].includes(m)) return res.status(400).json({ ok: false, error: 'paper ou live seulement' });
-  process.env.BROKER_MODE = m;
-  res.json({ ok: true, mode: m });
+  if (m !== 'paper') return res.status(403).json({ ok: false, error: 'LIVE_BROKER_EXECUTION_DISABLED', mode: 'paper', liveExecutionEnabled: false });
+  process.env.BROKER_MODE = 'paper';
+  res.json({ ok: true, mode: 'paper', liveExecutionEnabled: false });
 });
 
 // ─── AGENTS REPORT ────────────────────────────────────────────────────────────
