@@ -7280,6 +7280,15 @@ def traiter(etat, chats, updates):
                     pass
                 menu_marches(etat, qui)
                 continue
+            if choix == "markets" and marche_retiree_demande(mk):
+                try:
+                    telegram("answerCallbackQuery", callback_query_id=cb["id"],
+                             text="NASDAQ retiré — seuls BTC et GOLD sont disponibles")
+                except Exception:
+                    pass
+                # Ancien clavier NASDAQ : le remplacer sur place par le menu actuel BTC/GOLD.
+                menu_marches(etat, qui, (cb.get("message") or {}).get("message_id"))
+                continue
             if choix == "markets" and mk == "OK":
                 try:
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="✅ Marchés enregistrés")
