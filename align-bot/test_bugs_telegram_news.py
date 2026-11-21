@@ -51,6 +51,32 @@ class TelegramPullAuthorization(unittest.TestCase):
         ab.TELEGRAM_PULL_CONTEXT.news_chat_id = None
         self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "-100123", "text": news}))
 
+
+    def test_news_urgentes_transmet_uniquement_au_canal_selectionne_et_restaure_contexte(self):
+        import json
+        ab.TELEGRAM_PULL_CONTEXT.news_chat_id = "contexte-preexistant"
+        etat = {"news_urg_t": 0, "canaux_marche": {"BTC": "-100123", "GOLD": "-100456"}}
+        decision = json.dumps({"decision": "ALERTE", "idx": 0, "markets": ["BTC"], "impact": "HIGH", "direction": "BEARISH"})
+        appels = []
+        def telegram_simule(methode, **params):
+            autorise = ab._telegram_sortant_autorise(methode, params)
+            appels.append((methode, params.get("chat_id"), params.get("text", ""),
+                           getattr(ab.TELEGRAM_PULL_CONTEXT, "news_chat_id", None), autorise))
+            return {"ok": autorise}
+        with mock.patch.object(ab, "TOKEN", "token-test"), \
+             mock.patch.object(ab, "titres_urgents", return_value=["Fed rate decision affects Bitcoin"]), \
+             mock.patch.object(ab, "ia", return_value=decision), \
+             mock.patch.object(ab, "telegram", side_effect=telegram_simule), \
+             mock.patch.object(ab, "live_publier", return_value=True):
+            resultat = ab.news_urgentes(etat, maintenant=1000, lire=lambda _url: "<rss/>")
+        self.assertTrue(resultat.startswith("🚨 NEWS DE DERNIÈRE MINUTE"))
+        self.assertEqual(len(appels), 1)
+        methode, canal, texte, contexte, autorise = appels[0]
+        self.assertEqual((methode, canal, contexte), ("sendMessage", "-100123", "-100123"))
+        self.assertTrue(texte.startswith("🚨 NEWS DE DERNIÈRE MINUTE"))
+        self.assertTrue(autorise)
+        self.assertEqual(ab.TELEGRAM_PULL_CONTEXT.news_chat_id, "contexte-preexistant")
+
     def test_unsolicited_status_message_remains_blocked(self):
         ab.TELEGRAM_PULL_CONTEXT.chat_id = None
         ab.TELEGRAM_PULL_CONTEXT.private = False
