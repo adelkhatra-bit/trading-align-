@@ -313,6 +313,10 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("🔊 COACH VOCAL ON", source)
         self.assertIn("voixBtn.remove()", source)
         self.assertIn("parlerLive(m)", source)
+        self.assertIn("voiceschanged", source)  # voix navigateur parfois disponibles après document-idle
+        self.assertIn("voixEnAttente = item", source)  # commentaire FR retenté quand la liste de voix arrive
+        self.assertIn("hortense|audrey|julie|charlotte", source)  # noms courants de voix FR, sans repli robot
+        self.assertIn("localStorage.removeItem('alignVoixActive')", source)  # ON persisted ne contourne pas la gesture audio
         self.assertNotIn("Le coach ALIGN est en direct", source)  # v12.2.8 : plus de phrase d'accueil
 
 
