@@ -1,9 +1,8 @@
 """ALIGN — calcul et simulation Topstep (API TopstepX / ProjectX), micro-contrats MNQ / MGC / MBT ; aucun ordre réel.
 
 Différences voulues par Adel (15/11) avec FundedNext :
-  • Topstep = futures : TOUTES les positions sont fermées 1 h AVANT la limite Topstep (15 h 10 heure de Chicago),
-    annonce sur Telegram et sur le live 1 h avant puis 10 min avant, le bot s'arrête puis reprend après la réouverture
-    (17 h heure de Chicago, dimanche soir pour le week-end).
+  • Topstep = futures : annonces de fermeture 1 h et 10 min avant la limite Topstep (15 h 10 heure de Chicago).
+    Les positions réelles doivent être fermées MANUELLEMENT ; ALIGN reste en suivi informatif et ne passe aucun ordre.
   • FundedNext (MT5, auto_trade.py) peut garder les positions plus longtemps.
 
 Sécurité (codée en dur) : 1 micro-contrat, perte max 75 $ par position, arrêt à -150 $ dans la journée,
@@ -46,14 +45,14 @@ def phase(maintenant=None):
 
 
 MESSAGES = {
-    "annonce_1h": "⏰ COMPTES TOPSTEP : le marché ferme bientôt\n🔒 Pense à fermer tes positions dans l'heure\n🤖 Le bot ALIGN coupe les siennes et s'arrête de son côté\n🔁 Il reprend après la réouverture\n🟢 Comptes FundedNext / FTMO : on peut garder",
-    "annonce_10min": "🚨 COMPTES TOPSTEP : dernières 10 minutes\n🔒 Ferme tes positions maintenant\n🤖 Le bot ALIGN est à plat\n⚠️ Ceci n'est pas un conseil en investissement (DYOR)",
-    "reouverture": "🔔 Marché rouvert\n🤖 Le bot ALIGN reprend les positions sur Topstep\n👀 Suis la prochaine entrée en direct",
+    "annonce_1h": "⏰ COMPTES TOPSTEP : le marché ferme bientôt\n🔒 Ferme MANUELLEMENT tes positions dans l'heure\n🛑 ALIGN est en suivi informatif : aucun ordre réel n'est envoyé\n⚠️ Vérifie ton compte avant la clôture",
+    "annonce_10min": "🚨 COMPTES TOPSTEP : dernières 10 minutes\n🔒 Ferme MANUELLEMENT tes positions maintenant\n🛑 ALIGN ne ferme aucune position réelle\n⚠️ Ceci n'est pas un conseil en investissement (DYOR)",
+    "reouverture": "🔔 Marché rouvert\nℹ️ ALIGN reprend le suivi informatif\n🛑 Aucun ordre réel n'est envoyé",
 }
 BANDE = {
-    "annonce_1h": "⏰ COMPTES FUTURES : LE MARCHÉ FERME DANS 1 H • LE BOT COUPE SES POSITIONS • LIEN EN BIO",
-    "annonce_10min": "🚨 COMPTES FUTURES : 10 MIN AVANT LA FERMETURE • TOUT LE MONDE À PLAT • LIEN EN BIO",
-    "reouverture": "🔔 LE MARCHÉ ROUVRE • LE BOT REPREND • LIEN EN BIO",
+    "annonce_1h": "⏰ COMPTES FUTURES : FERMETURE DANS 1 H • POSITIONS À FERMER MANUELLEMENT • ALIGN SANS ORDRE RÉEL",
+    "annonce_10min": "🚨 COMPTES FUTURES : 10 MIN • FERME TES POSITIONS MANUELLEMENT • ALIGN SANS ORDRE RÉEL",
+    "reouverture": "🔔 LE MARCHÉ ROUVRE • ALIGN REPREND LE SUIVI INFORMATIF • PAS D'ORDRE RÉEL",
 }
 
 
