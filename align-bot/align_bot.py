@@ -13477,7 +13477,7 @@ def migrer_scope_marches_btc_gold_only(etat):
         etat["archives_marches_retirees"] = archives
 
     # Tables indexées par marché : aucune souscription ou configuration NASDAQ ne reste active.
-    for key in ("auto", "auto_marches", "coach_live", "canaux_marche", "liens_marche", "veille_cloture"):
+    for key in ("auto", "auto_marches", "coach_live", "canaux_marche", "canal_live", "liens_marche", "veille_cloture", "pause_auto"):
         table = etat.get(key)
         if isinstance(table, dict):
             table.pop("NASDAQ", None)
