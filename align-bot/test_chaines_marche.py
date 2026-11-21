@@ -16,12 +16,15 @@ class PreparerChaines(unittest.TestCase):
         for x in self.p:
             x.stop()
 
-    def test_logo_et_description_pour_les_3_chaines_meme_marche_ferme(self):
+    def test_logo_et_descriptions_btc_gold_et_logo_historique_nasdaq(self):
         etat = {"canaux_marche": {"BTC": -1, "GOLD": -2, "NASDAQ": -3}}
         ab.preparer_chaines(etat)
         for c in (-1, -2, -3):
             self.assertIn(("photo", c), self.appels)
+        for c in (-1, -2):
             self.assertIn(("setChatDescription", c), self.appels)
+        self.assertNotIn(("setChatDescription", -3), self.appels)
+        self.assertNotIn("desc_ok", etat.get("canal_live", {}).get("NASDAQ", {}))
         self.appels.clear()
         ab.preparer_chaines(etat)                       # déjà fait : rien n'est renvoyé
         self.assertEqual(self.appels, [])

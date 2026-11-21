@@ -15,7 +15,7 @@
 // Liaison : ALIGN_TV_MAILBOX (Durable Object). Secrets : ALIGN_TV_INGEST_TOKEN, ALIGN_TV_MAILBOX_TOKEN.
 
 const SOURCE = "ALIGN_MTF_PRO_V25";
-const SYMBOLS = new Set(["BTCUSD", "XAUUSD", "NAS100"]);
+const SYMBOLS = new Set(["BTCUSD", "XAUUSD"]);
 const MAX_BODY = 32768;
 const MAX_AGE_MS = 10 * 60 * 1000; // au-delà de 10 min, le message n'est plus servi
 // IP d'envoi publiées par TradingView (support.tradingview.com, « About webhooks »).
@@ -26,7 +26,6 @@ const TRADINGVIEW_IPS = new Set(["52.89.214.238", "34.212.75.30", "54.218.53.128
 const TICKER_MARKERS = {
   BTCUSD: ["BTC", "XBT"],
   XAUUSD: ["XAU", "GOLD"],
-  NAS100: ["NAS100", "NDX", "US100", "USTEC", "NQ"],
 };
 
 export function tickerMatchesSymbol(symbol, tickerid) {

@@ -70,7 +70,7 @@ class ParcoursLiveEtBudget(unittest.TestCase):
     def test_bouton_live_commence_par_le_choix_du_marche_meme_sans_live(self):
         etat = {"live_on": False}
         kb = json.loads(ab.clavier_live(etat, "7"))["inline_keyboard"]
-        self.assertEqual([b["callback_data"] for b in kb[0]], ["livemkt:BTC", "livemkt:GOLD", "livemkt:NASDAQ"])
+        self.assertEqual([b["callback_data"] for b in kb[0]], ["livemkt:BTC", "livemkt:GOLD"])
 
     def test_choix_du_marche_propose_la_seule_prochaine_position(self):
         kb = json.loads(ab.clavier_choix_coach("GOLD"))["inline_keyboard"]

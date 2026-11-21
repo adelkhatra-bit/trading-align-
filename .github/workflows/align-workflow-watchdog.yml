@@ -7,6 +7,7 @@ on:
       - "ALIGN contrôle IA (manuel)"
       - "ALIGN worker rollover"
       - "ALIGN MTF validation"
+      - "ALIGN MTF BOT (signaux BTC + Gold Telegram)"
       - "ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)"
       - "ALIGN audit des messages envoyés (manuel)"
       - "CI Integration Tests"

@@ -36,7 +36,9 @@ TRANSIENT_PATTERNS = (
     r"\bHTTP(?:Error)?\s*(?:429|500|502|503|504)\b",
     r"rate limit exceeded",
 )
-BOT_WORKFLOW = "ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)"
+BOT_WORKFLOW = "ALIGN MTF BOT (signaux BTC + Gold Telegram)"
+LEGACY_BOT_WORKFLOWS = {"ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)"}
+BOT_WORKFLOWS = {BOT_WORKFLOW, *LEGACY_BOT_WORKFLOWS}
 BOT_STALE_THRESHOLD_MINUTES = 370  # runtime nominal 350 min + marge, workflow timeout 355 min
 
 AUTO_REPAIR_WORKFLOW_NAMES = {
@@ -313,7 +315,7 @@ def cancelled_jobs(run_id: int) -> list[dict]:
 
 def cancelled_by_successor_rollover(run: dict) -> bool:
     """A BOT cancellation is intentional only when a newer successful main validation is retiring it."""
-    if run.get("name") != BOT_WORKFLOW or run.get("head_branch") != "main":
+    if run.get("name") not in BOT_WORKFLOWS or run.get("head_branch") != "main":
         return False
     try:
         worker_started = parse_time(run["created_at"])
@@ -403,7 +405,7 @@ def handle_completed(run: dict) -> None:
     if conclusion == "cancelled":
         # Worker rollover is the only expected cancellation. A manual/stray BOT cancellation
         # must be visible; never restart the production Telegram worker automatically.
-        if name != BOT_WORKFLOW:
+        if name not in BOT_WORKFLOWS:
             return
         if cancelled_by_successor_rollover(run):
             print(f"WATCHDOG_WORKER_CANCELLED_BY_ROLLOVER run={run_id}")
@@ -421,7 +423,7 @@ def handle_completed(run: dict) -> None:
 
     jobs = failed_jobs(run_id)
     attempt = int(run.get("run_attempt") or 1)
-    if name in SAFE_RETRY_WORKFLOWS and name != BOT_WORKFLOW and attempt == 1 and transient_failure(jobs):
+    if name in SAFE_RETRY_WORKFLOWS and name not in BOT_WORKFLOWS and attempt == 1 and transient_failure(jobs):
         api(f"/repos/{REPO}/actions/runs/{run_id}/rerun-failed-jobs", method="POST")
         print(f"WATCHDOG_SAFE_RETRY run={run_id} workflow={name} attempt=1")
         return
@@ -454,7 +456,7 @@ def inspect_stale_runs() -> None:
         if name == "ALIGN Workflow Watchdog":
             continue
         age_minutes = (now - parse_time(run["created_at"])).total_seconds() / 60
-        threshold = BOT_STALE_THRESHOLD_MINUTES if name == BOT_WORKFLOW else 20
+        threshold = BOT_STALE_THRESHOLD_MINUTES if name in BOT_WORKFLOWS else 20
         if age_minutes >= threshold:
             report(
                 run,
@@ -474,7 +476,7 @@ def inspect_recent_failures() -> None:
             if run.get("name") == "ALIGN Workflow Watchdog":
                 continue
             if run.get("conclusion") not in failures and not (
-                run.get("name") == BOT_WORKFLOW and run.get("conclusion") == "cancelled"
+                run.get("name") in BOT_WORKFLOWS and run.get("conclusion") == "cancelled"
             ):
                 continue
             if parse_time(run["created_at"]) < cutoff:

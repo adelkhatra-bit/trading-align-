@@ -233,8 +233,8 @@ class LiveTikTok(unittest.TestCase):
         self.etat["live_on"] = True
         kb = json.loads(ab.clavier_live(self.etat, "2"))["inline_keyboard"]
         # 1re ligne = parcours d'Adel (choix du marché → coach → prochaine position) ; « prendre la main » reste en 4e ligne.
-        self.assertEqual([b["callback_data"] for b in kb[0]], ["livemkt:BTC", "livemkt:GOLD", "livemkt:NASDAQ"])
-        self.assertEqual([b["text"] for b in kb[3]], ["🟠 BTC", "🥇 Gold", "💠 NASDAQ"])
+        self.assertEqual([b["callback_data"] for b in kb[0]], ["livemkt:BTC", "livemkt:GOLD"])
+        self.assertEqual([b["text"] for b in kb[3]], ["🟠 BTC", "🥇 Gold"])
         self.assertIn("capture", ab.texte_live(self.etat))
 
     def test_paiement_refuse_si_live_eteint(self):
@@ -299,7 +299,7 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("analysechoice:BOTH", actions)
         self.assertIn("searchpos:BOTH", actions)
         self.assertIn("marketsmenu:x", actions)
-        for market in ("BTC", "GOLD", "NASDAQ"):
+        for market in ("BTC", "GOLD"):
             self.assertIn(f"coachlive:{market}", actions)
 
     def test_live_script_has_click_to_enable_voice_and_cleans_it_up(self):
@@ -313,6 +313,19 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("🔊 COACH VOCAL ON", source)
         self.assertIn("voixBtn.remove()", source)
         self.assertIn("parlerLive(m)", source)
+        # End-to-end linkage: bot IA payload -> ntfy receiver -> AI bubble -> voice narration.
+        self.assertIn("if (txt.startsWith('IA:')) { recuIA(txt.slice(3)); return; }", source)
+        self.assertIn("montrer('🧠 ' + phrase, false, 2, 'membre', false, 'ia')", source)
+        self.assertIn("const voixDuree = parlerLive(m)", source)
+        self.assertIn("montrer(txt, bulle, 2, '', false, bulle ? 'marche' : 'live')", source)  # BULLE de marché envoyée au vocal
+        self.assertIn("const traductionEN = enAnglais(texte), anglaisTraduit = traductionEN !== texte", source)
+        self.assertIn("item.source === 'marche' && !item.anglaisTraduit", source)  # évite la voix anglaise sur une bulle restée en français
+        self.assertIn("item.source !== 'ia' && item.source !== 'marche'", source)
+        self.assertIn("voiceschanged", source)  # voix navigateur parfois disponibles après document-idle
+        self.assertIn("removeEventListener('voiceschanged', voixSurVoixChangees)", source)  # listener nettoyé à la réinjection
+        self.assertIn("voixEnAttente = item", source)  # commentaire FR retenté quand la liste de voix arrive
+        self.assertIn("hortense|audrey|julie|charlotte", source)  # noms courants de voix FR, sans repli robot
+        self.assertIn("localStorage.removeItem('alignVoixActive')", source)  # ON persisted ne contourne pas la gesture audio
         self.assertNotIn("Le coach ALIGN est en direct", source)  # v12.2.8 : plus de phrase d'accueil
 
 
@@ -1010,15 +1023,14 @@ class LiveMarketNarrationFallback(unittest.TestCase):
         }}
         raw = ab.commentaires_live_de_secours(data)
         parsed = ab.phrases_bande_par_marche(raw)
-        self.assertEqual(set(parsed), {"BTC", "GOLD", "NASDAQ"})
+        self.assertEqual(set(parsed), {"BTC", "GOLD"})
         self.assertTrue(all(len(parsed[m]) == 2 for m in parsed))
         self.assertTrue(all(8 <= len(fr) <= 140 and 8 <= len(en) <= 140 for pairs in parsed.values() for fr, en in pairs))
         self.assertIn("volume Kraken accélère", parsed["BTC"][1][0])
         self.assertIn("confirment la hausse", parsed["BTC"][0][0])
         self.assertIn("zone profonde", parsed["BTC"][1][0])
         self.assertIn("volume proxy reste discret", parsed["GOLD"][1][0])
-        self.assertIn("confirm the decline", parsed["NASDAQ"][0][1])
-        self.assertIn("volume is unavailable", parsed["NASDAQ"][1][1])
+        self.assertNotIn("NASDAQ", parsed)
 
     def test_fallback_never_invents_market_without_data(self):
         self.assertEqual(ab.commentaires_live_de_secours({"marches": {}}), "")
@@ -1046,7 +1058,7 @@ class LiveMarketPartialAiCoverage(unittest.TestCase):
             self.assertTrue(ab.live_phrases_ia(state, 1000, {}))
         self.assertEqual(len(published), 1)
         payload = json.loads(published[0][3:])
-        self.assertEqual(set(payload), {"BTC", "GOLD", "NASDAQ"})
+        self.assertEqual(set(payload), {"BTC", "GOLD"})
         self.assertTrue(all(len(payload[m]) == 2 for m in payload))
         self.assertIn("biais reste baissier", payload["GOLD"][0][0].lower())
 
@@ -1102,16 +1114,16 @@ class LiveClosedCandleContext(unittest.TestCase):
 class LiveNarrationPrioritizesM5M15Conflict(unittest.TestCase):
     def test_conflicting_closed_timeframe_sweeps_override_generic_ai(self):
         data = {"marches": {
-            "NASDAQ": {
+            "GOLD": {
                 "biais_plan": "neutre",
                 "confirmation_4h_1h": "non alignées",
                 "surveillance_retournement": {"direction": 0, "conflit": True, "timeframe": "M5/M15"}
             }
         }}
         ai = (
-            "NASDAQ | Le marché consolide dans sa zone technique et attend une clôture plus claire. | "
+            "GOLD | Le marché consolide dans sa zone technique et attend une clôture plus claire. | "
             "The market is consolidating in its technical area and awaits a clearer close.\n"
-            "NASDAQ | Le rythme ralentit avant la prochaine impulsion et la structure reste à surveiller. | "
+            "GOLD | Le rythme ralentit avant la prochaine impulsion et la structure reste à surveiller. | "
             "Momentum is slowing before the next impulse and structure remains in focus."
         )
         published = []
@@ -1124,8 +1136,7 @@ class LiveNarrationPrioritizesM5M15Conflict(unittest.TestCase):
         ):
             self.assertTrue(ab.live_phrases_ia({}, 1000, {}))
         payload = json.loads(published[0][3:])
-        self.assertIn("unités courtes et de référence divergent", payload["NASDAQ"][1][0])
-        self.assertIn("timeframes disagree", payload["NASDAQ"][1][1])
+        self.assertNotIn("NASDAQ", payload)
 
 
 class VoixNaturelleSeulementV1228(unittest.TestCase):
@@ -1135,12 +1146,15 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", *rel)
         return open(path, encoding="utf-8").read()
 
-    def test_bande_version_12_2_11(self):
+    def test_bande_version_12_2_12_voice_recovery(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
-        self.assertIn("// @version      12.2.11", bande)
-        self.assertIn("const VERSION = '12.2.11';", bande)
+        self.assertIn("// @version      12.2.12", bande)
+        self.assertIn("const VERSION = '12.2.12';", bande)
         self.assertIn('let voixUtterance = null', bande)
         self.assertIn('voixUtterance = utterance;', bande)
+        self.assertIn("voiceschanged", bande)
+        self.assertIn("voixEnAttente = item", bande)
+        self.assertIn("bulle ? 'marche' : 'live'", bande)
 
     def test_bande_sens_suit_le_plan_reel(self):
         """Le sens LONG/SHORT de la bannière vient du plan réel du tableau, pas de l'horloge seule."""
@@ -1164,7 +1178,9 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         # plus aucun repli sur "dansLangue[0]" (= voix robot) ; sans voix naturelle, on ne parle pas
         self.assertNotIn("utterance.voice = dansLangue[0]", bande)
         self.assertNotIn("dansLangue[0]", bande)
-        self.assertIn("if (!v) return 0;", bande)
+        self.assertIn("if (!v) {", bande)
+        self.assertIn("if (!anglais && voixActive) voixEnAttente = item;", bande)
+        self.assertIn("return 0;   // aucune voix naturelle disponible : silence plutôt qu'une voix robot", bande)
         self.assertIn("utterance.voice = v;", bande)
 
     def test_bande_off_coupe_toute_la_parole(self):

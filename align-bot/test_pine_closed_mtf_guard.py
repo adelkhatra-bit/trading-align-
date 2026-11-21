@@ -6,7 +6,7 @@ PINE = Path(__file__).resolve().parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
 
 
 class PineClosedMtfGuard(unittest.TestCase):
-    def test_gold_nasdaq_use_previous_closed_candle_for_m5_m15_h1_h4(self):
+    def test_gold_uses_previous_closed_candle_for_m5_m15_h1_h4(self):
         source = PINE.read_text(encoding="utf-8")
         self.assertIn("f_dir_confirme() =>", source)
         self.assertIn("d[1]", source)
@@ -15,14 +15,15 @@ class PineClosedMtfGuard(unittest.TestCase):
             pattern = rf'request\.security\(syminfo\.tickerid,\s*{re.escape(tf)},\s*f_dir_confirme\(\),\s*lookahead=barmerge\.lookahead_on\)'
             self.assertRegex(source, pattern)
 
-    def test_gold_nasdaq_trade_direction_is_blocked_without_four_way_confluence(self):
+    def test_gold_requires_four_way_confluence_and_unsupported_markets_are_blocked(self):
         source = PINE.read_text(encoding="utf-8")
-        self.assertIn("isGoldNasdaq", source)
-        self.assertIn("gnConfluence = dirStable != 0 and nz(d5Fermee) == dirStable and nz(d15Fermee) == dirStable", source)
+        self.assertIn("isGold", source)
+        self.assertIn("isSupportedMarket = isBtc or isGold", source)
+        self.assertIn("goldConfluence = dirStable != 0 and nz(d5Fermee) == dirStable and nz(d15Fermee) == dirStable", source)
         self.assertIn("nz(d60Fermee) == dirStable and nz(d240Fermee) == dirStable", source)
-        self.assertIn("dirPlan = isGoldNasdaq and not gnConfluence ? 0 : dirStable", source)
-        self.assertIn("(not isGoldNasdaq or (gnConfluence and dirStable == 1))", source)
-        self.assertIn("(not isGoldNasdaq or (gnConfluence and dirStable == -1))", source)
+        self.assertIn("dirPlan = not isSupportedMarket or (isGold and not goldConfluence) ? 0 : dirStable", source)
+        self.assertIn("sigHaut = isSupportedMarket and sigHaut0", source)
+        self.assertIn("sigBas  = isSupportedMarket and sigBas0", source)
 
 
     def test_direction_confirmation_uses_closed_htf_candles_not_live_ones(self):

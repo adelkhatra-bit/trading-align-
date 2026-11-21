@@ -90,10 +90,10 @@ class DonneesLive(unittest.TestCase):
         for interdit in ("3983", "3990", "4000", "4001", "4010", "3950", "sl", "tp", "entree_prix", "token", "ghp_", "prix"):
             self.assertNotIn(interdit, txt.replace('"entree"', ""))
         etats = {m["m"]: m["etat"] for m in d["marches"]}
-        self.assertEqual(etats, {"GOLD": "preparation", "BTC": "calme", "NASDAQ": "entree"})
+        self.assertEqual(etats, {"GOLD": "preparation", "BTC": "calme"})
         with patch.object(ab, "cme_ouvert", return_value=False):
             ferme = {m["m"]: m["etat"] for m in ab.construire_live(etat, derniers, 1_800_000_000)["marches"]}
-        self.assertEqual((ferme["GOLD"], ferme["NASDAQ"], ferme["BTC"]), ("ferme", "ferme", "calme"))
+        self.assertEqual((ferme["GOLD"], ferme["BTC"]), ("ferme", "calme"))
 
     def test_publication_throttled_unchanged_skipped_token_never_exposed(self):
         etat, appels = {}, []
@@ -153,7 +153,7 @@ class PageLive(unittest.TestCase):
 
     def test_production_bridge_requires_fresh_real_tradingview_price(self):
         workflow = (RACINE / ".github" / "workflows" / "align-bot.yml").read_text(encoding="utf-8")
-        bridge = workflow.split("      - name: Vérifier le bridge TradingView ROBOT V12", 1)[1].split("      - name: Analyse BTC + Gold + NASDAQ", 1)[0]
+        bridge = workflow.split("      - name: Vérifier le bridge TradingView ROBOT V12", 1)[1].split("      - name: Analyse BTC + Gold", 1)[0]
         self.assertIn('price = float(snap.get("price"))', bridge)
         self.assertIn('price_updated_at = snap.get("updatedAt")', bridge)
         self.assertIn("math.isfinite(price)", bridge)
@@ -185,7 +185,7 @@ class PageLive(unittest.TestCase):
         wf = (RACINE / ".github" / "workflows" / "align-bot.yml").read_text(encoding="utf-8")
         bot = (RACINE / "align-bot" / "align_bot.py").read_text(encoding="utf-8")
         self.assertNotIn("continue-on-error: true", wf.split("Vérifier une connexion IA réelle", 1)[1].split("Vérifier le bridge TradingView", 1)[0])
-        bridge = wf.split("Vérifier le bridge TradingView", 1)[1].split("Analyse BTC + Gold + NASDAQ", 1)[0]
+        bridge = wf.split("Vérifier le bridge TradingView", 1)[1].split("Analyse BTC + Gold", 1)[0]
         self.assertNotIn("continue-on-error: true", bridge)
         self.assertIn("raise SystemExit", bridge)
         self.assertIn("ALIGN_TV_API_URL", bridge)

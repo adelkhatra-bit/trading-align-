@@ -9,7 +9,7 @@ WORKFLOW = ROOT.parent / ".github" / "workflows" / "align-bot.yml"
 class BrokerExecutionSafety(unittest.TestCase):
     def test_production_worker_forces_broker_execution_off(self):
         source = WORKFLOW.read_text(encoding="utf-8")
-        start = source.index("      - name: Analyse BTC + Gold + NASDAQ et envoi Telegram")
+        start = source.index("      - name: Analyse BTC + Gold et envoi Telegram")
         step = source[start:]
         self.assertIn('AUTO_TRADE: "0"', step)
         self.assertIn('TOPSTEP_REEL: "0"', step)

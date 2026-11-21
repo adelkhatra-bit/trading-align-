@@ -1,4 +1,4 @@
-name: ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)
+name: ALIGN MTF BOT (signaux BTC + Gold Telegram)
 # Release trigger after verified cleanup of the previous production worker.
 
 on:
@@ -128,10 +128,8 @@ jobs:
                       report["telegram_offset_present"] = state.get("offset") is not None
                       report["btc_open_trade"] = bool((state.get("BTC") or {}).get("trade"))
                       report["gold_open_trade"] = bool((state.get("GOLD") or {}).get("trade"))
-                      report["nasdaq_open_trade"] = bool((state.get("NASDAQ") or {}).get("trade"))
                       report["btc_auto_follow_count"] = len((state.get("auto") or {}).get("BTC", []))
                       report["gold_auto_follow_count"] = len((state.get("auto") or {}).get("GOLD", []))
-                      report["nasdaq_auto_follow_count"] = len((state.get("auto") or {}).get("NASDAQ", []))
               except Exception as exc:
                   report["state_json_valid"] = False
                   report["parse_error"] = type(exc).__name__
@@ -150,9 +148,10 @@ jobs:
           retention-days: 1
 
       - name: Vérifier la connexion à Telegram sans envoyer de message
-        # Un simple délai réseau (read timeout sur getMe, vu aux runs 732-736) ne doit JAMAIS tuer le worker :
-        # 3 essais espacés de 15 s (timeout 60 s) ; si Telegram ne répond toujours pas → avertissement seulement,
-        # le bot a ses propres reprises réseau. Seul un secret absent ou un refus explicite de l'API reste bloquant.
+        # Préflight fail-closed : après 3 essais espacés de 15 s (timeout 60 s),
+        # toute API Telegram non vérifiée bloque le worker. Ne pas démarrer en polling
+        # si getMe/getWebhookInfo échoue ou si un webhook ne peut pas être retiré et revérifié.
+        # Aucun message utilisateur n'est envoyé par ce contrôle.
         working-directory: align-bot
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -185,8 +184,8 @@ jobs:
 
           def avertir(texte):
               print("::warning title=Telegram injoignable depuis le runner::" + texte)
-              print("TELEGRAM_API_UNREACHABLE le worker démarre quand même (reprises réseau du bot)")
-              raise SystemExit(0)
+              print("TELEGRAM_API_UNREACHABLE worker bloqué (fail-closed; aucune réception vérifiée)")
+              raise SystemExit(1)
 
           payload = appel("getMe")
           if payload is None:
@@ -207,7 +206,9 @@ jobs:
                   raise SystemExit("ÉCHEC: webhook Telegram actif et suppression impossible; le polling ne peut pas démarrer.")
               print("TELEGRAM_WEBHOOK_REMOVED pending_updates_preserved=true")
               verified = appel("getWebhookInfo")
-              if verified is not None and (not verified.get("ok") or (verified.get("result") or {}).get("url", "").strip()):
+              if verified is None:
+                  avertir("getWebhookInfo sans réponse après suppression du webhook : réception Telegram non vérifiée.")
+              if not verified.get("ok") or (verified.get("result") or {}).get("url", "").strip():
                   raise SystemExit("ÉCHEC: le webhook Telegram est toujours actif après suppression.")
           print("TELEGRAM_API_OK bot=@" + payload["result"].get("username", "unknown"))
           print("TELEGRAM_RECEIVE_MODE=polling webhook=none")
@@ -251,7 +252,7 @@ jobs:
           echo "Bridge local prêt (127.0.0.1:4100) ; dernier relevé du relais :"
           tail -n 1 "$RUNNER_TEMP/align_relais.log" || true
 
-      - name: Vérifier le bridge TradingView ROBOT V12 (BTC + GOLD + NASDAQ)
+      - name: Vérifier le bridge TradingView ROBOT V12 (BTC + GOLD)
         id: bridge
         # Contrôle strict et inchangé des données TradingView/ROBOT V12. S'il échoue : MODE SANS SIGNAL.
         # Aucun signal n'est émis (ALIGN_REQUIRE_TV_BRIDGE=1 : le bot refuse tout plan sans bridge),
@@ -267,7 +268,7 @@ jobs:
           token = os.environ.get("ALIGN_TV_READ_TOKEN", "").strip()
           if not base or not token:
               raise SystemExit("ÉCHEC: secrets ALIGN_TV_API_URL / ALIGN_TV_READ_TOKEN absents; bridge TradingView obligatoire, analyse Telegram bloquée.")
-          for symbol in ("BTCUSD", "XAUUSD", "NAS100"):
+          for symbol in ("BTCUSD", "XAUUSD"):
               url = base + "/bridge/robot-v12/mtf?symbol=" + urllib.parse.quote(symbol)
               req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token, "User-Agent": "ALIGN-bridge-preflight"})
               with urllib.request.urlopen(req, timeout=12) as response:
@@ -316,7 +317,7 @@ jobs:
             echo "MODE SANS SIGNAL : bridge TradingView indisponible, aucun signal émis ; Telegram, commandes et news actifs."
           fi
 
-      - name: Analyse BTC + Gold + NASDAQ et envoi Telegram
+      - name: Analyse BTC + Gold et envoi Telegram
         env:
           ALIGN_AI_HEALTHY_PROVIDER: ${{ steps.ia_preflight.outputs.provider }}
           ALIGN_REQUIRE_TV_BRIDGE: "1"
