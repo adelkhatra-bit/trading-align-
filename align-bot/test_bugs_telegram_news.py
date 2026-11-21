@@ -43,7 +43,7 @@ class TelegramPullAuthorization(unittest.TestCase):
         ab.TELEGRAM_PULL_CONTEXT.private = False
         ab.TELEGRAM_PULL_CONTEXT.news_chat_id = "-100123"
         ab.DERNIER_ETAT = {"canaux_marche": {"BTC": "-100123", "GOLD": "-100456"}}
-        news = "🚨 NEWS DE DERNIÈRE MINUTE\\n📰 Headline\\nDYOR"
+        news = "🚨 NEWS DE DERNIÈRE MINUTE\n📰 Headline\nDYOR"
         self.assertTrue(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "-100123", "text": news}))
         self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "-100456", "text": news}))
         self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "-100123", "text": "Statut du marché"}))
