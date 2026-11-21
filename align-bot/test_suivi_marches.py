@@ -67,6 +67,47 @@ class SuiviMarchesTest(unittest.TestCase):
         self.assertIn("✅ Tout recevoir", textes)
 
 
+class MigrationMarchesBtcGoldOnlyTest(unittest.TestCase):
+    def test_legacy_nasdaq_state_is_archived_and_removed_from_active_database(self):
+        legacy_trade = {"d": -1, "e": 100, "sl": 105, "tp1": 90, "qui": {"42": {"fini": False}}}
+        etat = {
+            "schema_version": 3,
+            "NASDAQ": {"trade": legacy_trade, "pine": {"old": True}},
+            "marches_par_chat": {"42": ["GOLD", "NASDAQ"], "43": "NASDAQ", "44": "BOTH"},
+            "auto": {"BTC": ["42"], "GOLD": ["44"], "NASDAQ": ["43"]},
+            "auto_marches": {"BTC": True, "GOLD": False, "NASDAQ": True},
+            "coach_live": {"NASDAQ": {"43": {"expire": 9999999999}}, "GOLD": {"44": {"expire": 9999999999}}},
+            "canaux_marche": {"NASDAQ": "-1009", "BTC": "-1001"},
+            "liens_marche": {"NASDAQ": "https://t.me/old_nasdaq", "GOLD": "https://t.me/gold"},
+            "veille_cloture": {"NASDAQ": {"43": {"expire": 9999999999}}},
+        }
+
+        self.assertTrue(ab.migrer_scope_marches_btc_gold_only(etat))
+        self.assertEqual(tuple(ab.MARCHES), ("BTC", "GOLD"))
+        self.assertEqual(ab.MARCHES_HISTORIQUES, ("BTC", "GOLD"))
+        self.assertEqual(etat["marches_actifs"], ["BTC", "GOLD"])
+        self.assertNotIn("NASDAQ", etat)
+        self.assertEqual(etat["archives_marches_retirees"]["NASDAQ"][0]["state"]["trade"], legacy_trade)
+        self.assertTrue(etat["archives_marches_retirees"]["NASDAQ"][0]["open_trade"])
+        self.assertEqual(etat["marches_par_chat"], {"42": ["GOLD"], "43": [], "44": "BOTH"})
+        for key in ("auto", "auto_marches", "coach_live", "canaux_marche", "liens_marche", "veille_cloture"):
+            self.assertNotIn("NASDAQ", etat.get(key, {}))
+        self.assertEqual(ab.marches_choisis(etat, "43"), set())
+        self.assertEqual(ab.marches_choisis(etat, "44"), {"BTC", "GOLD"})
+        self.assertEqual(ab.en_position(etat, "42"), [])
+
+        archive_count = len(etat["archives_marches_retirees"]["NASDAQ"])
+        self.assertFalse(ab.migrer_scope_marches_btc_gold_only(etat))
+        self.assertEqual(len(etat["archives_marches_retirees"]["NASDAQ"]), archive_count)
+
+    def test_legacy_market_selection_cannot_reintroduce_nasdaq(self):
+        etat = {"marches_par_chat": {}, "auto": {}}
+        ab.selectionner_marches_suivi(etat, "42", ["NASDAQ", "GOLD"])
+        self.assertEqual(ab.marches_choisis(etat, "42"), {"GOLD"})
+        self.assertEqual(etat["marches_par_chat"]["42"], ["GOLD"])
+        self.assertEqual(ab.MARCHES_HISTORIQUES, ("BTC", "GOLD"))
+
+
 class IaEnPositionTest(unittest.TestCase):
     @unittest.mock.patch("align_bot.IA_AUTO", True)   # IA automatique coupée en prod (règle d'Adel) : on teste le mécanisme quand on la rallume
     def test_ia_branchee_au_sl_be_et_retournement(self):
