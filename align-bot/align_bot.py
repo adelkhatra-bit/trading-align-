@@ -3294,6 +3294,12 @@ def _telegram_sortant_autorise(methode, params):
     prive = bool(getattr(TELEGRAM_PULL_CONTEXT, "private", False))
     if cid and prive and cid == contexte:
         return True
+    # Autorisation strictement scoped : la classification news ouvre seulement
+    # un sendMessage vers le canal actif explicitement choisi, pour un titre NEWS.
+    news_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "news_chat_id", "") or "")
+    if (cid and cid == news_chat and methode == "sendMessage"
+            and texte.startswith("🚨 NEWS DE DERNIÈRE MINUTE")):
+        return True
     etat = DERNIER_ETAT or {}
     actifs = {str(x) for x in etat.get("recherche_positions_active", [])}
     texte = str(params.get("text") or params.get("caption") or "")
@@ -11775,7 +11781,12 @@ def news_urgentes(etat, maintenant=None, lire=None):
             for cle in alias[m]:
                 canal = canaux.get(cle)
                 if canal and canal not in envoyes:
-                    _envoi_sur(canal, text=texte)
+                    ancien_news_chat = getattr(TELEGRAM_PULL_CONTEXT, "news_chat_id", None)
+                    TELEGRAM_PULL_CONTEXT.news_chat_id = str(canal)
+                    try:
+                        _envoi_sur(canal, text=texte)
+                    finally:
+                        TELEGRAM_PULL_CONTEXT.news_chat_id = ancien_news_chat
                     envoyes.add(canal)
     propre = lambda x: re.sub(r"\d|\$|%|€", "", x).strip()
     live_publier("NEWS:" + propre("Actualité: " + titre) + "|" + propre("Breaking news: " + titre))
