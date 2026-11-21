@@ -365,6 +365,70 @@ jobs:
           PAUSE_SEC: "5"
         run: exec python3 align_bot.py
 
+      - name: Auditer la mémoire persistée après migration BTC + GOLD
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          path = "state.json"
+          if not os.path.isfile(path):
+              raise SystemExit("ÉCHEC MÉMOIRE: state.json absent après le worker")
+          try:
+              with open(path, encoding="utf-8") as f:
+                  state = json.load(f)
+          except Exception as exc:
+              raise SystemExit("ÉCHEC MÉMOIRE: state.json illisible (" + type(exc).__name__ + ")")
+
+          errors = []
+          if not isinstance(state, dict):
+              raise SystemExit("ÉCHEC MÉMOIRE: racine JSON non-objet")
+          if state.get("schema_version") != 4:
+              errors.append("schema_version doit être 4")
+          if state.get("marches_actifs") != ["BTC", "GOLD"]:
+              errors.append("marches_actifs doit être exactement BTC,GOLD")
+          if "NASDAQ" in state:
+              errors.append("NASDAQ encore présent à la racine active")
+
+          tables = ("auto", "auto_marches", "coach_live", "canaux_marche",
+                    "canal_live", "liens_marche", "veille_cloture", "pause_auto")
+          for name in tables:
+              table = state.get(name)
+              if isinstance(table, dict) and "NASDAQ" in table:
+                  errors.append(name + " contient encore NASDAQ")
+
+          preferences = state.get("marches_par_chat")
+          if isinstance(preferences, dict):
+              for value in preferences.values():
+                  if value == "NASDAQ" or (
+                      isinstance(value, (list, tuple, set)) and "NASDAQ" in value
+                  ):
+                      errors.append("une préférence utilisateur contient encore NASDAQ")
+                      break
+
+          if not isinstance(state.get("chats"), list):
+              errors.append("liste des abonnés absente ou invalide")
+          if not isinstance(state.get("telegram_outbox", []), list):
+              errors.append("file Telegram invalide")
+
+          if errors:
+              for error in errors:
+                  print("ALIGN_STATE_POST_AUDIT_ERROR=" + error)
+              raise SystemExit(1)
+
+          archives = state.get("archives_marches_retirees") or {}
+          history = archives.get("NASDAQ") if isinstance(archives, dict) else []
+          print("ALIGN_STATE_POST_AUDIT schema=4 active_markets=BTC,GOLD nasdaq_active=false "
+                + "nasdaq_archived=" + str(len(history or []))
+                + " subscribers=" + str(len(state.get("chats", [])))
+                + " prospects=" + str(len(state.get("prospects") or []))
+                + " telegram_offset_present=" + str(state.get("offset") is not None)
+                + " btc_open_trade=" + str(bool((state.get("BTC") or {}).get("trade")))
+                + " gold_open_trade=" + str(bool((state.get("GOLD") or {}).get("trade")))
+                + " telegram_outbox=" + str(len(state.get("telegram_outbox") or [])))
+          PY
+
       - name: Clé unique de sauvegarde de la mémoire
         id: cle_sauvegarde
         if: always()
