@@ -361,8 +361,8 @@ jobs:
           TOPSTEP_PLANCHER: ${{ vars.TOPSTEP_PLANCHER }}
           TOPSTEP_REEL: "0"
           # Garder le poller Telegram disponible pendant le cycle complet.
-          # Si le bridge est absent, ALIGN_REQUIRE_TV_BRIDGE=1 + ALIGN_TV_BRIDGE_PRET=0 bloquent
-          # toujours les signaux ; le gate final conserve l'échec tant que le bridge reste invalide.
+          # Si le préflight de démarrage échoue, ALIGN_REQUIRE_TV_BRIDGE=1 + ALIGN_TV_BRIDGE_PRET=0
+          # bloquent les signaux ; le gate final signale cet échec de préflight après le cycle.
           DUREE_SEC: "21000"
           PAUSE_SEC: "5"
         run: exec python3 align_bot.py
