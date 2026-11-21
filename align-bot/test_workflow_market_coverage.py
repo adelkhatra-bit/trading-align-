@@ -20,7 +20,9 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.assertNotIn('"NASDAQ": "💠 NASDAQ"', self.bot)
         self.assertIn("def marche_retiree_demande(txt):", self.bot)
         self.assertIn("if marche_retiree_demande(txt):", self.bot)
-        self.assertIn('MARCHES_HISTORIQUES = (*MARCHES, "NASDAQ")', self.bot)  # historique uniquement pour clôture/nettoyage
+        self.assertIn("MARCHES_HISTORIQUES = tuple(MARCHES)", self.bot)
+        self.assertIn("STATE_SCHEMA_VERSION = 4", self.bot)
+        self.assertIn("def migrer_scope_marches_btc_gold_only(etat):", self.bot)
         self.assertIn('LIVE_CHOIX = {', self.bot)
         self.assertNotIn('"NASDAQ": ("sym"', self.bot)
         self.assertIn('"GOLD et BTC", "GOLD and BTC"', self.bot)
