@@ -1146,12 +1146,15 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", *rel)
         return open(path, encoding="utf-8").read()
 
-    def test_bande_version_12_2_11(self):
+    def test_bande_version_12_2_12_voice_recovery(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
-        self.assertIn("// @version      12.2.11", bande)
-        self.assertIn("const VERSION = '12.2.11';", bande)
+        self.assertIn("// @version      12.2.12", bande)
+        self.assertIn("const VERSION = '12.2.12';", bande)
         self.assertIn('let voixUtterance = null', bande)
         self.assertIn('voixUtterance = utterance;', bande)
+        self.assertIn("voiceschanged", bande)
+        self.assertIn("voixEnAttente = item", bande)
+        self.assertIn("bulle ? 'marche' : 'live'", bande)
 
     def test_bande_sens_suit_le_plan_reel(self):
         """Le sens LONG/SHORT de la bannière vient du plan réel du tableau, pas de l'horloge seule."""
