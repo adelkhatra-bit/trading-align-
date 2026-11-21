@@ -12,7 +12,7 @@ from unittest.mock import patch
 import align_bot as ab
 from test_parite_pine import jeu_simule
 
-T0 = (int(time.time()) // 60 - 285) * 60  # bougies M1 alignées, scénario terminé à la minute courante
+T0 = (int(time.time()) // 900 * 900) - 285 * 60  # ancrage commun M1/M3/M5 sur une frontière de 15 min
 PTS = [(0, 3960), (30, 3980), (60, 3990), (120, 3996.0), (122, 3998.2), (124, 3996.0), (150, 3984), (163, 3996.0), (165, 3997.9), (167, 3996.0), (185, 3988),
        (193, 3995.0), (195, 3996.9), (197, 3995.0), (205, 3990), (215, 3993.3), (225, 3995.0), (229, 3995.8), (231, 3996.0), (233, 3995.2), (236, 3994.0),
        (240, 3992.0), (285, 3978.0)]     # structure M5 (3998,2) > M3 (3997,9) > M1 (3996,9), entrée dans la zone par le bas vers la minute 215, pic ~3997,6, chute
