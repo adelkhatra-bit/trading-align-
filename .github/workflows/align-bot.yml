@@ -184,7 +184,7 @@ jobs:
 
           def avertir(texte):
               print("::warning title=Telegram injoignable depuis le runner::" + texte)
-              print("TELEGRAM_API_UNREACHABLE le worker démarre quand même (reprises réseau du bot)")
+              print("TELEGRAM_API_UNREACHABLE worker bloqué (fail-closed; aucune réception vérifiée)")
               raise SystemExit(1)
 
           payload = appel("getMe")
