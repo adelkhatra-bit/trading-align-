@@ -42,17 +42,18 @@ class ClosedMtfSafety(unittest.TestCase):
             self.assertEqual(dirs[idx], ab.etat_ut(series[key])[0])
 
     def test_gold_nasdaq_require_all_four_closed_timeframes_for_long_and_short(self):
-        for market in ("GOLD", "NASDAQ"):
+        for market in ("GOLD",):
             for direction in (1, -1):
                 aligned = [direction] * 11
                 self.assertEqual(ab.direction_confirmee_marche(market, aligned, direction), direction)
+                self.assertEqual(ab.direction_confirmee_marche("NASDAQ", aligned, direction), 0)
                 for idx in (2, 4, 7, 9):
                     conflicting = aligned.copy()
                     conflicting[idx] = -direction
                     self.assertEqual(ab.direction_confirmee_marche(market, conflicting, direction), 0)
 
     def test_mtf_profile_uses_only_four_closed_directions_for_gold_nasdaq(self):
-        for market in ("GOLD", "NASDAQ"):
+        for market in ("GOLD",):
             # Les lectures en formation sont toutes LONG, mais la dernière clôture M5 contredit le plan.
             forming = [1] * 11
             closed = [1] * 11
@@ -78,7 +79,7 @@ class ClosedMtfSafety(unittest.TestCase):
             self.assertEqual(profile["direction"], 0)
 
     def test_gold_nasdaq_dashboard_uses_closed_directions_without_forming_fallback(self):
-        for market in ("GOLD", "NASDAQ"):
+        for market in ("GOLD",):
             r = {
                 "market": market,
                 "dirs": [1] * 11,
@@ -95,9 +96,10 @@ class ClosedMtfSafety(unittest.TestCase):
             self.assertIn("PROFIL RETENU : ATTENTE", message)
             self.assertIn("Stratégie : aucune", message)
             self.assertIn("aucune position avant la confluence des quatre clôtures", message)
+        self.assertIn("Marché retiré", "\n".join(ab.strategie_mtf({"market": "NASDAQ"})))
 
     def test_gold_nasdaq_daily_weekly_block_cannot_be_bypassed_by_forming_trend(self):
-        for market in ("GOLD", "NASDAQ"):
+        for market in ("GOLD",):
             r = {
                 "market": market,
                 "posD": 0.90,
@@ -115,6 +117,8 @@ class ClosedMtfSafety(unittest.TestCase):
             "dirs_cloturees": [-1] * 11,
         }
         self.assertFalse(ab.bloque_dw(btc, 1))
+        retired = {"market": "NASDAQ", "posD": 0.5, "posW": 0.5}
+        self.assertTrue(ab.bloque_dw(retired, 1))
 
     def test_mtf_confirmation_rejects_stale_m5_and_stale_m1(self):
         now = int(time.time())
@@ -125,7 +129,7 @@ class ClosedMtfSafety(unittest.TestCase):
         self.assertEqual(ab.direction_confirmee_marche("GOLD", aligned, 1, ctx), 0)
         ctx = fresh_context(now)
         ctx["m1"][-1]["t"] = now - 180
-        self.assertEqual(ab.direction_confirmee_marche("NASDAQ", aligned, 1, ctx), 0)
+        self.assertEqual(ab.direction_confirmee_marche("GOLD", aligned, 1, ctx), 0)
 
     def test_mtf_confirmation_uses_tradingview_bridge_when_available(self):
         ctx = fresh_context()
@@ -151,8 +155,9 @@ class ClosedMtfSafety(unittest.TestCase):
         now = int(time.time())
         ctx = fresh_context(now)
         aligned = [1] * 11
-        for market in ("GOLD", "NASDAQ"):
+        for market in ("GOLD",):
             self.assertEqual(ab.direction_plan_autorisee(market, 1, aligned, ctx), 1)
+            self.assertEqual(ab.direction_plan_autorisee("NASDAQ", 1, aligned, ctx), 0)
             for idx in (2, 4, 7, 9):
                 conflicting = aligned.copy()
                 conflicting[idx] = -1
@@ -207,7 +212,7 @@ class ClosedMtfSafety(unittest.TestCase):
 
     def test_strategy_blocks_gold_nasdaq_when_m5_or_m15_conflicts_but_preserves_btc(self):
         aligned = [1] * 11
-        for market in ("GOLD", "NASDAQ"):
+        for market in ("GOLD",):
             strat, status, reason = ab.strategie_alignement(aligned, 1, 1, market)
             self.assertEqual(status, "CONFIRMÉ")
             self.assertTrue(strat)
@@ -223,7 +228,7 @@ class ClosedMtfSafety(unittest.TestCase):
         self.assertEqual(ab.strategie_alignement(btc, 1, 1, "BTC")[1], "CONFIRMÉ")
 
     def test_sniper_blocks_short_term_countertrend(self):
-        for market in ("GOLD", "NASDAQ"):
+        for market in ("GOLD",):
             for idx in (2, 4):
                 dirs = [1] * 11
                 dirs[idx] = -1
