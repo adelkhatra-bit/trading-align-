@@ -317,8 +317,8 @@
       voixDerniere = Date.now();
       const dernier = dernierCommentaireIA;
       if (dernier && (!dernier.market || dernier.market === codeMarche())) {
-        if (dernier.fr) parlerLive(dernier.fr, true);
-        if (dernier.en && dernier.en.anglaisTraduit) parlerLive(dernier.en, true);
+        const dureeFR = dernier.fr ? parlerLive(dernier.fr, true) : 0;
+        if (dureeFR > 0 && dernier.en && dernier.en.anglaisTraduit) parlerLive(dernier.en, true);
       }
     } else {
       try { window.speechSynthesis.cancel(); } catch (e) {}   // v12.2.8 : OFF coupe tout ce qui est en file
