@@ -317,6 +317,7 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("if (txt.startsWith('IA:')) { recuIA(txt.slice(3)); return; }", source)
         self.assertIn("montrer('🧠 ' + phrase, false, 2, 'membre', false, 'ia')", source)
         self.assertIn("const voixDuree = parlerLive(m)", source)
+        self.assertIn("montrer(txt, bulle, 2, '', false, bulle ? 'marche' : 'live')", source)  # BULLE de marché envoyée au vocal
         self.assertIn("item.source !== 'ia' && item.source !== 'marche'", source)
         self.assertIn("voiceschanged", source)  # voix navigateur parfois disponibles après document-idle
         self.assertIn("removeEventListener('voiceschanged', voixSurVoixChangees)", source)  # listener nettoyé à la réinjection
