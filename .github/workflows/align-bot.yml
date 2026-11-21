@@ -129,6 +129,20 @@ jobs:
                       report["gold_open_trade"] = bool((state.get("GOLD") or {}).get("trade"))
                       report["btc_auto_follow_count"] = len((state.get("auto") or {}).get("BTC", []))
                       report["gold_auto_follow_count"] = len((state.get("auto") or {}).get("GOLD", []))
+                      report["active_markets"] = state.get("marches_actifs", [])
+                      report["nasdaq_active_root_key"] = "NASDAQ" in state
+                      archives = state.get("archives_marches_retirees") or {}
+                      report["nasdaq_archive_count"] = len(archives.get("NASDAQ") or [])
+                      market_tables = ("auto", "auto_marches", "coach_live", "canaux_marche",
+                                       "canal_live", "liens_marche", "veille_cloture", "pause_auto")
+                      for table in market_tables:
+                          values = state.get(table) or {}
+                          report[f"{table}_has_nasdaq"] = isinstance(values, dict) and "NASDAQ" in values
+                      preferences = (state.get("marches_par_chat") or {}).values()
+                      report["nasdaq_preference_count"] = sum(
+                          1 for value in preferences
+                          if value == "NASDAQ" or (isinstance(value, (list, tuple, set)) and "NASDAQ" in value)
+                      )
               except Exception as exc:
                   report["state_json_valid"] = False
                   report["parse_error"] = type(exc).__name__

@@ -28,7 +28,7 @@ TELEGRAM_PULL_CONTEXT = threading.local()
 TELEGRAM_LIVRES = [0]   # messages réellement acceptés par Telegram (compteur du journal)
 TELEGRAM_PULL_MODE = False  # activé par main(); les tests unitaires du wrapper restent isolés par défaut
 MARCHES = {"BTC": "XBTUSD", "GOLD": "XAUUSD"}  # Périmètre opérationnel ALIGN : BTC + GOLD uniquement
-MARCHES_HISTORIQUES = (*MARCHES, "NASDAQ")  # Conservé uniquement pour nettoyer/terminer les suivis d'anciennes positions
+MARCHES_HISTORIQUES = tuple(MARCHES)  # Seuls BTC et GOLD restent actifs, y compris dans le suivi des positions
 MIN_ALIGN, MIN_SQZ, MARGE_ATR, GAIN_MIN = 8, 4, 0.5, 1.5   # = réglages par défaut de l'indicateur ALIGN MTF PRO v24
 # Décision trader : gain/risque minimum 1:2 pour AUTORISER une entrée (sinon ATTENTE). GAIN_MIN reste celui de l'indicateur (parité Pine).
 RR_MIN_ENTREE = 2.0
@@ -7280,6 +7280,15 @@ def traiter(etat, chats, updates):
                     pass
                 menu_marches(etat, qui)
                 continue
+            if choix == "markets" and marche_retiree_demande(mk):
+                try:
+                    telegram("answerCallbackQuery", callback_query_id=cb["id"],
+                             text="NASDAQ retiré — seuls BTC et GOLD sont disponibles")
+                except Exception:
+                    pass
+                # Ancien clavier NASDAQ : le remplacer sur place par le menu actuel BTC/GOLD.
+                menu_marches(etat, qui, (cb.get("message") or {}).get("message_id"))
+                continue
             if choix == "markets" and mk == "OK":
                 try:
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="✅ Marchés enregistrés")
@@ -9032,7 +9041,7 @@ def connecter_canal(etat, mcm):
         etat.pop("canal", None)
 
 def _vers_ensemble(choix):
-    """BTC / GOLD / NASDAQ, liste de marchés, ancien « BOTH » (= BTC + GOLD) ou « ALL » (= tout)."""
+    """Marchés actifs uniquement : BTC / GOLD, ancien « BOTH » (= les deux) ou « ALL » (= tout)."""
     if isinstance(choix, (list, tuple, set, frozenset)):
         return {m for m in choix if m in MARCHES}
     if choix == "BOTH":
@@ -9122,7 +9131,7 @@ def marches_choisis(etat, cid):
 def marche_selection(etat, cid):
     """Compatibilité : « BTC », « GOLD », « BOTH » (BTC + GOLD) ou la liste des marchés cochés."""
     brut = etat.setdefault("marches_par_chat", {}).get(str(cid), "BOTH")
-    if isinstance(brut, str) and brut in ("BTC", "GOLD", "NASDAQ", "BOTH"):
+    if isinstance(brut, str) and brut in ("BTC", "GOLD", "BOTH"):
         return brut
     ens = _vers_ensemble(brut)
     return "BOTH" if ens == {"BTC", "GOLD"} else (next(iter(ens)) if len(ens) == 1 else sorted(ens) or "BOTH")
@@ -13448,7 +13457,54 @@ def un_tour(etat, chats):
     print(f"{len(envois)} signal(s) préparé(s) • {TELEGRAM_LIVRES[0]} message(s) Telegram livré(s) depuis le démarrage • {len(chats)} téléphone(s)")
     sauver_etat(etat, chats)
 
-STATE_SCHEMA_VERSION = 3
+STATE_SCHEMA_VERSION = 4
+
+def migrer_scope_marches_btc_gold_only(etat):
+    """Retire NASDAQ de la mémoire opérationnelle, en archivant ses anciennes données sans les rejouer."""
+    if not isinstance(etat, dict):
+        raise RuntimeError("ÉTAT ALIGN INVALIDE — migration des marchés impossible")
+    archives = etat.get("archives_marches_retirees")
+    if archives is None:
+        archives = {}
+    if not isinstance(archives, dict):
+        raise RuntimeError("ÉTAT ALIGN INVALIDE — archive des marchés retirés illisible")
+
+    legacy = etat.pop("NASDAQ", None)
+    if legacy is not None:
+        history = archives.get("NASDAQ")
+        if history is None:
+            history = []
+        elif not isinstance(history, list):
+            history = [history]
+        history.append({
+            "archive_t": int(time.time()),
+            "state": legacy,
+            "open_trade": bool((legacy or {}).get("trade")) if isinstance(legacy, dict) else False,
+        })
+        archives["NASDAQ"] = history
+    if archives:
+        etat["archives_marches_retirees"] = archives
+
+    # Tables indexées par marché : aucune souscription ou configuration NASDAQ ne reste active.
+    for key in ("auto", "auto_marches", "coach_live", "canaux_marche", "canal_live", "liens_marche", "veille_cloture", "pause_auto"):
+        table = etat.get(key)
+        if isinstance(table, dict):
+            table.pop("NASDAQ", None)
+
+    # Conserve exactement le consentement utilisateur après filtrage sur les deux marchés actifs.
+    preferences = etat.get("marches_par_chat")
+    if isinstance(preferences, dict):
+        for cid, raw in list(preferences.items()):
+            if raw is None:
+                continue
+            if isinstance(raw, str) and raw in ("BOTH", "ALL"):
+                preferences[cid] = "BOTH"
+                continue
+            actifs = sorted(_vers_ensemble(raw))
+            preferences[cid] = actifs[0] if isinstance(raw, str) and len(actifs) == 1 else actifs
+
+    etat["marches_actifs"] = list(MARCHES)
+    return legacy is not None
 
 def _bot_deja_en_service():
     """Vrai si le bot a déjà tourné (live-data/live.json existe). En cas de doute (API muette) : vrai."""
@@ -13471,7 +13527,7 @@ def charger_etat():
                 and _bot_deja_en_service()):
             raise RuntimeError("MÉMOIRE ALIGN ABSENTE — arrêt préventif : aucune sauvegarde restaurée alors que le bot "
                                "a déjà tourné. Rien n'est écrasé. Démarrage à vide volontaire : variable ALIGN_ETAT_VIERGE_OK=1.")
-        return {"schema_version": STATE_SCHEMA_VERSION}
+        return {"schema_version": STATE_SCHEMA_VERSION, "marches_actifs": list(MARCHES)}
     try:
         with open(ETAT_FICHIER, "r", encoding="utf-8") as f:
             etat = json.load(f)
@@ -13495,6 +13551,9 @@ def charger_etat():
         etat["telegram_outbox"] = []
         etat["veille_cloture"] = {}
         print("TELEGRAM_PULL_MIGRATION=enabled; legacy push subscriptions and queued messages cleared", flush=True)
+    archive_nasdaq = migrer_scope_marches_btc_gold_only(etat)
+    if archive_nasdaq:
+        print("MARKET_SCOPE_MIGRATION=BTC,GOLD_ONLY; NASDAQ archived and removed from active state", flush=True)
     etat["schema_version"] = STATE_SCHEMA_VERSION
     if version < STATE_SCHEMA_VERSION:
         print(f"STATE_MIGRATION={version}->{STATE_SCHEMA_VERSION} (conservation des données)", flush=True)

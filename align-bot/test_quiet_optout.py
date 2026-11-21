@@ -158,17 +158,16 @@ class QuietOptOutTest(unittest.TestCase):
         state = {
             "BTC": {"trade": {"qui": {"11": dict(position), "22": dict(position)}}},
             "GOLD": {"trade": {"qui": {"11": dict(position), "22": dict(position)}}},
-            "NASDAQ": {"trade": {"qui": {"22": dict(position)}}},
         }
 
         ab.retirer_suivi_positions(state, "11")
 
         self.assertEqual(ab.en_position(state, "11"), [])
-        self.assertEqual(set(ab.en_position(state, "22")), {"BTC", "GOLD", "NASDAQ"})
+        self.assertEqual(set(ab.en_position(state, "22")), {"BTC", "GOLD"})
         with patch.object(ab, "noter") as notify:
-            for market in ("BTC", "GOLD", "NASDAQ"):
+            for market in ("BTC", "GOLD"):
                 ab.cloturer_abonnes(state, market, state[market]["trade"], 104.0, "TP1")
-        self.assertEqual([call.args[1] for call in notify.call_args_list], ["22", "22", "22"])
+        self.assertEqual([call.args[1] for call in notify.call_args_list], ["22", "22"])
 
     def test_coach_no_revokes_open_position_follow(self):
         position = {"e": 100.0, "sl": 95.0, "tp1": 110.0}

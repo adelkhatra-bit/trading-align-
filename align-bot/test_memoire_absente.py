@@ -1,4 +1,5 @@
 """Le bot ne repart jamais à vide en silence si sa mémoire n'a pas été restaurée."""
+import json
 import os
 import sys
 import tempfile
@@ -39,6 +40,32 @@ class MemoireAbsente(unittest.TestCase):
     def test_hors_production_inchange(self):
         with mock.patch.dict(os.environ, {"ALIGN_EXIGER_MEMOIRE": "0"}):
             self.assertEqual(ab.charger_etat()["schema_version"], ab.STATE_SCHEMA_VERSION)
+
+    def test_ancienne_memoire_v3_migre_vers_btc_gold_only_au_chargement(self):
+        legacy_trade = {"d": -1, "e": 100.0, "sl": 105.0, "tp1": 90.0, "qui": {"22": {"fini": False}}}
+        legacy = {
+            "schema_version": 3,
+            "chats": ["22"],
+            "NASDAQ": {"trade": legacy_trade, "memoire": [{"resultat": "ancien"}]},
+            "marches_par_chat": {"22": ["NASDAQ", "GOLD"]},
+            "auto": {"NASDAQ": ["22"], "GOLD": []},
+            "canal_live": {"NASDAQ": {"message_id": 77}},
+            "pause_auto": {"NASDAQ": 1234567890},
+        }
+        with open(ab.ETAT_FICHIER, "w", encoding="utf-8") as f:
+            json.dump(legacy, f)
+
+        state = ab.charger_etat()
+
+        self.assertEqual(state["schema_version"], 4)
+        self.assertEqual(state["marches_actifs"], ["BTC", "GOLD"])
+        self.assertNotIn("NASDAQ", state)
+        self.assertEqual(state["marches_par_chat"]["22"], ["GOLD"])
+        self.assertNotIn("NASDAQ", state["auto"])
+        self.assertNotIn("NASDAQ", state["canal_live"])
+        self.assertNotIn("NASDAQ", state["pause_auto"])
+        self.assertEqual(state["archives_marches_retirees"]["NASDAQ"][0]["state"]["trade"], legacy_trade)
+        self.assertTrue(state["archives_marches_retirees"]["NASDAQ"][0]["open_trade"])
 
     def test_api_muette_compte_comme_deja_en_service(self):
         with mock.patch.object(ab, "_api_github", side_effect=OSError("réseau")):
