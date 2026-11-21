@@ -10,7 +10,10 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.bot = (Path(__file__).parent / "align_bot.py").read_text(encoding="utf-8")
 
     def test_worker_operational_scope_is_btc_and_gold_only(self):
-        self.assertIn('for symbol in ("BTCUSD", "XAUUSD")', self.workflow)
+        self.assertIn("required_symbols = align_bot.symboles_bridge_obligatoires(time.time())", self.workflow)
+        self.assertIn("for symbol in required_symbols:", self.workflow)
+        self.assertIn("def symboles_bridge_obligatoires(ts=None):", self.bot)
+        self.assertIn("BRIDGE_SESSION_CLOSED symbol=XAUUSD", self.workflow)
         self.assertIn("Analyse BTC + Gold et envoi Telegram", self.workflow)
         self.assertNotIn("NAS100", self.workflow)
         self.assertNotIn('report["nasdaq_open_trade"]', self.workflow)
@@ -33,6 +36,15 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.assertIn('"GOLD et BTC", "GOLD and BTC"', self.bot)
         self.assertNotIn('"GOLD et BTC", "NASDAQ, GOLD and BTC"', self.bot)
 
+    def test_worker_cycle_exception_emits_bounded_traceback(self):
+        self.assertIn("traceback.print_exc(limit=8)", self.bot)
+        self.assertIn('print("tour", ex, flush=True)', self.bot)
+
+    def test_post_run_memory_audit_checks_persisted_btc_gold_scope(self):
+        self.assertIn("Auditer la mémoire persistée après migration BTC + GOLD", self.workflow)
+        self.assertIn('if state.get("marches_actifs") != ["BTC", "GOLD"]:', self.workflow)
+        self.assertIn('if "NASDAQ" in state:', self.workflow)
+        self.assertIn("state.json absent après le worker", self.workflow)
     def test_worker_rollover_recognizes_both_legacy_and_renamed_worker(self):
         self.assertIn("if run.get(\"name\") in {", self.rollover)
         self.assertIn("ALIGN MTF BOT (signaux BTC + Gold Telegram)", self.rollover)
