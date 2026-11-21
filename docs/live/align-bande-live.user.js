@@ -351,7 +351,7 @@
       const v = choisirVoix(anglais ? 'en' : 'fr');
       if (!v) {
         // Les voix sont souvent chargées après document-idle : retenter le commentaire FR quand voiceschanged arrive.
-        if (!anglais && voixActive && rafraichirVoix().length === 0) voixEnAttente = item;
+        if (!anglais && voixActive) voixEnAttente = item;
         return 0;   // aucune voix naturelle disponible : silence plutôt qu'une voix robot
       }
       utterance.voice = v;
