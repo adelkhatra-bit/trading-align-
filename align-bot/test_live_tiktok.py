@@ -318,6 +318,8 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("montrer('🧠 ' + phrase, false, 2, 'membre', false, 'ia')", source)
         self.assertIn("const voixDuree = parlerLive(m)", source)
         self.assertIn("montrer(txt, bulle, 2, '', false, bulle ? 'marche' : 'live')", source)  # BULLE de marché envoyée au vocal
+        self.assertIn("const traductionEN = enAnglais(texte), anglaisTraduit = traductionEN !== texte", source)
+        self.assertIn("item.source === 'marche' && !item.anglaisTraduit", source)  # évite la voix anglaise sur une bulle restée en français
         self.assertIn("item.source !== 'ia' && item.source !== 'marche'", source)
         self.assertIn("voiceschanged", source)  # voix navigateur parfois disponibles après document-idle
         self.assertIn("removeEventListener('voiceschanged', voixSurVoixChangees)", source)  # listener nettoyé à la réinjection
