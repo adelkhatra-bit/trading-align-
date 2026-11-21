@@ -4679,9 +4679,6 @@ def retournement_marche(m, r, cle):
     if len(dirs) < 10 or len(b5) < 6 or len(b15) < 41 or len(b1) < 6 or len(b4) < 6:
         return None
     d5, d15, d60, d240 = dirs[2], dirs[4], dirs[7], dirs[9]
-    vols = [x.get("v") or 0 for x in b15]
-    vma = sum(vols[-41:-1]) / 40
-    vol_fort = vma > 0 and vols[-1] > 1.3 * vma
     p = r["m1"][-1]["c"] if r.get("m1") else b15[-1]["c"]
     h1, l1 = max(x["h"] for x in b1[-6:]), min(x["l"] for x in b1[-6:])
     h4, l4 = max(x["h"] for x in b4[-6:]), min(x["l"] for x in b4[-6:])
@@ -5361,7 +5358,7 @@ def bouton_plateforme(etat, cid):
     return {"text": "💱 Mes prix : " + PLATEFORMES[plateforme(etat, cid)].split(" (")[0] + " → changer", "callback_data": "plateforme:menu"}
 
 def plateforme(etat, cid):
-    """Où l'utilisateur trade : 'tv' (FTMO / FundedNext / CFD, prix du graphique, par défaut), 'topstep' (futures MNQ / MGC / MBT) ou 'deux'."""
+    """Où l'utilisateur trade : 'tv' (FTMO / FundedNext / CFD, prix du graphique, par défaut), 'topstep' (futures MGC / MBT) ou 'deux'."""
     v = (etat.get("plateforme") or {}).get(str(cid), "tv")
     return v if v in PLATEFORMES else "tv"
 
@@ -5436,7 +5433,7 @@ def timeframe_attendu(r, cle):
         return "1h"
 
     marche = r.get("market")
-    if marche in ("GOLD", "NASDAQ"):
+    if marche == "GOLD":
         d5 = dirs[2] if len(dirs) > 2 else 0
         d15 = dirs[4] if len(dirs) > 4 else 0
         if d5 != d4h:
@@ -11902,7 +11899,7 @@ def contexte_technique_live(derniers):
             "rsi_15m": round(float(r.get("rC")), 1) if isinstance(r.get("rC"), (int, float)) else None,
             "compression_unites": r.get("comp"),
         }
-        if marche in ("GOLD", "NASDAQ"):
+        if marche == "GOLD":
             contexte["fibonacci"] = progression_fibonacci_live(r, marche)
         # Les fournisseurs Kraken/Yahoo et regrouper() retirent déjà les bougies en formation : la dernière M15 est clôturée.
         barres = (r.get("b15_long") or r.get("b15") or [])
