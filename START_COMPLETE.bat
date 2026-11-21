@@ -40,7 +40,7 @@ timeout /t 1 >nul
 
 REM Démarrer Node.js Server
 echo ▶️  Démarrage Studio Server (port 4000)...
-start "Trading Studio" cmd /k "set BROKER_MODE=live && set SAFE_MODE=0 && node server.js"
+start "Trading Studio" cmd /k "set BROKER_MODE=paper && set SAFE_MODE=1 && node server.js"
 timeout /t 2 >nul
 
 echo.
