@@ -2,7 +2,7 @@
 """ALIGN MTF BOT — même logique que l'indicateur TradingView ALIGN MTF PRO.
 Prix gratuits : BTC = Kraken XBTUSD, Gold = XAUUSD spot (bougies COMEX Yahoo recalées sur le prix spot Swissquote).
 Tourne toutes les 5 minutes (GitHub Actions). Aucune dépendance externe."""
-import json, unicodedata, os, re, time, hashlib, urllib.request, urllib.error, urllib.parse, datetime, threading, queue, signal, email.utils, math
+import json, unicodedata, os, re, time, hashlib, urllib.request, urllib.error, urllib.parse, datetime, threading, queue, signal, email.utils, math, traceback
 from zoneinfo import ZoneInfo
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -86,7 +86,11 @@ def detail_bridge_invalide(payload):
         if absents:
             morceaux.append("UT absentes " + ",".join(absents))
         if perimes:
-            morceaux.append("UT périmées " + ",".join(perimes))
+            ages = []
+            for tf in perimes:
+                age = (snaps.get(tf) or {}).get("ageMs")
+                ages.append(f"{tf} ({round(age / 1000)} s)" if isinstance(age, (int, float)) else tf)
+            morceaux.append("UT périmées " + ",".join(ages))
     rejet = payload.get("lastRejection")
     if isinstance(rejet, dict) and rejet.get("error"):
         age = rejet.get("ageMs")
@@ -1240,6 +1244,11 @@ def cme_ouvert(ts):
     if ct.weekday() == 5 or (ct.weekday() == 4 and ct.hour >= 16) or (ct.weekday() == 6 and ct.hour < 17):
         return False
     return ct.hour != 16
+
+def symboles_bridge_obligatoires(ts=None):
+    """BTC est continu ; le bridge GOLD n'est obligatoire que pendant la session CME utilisée par ALIGN."""
+    maintenant = time.time() if ts is None else float(ts)
+    return ("BTCUSD", "XAUUSD") if cme_ouvert(maintenant) else ("BTCUSD",)
 
 def barre(r):
     s = ""
@@ -13586,7 +13595,8 @@ def main():
         try:
             un_tour(etat, chats)
         except Exception as ex:
-            print("tour", ex)
+            print("tour", ex, flush=True)
+            traceback.print_exc(limit=8)
         if SHUTDOWN_REQUESTED.is_set():
             break
         prochain = time.time() + PAUSE_SEC
