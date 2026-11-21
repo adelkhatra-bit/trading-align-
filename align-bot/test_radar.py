@@ -15,19 +15,18 @@ def props_test():
              action="clôture 1h sous 4001,30", au_dessus=False),
         dict(m="BTC", prix=60000.0, atr_n=3.2, classe="en_approche", rang=2, d=-1, za=61000, zb=61500, dist=1000,
              action="x", au_dessus=True),
-        dict(m="NASDAQ", prix=28227.0, atr_n=99.0, classe="sans_plan", rang=5),
     ]
 
 
 DERNIERS = {"GOLD": {"strat": "SWING", "bear": 11, "plan_fige": {"d": -1, "e": 4000.0, "sl": 4019.86, "tp1": 3895.54}},
-            "BTC": {"bear": 7}, "NASDAQ": {}}
+            "BTC": {"bear": 7}}
 
 
 class TexteRadarTest(unittest.TestCase):
     def test_vip_focus_et_niveaux(self):
         t = ab.texte_radar(props_test(), DERNIERS, vip=True, now=time.time())
         self.assertIn("🎯 FOCUS : 🥇 GOLD — prépare-toi", t.split("\n")[0])
-        for morceau in ("SHORT", "SWING", "Zone d'entrée", "SL", "TP1", "J'attends", "11/11", "2️⃣ 🟠 BTC", "3️⃣ 💠 NASDAQ"):
+        for morceau in ("SHORT", "SWING", "Zone d'entrée", "SL", "TP1", "J'attends", "11/11", "2️⃣ 🟠 BTC"):
             self.assertIn(morceau, t)
         self.assertNotIn("SHORT ⬇️ · pas de plan", t)          # pas de sens affiché pour un marché sans plan
 
@@ -41,23 +40,23 @@ class TexteRadarTest(unittest.TestCase):
     def test_rien_de_proche(self):
         p = [dict(m="NASDAQ", prix=1.0, atr_n=99.0, classe="sans_plan", rang=5)]
         t = ab.texte_radar(p, {}, vip=True, now=time.time())
-        self.assertTrue(t.startswith("📡 RADAR ALIGN — aucune entrée proche"))
+        self.assertIsNone(t)
 
 
 class AlignementRequisTest(unittest.TestCase):
-    def test_proche_mais_pas_aligne_n_est_pas_prepare_toi(self):
-        d = {"NASDAQ": {"bull": 6}, "GOLD": {"bear": 9}}
-        p = [dict(m="NASDAQ", prix=1.0, atr_n=0.9, classe="proche", rang=1, d=1, za=1, zb=2, dist=0.5, action="x", au_dessus=True),
+    def test_btc_proche_mais_pas_aligne_n_est_pas_prepare_toi(self):
+        d = {"BTC": {"bull": 6}, "GOLD": {"bear": 9}}
+        p = [dict(m="BTC", prix=1.0, atr_n=0.9, classe="proche", rang=1, d=1, za=1, zb=2, dist=0.5, action="x", au_dessus=True),
              dict(m="GOLD", prix=1.0, atr_n=2.8, classe="en_approche", rang=2, d=-1, za=1, zb=2, dist=3, action="y", au_dessus=False)]
         t = ab.texte_radar(p, d, vip=True, now=time.time())
         self.assertNotIn("prépare-toi", t)
-        self.assertIn("NASDAQ — proche, alignement pas encore atteint", t)
-        d["NASDAQ"]["bull"] = 8
-        self.assertIn("NASDAQ — prépare-toi", ab.texte_radar(p, d, vip=True, now=time.time()))
+        self.assertIn("BTC — proche, alignement pas encore atteint", t)
+        d["BTC"]["bull"] = 8
+        self.assertIn("BTC — prépare-toi", ab.texte_radar(p, d, vip=True, now=time.time()))
 
-    def test_marche_pret_passe_devant(self):
-        d = {"NASDAQ": {"bull": 6}, "GOLD": {"bear": 10}}
-        p = [dict(m="NASDAQ", prix=1.0, atr_n=0.2, classe="dans_zone", rang=0, d=1, za=1, zb=2, dist=0, action="x", au_dessus=True),
+    def test_gold_pret_passe_devant_un_btc_non_aligne(self):
+        d = {"BTC": {"bull": 6}, "GOLD": {"bear": 10}}
+        p = [dict(m="BTC", prix=1.0, atr_n=0.2, classe="dans_zone", rang=0, d=1, za=1, zb=2, dist=0, action="x", au_dessus=True),
              dict(m="GOLD", prix=1.0, atr_n=1.2, classe="proche", rang=1, d=-1, za=1, zb=2, dist=1, action="y", au_dessus=False)]
         self.assertIn("🎯 FOCUS : 🥇 GOLD — prépare-toi", ab.texte_radar(p, d, vip=True, now=time.time()).split("\n")[0])
 
@@ -101,7 +100,7 @@ class RadarIaTest(unittest.TestCase):
         derniers = {**DERNIERS, "GOLD": {**DERNIERS["GOLD"], "m1": [{"c": 3995.0}]}}
         with mock.patch.object(ab, "ia", faux_ia), mock.patch.object(ab, "donnees_ia", lambda *a, **k: {}), \
              mock.patch.object(ab, "telegram", tg), mock.patch.object(ab, "_envoi_sur", lambda cid, **kw: tg("sendMessage", chat_id=cid, **kw)), \
-             mock.patch.object(ab, "autorise", lambda *a: True), mock.patch.object(ab, "marches_choisis", lambda e, c: {"GOLD", "BTC", "NASDAQ"}), \
+             mock.patch.object(ab, "autorise", lambda *a: True), mock.patch.object(ab, "marches_choisis", lambda e, c: {"GOLD", "BTC"}), \
              mock.patch.object(ab, "classer_marches", lambda d, e, c, n=None: props):
             etat = {"auto": {"GOLD": ["42"]}}
             ab.radar_tick(etat, {"42"}, derniers, now=1_000_000.0)            # GOLD prêt : alerte → 1 appel IA
