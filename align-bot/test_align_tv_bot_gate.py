@@ -11,9 +11,7 @@ WORKFLOW_SOURCE = pathlib.Path(__file__).resolve().parents[1].joinpath(".github"
 
 class TradingViewBridgeGateTests(unittest.TestCase):
     def test_bridge_failure_keeps_telegram_worker_alive_but_signals_fail_closed(self):
-        # Manual diagnostics use 300s; production schedule/workflow_run retain 21000s.
-        self.assertIn("DUREE_SEC: \"${{ github.event_name == 'workflow_dispatch' && '300' || '21000' }}\"", WORKFLOW_SOURCE)
-        self.assertIn("Les workers schedule/workflow_run conservent leur durée de production.", WORKFLOW_SOURCE)
+        self.assertRegex(WORKFLOW_SOURCE, r'DUREE_SEC:\s*"21000"')
         self.assertIn('ALIGN_TV_BRIDGE_PRET: ${{ steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == \'0\' && \'0\' || \'1\' }}', WORKFLOW_SOURCE)
         self.assertIn('ALIGN_REQUIRE_TV_BRIDGE: "1"', WORKFLOW_SOURCE)
         self.assertRegex(

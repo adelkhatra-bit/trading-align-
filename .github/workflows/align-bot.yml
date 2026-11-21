@@ -379,9 +379,7 @@ jobs:
           # Bridge absent/invalide : conserver Telegram/commandes 120 s puis laisser le gate final échouer.
           # Garder le poller Telegram disponible pendant le cycle complet.
           # Le bridge reste obligatoire pour toute entrée ; le gate final échoue si le préflight est invalide.
-          # Validation manuelle : worker court pour observer les snapshots live sans attendre 5 h 50.
-          # Les workers schedule/workflow_run conservent leur durée de production.
-          DUREE_SEC: "${{ github.event_name == 'workflow_dispatch' && '300' || '21000' }}"
+          DUREE_SEC: "21000"
           PAUSE_SEC: "5"
         run: exec python3 align_bot.py
 
