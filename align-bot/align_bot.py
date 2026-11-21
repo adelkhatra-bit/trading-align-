@@ -3596,19 +3596,32 @@ ECOUTE_SEC = int(os.environ.get("ECOUTE_SEC", "200"))   # (ancien réglage, gard
 DUREE_SEC = int(os.environ.get("DUREE_SEC", str(ECOUTE_SEC)))   # durée d'un lancement (5 h 40 sur GitHub = bot toujours allumé)
 PAUSE_SEC = int(os.environ.get("PAUSE_SEC", "5"))    # surveillance des setups toutes les 5 s ; les sources de marché restent mises en cache
 
+def marche_retiree_demande(txt):
+    """Détecte une demande NASDAQ pour la refuser explicitement, sans la convertir en BTC ou GOLD."""
+    return bool(re.search(r"\b(?:NASDAQ|NAS100|NQ)\b", str(txt or ""), re.IGNORECASE))
+
+
+def refuser_marche_retire(cid):
+    """Explique le périmètre actif sans lancer d'analyse ni activer de suivi."""
+    anglais = str(cid) in LANG_EN
+    texte = ("⛔ NASDAQ a été retiré d'ALIGN. Les seuls marchés actifs sont BTC et GOLD. Demande une analyse BTC ou GOLD."
+             if not anglais else
+             "⛔ NASDAQ has been retired from ALIGN. Only BTC and GOLD are active. Request a BTC or GOLD analysis.")
+    _envoi_sur(cid, text=texte)
+
+
 def marche_demande(txt):
     """Marché demandé : Gold par défaut ; BTC seul si cité ; les deux si BTC et Gold sont cités."""
     t = str(txt or "").lower()
     t = t.replace("é", "e").replace("è", "e").replace("ê", "e")
+    if marche_retiree_demande(t):
+        return None
     btc = "btc" in t or "bitcoin" in t
     gold = "gold" in t or " xau" in t or "xauusd" in t or "or" in t.split()
-    nasdaq = "nasdaq" in t or "nas100" in t or "nq" in t.split()
-    if btc + gold + nasdaq > 1:
-        return None                 # demande explicite de plusieurs marchés
+    if btc and gold:
+        return None
     if btc:
         return "BTC"
-    if nasdaq:
-        return "NASDAQ"
     return "GOLD"                   # demande générale = Gold uniquement
 
 def tendance_armee(r, cle):
@@ -7193,6 +7206,13 @@ def traiter(etat, chats, updates):
                                       "⏹ La recherche reste active jusqu'à ton arrêt." + precision_retard), 
                            reply_markup=json.dumps({"inline_keyboard": boutons_stop}))
                 continue
+            if choix == "analysechoice" and marche_retiree_demande(mk):
+                try:
+                    telegram("answerCallbackQuery", callback_query_id=cb["id"], text="NASDAQ retiré — BTC / GOLD uniquement")
+                except Exception:
+                    pass
+                refuser_marche_retire(qui)
+                continue
             if choix == "analysechoice" and (mk in MARCHES or mk == "BOTH"):
                 try:
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="📊 Analyse en cours")
@@ -7710,7 +7730,10 @@ def traiter(etat, chats, updates):
             elif "mes march" in txtv or "my markets" in txtv:
                 menu_marches(etat, cid)
             elif "analyse" in txtv:
-                analyse_visiteur(etat, cid, marche_demande(txtv))
+                if marche_retiree_demande(txtv):
+                    refuser_marche_retire(cid)
+                else:
+                    analyse_visiteur(etat, cid, marche_demande(txtv))
             elif "vip" in txtv or "/start" in txtv:
                 refuser(etat, cid)
             else:
@@ -7763,8 +7786,11 @@ def traiter(etat, chats, updates):
                                                       [{"text": "📊 Mes marchés", "callback_data": "analysechoice:BOTH"}]
                        ]}))
         elif "analyse" in txt or "etat" in txt:
+            if marche_retiree_demande(txt):
+                refuser_marche_retire(cid)
+                continue
             md_ = marche_demande(txt)
-            if any(k in txt for k in ("btc", "bitcoin", "gold", "xau", "nasdaq", "nas100")):
+            if any(k in txt for k in ("btc", "bitcoin", "gold", "xau")):
                 premier_choix_marche(etat, cid, md_)
             demandes.append((cid, md_))
         elif "financeplus" in txt:                       # « 📖 En savoir plus » du message compte financé
@@ -7791,8 +7817,10 @@ AUTO_MARCHES = ("BTC", "GOLD")
 
 
 def commande_auto(etat, cid, txt):
-    """Admin (propriétaire) : /auto = état + BOUTONS, /auto_btc /auto_gold /auto_nasdaq = allumer / éteindre le trading automatique.
-    Demande d'Adel (15/11) : boutons pour tout arrêter / tout relancer depuis Telegram (en plus de l'arrêt automatique sur pertes)."""
+    """Admin (propriétaire) : /auto = état + boutons BTC/GOLD, tout arrêter ou tout relancer."""
+    if txt.strip().lower() in {"/auto_nasdaq", "/auto_nas100", "/auto_nq"}:
+        refuser_marche_retire(cid)
+        return
     am = etat.setdefault("auto_marches", {})
     for m in AUTO_MARCHES:
         if txt.strip() == f"/auto_{m.lower()}":
@@ -9105,7 +9133,7 @@ def marche_autorise(etat, cid, marche):
         return True                     # pas encore de choix : tous les marchés
     return marche in _vers_ensemble(brut)
 
-NOMS_MARCHES = {"BTC": "🟠 BTC", "GOLD": "🥇 GOLD", "NASDAQ": "💠 NASDAQ"}
+NOMS_MARCHES = {"BTC": "🟠 BTC", "GOLD": "🥇 GOLD"}
 
 def _ou_en_est(etat, m, anglais=False):
     """Une ligne « où ça en est » à partir des vraies données du dernier cycle (jamais inventée)."""
