@@ -7837,7 +7837,7 @@ def auto_entree(etat, m, trx, contre=False):
                 lignes.append(f"{'✅' if x.get('ok') else '⏸'} {nom} : " + ("ordre TEST préparé" if x.get("test") else "ordre envoyé" if x.get("ok") else x.get("raison", "?")))
         except Exception as ex:
             lignes.append(f"⚠️ {nom} : erreur {ex}")
-    print("AUTO_TRADE", m, lignes)
+    print("AUTO_TRADE", m, str(lignes).encode("ascii", "backslashreplace").decode("ascii"))
     if any("éteint" not in l_ for l_ in lignes):
         for p_ in proprio(etat):
             _envoi_sur(p_, text=f"🤖 {ICONE.get(m, '')} {m} {sig['sens']}{' ↩ contre-tendance (60 $ max)' if contre else ''} — trading automatique\n" + "\n".join(lignes))
