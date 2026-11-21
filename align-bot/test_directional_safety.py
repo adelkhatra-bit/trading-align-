@@ -155,26 +155,19 @@ class DirectionSafety(unittest.TestCase):
                 has_confirmation = "confirmation" in [e["kind"] for e in events]
                 self.assertEqual(has_confirmation, expected, (market, h4, events))
 
-    def test_gold_nasdaq_do_not_emit_inverse_scalp_events_btc_keeps_legacy(self):
+    def test_local_inverse_scalp_never_emits_a_live_event_without_a_pine_inverse_plan(self):
         r = dict(comp=0, dirs=[0,0,1,0,1,0,0,1,0,1,1],
                  sniper=None, dirPlan=1, strat="", zone_pine=None)
         fake_si = dict(d=-1, e=100.0)
-        for market in ("GOLD",):
-            with mock.patch.object(ab, "etat_marche_hb", return_value=("ouvert", None)), \
+        for market in ("BTC", "GOLD"):
+            with self.subTest(market=market), \
+                 mock.patch.object(ab, "etat_marche_hb", return_value=("ouvert", None)), \
                  mock.patch.object(ab, "hb_etat_surveille", return_value={"d": 1, "n": 9}), \
                  mock.patch.object(ab, "scalp_inverse", return_value=fake_si) as inverse, \
                  mock.patch.object(ab, "trait_indicateur", return_value=None):
                 events = ab.evenements_pine({}, market, r, {}, 50000)
             inverse.assert_not_called()
             self.assertNotIn("scalp_inv", [e["kind"] for e in events])
-
-        with mock.patch.object(ab, "etat_marche_hb", return_value=("ouvert", None)), \
-             mock.patch.object(ab, "hb_etat_surveille", return_value={"d": 1, "n": 9}), \
-             mock.patch.object(ab, "scalp_inverse", return_value=fake_si) as inverse, \
-             mock.patch.object(ab, "trait_indicateur", return_value=None):
-            events = ab.evenements_pine({}, "BTC", r, {}, 50000)
-        inverse.assert_called_once()
-        self.assertIn("scalp_inv", [e["kind"] for e in events])
 
 
 if __name__ == "__main__":
