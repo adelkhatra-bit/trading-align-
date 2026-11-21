@@ -23,7 +23,9 @@ class LiveVoiceLanguagePreference(unittest.TestCase):
         source = LIVE_JS.read_text(encoding="utf-8")
         self.assertIn("\\brisques?\\b|\\brisks?\\b", source)
         self.assertIn("function choisirVoix(lang)", source)
-        self.assertIn("if (!v) return 0;", source)   # v12.2.8 : sans voix naturelle, silence (plus de voix robot)
+        self.assertIn("if (!v) {", source)
+        self.assertIn("if (!anglais && voixActive) voixEnAttente = item;", source)
+        self.assertIn("return 0;   // aucune voix naturelle disponible : silence plutôt qu'une voix robot", source)   # v12.2.8 : sans voix naturelle, silence (plus de voix robot)
         self.assertIn("utterance.voice = v;", source)
 
     def test_animation_toggle_remains_independent_and_persisted(self):
