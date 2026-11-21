@@ -86,7 +86,11 @@ def detail_bridge_invalide(payload):
         if absents:
             morceaux.append("UT absentes " + ",".join(absents))
         if perimes:
-            morceaux.append("UT périmées " + ",".join(perimes))
+            ages = []
+            for tf in perimes:
+                age = (snaps.get(tf) or {}).get("ageMs")
+                ages.append(f"{tf} ({round(age / 1000)} s)" if isinstance(age, (int, float)) else tf)
+            morceaux.append("UT périmées " + ",".join(ages))
     rejet = payload.get("lastRejection")
     if isinstance(rejet, dict) and rejet.get("error"):
         age = rejet.get("ageMs")
@@ -1296,6 +1300,11 @@ def cme_ouvert(ts):
     if ct.weekday() == 5 or (ct.weekday() == 4 and ct.hour >= 16) or (ct.weekday() == 6 and ct.hour < 17):
         return False
     return ct.hour != 16
+
+def symboles_bridge_obligatoires(ts=None):
+    """BTC est continu ; le bridge GOLD n'est obligatoire que pendant la session CME utilisée par ALIGN."""
+    maintenant = time.time() if ts is None else float(ts)
+    return ("BTCUSD", "XAUUSD") if cme_ouvert(maintenant) else ("BTCUSD",)
 
 def barre(r):
     s = ""

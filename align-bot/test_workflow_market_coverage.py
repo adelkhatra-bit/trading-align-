@@ -10,7 +10,10 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.bot = (Path(__file__).parent / "align_bot.py").read_text(encoding="utf-8")
 
     def test_worker_operational_scope_is_btc_and_gold_only(self):
-        self.assertIn('for symbol in ("BTCUSD", "XAUUSD")', self.workflow)
+        self.assertIn("required_symbols = align_bot.symboles_bridge_obligatoires(time.time())", self.workflow)
+        self.assertIn("for symbol in required_symbols:", self.workflow)
+        self.assertIn("def symboles_bridge_obligatoires(ts=None):", self.bot)
+        self.assertIn("BRIDGE_SESSION_CLOSED symbol=XAUUSD", self.workflow)
         self.assertIn("Analyse BTC + Gold et envoi Telegram", self.workflow)
         self.assertNotIn("NAS100", self.workflow)
         self.assertNotIn('report["nasdaq_open_trade"]', self.workflow)
