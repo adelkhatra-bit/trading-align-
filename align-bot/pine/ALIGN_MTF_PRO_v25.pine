@@ -619,19 +619,20 @@ bridgeConfirmed = bridgePlanValid and etatS == "CONFIRMÉ" and scoreV >= 75 and 
 bridgeZone = zoneBas ? "SUPPORT" : zoneHaut ? "RESISTANCE" : "PLAN"
 
 // Chaque timeframe transporte l'heure d'ouverture de SA propre bougie.
-// Le bridge calcule la fraîcheur MTF à partir de ces timestamps, pas de l'heure du webhook.
+// Sur un chart supérieur, time("5") peut rester sur le premier intrabar :
+// request.security(..., time, lookahead_off) suit le dernier intrabar en temps réel.
 bridgeEntryTf = strat == "SWING" ? "60" : strat == "DAY" ? "5" : strat == "SCALPING" ? "1" : ""
 [bridgeEntryOpen, bridgeEntryHigh, bridgeEntryLow, bridgeEntryClose, bridgeEntryTime] = request.security(syminfo.tickerid, bridgeEntryTf == "" ? timeframe.period : bridgeEntryTf, [open[1], high[1], low[1], close[1], time[1]], lookahead=barmerge.lookahead_on)
 bridgeEntryTimeSafe = bridgeEntryTf == "" ? na : bridgeEntryTime
-bridgeTimeM1 = time("1")
-bridgeTimeM5 = time("5")
-bridgeTimeM15 = time("15")
-bridgeTimeM30 = time("30")
-bridgeTimeH1 = time("60")
-bridgeTimeH2 = time("120")
-bridgeTimeH4 = time("240")
-bridgeTimeD1 = time("D")
-bridgeTimeW1 = time("W")
+bridgeTimeM1 = request.security(syminfo.tickerid, "1", time, lookahead=barmerge.lookahead_off)
+bridgeTimeM5 = request.security(syminfo.tickerid, "5", time, lookahead=barmerge.lookahead_off)
+bridgeTimeM15 = request.security(syminfo.tickerid, "15", time, lookahead=barmerge.lookahead_off)
+bridgeTimeM30 = request.security(syminfo.tickerid, "30", time, lookahead=barmerge.lookahead_off)
+bridgeTimeH1 = request.security(syminfo.tickerid, "60", time, lookahead=barmerge.lookahead_off)
+bridgeTimeH2 = request.security(syminfo.tickerid, "120", time, lookahead=barmerge.lookahead_off)
+bridgeTimeH4 = request.security(syminfo.tickerid, "240", time, lookahead=barmerge.lookahead_off)
+bridgeTimeD1 = request.security(syminfo.tickerid, "D", time, lookahead=barmerge.lookahead_off)
+bridgeTimeW1 = request.security(syminfo.tickerid, "W", time, lookahead=barmerge.lookahead_off)
 
 bridgePayload = '{"source":"ALIGN_MTF_PRO_V25","symbol":"' + bridgeMarket + '","tickerid":"' + syminfo.tickerid + '","timeframe":"' + bridgeTf + '","planTimeframe":"M15","entryTimeframe":"' + (strat == "SWING" ? "H1" : strat == "DAY" ? "M5" : strat == "SCALPING" ? "M1" : "UNSUPPORTED") + '","entryZoneLow":' + f_align_v25_json_num(bridgePlanValid ? zBas : na) + ',"entryZoneHigh":' + f_align_v25_json_num(bridgePlanValid ? zHaut : na) + ',"entryDecision":' + f_align_v25_json_num(bridgePlanValid ? (zBas + zHaut) / 2 : na) + ',"entryBarTime":' + f_align_v25_json_int(bridgeEntryTimeSafe) + ',"entryBarOpen":' + f_align_v25_json_num(bridgeEntryOpen) + ',"entryBarHigh":' + f_align_v25_json_num(bridgeEntryHigh) + ',"entryBarLow":' + f_align_v25_json_num(bridgeEntryLow) + ',"entryBarClose":' + f_align_v25_json_num(bridgeEntryClose) + ',"price":' + f_align_v25_json_num(close) + ',"timestamp":' + str.tostring(timenow) + ',"candle_time":' + str.tostring(time) + ',"confirmed":' + str.tostring(bridgeConfirmed) + ',"candle_confirmed":' + str.tostring(barstate.isconfirmed) + ',"bar_confirmed":' + str.tostring(barstate.isconfirmed) + ',"signal":"' + bridgeSignal + '","verdict":"' + decisionS + '","entry":' + f_align_v25_json_num(bridgePlanValid ? ent : na) + ',"sl":' + f_align_v25_json_num(bridgePlanValid ? sl : na) + ',"tp1":' + f_align_v25_json_num(bridgePlanValid ? tp1 : na) + ',"tp2":' + f_align_v25_json_num(bridgePlanValid ? tp2 : na) + ',"rrRatio":' + f_align_v25_json_num(rr) + ',"macro_bull":' + str.tostring(bull) + ',"macro_bear":' + str.tostring(bear) + ',"long_score":' + str.tostring(dirPlan == 1 ? scoreV : 0) + ',"short_score":' + str.tostring(dirPlan == -1 ? scoreV : 0) + ',"scalp_inverse":false,"strategy":"' + strat + '","anticipation":"' + (retHaut ? "HAUSSIER" : retBas ? "BAISSIER" : "AUCUNE") + '","zone_proche":"' + bridgeZone + '","volume":"' + (volOk ? "OK" : "INDISPONIBLE") + '","rsi_etat":"' + (rsiOB >= 3 ? "SURACHAT" : rsiOS >= 3 ? "SURVENTE" : "NORMAL") + '","rsi_1m":' + f_align_v25_json_num(r1) + ',"rsi_5m":' + f_align_v25_json_num(r5) + ',"rsi_15m":' + f_align_v25_json_num(r15) + ',"rsi_60m":' + f_align_v25_json_num(r60) + ',"lecture_1m":' + f_align_v25_json_dir(d1) + ',"lecture_5m":' + f_align_v25_json_dir(nz(d5Fermee)) + ',"lecture_15m":' + f_align_v25_json_dir(nz(d15Fermee)) + ',"lecture_60m":' + f_align_v25_json_dir(nz(d60Fermee)) + ',"mtf":{"M1":{"direction":' + f_align_v25_json_int(d1) + ',"rsi":' + f_align_v25_json_num(r1) + ',"bar_time":' + str.tostring(nz(bridgeTimeM1, 0)) + '},"M5":{"direction":' + f_align_v25_json_int(d5Strat) + ',"rsi":' + f_align_v25_json_num(r5) + ',"bar_time":' + str.tostring(nz(bridgeTimeM5, 0)) + '},"M15":{"direction":' + f_align_v25_json_int(d15Strat) + ',"rsi":' + f_align_v25_json_num(r15) + ',"bar_time":' + str.tostring(nz(bridgeTimeM15, 0)) + '},"M30":{"direction":' + f_align_v25_json_int(d30) + ',"rsi":' + f_align_v25_json_num(r30) + ',"bar_time":' + str.tostring(nz(bridgeTimeM30, 0)) + '},"H1":{"direction":' + f_align_v25_json_int(d1hStrat) + ',"rsi":' + f_align_v25_json_num(r60) + ',"bar_time":' + str.tostring(nz(bridgeTimeH1, 0)) + '},"H2":{"direction":' + f_align_v25_json_int(d120) + ',"rsi":' + f_align_v25_json_num(r120) + ',"bar_time":' + str.tostring(nz(bridgeTimeH2, 0)) + '},"H4":{"direction":' + f_align_v25_json_int(d4Strat) + ',"rsi":' + f_align_v25_json_num(r240) + ',"bar_time":' + str.tostring(nz(bridgeTimeH4, 0)) + '},"D1":{"direction":' + f_align_v25_json_int(dD) + ',"rsi":' + f_align_v25_json_num(rD) + ',"bar_time":' + str.tostring(nz(bridgeTimeD1, 0)) + '},"W1":{"direction":' + f_align_v25_json_int(dW) + ',"rsi":' + f_align_v25_json_num(rW) + ',"bar_time":' + str.tostring(nz(bridgeTimeW1, 0)) + '}}}'
 
