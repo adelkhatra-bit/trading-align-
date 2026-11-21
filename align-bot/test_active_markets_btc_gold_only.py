@@ -42,6 +42,18 @@ class ActiveMarketsBTCGoldOnly(unittest.TestCase):
                 self.assertTrue(ab.marche_retiree_demande(request))
                 self.assertIsNone(ab.marche_demande(request))
 
+    def test_retired_market_labels_are_not_in_active_telegram_menus(self):
+        self.assertNotIn("💠 Analyse Nasdaq", ab.TRAD)
+        self.assertFalse(any("nasdaq" in row[1].lower() or "nasdaq" in row[2].lower()
+                             for row in ab.SESSIONS))
+
+    def test_nasdaq_only_legacy_alert_is_not_routed_to_telegram_channel(self):
+        message = ab.Msg("NASDAQ : ancienne alerte")
+        message.marches = frozenset({"NASDAQ"})
+        self.assertEqual(ab.destinataires_message({"canal": "-100123"}, ["12345"], message), [])
+        self.assertEqual(ab.destinataires_message({"canal": "-100123"}, ["12345"],
+                                                  "NASDAQ : ancienne alerte"), [])
+
 
 if __name__ == "__main__":
     unittest.main()
