@@ -1,6 +1,7 @@
 import os
 import re
 import unittest
+from pathlib import Path
 
 import align_bot as ab
 
@@ -18,7 +19,7 @@ class RRMinEntree(unittest.TestCase):
         self.assertEqual(ab.GAIN_MIN, 1.5)
 
     def test_aucune_porte_d_entree_ne_repasse_a_gain_min(self):
-        src = open(os.path.join(HERE, "align_bot.py"), encoding="utf-8").read()
+        src = Path(os.path.join(HERE, "align_bot.py")).read_text(encoding="utf-8")
         # Une porte d'entrée compare un ratio calculé à un seuil : aucune ne doit garder GAIN_MIN.
         self.assertIsNone(re.search(r"\brr\s*<\s*GAIN_MIN\b", src))
         self.assertIsNone(re.search(r"\brr\"?\]?\s*<\s*GAIN_MIN\b", src))
@@ -32,7 +33,7 @@ if __name__ == "__main__":
 
 class RRAttenteExplicite(unittest.TestCase):
     def test_message_radar_affiche_attente_avec_le_ratio(self):
-        src = open(os.path.join(HERE, "align_bot.py"), encoding="utf-8").read()
+        src = Path(os.path.join(HERE, "align_bot.py")).read_text(encoding="utf-8")
         self.assertIn("🟡 ATTENTE — gain/risque 1:{rr:.1f} sous le minimum 1:{RR_MIN_ENTREE:g}", src)
 
 

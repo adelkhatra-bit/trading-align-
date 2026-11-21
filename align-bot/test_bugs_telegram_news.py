@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import unittest
+from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -136,7 +137,7 @@ class PlanArrondi(unittest.TestCase):
 class RetoursALaLigne(unittest.TestCase):
     def test_aucun_antislash_n_litteral_dans_le_code_des_messages(self):
         import io, tokenize
-        src = open(ab.__file__, encoding="utf-8").read()
+        src = Path(ab.__file__).read_text(encoding="utf-8")
         mauvais = []
         for tok in tokenize.generate_tokens(io.StringIO(src).readline):
             if tok.type == tokenize.STRING or tok.type == getattr(tokenize, "FSTRING_MIDDLE", -1):
