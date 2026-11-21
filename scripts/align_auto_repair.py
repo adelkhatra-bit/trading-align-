@@ -180,6 +180,53 @@ def find_issue_for_sha(issues: list[dict], sha: str) -> dict | None:
     marker = f"<!-- ALIGN_REPAIR_SHA={sha} -->"
     return next((item for item in issues if is_actions_bot(item) and marker in (item.get("body") or "")), None)
 
+def find_watchdog_issue_for_target(issues: list[dict], target: dict) -> dict | None:
+    """Reuse an existing watchdog incident for the same immutable source SHA."""
+    commit_line = f"**Commit:** {target['sha']}"
+    for item in issues:
+        if not is_actions_bot(item) or item.get("state") != "open" or "pull_request" in item:
+            continue
+        if commit_line in (item.get("body") or ""):
+            return item
+    return None
+
+
+def annotate_watchdog_issue_body(body: str, target: dict, attempt: int = 1) -> str:
+    """Tag a watchdog report so both coordinators recognize the shared incident."""
+    marker = f"<!-- ALIGN_REPAIR_SHA={target['sha']} -->"
+    if marker in body:
+        return body
+    block = "\n".join((
+        marker,
+        f"<!-- ALIGN_REPAIR_ATTEMPT={attempt} -->",
+        f"<!-- ALIGN_REPAIR_RUN={target['run_id']} -->",
+    ))
+    return body.rstrip() + "\n\n" + block + "\n"
+
+
+def attach_repair_to_watchdog_issue(issue: dict, target: dict, failure_summary: str) -> int:
+    """Add repair provenance to a watchdog issue instead of opening a second ticket."""
+    number = int(issue["number"])
+    old_body = issue.get("body") or ""
+    body = annotate_watchdog_issue_body(old_body, target, 1)
+    if body != old_body:
+        request_json(f"/repos/{EXPECTED_REPO}/issues/{number}", "PATCH", {"body": body})
+    comment = (
+        "## Diagnostic ALIGN auto-repair rattaché à ce signalement existant\n\n"
+        f"- SHA : `{target['sha']}`\n"
+        f"- Workflow : {target['run_name']}\n"
+        f"- Run : [{target['run_id']}]({target['run_url']})\n\n"
+        "### Étapes en échec\n"
+        f"{failure_summary}\n\n"
+        "<!-- ALIGN_REPAIR_ATTEMPT=1 -->\n"
+        f"<!-- ALIGN_REPAIR_RUN={target['run_id']} -->"
+    )
+    request_json(f"/repos/{EXPECTED_REPO}/issues/{number}/comments", "POST", {"body": comment})
+    request_json(f"/repos/{EXPECTED_REPO}/issues/{number}/labels", "POST", {"labels": [LABEL]})
+    return number
+
+
+
 
 def ensure_label() -> None:
     labels = request_json(f"/repos/{EXPECTED_REPO}/labels?per_page=100")
@@ -298,6 +345,13 @@ def main() -> int:
         )
         request_json(f"/repos/{EXPECTED_REPO}/issues/{existing['number']}/comments", "POST", {"body": body})
         print(f"Updated existing repair issue #{existing['number']} for SHA {target['sha']} (attempt {attempt}).")
+        return 0
+
+    watchdog_existing = find_watchdog_issue_for_target(issues, target)
+    if watchdog_existing:
+        issue_number = attach_repair_to_watchdog_issue(watchdog_existing, target, summary)
+        print(f"Attached repair evidence to existing watchdog issue #{issue_number}; no duplicate issue created.")
+        assign_copilot_if_available(issue_number, issues)
         return 0
 
     body = repair_issue_body(target, summary, 1)

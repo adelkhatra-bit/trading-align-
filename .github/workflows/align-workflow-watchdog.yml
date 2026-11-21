@@ -16,7 +16,7 @@ on:
       - "ALIGN Topstep vérification"
       - "pages build and deployment"
       - "ALIGN Copilot Issue Relay"
-      - "ALIGN Auto Repair Coordinator"
+      - "ALIGN Coordinateur de réparation automatique"
     types: [completed]
   schedule:
     - cron: "*/5 * * * *"
