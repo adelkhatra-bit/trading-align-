@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 import threading
 import time
 import unittest
@@ -84,6 +85,25 @@ def valid_payload(now_ms=BASE_MS, symbol="BTCUSD", timeframe="M1"):
 class BridgeStoreTests(unittest.TestCase):
     def setUp(self):
         self.store = BridgeStore(INGEST, READ)
+
+    def test_pine_bridge_uses_native_timeframe_clock_for_bar_timestamps(self):
+        pine_path = Path(__file__).resolve().parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
+        pine = pine_path.read_text(encoding="utf-8")
+        expected = {
+            "bridgeTimeM1": 'time("1")',
+            "bridgeTimeM5": 'time("5")',
+            "bridgeTimeM15": 'time("15")',
+            "bridgeTimeM30": 'time("30")',
+            "bridgeTimeH1": 'time("60")',
+            "bridgeTimeH2": 'time("120")',
+            "bridgeTimeH4": 'time("240")',
+            "bridgeTimeD1": 'time("D")',
+            "bridgeTimeW1": 'time("W")',
+        }
+        for variable, expression in expected.items():
+            with self.subTest(timeframe=variable):
+                self.assertIn(f"{variable} = {expression}", pine)
+                self.assertNotIn(f"{variable} = request.security", pine)
 
     def test_accepts_snapshot_and_exposes_workflow_contract(self):
         status, result = self.store.ingest(valid_payload(), INGEST, BASE_MS)
