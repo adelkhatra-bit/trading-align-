@@ -1,4 +1,4 @@
-"""Le bot dit toujours clairement quels marchés il surveille pour la personne (GOLD + NASDAQ, etc.)."""
+"""Le bot ne présente que BTC et GOLD, même avec d'anciennes préférences NASDAQ en mémoire."""
 import json
 import os
 import sys
