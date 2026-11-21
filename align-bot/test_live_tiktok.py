@@ -313,6 +313,11 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("🔊 COACH VOCAL ON", source)
         self.assertIn("voixBtn.remove()", source)
         self.assertIn("parlerLive(m)", source)
+        # End-to-end linkage: bot IA payload -> ntfy receiver -> AI bubble -> voice narration.
+        self.assertIn("if (txt.startsWith('IA:')) { recuIA(txt.slice(3)); return; }", source)
+        self.assertIn("montrer('🧠 ' + phrase, false, 2, 'membre', false, 'ia')", source)
+        self.assertIn("const voixDuree = parlerLive(m)", source)
+        self.assertIn("item.source !== 'ia' && item.source !== 'marche'", source)
         self.assertIn("voiceschanged", source)  # voix navigateur parfois disponibles après document-idle
         self.assertIn("voixEnAttente = item", source)  # commentaire FR retenté quand la liste de voix arrive
         self.assertIn("hortense|audrey|julie|charlotte", source)  # noms courants de voix FR, sans repli robot
