@@ -10,8 +10,8 @@
 - Apply these rules only to work explicitly identified as ALIGN/TRADING. If the account user or project context is ambiguous, ask before acting.
 - Never assume a branch name, SHA, PR state, deployment state, or runtime health. Read it from GitHub immediately before acting.
 
-## Permanent project identity lock — Claude Chrome and ALIGN
-- The authorized recovery source identified by the owner is **Claude Chrome**. Do not rename it or substitute Claude Code, VS Code, Cowork, or another tool; keep their sessions and provenance distinct.
+## Historical provenance reference - Claude Chrome and ALIGN
+- Claude Chrome is preserved as a historical provenance/source-history reference only. It is not a repository-managed agent and grants no coding agent access or write authorization. Keep historical session provenance distinct; do not substitute another source or infer unverified history.
 - The only target repository is `adelkhatra-bit/trading-align-`. `main` is the production code branch and `live-data` is only the generated public-data branch.
 - The former `trading-auto` environment, its pages, servers, workers, Puppeteer sessions, ports, and similarly named local folders are out of scope. Do not inspect their operational data, connect to their ports, reuse their files, change their processes, or delete them during ALIGN work.
 - Prove project identity from the canonical GitHub repository, exact branch and SHA, and file provenance. An open port, process name, folder name, browser tab, or old branch label is not proof.
@@ -68,18 +68,27 @@ Never merge or deploy on a failed, missing, stale, or mismatched required check.
 ## Required work report
 For each task report, concisely: issue and proven root cause; repository/branch/PR/base SHA/head SHA; files changed; minimal fix; tests and exact results; runtime checks; residual risks; and rollback plan. State explicitly what was not verified. Never claim continuous background monitoring or completed work without evidence.
 
-## Agent protocol: diagnose and propose before editing
+## Human maintainer protocol
 
-This section applies to every Copilot, Codex, and other coding agent working in this repository.
+This procedure applies to the repository owner and explicitly authorized human maintainers. It does not authorize a repository-managed coding agent.
 
-1. **Read-only first.** Before editing, verify the repository, task, branch, PR, base/head SHAs, changed-file list, latest checks, and exact canonical source files.
+1. **Read-only first.** Verify the canonical repository, issue, branch, PR, base/head SHAs, changed-file list, latest checks, canonical Pine source, and working-tree state before modifying anything.
 2. **Localize the defect.** Identify the exact file, function or block, line range, root cause, reproduction scenario, and affected behavior. Do not infer a cause from a failing workflow name alone.
-3. **Propose before changing code.** Post a concise diagnosis and minimal patch plan: exact files/lines, intended behavior, targeted regression tests, possible side effects, and rollback. Wait for explicit owner approval before writing files or commits.
-4. **No branch takeover.** Never replace, rewrite, rebase, reset, force-push, or bulk-synchronize an existing branch. Preserve every existing commit and unrelated change. Work only on the verified task branch; if it contains unrelated work or has drifted, stop and propose an isolated branch instead.
-5. **One defect, one focused change.** Do not bundle unrelated review findings or opportunistic refactors. Touch only the smallest set of files required by the proven dependency chain. Explain every additional file before changing it.
-6. **Canonical TradingView indicator — strict identity.** The only authorized active indicator is `align-bot/pine/ALIGN_MTF_PRO_v25.pine`, with title `ALIGN MTF PRO v25 (Inside)` and short title `ALIGN MTF v25`. Verify its current source and version from `main` before each change; do not rely on a hard-coded historical SHA. Keep `Animation en temps réel` enabled by default. Never substitute an older v24 file, a proposal file, or an unrelated indicator.
-7. **Zero regression.** Preserve ALIGN identity, Pine calculations, signals, Entry/SL/TP, MTF behavior, design, Claude-era v12.2 animations, AI commentary, alerts, Telegram, bridge, server, and strict separation between `main` and `live-data`. Do not modify them unless the approved task requires it and the plan names the exact scope.
-8. **Stop on uncertainty or failure.** If the canonical source, branch ownership, required access, live dependency, or expected behavior cannot be verified, report the blocker. If a test fails, stop and diagnose; do not weaken or delete tests and do not claim completion.
-9. **Evidence-based handoff.** Report the exact head SHA, changed files, minimal diff, test names/results, workflow URLs, unresolved findings, runtime checks not performed, and rollback path. Never claim an agent is running without a verifiable run, response, or commit.
+3. **Minimal plan before changes.** Record the exact files and behavior to change, focused regression tests, side effects, and rollback path. Obtain owner authorization before changing shared production code.
+4. **No branch takeover.** Never replace, rewrite, rebase, reset, force-push, or bulk-synchronize an existing branch. Preserve every existing commit and unrelated change. Use an isolated branch from the current verified main when the existing work is not demonstrably the same task.
+5. **One defect, one focused change.** Do not bundle unrelated findings or opportunistic refactors. Touch only the smallest set of files required by the proven dependency chain.
+6. **Canonical TradingView indicator.** The only active indicator is align-bot/pine/ALIGN_MTF_PRO_v25.pine, titled ALIGN MTF PRO v25 (Inside). Never substitute older v24 files or proposal files. Verify the source from current main before work.
+7. **Zero regression.** Preserve Pine calculations, signal logic, Entry/SL/TP, MTF behavior, design, Claude-era v12.2 animations, AI commentary, Telegram, bridge, server, memory, and separation of main and live-data.
+8. **Stop on uncertainty or failure.** If source, branch ownership, permissions, a live dependency, or expected behavior cannot be verified, report the blocker. Never weaken or delete a failing test to get a green result.
+9. **Evidence-based handoff.** Report exact branch and SHA, files, diff, tests and workflow URLs, runtime checks not performed, residual risks, and rollback path. Never claim a change or external process ran without evidence.
+10. No human or automated process may place a real broker order through this maintenance workflow. Production trading remains subject to the separate explicit trading safety constraints above.
 
-No agent may merge, deploy, modify secrets, restart production services, or place broker orders. All merges require explicit owner approval after diff review, required checks, and applicable runtime validation.
+## External code-agent access is disabled
+
+- ALIGN does not use GitHub Copilot CLI relays, Copilot cloud-agent assignment, repository custom-agent profiles, or automated code-agent handoffs.
+- The workflow watchdog and auto-repair coordinator may create or update deduplicated diagnostic issues for human maintainers only. They must never read a Copilot token, query assignable code agents, or assign an agent.
+- Runtime AI providers used by the Telegram BOT for market commentary remain a separate production feature. Keep their existing quotas, fallback, consent, market isolation, and safety controls.
+- A public repository remains readable by external services, including AI services. Repository instructions cannot prevent external reading; private visibility and GitHub permission changes must be enforced in repository settings by an authorized owner.
+- No automated coding agent may write, commit, push, merge, deploy, change secrets, or place broker orders in ALIGN. All changes continue through a focused branch, reviewed diff, green required checks, and explicit human authorization.
+- Every contributor must obtain explicit user approval before any merge.
+- All merges require explicit owner approval after diff review, required checks, and applicable runtime validation.

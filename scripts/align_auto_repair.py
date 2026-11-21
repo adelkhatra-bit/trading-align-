@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Failure evidence coordinator for ALIGN; reports only, with optional guarded Copilot assignment."""
+"""Failure evidence coordinator for ALIGN; creates deduplicated reports for human maintainers only."""
 from __future__ import annotations
 
 import json
@@ -21,16 +21,15 @@ ATTEMPT_MARKER = re.compile(r"<!-- ALIGN_REPAIR_ATTEMPT=(\d+) -->")
 RUN_MARKER = re.compile(r"<!-- ALIGN_REPAIR_RUN=(\d+) -->")
 REPO = os.environ.get("GITHUB_REPOSITORY", "")
 TOKEN = os.environ.get("GH_TOKEN", "")
-COPILOT_TOKEN = os.environ.get("COPILOT_GITHUB_TOKEN", "")
 
 
-def request_json(path: str, method: str = "GET", payload: dict | None = None, token: str | None = None):
+def request_json(path: str, method: str = "GET", payload: dict | None = None):
     data = None if payload is None else json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         API + path, data=data, method=method,
         headers={
             "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {TOKEN if token is None else token}",
+            "Authorization": f"Bearer {TOKEN}",
             "X-GitHub-Api-Version": "2022-11-28",
             "Content-Type": "application/json",
             "User-Agent": "ALIGN-Auto-Repair-Coordinator",
@@ -104,77 +103,6 @@ def all_issues() -> list[dict]:
     raise RuntimeError("Issue pagination exceeded the 1000-item safety limit.")
 
 
-
-def request_graphql(query: str) -> dict:
-    data = json.dumps({"query": query}).encode("utf-8")
-    req = urllib.request.Request(
-        "https://api.github.com/graphql", data=data, method="POST",
-        headers={
-            "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {COPILOT_TOKEN}",
-            "X-GitHub-Api-Version": "2022-11-28",
-            "GraphQL-Features": "issues_copilot_assignment_api_support,coding_agent_model_selection",
-            "Content-Type": "application/json",
-            "User-Agent": "ALIGN-Auto-Repair-Coordinator",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=30) as response:
-        return json.loads(response.read().decode("utf-8"))
-
-
-def assign_copilot_if_available(issue_number: int, issues: list[dict]) -> bool:
-    """Assign only when the user-owned token exists, Copilot is enabled, and no agent is active."""
-    if not COPILOT_TOKEN:
-        return False
-    for issue in issues:
-        if issue.get("state") != "open":
-            continue
-        assignees = issue.get("assignees") or []
-        if any(item.get("login") == "copilot-swe-agent[bot]" for item in assignees):
-            print("Copilot assignment skipped: another ALIGN repair issue already has an active Copilot agent.")
-            return False
-
-    query = """query {
-      repository(owner: "adelkhatra-bit", name: "trading-align-") {
-        suggestedActors(capabilities: [CAN_BE_ASSIGNED], first: 100) {
-          nodes { login }
-        }
-      }
-    }"""
-    try:
-        result = request_graphql(query)
-        nodes = (((result or {}).get("data") or {}).get("repository") or {}).get("suggestedActors", {}).get("nodes") or []
-        if not any(item.get("login") == "copilot-swe-agent" for item in nodes):
-            print("Copilot cloud agent is not available as an assignable actor; issue left for manual assignment.")
-            return False
-        instructions = (
-            "Work only in adelkhatra-bit/trading-align- on a dedicated branch based on main. "
-            "Diagnose the supplied failing SHA/run, make the smallest targeted fix, add focused regression tests, "
-            "and open a draft pull request. Never merge or deploy. Do not modify Pine, indicator design, animations, "
-            "signal strategy, Entry/SL/TP, broker execution, or live-data/live.json. Never expose secrets. "
-            "Preserve all existing ALIGN and Claude-era behavior. Stop and report if evidence is insufficient."
-        )
-        request_json(
-            f"/repos/{EXPECTED_REPO}/issues/{issue_number}/assignees",
-            method="POST",
-            payload={
-                "assignees": ["copilot-swe-agent[bot]"],
-                "agent_assignment": {
-                    "target_repo": EXPECTED_REPO,
-                    "base_branch": "main",
-                    "custom_instructions": instructions,
-                },
-            },
-            token=COPILOT_TOKEN,
-        )
-        print(f"Copilot cloud agent assigned to repair issue #{issue_number}.")
-        return True
-    except urllib.error.HTTPError as exc:
-        print(f"Copilot automatic assignment unavailable (HTTP {exc.code}); issue remains available for manual assignment.")
-        return False
-    except Exception as exc:
-        print(f"Copilot automatic assignment unavailable ({type(exc).__name__}); issue remains available for manual assignment.")
-        return False
 
 def find_issue_for_sha(issues: list[dict], sha: str) -> dict | None:
     marker = f"<!-- ALIGN_REPAIR_SHA={sha} -->"
@@ -286,19 +214,17 @@ def repair_issue_body(target: dict, failure_summary: str, attempt: int) -> str:
 ### Étapes en échec
 {failure_summary}
 
-### Consignes à l'agent (assignation humaine par défaut)
-1. Diagnostiquer uniquement les fichiers liés à cet échec.
-2. Proposer un correctif minimal sur une branche dédiée et une PR brouillon.
-3. Exécuter les tests ciblés puis la suite de régression concernée.
-4. Ne jamais merger ni déployer. Ne modifier ni Pine, ni le design, ni les animations, ni les signaux ou le trading sans mission explicite.
-5. Préserver `live-data/live.json` et ne jamais afficher de secrets.
-6. Vérifier le SHA exact avant toute analyse; ne jamais diagnostiquer une autre branche ou version par confusion.
-7. Établir la provenance du fichier réellement exécuté (version, chemin, appelant, branche et SHA) avant de proposer un raccordement. Ne pas remplacer un module par une copie d'une autre version.
-8. Un seul agent à la fois; maximum deux tentatives sur ce SHA. Après deux échecs, ou si la cause n'est pas prouvée, arrêter et fournir un diagnostic factuel.
-9. Les liens de logs des jobs échoués sont fournis ci-dessous lorsqu'ils sont disponibles; ne pas inventer des logs manquants.
+### Instructions pour le mainteneur humain
+1. Diagnostiquer uniquement les fichiers liés à cet échec et vérifier le SHA exact.
+2. Examiner les journaux et la provenance avant toute modification.
+3. Préparer une correction minimale sur une branche dédiée et une PR soumise à revue humaine.
+4. Exécuter les tests ciblés puis la suite de régression concernée.
+5. Ne jamais fusionner ni déployer sans validation requise et autorisation humaine explicite.
+6. Préserver Pine, le design, les animations, les signaux, le trading et live-data/live.json.
+7. Ne jamais exposer de secret et ne jamais placer d'ordre broker réel.
 
-L'assignation à Copilot cloud agent reste manuelle par défaut. Aucun agent n'est lancé par ce workflow.
- 
+Aucun agent de code externe n'est assigné ou lancé par le coordinateur. Ce signalement est destiné à un mainteneur humain.
+
 <!-- ALIGN_REPAIR_SHA={target['sha']} -->
 <!-- ALIGN_REPAIR_ATTEMPT={attempt} -->
 <!-- ALIGN_REPAIR_RUN={target['run_id']} -->
@@ -351,7 +277,6 @@ def main() -> int:
     if watchdog_existing:
         issue_number = attach_repair_to_watchdog_issue(watchdog_existing, target, summary)
         print(f"Attached repair evidence to existing watchdog issue #{issue_number}; no duplicate issue created.")
-        assign_copilot_if_available(issue_number, issues)
         return 0
 
     body = repair_issue_body(target, summary, 1)
@@ -362,8 +287,6 @@ def main() -> int:
     )
     issue_number = int(created.get("number") or 0)
     print(f"Created repair issue #{issue_number} for SHA {target['sha']}; attempt 1/{MAX_ATTEMPTS}.")
-    if issue_number:
-        assign_copilot_if_available(issue_number, issues)
     return 0
 
 

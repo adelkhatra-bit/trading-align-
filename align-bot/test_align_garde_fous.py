@@ -74,6 +74,24 @@ class GardeFousWorkflows(unittest.TestCase):
         for triggers in (watchdog_triggers, repair_triggers):
             self.assertNotIn("NASDAQ Telegram", triggers)
 
+    def test_external_code_agents_and_relays_are_absent(self):
+        forbidden = [
+            WF / "align-copilot-issue-relay.yml",
+            ROOT / "scripts" / "align_copilot_issue_relay.py",
+            ROOT / "align-bot" / "test_align_copilot_issue_relay.py",
+            ROOT / ".github" / "copilot-instructions.md",
+            ROOT / ".github" / "agents",
+        ]
+        for path in forbidden:
+            self.assertFalse(path.exists(), f"external code-agent entry point remains: {path}")
+        coordinator = (ROOT / "scripts" / "align_auto_repair.py").read_text(encoding="utf-8")
+        workflow = (WF / "align-auto-repair.yml").read_text(encoding="utf-8")
+        self.assertNotIn("COPILOT_GITHUB_TOKEN", coordinator)
+        self.assertNotIn("COPILOT_GITHUB_TOKEN", workflow)
+        self.assertNotIn("assign_copilot_if_available", coordinator)
+        self.assertNotIn("suggestedActors", coordinator)
+        self.assertIn("human maintainers only", coordinator)
+
     def test_watchdog_reste_planifie(self):
         texte = (WF / "align-workflow-watchdog.yml").read_text(encoding="utf-8")
         self.assertRegex(texte, r"schedule:\s*\n\s*- cron:", "le watchdog n'est plus planifié")
