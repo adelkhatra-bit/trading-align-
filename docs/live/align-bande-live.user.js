@@ -326,6 +326,7 @@
     if (!voixActive || !item || (item.source !== 'ia' && item.source !== 'marche') ||!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return 0;
     // v12.2.7 (règle d'Adel) : chaque info est dite en FRANÇAIS, puis la même en ANGLAIS, jamais mélangées.
     const anglais = !!item.en;
+    if (anglais && item.source === 'marche' && !item.anglaisTraduit) return 0;  // une bulle non traduite reste silencieuse en EN
     const maintenant = Date.now();
     const suiteAnglaise = anglais && maintenant - voixDerniereFR < 60000;   // l'anglais suit le français qu'on vient de dire
     if (anglais && !suiteAnglaise) return 0;                                // pas d'anglais orphelin
@@ -480,7 +481,8 @@
     // v6.4 : chaque info passe en français PUIS en anglais (au moins 2 passages)
     // v12.2.8 : plus de « risque de perte » ajouté à chaque info : la mention légale reste seulement dans le pied de bande
     // v7.3 (règle d'Adel, 15/11) : chaque info passe 2 fois en français PUIS 2 fois en anglais
-    const nPass = Math.max(4, 2 * (fois || 1)), items = []; for (let i = 0; i < nPass; i++) items.push({ texte: (i >= nPass / 2 ? '🇬🇧 ' : '🇫🇷 ') + plateforme(i >= nPass / 2 ? enAnglais(texte) : texte), bulle, g, en: i >= nPass / 2, source: source || 'live' });   // v7.4 : jamais FR et EN mélangés, drapeau + teinte
+    const traductionEN = enAnglais(texte), anglaisTraduit = traductionEN !== texte;
+    const nPass = Math.max(4, 2 * (fois || 1)), items = []; for (let i = 0; i < nPass; i++) items.push({ texte: (i >= nPass / 2 ? '🇬🇧 ' : '🇫🇷 ') + plateforme(i >= nPass / 2 ? traductionEN : texte), bulle, g, en: i >= nPass / 2, anglaisTraduit, source: source || 'live' });   // v12.2.12 : garde la preuve de traduction pour ne pas vocaliser du français avec une voix EN
     if (devant) { file.splice(0, file.length, ...items, ...file.filter(m => m.g && m.g !== 'proche')); couper(); }   // v7.5 : clic sur une zone = la bande en parle TOUT DE SUITE
     else if (urgent) { let k = 0; while (k < file.length && file[k].g && file[k].g !== 'proche') k++; file.splice(k, 0, ...items); }
     else file.push(...items);
