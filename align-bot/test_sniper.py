@@ -145,13 +145,22 @@ class Cascade(unittest.TestCase):
 class MessagesEtRegles(unittest.TestCase):
     M1 = chemin_nuit()
 
-    def evenement(self, etat=None, now=None, k=None):
+    PINE_PLAN = {
+        "available": True, "triggered": True, "direction": -1,
+        "entry": 4000.5, "sl": 4020.0, "tp1": 3970.0, "tp2": 3895.54,
+        "zone_low": 3993.28, "zone_high": 4012.79,
+        "entry_bar_time": 1_795_017_600_000, "entry_timeframe": "H1",
+    }
+
+    def evenement(self, etat=None, now=None, k=None, pine_plan=None):
         etat = {} if etat is None else etat
         k, sn = premiere_proposition(self.M1) if k is None else (k, None)
         r = dict(r_at(self.M1, k), comp=0, sqzs=[0] * 11, dirW=0, pctH=20, sniper=sn)
         r["sniper"] = ab.entree_sniper(r)
         now = now or r["m1"][-1]["t"]
-        with patch.object(ab, "cme_ouvert", return_value=True):
+        plan = self.PINE_PLAN if pine_plan is None else pine_plan
+        with patch.object(ab, "cme_ouvert", return_value=True), \
+             patch.object(ab, "plan_indicateur", return_value=plan):
             return etat, [e for e in ab.evenements_pine(etat, "GOLD", r, etat.setdefault("GOLD", {}), now) if e["kind"] == "sniper"], r
 
     def test_message_in_addition_to_plan_short_varied_fr_en_once(self):
@@ -159,11 +168,34 @@ class MessagesEtRegles(unittest.TestCase):
         self.assertEqual(len(ev), 1)
         fr = ab.texte_pine({}, ev[0]); en = ab.texte_pine({}, ev[0], True)
         self.assertLessEqual(len(fr), 3)
-        self.assertIn("🎯 Entrée sniper 🥇 GOLD : vente", fr[0]); self.assertIn("SL ", fr[1]); self.assertIn("TP1", fr[1]); self.assertIn("3895,54", fr[1])
-        self.assertIn("Sniper entry", en[0]); self.assertIn("sell", en[0]); self.assertNotIn("vente", " ".join(en))
+        self.assertIn("🎯 Entrée sniper 🥇 GOLD : vente Pine 4000,5", fr[0])
+        self.assertIn("zone 3993,28–4012,79", fr[0])
+        self.assertIn("SL Pine 4020 • TP1 Pine 3970 • TP2 Pine 3895,54", fr[1])
+        self.assertIn("rejet M1/M3", fr[2])
+        self.assertEqual(ev[0]["entree"], "4000,50")
+        self.assertEqual((ev[0]["sl"], ev[0]["tp1"], ev[0]["tp"]), ("4020", "3970", "3895,54"))
+        self.assertIn("Pine-confirmed sniper entry", en[0]); self.assertIn("sell", en[0]); self.assertNotIn("vente", " ".join(en))
         self.assertEqual(len({" ".join(ab.texte_pine({"al_rot": {"p:sniper:GOLD": k}}, ev[0])) for k in (-1, 0, 1)}), 3)
         etat2, ev2, _ = self.evenement(etat, now=r["m1"][-1]["t"] + 60, k=None)
         self.assertEqual(ev2, [])                                                                 # une seule fois (même niveau, même UT)
+
+    def test_local_sniper_never_publishes_without_matching_confirmed_pine_trigger(self):
+        cases = (
+            dict(self.PINE_PLAN, available=False),
+            dict(self.PINE_PLAN, triggered=False),
+            dict(self.PINE_PLAN, direction=1),
+        )
+        for plan in cases:
+            with self.subTest(plan=plan):
+                _, events, _ = self.evenement(pine_plan=plan)
+                self.assertEqual(events, [])
+
+    def test_local_sniper_rejection_expires_after_two_minutes(self):
+        k, _ = premiere_proposition(self.M1)
+        r = r_at(self.M1, k)
+        stale_now = r["m1"][-1]["t"] + 121
+        _, events, _ = self.evenement(now=stale_now)
+        self.assertEqual(events, [])
 
     def test_free_sees_nothing_of_the_sniper_and_vip_gets_it(self):
         import inspect

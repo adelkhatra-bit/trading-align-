@@ -46,6 +46,19 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn("candle_trigger", plan)
         self.assertIn("candle_before_stop", plan)
 
+    def test_live_sniper_notification_requires_confirmed_pine_levels(self):
+        start = self.bot.index("def evenements_pine(etat, m, r, cle, now):")
+        end = self.bot.index("\ndef texte_pine(", start)
+        events = self.bot[start:end]
+        self.assertIn("plan_tv = plan_indicateur(r)", events)
+        self.assertIn('plan_tv.get("available") is True', events)
+        self.assertIn('plan_tv.get("triggered") is True', events)
+        self.assertIn("pine_direction == sn_direction", events)
+        self.assertIn("entree=px(pine_entry)", events)
+        self.assertIn("sl=px(pine_sl)", events)
+        self.assertIn("tp1=px(pine_tp1)", events)
+        self.assertNotIn('kind="scalp_inv"', events)
+
     def test_pine_payload_exports_levels_and_strategy_timeframe(self):
         marker = "// ═════════ BRIDGE ALIGN — export structuré du Pine v25"
         self.assertIn(marker, self.pine)

@@ -3730,17 +3730,41 @@ class PineOnlyEntryGateTests(unittest.TestCase):
             # Marché sans exigence de bridge : inchangé.
             self.assertFalse(align_bot.mode_sans_signal({"require_tv_bridge": False, "tv_indicator_mtf": {"available": False}}))
 
-    def test_bridge_ready_still_runs_local_radar(self):
-        """Contre-preuve : bridge prêt, le radar local reste branché (rien n'est enlevé)."""
+    def test_required_bridge_suppresses_all_local_entry_emitters_when_healthy(self):
+        """Même bridge sain : seuls le plan/trigger Pine v25 peuvent produire Entry/SL/TP."""
         from unittest.mock import patch
         r = self._market()
         r["require_tv_bridge"] = True
         state = {"t1m": 0}
         with patch.dict(align_bot.os.environ, {"ALIGN_TV_BRIDGE_PRET": "1"}), \
-             patch.object(align_bot, "radar_climax", return_value="RADAR_LOCAL") as rc:
+             patch.object(align_bot, "reprise_entree", side_effect=AssertionError("local resume entry called")), \
+             patch.object(align_bot, "entree_retest", side_effect=AssertionError("local retest entry called")), \
+             patch.object(align_bot, "radar_climax", side_effect=AssertionError("local radar entry called")), \
+             patch.object(align_bot, "retournement_marche", side_effect=AssertionError("local BTC reversal levels called")):
             out = align_bot.agent("BTC", r, state, "")
-        self.assertTrue(rc.called)
-        self.assertIn("RADAR_LOCAL", out)
+        self.assertFalse(state.get("trade"))
+        self.assertEqual(state.get("ordre", {}).get("e"), 100.0)
+        self.assertTrue(any("Attendre le retest" in str(x) for x in out))
+        self.assertFalse(any("RADAR_LOCAL" in str(x) for x in out))
+
+    def test_manipulation_bridge_mode_never_publishes_local_entry_or_stop(self):
+        bars = [
+            dict(candle(i * 900, o=100.0, h=101.0, l=99.0, c=100.0), v=100)
+            for i in range(21)
+        ]
+        bars.append(dict(candle(21 * 900, o=100.0, h=101.0, l=97.0, c=100.5), v=400))
+        out = []
+        stale_local_order = {"e": 100.0, "sl": 97.0, "tp1": 123.45, "n1": "ancien TP local"}
+        align_bot.manipulation(out, "BTC", {
+            "b15": bars, "atr": 1.0, "t": 20_000,
+            "annonce": False, "confirme": 1, "require_tv_bridge": True,
+        }, {"ordre": stale_local_order})
+        message = "\n".join(str(item[0] if isinstance(item, tuple) else item) for item in out)
+        self.assertIn("Aucun Entry/SL local", message)
+        self.assertNotIn("Point d'entrée visé", message)
+        self.assertNotIn("SL un peu", message)
+        self.assertNotIn("123,45", message)
+        self.assertNotIn("TP visé", message)
 
     def test_required_bridge_waits_for_pine_closed_entry_trigger(self):
         from unittest.mock import patch

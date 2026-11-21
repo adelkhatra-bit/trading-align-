@@ -8015,9 +8015,9 @@ _PINE_TEXTES = {   # type -> variantes (FR, EN) ; {ic} {m} {n} {c} {seuil} {sens
                  ("🏁 {ic} {m} : retournement confirmé, direction {sens}", "🧭 {strat}")),
     "ret_cancel": (("⛔ {ic} {m} : SL cassé à la clôture", "↩ Retournement en cours, j'attends 15 min / 1h"), ("🛑 {ic} {m} : le stop du plan est franchi", "🔄 Je guette la confirmation 15 min / 1h"),
                    ("🚧 {ic} {m} : plan annulé (stop cassé)", "👀 Retournement possible, rien n'est validé")),
-    "sniper": (("🎯 Entrée sniper {ic} {m} : {ordre} {za}–{zb} ({ut})", "🛑 SL {sl} • TP1 {tp1} • TP plan {tp}", "📐 R/R {rr} (plan {rrp}) • rejet {rejets}"),
-               ("🔫 {ic} {m} : {ordre} sniper {za}–{zb} sur {ut}", "🛑 Stop {sl} • 🎯 TP1 {tp1}, puis {tp}", "📐 x{rr} le risque (plan x{rrp})"),
-               ("🎯 Sniper {ic} {m} : rejet confirmé {rejets}, {ordre} {za}–{zb}", "🛑 SL {sl} • TP1 {tp1}", "🗺 Plan {tp} conservé, R/R plan {rrp}")),
+    "sniper": (("🎯 Entrée sniper {ic} {m} : {ordre} Pine {entree} • zone {za}–{zb} ({ut})", "🛑 SL Pine {sl} • TP1 Pine {tp1} • TP2 Pine {tp}", "📐 R/R Pine {rr} (TP2 {rrp}) • rejet M1/M3 {rejets}"),
+               ("🔫 {ic} {m} : {ordre} Pine {entree} sur {ut} • zone {za}–{zb}", "🛑 Stop Pine {sl} • 🎯 TP1 {tp1}, puis TP2 {tp}", "📐 x{rr} au TP1 • x{rrp} au TP2 • rejet {rejets}"),
+               ("🎯 Sniper {ic} {m} : rejet M1/M3 confirmé {rejets}, {ordre} Pine {entree}", "🛑 SL Pine {sl} • TP1 {tp1} • TP2 {tp}", "🗺 Zone Pine {za}–{zb} • {ut} • R/R {rr}/{rrp}")),
     "confirmation": (("✅ {ic} {m} : CONFIRMATION {sens}", "🕯 Clôture {u} {pos} {niv}"), ("🔔 {ic} {m} : confirmation {sens} validée", "🕯 {u} clôturée {pos} {niv}"),
                      ("🎯 {ic} {m} : {sens} confirmé à la clôture {u}", "📍 Ligne de décision {niv}")),
 }
@@ -8036,9 +8036,9 @@ _PINE_TEXTES_EN = {
                  ("🏁 {ic} {m}: reversal confirmed, direction {sens}", "🧭 {strat}")),
     "ret_cancel": (("⛔ {ic} {m}: SL broken at the close", "↩ Reversal in progress, waiting for 15 min / 1h"), ("🛑 {ic} {m}: the plan's stop is crossed", "🔄 Watching for the 15 min / 1h confirmation"),
                    ("🚧 {ic} {m}: plan cancelled (stop broken)", "👀 Reversal possible, nothing validated")),
-    "sniper": (("🎯 Sniper entry {ic} {m}: {ordre} {za}–{zb} ({ut})", "🛑 SL {sl} • TP1 {tp1} • plan TP {tp}", "📐 R/R {rr} (plan {rrp}) • rejection {rejets}"),
-               ("🔫 {ic} {m}: sniper {ordre} {za}–{zb} on {ut}", "🛑 Stop {sl} • 🎯 TP1 {tp1}, then {tp}", "📐 x{rr} the risk (plan x{rrp})"),
-               ("🎯 Sniper {ic} {m}: rejection confirmed {rejets}, {ordre} {za}–{zb}", "🛑 SL {sl} • TP1 {tp1}", "🗺 Plan {tp} kept, plan R/R {rrp}")),
+    "sniper": (("🎯 Pine-confirmed sniper entry {ic} {m}: {ordre} {entree} • zone {za}–{zb} ({ut})", "🛑 Pine SL {sl} • TP1 Pine {tp1} • TP2 Pine {tp}", "📐 Pine R/R {rr} (TP2 {rrp}) • M1/M3 rejection {rejets}"),
+               ("🔫 {ic} {m}: Pine {ordre} {entree} on {ut} • zone {za}–{zb}", "🛑 Pine stop {sl} • 🎯 TP1 {tp1}, then TP2 {tp}", "📐 x{rr} to TP1 • x{rrp} to TP2 • rejection {rejets}"),
+               ("🎯 Sniper {ic} {m}: confirmed M1/M3 rejection {rejets}, Pine {ordre} {entree}", "🛑 Pine SL {sl} • TP1 {tp1} • TP2 {tp}", "🗺 Pine zone {za}–{zb} • {ut} • R/R {rr}/{rrp}")),
     "confirmation": (("✅ {ic} {m}: CONFIRMATION {sens}", "🕯 {u} close {pos} {niv}"), ("🔔 {ic} {m}: {sens} confirmation validated", "🕯 {u} closed {pos} {niv}"),
                      ("🎯 {ic} {m}: {sens} confirmed at the {u} close", "📍 Decision line {niv}")),
 }
@@ -8085,23 +8085,59 @@ def evenements_pine(etat, m, r, cle, now):
         ev.append(dict(kind="ret_cancel", **base))
     mem["rc"], mem["rd"] = rc, bool(rd)
     sn = r.get("sniper")
-    if sn and not cle.get("trade"):                      # entrée sniper en cascade : une fois par UT et par niveau, 30 min mini ; s'ajoute au plan, ne le remplace pas
-        cle_sn = f"{sn['d']}:{sn['ut']}:{round(sn['niveau'] / max(sn['niveau'] * 0.0004, 1e-9))}"
-        if mem.get("sn_cle") != cle_sn and now - mem.get("sn_t", 0) >= 1800:
-            mem["sn_cle"], mem["sn_t"] = cle_sn, now
-            f = lambda v: px(v)
-            ev.append(dict(kind="sniper", **base, ordre="vente" if sn["d"] == -1 else "achat", za=f(sn["za"]), zb=f(sn["zb"]), sl=f(sn["sl"]), tp1=f(sn["tp1"]),
-                           tp=f(sn["tp2"]), ut=sn["ut"], rejets="+".join(sn["rejets"]), rr=str(round(sn["rr"], 1)).replace(".", ","), rrp=str(round(sn["rr_plan"], 1)).replace(".", ",")))
-    if d and not cle.get("trade") and m == "BTC":        # BTC seul : Gold ne publient pas de position inverse
+    if sn and not cle.get("trade"):
+        # Le rejet M1/M3/M5 reste un filtre de timing local. Toute notification d'entrée
+        # dépend du plan Pine v25 confirmé, et tous les prix affichés viennent de ce plan.
+        plan_tv = plan_indicateur(r)
         try:
-            si = scalp_inverse(r, d)
-        except Exception:
-            si = None
-        if si:
-            cle_si = f"{si['d']}:{round(si['e'] / max(si['e'] * 0.0005, 1e-9))}"
-            if mem.get("si_cle") != cle_si and now - mem.get("si_t", 0) >= 1800:
-                mem["si_cle"], mem["si_t"] = cle_si, now
-                ev.append(dict(kind="scalp_inv", **base, si=si, dp=d))
+            sn_direction = int(sn.get("d") or 0)
+            sn_bar_time = int(sn.get("t") or 0)
+            pine_direction = int(plan_tv.get("direction") or 0)
+            pine_entry = float(plan_tv["entry"])
+            pine_sl = float(plan_tv["sl"])
+            pine_tp1 = float(plan_tv["tp1"])
+            raw_tp2 = plan_tv.get("tp2")
+            pine_tp2 = float(raw_tp2) if raw_tp2 not in (None, "") else None
+            pine_zone_low = float(plan_tv["zone_low"])
+            pine_zone_high = float(plan_tv["zone_high"])
+            risk = abs(pine_entry - pine_sl)
+            pine_levels_valid = (
+                risk > 0 and pine_entry > 0 and pine_sl > 0 and pine_tp1 > 0
+                and pine_zone_low > 0 and pine_zone_low < pine_zone_high
+                and (pine_tp2 is None or pine_tp2 > 0)
+                and (pine_sl < pine_entry < pine_tp1 and (pine_tp2 is None or pine_tp2 > pine_tp1)
+                     if pine_direction == 1 else
+                     pine_tp1 < pine_entry < pine_sl and (pine_tp2 is None or pine_tp2 < pine_tp1)
+                     if pine_direction == -1 else False)
+            )
+        except (KeyError, TypeError, ValueError):
+            pine_levels_valid = False
+            pine_entry = pine_sl = pine_tp1 = pine_zone_low = pine_zone_high = risk = 0.0
+            pine_tp2 = None
+        sn_fresh = sn_bar_time > 0 and 0 <= now - sn_bar_time <= 120
+        pine_trigger_valid = (
+            plan_tv.get("available") is True and plan_tv.get("triggered") is True
+            and sn_direction in (-1, 1) and pine_direction == sn_direction
+            and sn_fresh and pine_levels_valid
+        )
+        if pine_trigger_valid:
+            cle_sn = f"{plan_tv.get('entry_bar_time')}:{plan_tv.get('entry_timeframe')}:{pine_direction}"
+            if mem.get("sn_cle") != cle_sn and now - mem.get("sn_t", 0) >= 1800:
+                mem["sn_cle"], mem["sn_t"] = cle_sn, now
+                rr_tp1 = abs(pine_tp1 - pine_entry) / risk
+                rr_tp2 = abs(pine_tp2 - pine_entry) / risk if pine_tp2 is not None else None
+                fmt_rr = lambda value: str(round(value, 1)).replace(".", ",") if value is not None else "—"
+                ev.append(dict(
+                    kind="sniper", **base,
+                    ordre="vente" if pine_direction == -1 else "achat",
+                    entree=px(pine_entry), za=px(pine_zone_low), zb=px(pine_zone_high),
+                    sl=px(pine_sl), tp1=px(pine_tp1), tp=px(pine_tp2) if pine_tp2 is not None else "—",
+                    ut=str(sn.get("ut") or "M1/M3"), rejets="+".join(sn.get("rejets") or []),
+                    rr=fmt_rr(rr_tp1), rrp=fmt_rr(rr_tp2),
+                ))
+    # scalp_inverse() reste disponible pour les simulations et diagnostics locaux.
+    # Pine v25 ne transporte pas de plan inverse distinct : aucune entrée inverse
+    # issue de niveaux Python ne peut donc être diffusée ou exécutée comme position live.
     zp, strat = r.get("zone_pine"), r.get("strat") or ""
     zp = trait_indicateur(r, d) or zp                  # v24.3 : trait blanc « Clôture … ce trait » de l'indicateur sur la vue de validation
     dirs_confirmation = (r.get("dirs_cloturees") or r.get("dirs") or []) if m == "GOLD" else (r.get("dirs") or [])
@@ -10556,13 +10592,18 @@ def manipulation(out, m, r, cle):
         l.append("🧘 Tu es en position : reste cool, ton SL est en place" if tr["d"] == dm else
                  "⚠️ C'est CONTRE ta position : ne bouge pas ton SL, je surveille")
     elif r["confirme"] == dm:
-        mid = (niv + meche) / 2
-        l += [f"✅ Dans le sens de la tendance : {SENS[dm]}",
-              f"🎯 Point d'entrée visé : retour vers ≈ {px(niv)} ({'ancien plus bas' if dm == 1 else 'ancien plus haut'} 15 min)",
-              f"⭐ Encore mieux : milieu de la mèche ≈ {px(mid)}",
-              f"🛑 SL un peu {'SOUS' if dm == 1 else 'AU-DESSUS de'} la mèche ≈ {px(meche - dm * 0.2 * a)} • bougie 15 min de {heure(x['t'])}",
-              "⏳ Patience : j'entre seulement sur une mèche de rejet + CLÔTURE 5 min",
-              "🔔 Je t'envoie 🟢 J'ENTRE MAINTENANT au bon moment"]
+        if r.get("require_tv_bridge"):
+            l += [f"✅ Dans le sens du biais local : {SENS[dm]}",
+                  "⛔ Aucun Entry/SL local n'est publié : j'attends le déclencheur et les niveaux confirmés par Pine v25.",
+                  "⏳ Le rejet et la clôture de l'unité de déclenchement doivent être validés par le bridge TradingView."]
+        else:
+            mid = (niv + meche) / 2
+            l += [f"✅ Dans le sens de la tendance : {SENS[dm]}",
+                  f"🎯 Point d'entrée visé : retour vers ≈ {px(niv)} ({'ancien plus bas' if dm == 1 else 'ancien plus haut'} 15 min)",
+                  f"⭐ Encore mieux : milieu de la mèche ≈ {px(mid)}",
+                  f"🛑 SL un peu {'SOUS' if dm == 1 else 'AU-DESSUS de'} la mèche ≈ {px(meche - dm * 0.2 * a)} • bougie 15 min de {heure(x['t'])}",
+                  "⏳ Patience : j'entre seulement sur une mèche de rejet + CLÔTURE 5 min",
+                  "🔔 Je t'envoie 🟢 J'ENTRE MAINTENANT au bon moment"]
     elif r["confirme"] == -dm:
         l += [f"⚠️ CONTRE la tendance de fond ({SENS[-dm]})",
               f"⛔ Pas de {SENS[dm]} tant que 15 min / 1 h / 4 h ne se retournent pas",
@@ -10572,7 +10613,8 @@ def manipulation(out, m, r, cle):
               "✅ Validé quand 15 min + 1 h + 4 h vont dans le même sens",
               "🔔 Je te préviens dès que c'est bon"]
     if not tr:
-        l.append(statut_txt(0 if r["confirme"] == dm else -1, cle.get("ordre") if r["confirme"] == dm else None).strip())
+        ordre_statut = None if r.get("require_tv_bridge") else (cle.get("ordre") if r["confirme"] == dm else None)
+        l.append(statut_txt(0 if r["confirme"] == dm else -1, ordre_statut).strip())
     out.append(("\n".join(l), bouton_auto(m)) if not tr else "\n".join(l))
 
 def statut_position(tr, p):
@@ -10898,6 +10940,7 @@ def agent(m, r, cle, ferme):
     # Mode sans signal (bridge TradingView non branché) : AUCUNE alerte calculée localement
     # (manipulation, niveaux, FVG, radar, retournement, retest, après-SL) — seule la source v25 parle.
     # Une position déjà ouverte reste suivie jusqu'à sa clôture ; aucune nouvelle info de marché.
+    require_tv = bool(r.get("require_tv_bridge"))
     sans_signal = mode_sans_signal(r)
     if sans_signal and not tr:
         cause = (r.get("tv_indicator_mtf") or {}).get("detail") or (r.get("tv_indicator_mtf") or {}).get("reason") or "inconnue"
@@ -10908,34 +10951,39 @@ def agent(m, r, cle, ferme):
             manipulation(out, m, r, cle)
             meche_suspecte(out, m, r, cle)
             niveaux_cles(out, m, r, cle)
-            resistance_fvg(out, m, r, cle)              # v7.2 : résistance / support / FVG touché → chaîne + indice live
+            resistance_fvg(out, m, r, cle)              # contexte de zones uniquement, jamais une entrée
         except Exception as ex:
             print("manipulation", ex)
         try:
             suivre_apres_sl(out, m, r, cle, hi, lo)
         except Exception as ex:
             print("après SL", ex)
-        try:
-            re_ = reprise_entree(m, r, cle) if not tr else None   # après « COUPE ET REPRENDS » : retour à l'entrée → on reprend
-            if re_:
-                out.append(re_)
-            er_ = entree_retest(m, r, cle) if not tr else None   # résistance cassée qui devient support (règle d'Adel)
-            if er_:
-                out.append(er_)
-            rc_ = radar_climax(m, r, cle)                 # radar retournement (volume climax + balayage + EMA9)
-            if rc_ and not tr:
-                out.append(rc_)
-        except Exception as ex:
-            print("radar_climax", ex)
-        try:
-            rv_ = retournement_marche(m, r, cle)  # surveillance active aussi pendant les positions GOLD : alerte uniquement, aucune clôture automatique
-            if rv_ and not (tr and tr.get("d") == (1 if "LONG" in rv_.split("\n")[0] else -1)):
-                out.append(rv_)
-        except Exception as ex:
-            print("retournement_marche", ex)
+        # Les stratégies locales qui proposent une entrée/SL/TP sont désactivées lorsque
+        # Pine v25 est la source obligatoire. Elles restent disponibles hors de ce mode.
+        if not require_tv:
+            try:
+                re_ = reprise_entree(m, r, cle) if not tr else None
+                if re_:
+                    out.append(re_)
+                er_ = entree_retest(m, r, cle) if not tr else None
+                if er_:
+                    out.append(er_)
+                rc_ = radar_climax(m, r, cle)
+                if rc_ and not tr:
+                    out.append(rc_)
+            except Exception as ex:
+                print("radar_climax", ex)
+        # Le retournement GOLD reste une observation sans niveaux ; le retournement BTC
+        # historique contient des Entry/SL/cibles locaux et est donc bloqué en mode Pine.
+        if not require_tv or m == "GOLD":
+            try:
+                rv_ = retournement_marche(m, r, cle)
+                if rv_ and not (tr and tr.get("d") == (1 if "LONG" in rv_.split("\n")[0] else -1)):
+                    out.append(rv_)
+            except Exception as ex:
+                print("retournement_marche", ex)
 
     # ── Bridge Pine obligatoire : aucun fallback de niveaux locaux ──
-    require_tv = bool(r.get("require_tv_bridge"))
     if require_tv and not tr:
         if r.get("fermeture"):
             return out
