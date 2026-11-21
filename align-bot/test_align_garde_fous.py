@@ -112,6 +112,8 @@ class GardeFousBridge(unittest.TestCase):
         self.assertGreater(bridge.ACTIVE_MAX_AGE_MS, 0, "fenêtre de fraîcheur nulle : le bridge rejetterait tout")
         # 90 s décidé par Adel le 19/11 (alertes TradingView 1 fois par minute). Ne jamais aller au-delà.
         self.assertLessEqual(bridge.ACTIVE_MAX_AGE_MS, 90_000, "fraîcheur du prix relâchée")
+        self.assertEqual(bridge.MTF_BAR_GRACE_MS, 90_000, "MTF grace must match documented webhook delivery delay")
+        self.assertEqual(bridge.ENTRY_BAR_GRACE_MS, 30_000, "entry trigger freshness must remain strict")
         self.assertEqual(set(bridge.REQUIRED_TIMEFRAMES), {"M5", "M15", "H1", "H4", "D1", "W1"})
 
 
