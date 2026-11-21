@@ -1,5 +1,6 @@
 """Radar retournement (oui radar, 15/11) : volume climax + balayage + clôture au-dessus de l'EMA9."""
 import os, sys, unittest
+from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import align_bot as ab
 
@@ -40,7 +41,7 @@ class Radar(unittest.TestCase):
 
 class RadarBranche(unittest.TestCase):
     def test_le_vrai_bot_donne_assez_de_bougies_au_radar(self):
-        src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "align_bot.py"), encoding="utf-8").read()
+        src = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "align_bot.py")).read_text(encoding="utf-8")
         self.assertIn("b15_long=m15[-90:]", src)                       # ≥ 66 bougies 15 min, sinon le radar est muet
         b = serie()["b15"]
         self.assertIsNotNone(ab.radar_climax("BTC", {"b15": b[-30:], "b15_long": b, "t": 70 * 900}, {}))
