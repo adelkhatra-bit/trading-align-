@@ -105,6 +105,13 @@ assert auto_trade.REEL is False, "AUTO_TRADE must never enable live orders"
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_topstep_messages_never_claim_automatic_real_position_closure(self):
+        source = (REPO / "align-bot" / "topstep_trade.py").read_text(encoding="utf-8")
+        self.assertIn("Ferme MANUELLEMENT tes positions", source)
+        self.assertIn("aucun ordre réel n'est envoyé", source)
+        self.assertNotIn("Le bot ALIGN coupe les siennes", source)
+        self.assertNotIn("LE BOT COUPE SES POSITIONS", source)
+
     def test_env_example_is_paper_only(self):
         source = ENV_EXAMPLE.read_text(encoding="utf-8")
         self.assertIn("SAFE_MODE=1", source)
