@@ -590,7 +590,7 @@ def direction_confirmee_marche(m, dirs, d, contexte=None, now_ts=None):
 
 
 def direction_plan_autorisee(m, d, dirs, contexte=None):
-    """Le plan affiché suit le même garde-fou que les entrées : clôtures M5/M15/H1/H4 + flux frais pour Gold/Nasdaq."""
+    """Le plan affiché suit le même garde-fou que les entrées : clôtures M5/M15/H1/H4 + flux frais pour Gold."""
     if m == "GOLD":
         return d if direction_confirmee_marche(m, dirs, d, contexte) == d else 0
     return d
@@ -2083,7 +2083,7 @@ def verdict(r, cle):
 # ───────── Langue : chaque utilisateur choisit 🇫🇷 / 🇬🇧, tout le système suit ─────────
 TRAD = {
 # Boutons
-"🟠 Analyse BTC": "🟠 BTC Analysis", "🥇 Analyse Gold": "🥇 Gold Analysis", "💠 Analyse Nasdaq": "💠 Nasdaq Analysis", "📡 Choisir mes marchés": "📡 Choose my markets", "📡 Mes marchés cochés": "📡 My ticked markets", "📊 Faire une analyse": "📊 Run an analysis",
+"🟠 Analyse BTC": "🟠 BTC Analysis", "🥇 Analyse Gold": "🥇 Gold Analysis", "📡 Choisir mes marchés": "📡 Choose my markets", "📡 Mes marchés cochés": "📡 My ticked markets", "📊 Faire une analyse": "📊 Run an analysis",
 "📡 Mes marchés": "📡 My markets", "🔔 Son pièce": "🔔 Coin sound", "🔔 Son envoyé": "🔔 Sound sent",
 "🧑‍🏫 Coach : suis ma position": "🧑‍🏫 Coach: follow my position", "📍 Ma position • SL / TP": "📍 My position • SL / TP", "📍 Si tu prends cette position, active son suivi avec le bouton ci-dessous.": "📍 If you take this position, activate its tracking with the button below.",
  "🟠 BTC uniquement": "🟠 BTC only", "🥇 GOLD uniquement": "🥇 GOLD only",
@@ -4571,7 +4571,7 @@ def entree_retest(m, r, cle):
         rr = abs(tp1 - entree) / risque
         if d * (tp1 - entree) <= 0 or d * (tp2 - tp1) <= 0 or rr < RR_MIN_ENTREE:
             continue
-        # Ne consomme le cooldown que lorsqu'une alerte Gold/Nasdaq complète est réellement produite.
+        # Ne consomme le cooldown que lorsqu'une alerte Gold complète est réellement produite.
         vu[k] = r.get("t", 0)
         return (f"🎯 ENTRÉE POSSIBLE SUR RETEST : {'LONG' if d == 1 else 'SHORT'} — {ICONE.get(m, '')} {m}\n"
                 f"🧱 L'ancienne {ancien} {px(niveau)} a été cassée à la clôture : elle devient {nouveau}\n"
@@ -6124,7 +6124,7 @@ def notifier_clotures(etat, m, r, cle):
 
 
 def prochaine_ouverture_cme(ts):
-    """Prochaine réouverture CME/CFD (Gold, Nasdaq), cherchée par pas de 5 min avec la même règle que cme_ouvert."""
+    """Prochaine réouverture CME/CFD (Gold), cherchée par pas de 5 min avec la même règle que cme_ouvert."""
     t = int(ts) // 300 * 300
     for _ in range(12 * 80):
         t += 300
@@ -7908,7 +7908,7 @@ def recevoir_pseudo(etat, cid, pseudo):
 SESSIONS = (   # code, nom FR, nom EN, fuseau, ouverture, fermeture, jours d'ouverture, jours de fermeture, marchés concernés
     ("tokyo", "Tokyo", "Tokyo", "Asia/Tokyo", (9, 0), (15, 30), range(0, 5), range(0, 5), "BTC et GOLD", "BTC and GOLD"),
     ("londres", "Londres", "London", "Europe/London", (8, 0), (16, 30), range(0, 5), range(0, 5), "GOLD et BTC", "GOLD and BTC"),
-    ("wall", "Wall Street / Nasdaq", "Wall Street / Nasdaq", "America/New_York", (9, 30), (16, 0), range(0, 5), range(0, 5), "GOLD et BTC", "GOLD and BTC"),
+    ("wall", "Ouverture américaine", "US market open", "America/New_York", (9, 30), (16, 0), range(0, 5), range(0, 5), "GOLD et BTC", "GOLD and BTC"),
     ("gold", "Gold (CME)", "Gold (CME)", "America/Chicago", (17, 0), (16, 0), (6, 0, 1, 2, 3), range(0, 5), "GOLD", "GOLD"),
     ("btc", "BTC (bougie Daily)", "BTC (Daily candle)", "UTC", None, (0, 0), (), range(0, 7), "BTC", "BTC"),
 )
@@ -8116,7 +8116,7 @@ def diffuser_alerte(etat, chats, fr, en):
         _envoi_sur(cid, text="\n".join(en if str(cid) in LANG_EN else fr))
 
 def _liste_marches(noms, anglais=False):
-    """« GOLD » · « GOLD et NASDAQ » · « NASDAQ, GOLD et BTC » (anglais : and)."""
+    """Formate uniquement la liste des marchés actifs BTC et GOLD."""
     et = " and " if anglais else " et "
     return noms[0] if len(noms) == 1 else ", ".join(noms[:-1]) + et + noms[-1]
 
@@ -9249,7 +9249,11 @@ def contient_niveaux(texte):
 def destinataires_message(etat, chats, texte):
     """Une seule destination privée : le bot ALIGN ; seuls les messages explicitement liés à un marché sont poussés."""
     tag = set(getattr(texte, "marches", ()) or ())
-    ens = (marches_du_message(texte) if not tag or "*" in tag else tag) & set(MARCHES)
+    source_marches = marches_du_message(texte) if not tag or "*" in tag else (tag - {"*"})
+    ens = source_marches & set(MARCHES)
+    # Une ancienne alerte liée uniquement au marché retiré ne part ni en privé ni sur la chaîne.
+    if source_marches and not ens:
+        return []
     canal = str(etat.get("canal") or "")
     # Pas de diffusion privée pour news, agenda, DXY ou messages globaux :
     # l'utilisateur les consulte dans l'analyse demandée ou le live public.
@@ -13099,7 +13103,7 @@ def un_tour(etat, chats):
             r["tv_indicator_mtf"] = fetch_tv_mtf(pair)
             r["require_tv_bridge"] = os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "1") == "1" and nom_marche in MARCHES
             fusionne_lectures_tradingview(r)
-            # Revalider après lecture du bridge : Gold/Nasdaq ne peuvent pas ouvrir de position sans ROBOT V12 M5/M15/H1 frais.
+            # Revalider après lecture du bridge : Gold ne peuvent pas ouvrir de position sans ROBOT V12 M5/M15/H1 frais.
             r["confirme"] = direction_confirmee_marche(
                 nom_marche, r.get("dirs_cloturees") or r.get("dirs"), r.get("confirme"), r
             )
