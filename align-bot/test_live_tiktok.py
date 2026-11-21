@@ -319,6 +319,7 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("const voixDuree = parlerLive(m)", source)
         self.assertIn("item.source !== 'ia' && item.source !== 'marche'", source)
         self.assertIn("voiceschanged", source)  # voix navigateur parfois disponibles après document-idle
+        self.assertIn("removeEventListener('voiceschanged', voixSurVoixChangees)", source)  # listener nettoyé à la réinjection
         self.assertIn("voixEnAttente = item", source)  # commentaire FR retenté quand la liste de voix arrive
         self.assertIn("hortense|audrey|julie|charlotte", source)  # noms courants de voix FR, sans repli robot
         self.assertIn("localStorage.removeItem('alignVoixActive')", source)  # ON persisted ne contourne pas la gesture audio
