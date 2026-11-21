@@ -360,8 +360,10 @@ jobs:
           TOPSTEP_COMPTE: ${{ vars.TOPSTEP_COMPTE }}
           TOPSTEP_PLANCHER: ${{ vars.TOPSTEP_PLANCHER }}
           TOPSTEP_REEL: "0"
-          # Bridge absent/invalide : conserver Telegram/commandes 120 s puis laisser le gate final échouer.
-          DUREE_SEC: ${{ steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == '0' && '120' || '21000' }}
+          # Garder le poller Telegram disponible pendant le cycle complet.
+          # Si le bridge est absent, ALIGN_REQUIRE_TV_BRIDGE=1 + ALIGN_TV_BRIDGE_PRET=0 bloquent
+          # toujours les signaux ; le gate final conserve l'échec tant que le bridge reste invalide.
+          DUREE_SEC: "21000"
           PAUSE_SEC: "5"
         run: exec python3 align_bot.py
 
