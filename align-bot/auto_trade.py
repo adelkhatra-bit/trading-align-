@@ -1,17 +1,13 @@
-"""ALIGN — exécution automatique des positions sur les comptes FundedNext (MT5 via MetaApi).
+"""ALIGN — calcul et simulation des positions FundedNext (MT5 via MetaApi).
 
-Demande d'Adel (15/11) : le bot prend la position RÉELLEMENT au moment où il l'annonce,
-en respectant les règles du challenge Stellar Lite 2-Step 10K, et ne doit JAMAIS faire sauter un compte.
+Aucun ordre broker réel n'est autorisé dans ALIGN. Le module conserve ses calculs,
+lectures de prix et simulations ; AUTO_TRADE ne peut pas réactiver l'exécution réelle.
 
-Sécurité (codée en dur, non modifiable par un message) :
-  • perte du jour  : arrêt à -350 $ (règle FundedNext : -400 $/jour)
-  • perte totale   : arrêt à -750 $ sous le solde de départ (règle : -800 $ statique)
-  • risque         : 75 $ par position (demande d'Adel : SL plus loin, derrière la mèche, on attend la confirmation)
-  • positions      : 2 max ouvertes par compte, jamais deux sens opposés sur un même marché
-  • mode TEST par défaut : AUTO_TRADE=1 obligatoire pour envoyer de vrais ordres
-
-Secrets GitHub attendus : METAAPI_TOKEN, METAAPI_COMPTES (ids MetaApi séparés par des virgules,
-le 1er = compte maître 12140656), METAAPI_REGION (ex. london).
+Limites de risque conservées pour les simulations :
+  • perte du jour  : arrêt à -350 $
+  • perte totale   : arrêt à -750 $ sous le solde de départ
+  • risque         : 75 $ par position (calcul du SL derrière la mèche)
+  • positions      : 2 max ouvertes par compte en modèle de simulation
 """
 import json, os, re, time, datetime, urllib.request, urllib.error
 
@@ -51,7 +47,7 @@ def lire_comptes(brut):
 
 COMPTES = lire_comptes(os.environ.get("METAAPI_COMPTES", ""))
 REGION = os.environ.get("METAAPI_REGION", "london")
-REEL = os.environ.get("AUTO_TRADE", "0") == "1"
+REEL = False  # Verrou ALIGN : aucune activation par variable d’environnement.
 
 
 def _api(methode, chemin, corps=None):
