@@ -40,6 +40,7 @@ class TradingViewBridgeGateTests(unittest.TestCase):
         self.assertIn('"; active_age_ms=" + str(active_age)', WORKFLOW_SOURCE)
         self.assertIn('"; UT_périmées="', WORKFLOW_SOURCE)
         self.assertIn('"; last_rejection=" + rejection_text', WORKFLOW_SOURCE)
+        self.assertIn("réponse bridge JSON non-objet pour", WORKFLOW_SOURCE)
 
     def test_bridge_failure_detail_reports_age_of_each_stale_timeframe(self):
         detail = ab.detail_bridge_invalide({
