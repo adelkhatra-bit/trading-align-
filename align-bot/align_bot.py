@@ -524,7 +524,9 @@ def directions_cloturees(series):
 
 
 def donnees_mtf_fraiches(m, r, now_ts=None):
-    """Refuse une nouvelle entrée GOLD si les bougies M5/M15/H1/H4 ou le flux M1 sont périmés."""
+    """Refuse une entrée si le marché n'est pas actif ou si les données GOLD sont périmées."""
+    if m not in MARCHES:
+        return False
     if m != "GOLD":
         return True
     now = time.time() if now_ts is None else float(now_ts)
@@ -544,7 +546,9 @@ def donnees_mtf_fraiches(m, r, now_ts=None):
 
 
 def direction_confirmee_marche(m, dirs, d, contexte=None, now_ts=None):
-    """Filtre d'entrée : GOLD exigent quatre clôtures concordantes, un prix live frais et pas de déplacement live marqué contre le sens."""
+    """Filtre d'entrée : GOLD exige quatre clôtures concordantes, un prix live frais et aucun déplacement marqué contre le sens."""
+    if m not in MARCHES:
+        return 0
     if d not in (1, -1):
         return 0
     if m == "GOLD":
@@ -590,7 +594,9 @@ def direction_confirmee_marche(m, dirs, d, contexte=None, now_ts=None):
 
 
 def direction_plan_autorisee(m, d, dirs, contexte=None):
-    """Le plan affiché suit le même garde-fou que les entrées : clôtures M5/M15/H1/H4 + flux frais pour Gold."""
+    """Le plan affiché suit les garde-fous des marchés actifs."""
+    if m not in MARCHES:
+        return 0
     if m == "GOLD":
         return d if direction_confirmee_marche(m, dirs, d, contexte) == d else 0
     return d
@@ -875,7 +881,9 @@ def _structures_ut(series):
     return out
 
 def calculer_analyse(S, stable=None, comp_prev=None, market=None):
-    """Calcul pur à partir des bougies S (m1, m5, m15, m30, h1, h4, d1, w1). Aucun accès réseau."""
+    """Calcul pur à partir des bougies S ; seuls les marchés explicitement actifs sont admis."""
+    if market is not None and market not in MARCHES:
+        raise ValueError(f"Marché ALIGN non pris en charge : {market}")
     m1, m5, m15, h1, h4, d1, w1 = (S[k] for k in ("m1", "m5", "m15", "h1", "h4", "d1", "w1"))
     series = {"1": m1, "3": regrouper(m1, 3, 60), "5": m5, "10": regrouper(m5, 2, 300), "15": m15,
               "30": S["m30"], "45": regrouper(m15, 3, 900), "1h": h1, "2h": regrouper(h1, 2, 3600), "4h": h4, "D": d1}
@@ -1117,6 +1125,8 @@ def entree_sniper(r):
 
 def _sniper(r):
     """(proposition ou None, raison du refus) : la raison sert au diagnostic du rejeu, jamais à Telegram."""
+    if r.get("market") not in MARCHES:
+        return None, "MARCHE_RETIREE"
     d = r.get("dirPlan") or 0
     dirs = (r.get("dirs_cloturees") or r.get("dirs") or []) if r.get("market") == "GOLD" else (r.get("dirs") or [])
     a3, a15, a5, zp = r.get("atr3"), r.get("atr"), r.get("atr5") or r.get("atr"), r.get("zone_pine")
@@ -4529,6 +4539,8 @@ def reprise_entree(m, r, cle):
 def entree_retest(m, r, cle):
     """GOLD : retest avec clôtures M5/M15/H1/H4, prix frais et TP1/TP2 validés.
     BTC conserve exactement son ancien déclencheur et son ancien message."""
+    if m not in MARCHES:
+        return None
     b = (r.get("b15") or [])[:-1]
     dirs = (r.get("dirs_cloturees") or r.get("dirs") or []) if m == "GOLD" else (r.get("dirs") or [])
     atr = r.get("atr") or 0
@@ -4583,6 +4595,8 @@ def entree_retest(m, r, cle):
     return None
 
 def radar_climax(m, r, cle):
+    if m not in MARCHES:
+        return None
     """RADAR RETOURNEMENT (validé par Adel le 15/11, « oui radar ») — le LONG raté 62 → 65,5 k BTC :
     1) volume climax : une des 4 dernières bougies 15 min CLÔTURÉES a un volume ≥ 3 × la moyenne des 40 d'avant (épuisement) ;
     2) balayage : une de ces bougies est passée sous le plus bas (sur le plus haut) des 20 bougies d'avant, puis la clôture est revenue au-dessus ;
@@ -4661,6 +4675,8 @@ def radar_climax(m, r, cle):
     return None
 
 def retournement_marche(m, r, cle):
+    if m not in MARCHES:
+        return None
     """v71 = Pine « RETOURNEMENT PAR MARCHÉ » (mesuré sur 60 jours de bougies 5 min) :
     GOLD : M5/M15 contre H1/H4 = observation uniquement, jamais une position avant confirmation des quatre clôtures.
     BTC conserve sa règle historique : M5 + M15 + H1 contre H4, avec les cibles et le SL existants.
@@ -8020,6 +8036,8 @@ CONF_REPIT = {"SWING": 4 * 3600, "DAY": 3600, "SCALPING": 900}   # même confirm
 
 def evenements_pine(etat, m, r, cle, now):
     """Évènements de l'indicateur au moment où ils arrivent : chacun une seule fois (fronts montants mémorisés par marché)."""
+    if m not in MARCHES:
+        return []
     mem = etat.setdefault("al_mem", {}).setdefault("pine", {}).setdefault(m, {})
     statut, _ = etat_marche_hb(m, r, now)
     ev, e = [], hb_etat_surveille(r)
@@ -10842,7 +10860,9 @@ def suivre_apres_sl(out, m, r, cle, hi, lo):
 
 
 def agent(m, r, cle, ferme):
-    """BTC conserve H4/H1 + déclencheur M5 ; GOLD exigent M5/M15/H1/H4 clôturés concordants."""
+    """BTC conserve H4/H1 + déclencheur M5 ; GOLD exige M5/M15/H1/H4 clôturés concordants."""
+    if m not in MARCHES:
+        return []
     r.setdefault("market", m)
     r.setdefault("confirme", 0)
     # Sans flux M1, l'agent ne peut ni calculer le prix ni valider une entrée ; il reste silencieux et ne plante pas.
