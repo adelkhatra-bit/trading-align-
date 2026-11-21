@@ -4,9 +4,11 @@
 
 This bridge connects the **canonical production indicator** `align-bot/pine/ALIGN_MTF_PRO_v25.pine` (`ALIGN MTF PRO v25 (Inside)`) to the existing ALIGN MTF BOT preflight contract.
 
-The only Pine changes are two isolated, opt-in bridge blocks:
-- a settings group, disabled by default;
+The only Pine changes are two isolated bridge blocks:
+- a settings group with snapshot export enabled by default;
 - a structured JSON export appended after the existing script.
+
+The export only sends snapshots when the user creates an active TradingView alert using **Any alert() function call** and the dedicated bridge webhook. It does not place or authorize broker orders.
 
 The canonical indicator's existing source is protected by a regression test: after removing those two bridge blocks, its Git blob SHA must remain exactly `823635f039ff3b59c39867a7b59dfa3ed6fafaf1`. The title, short title, signal calculations, Entry/SL/TP1/TP2 logic, animation setting, chart drawings, table and existing human-readable alerts remain unchanged. No second indicator is introduced.
 
@@ -15,8 +17,8 @@ This service is isolated from the legacy `server.js`/port 4000 and from the `tra
 ## Data flow
 
 1. Two TradingView charts/alerts are configured: BTC and GOLD only. NASDAQ is not an accepted ALIGN market.
-2. In the canonical v25 indicator settings, enable **Envoyer les snapshots au ROBOT V12** and select exactly one supported market: `BTCUSD` or `XAUUSD`.
-3. Create an alert with condition **Any alert() function call**. While the chart is receiving real-time updates, the bridge export sends a JSON snapshot every 20 seconds. Existing human-readable Pine alerts remain unchanged; the bridge ignores non-JSON alert messages.
+2. In the canonical v25 indicator settings, verify **Envoyer les snapshots au ROBOT V12** is enabled (it is enabled by default) and select exactly one supported market: `BTCUSD` or `XAUUSD`.
+3. Create or recreate an alert with condition **Any alert() function call**. While the chart is receiving real-time updates, the bridge export sends a JSON snapshot every 20 seconds. Existing human-readable Pine alerts remain unchanged; the bridge ignores non-JSON alert messages.
 4. The payload contains the active chart timeframe, actual TradingView price, the indicator's current Entry/SL/TP1/TP2 plan, confirmation state, and independent MTF direction/RSI/bar-time data for M1, M5, M15, M30, H1, H2, H4, D1 and W1.
 5. The dedicated bridge validates the source, symbol, active timeframe, source timestamp, each timeframe's own candle timestamp, the fixed M15 plan, the green entry zone and its decision line, plus the strategy-specific closed trigger candle. It never places orders.
 6. The trigger timeframe is independent of the chart timeframe: SCALPING = M1, DAY = M5, SWING = H1. The plan levels remain anchored to the last closed M15 calculation.
@@ -61,6 +63,8 @@ For each supported market (BTC and GOLD):
    `https://<dedicated-https-host>/ingest/<ALIGN_TV_INGEST_TOKEN>`
 
 The MTF readings are included in the same payload; separate alerts for each timeframe are not required.
+
+**Important — TradingView alert snapshots:** TradingView keeps a server-side copy of the script, its input values and chart context when an alert is created. After updating the Pine script or changing the bridge checkbox/market, delete the old alert and create a new one for that market. An old alert does not inherit the new Pine code or settings.
 
 ## GitHub Actions secrets
 
