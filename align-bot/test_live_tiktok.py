@@ -313,6 +313,19 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("🔊 COACH VOCAL ON", source)
         self.assertIn("voixBtn.remove()", source)
         self.assertIn("parlerLive(m)", source)
+        # End-to-end linkage: bot IA payload -> ntfy receiver -> AI bubble -> voice narration.
+        self.assertIn("if (txt.startsWith('IA:')) { recuIA(txt.slice(3)); return; }", source)
+        self.assertIn("montrer('🧠 ' + phrase, false, 2, 'membre', false, 'ia')", source)
+        self.assertIn("const voixDuree = parlerLive(m)", source)
+        self.assertIn("montrer(txt, bulle, 2, '', false, bulle ? 'marche' : 'live')", source)  # BULLE de marché envoyée au vocal
+        self.assertIn("const traductionEN = enAnglais(texte), anglaisTraduit = traductionEN !== texte", source)
+        self.assertIn("item.source === 'marche' && !item.anglaisTraduit", source)  # évite la voix anglaise sur une bulle restée en français
+        self.assertIn("item.source !== 'ia' && item.source !== 'marche'", source)
+        self.assertIn("voiceschanged", source)  # voix navigateur parfois disponibles après document-idle
+        self.assertIn("removeEventListener('voiceschanged', voixSurVoixChangees)", source)  # listener nettoyé à la réinjection
+        self.assertIn("voixEnAttente = item", source)  # commentaire FR retenté quand la liste de voix arrive
+        self.assertIn("hortense|audrey|julie|charlotte", source)  # noms courants de voix FR, sans repli robot
+        self.assertIn("localStorage.removeItem('alignVoixActive')", source)  # ON persisted ne contourne pas la gesture audio
         self.assertNotIn("Le coach ALIGN est en direct", source)  # v12.2.8 : plus de phrase d'accueil
 
 
@@ -1133,12 +1146,15 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", *rel)
         return open(path, encoding="utf-8").read()
 
-    def test_bande_version_12_2_11(self):
+    def test_bande_version_12_2_12_voice_recovery(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
-        self.assertIn("// @version      12.2.11", bande)
-        self.assertIn("const VERSION = '12.2.11';", bande)
+        self.assertIn("// @version      12.2.12", bande)
+        self.assertIn("const VERSION = '12.2.12';", bande)
         self.assertIn('let voixUtterance = null', bande)
         self.assertIn('voixUtterance = utterance;', bande)
+        self.assertIn("voiceschanged", bande)
+        self.assertIn("voixEnAttente = item", bande)
+        self.assertIn("bulle ? 'marche' : 'live'", bande)
 
     def test_bande_sens_suit_le_plan_reel(self):
         """Le sens LONG/SHORT de la bannière vient du plan réel du tableau, pas de l'horloge seule."""
@@ -1162,7 +1178,9 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         # plus aucun repli sur "dansLangue[0]" (= voix robot) ; sans voix naturelle, on ne parle pas
         self.assertNotIn("utterance.voice = dansLangue[0]", bande)
         self.assertNotIn("dansLangue[0]", bande)
-        self.assertIn("if (!v) return 0;", bande)
+        self.assertIn("if (!v) {", bande)
+        self.assertIn("if (!anglais && voixActive) voixEnAttente = item;", bande)
+        self.assertIn("return 0;   // aucune voix naturelle disponible : silence plutôt qu'une voix robot", bande)
         self.assertIn("utterance.voice = v;", bande)
 
     def test_bande_off_coupe_toute_la_parole(self):
