@@ -853,7 +853,7 @@
     if (/\bSL\b[^\n]{0,12}TOUCH|STOP TOUCH/i.test(txt)) setTimeout(() => coeurs(1, ['😢']), 3600);
     if (/PLONGE|DIVING/i.test(txt)) { coeurs(1, ['🌊']); setTimeout(() => coeurs(1, ['😄']), 5000); }   // v10.7 : quand ça coule aussi
     else if (/ACCÉLÈRE|SPEEDING UP|DIRECTION TP|ENTRE EN POSITION|POSITION ALIGN CONFIRMÉE/i.test(txt)) { coeurs(1, ['🚀']); setTimeout(() => coeurs(1, ['😄']), 5000); }   // v10.5 (Adel) : fusée quand ça part fort + sourire   // v7.1 : smiley triste, on se refait
-    montrer(txt, bulle, 2);
+    montrer(txt, bulle, 2, '', false, bulle ? 'marche' : 'live');   // Les messages BULLE du marché sont aussi narrés ; messages ordinaires restent muets
     const em = (txt.slice(0, 4).match(/🔮|🧱|🛏/) || [])[0]; if (em) setTimeout(() => coeurs(1, [em]), 1500);   // v7.3 : animation « le graphique parle »
   }
 
