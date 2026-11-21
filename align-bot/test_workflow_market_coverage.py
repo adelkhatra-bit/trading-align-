@@ -1,3 +1,5 @@
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -45,6 +47,18 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.assertNotIn("NAS100", self.sniper_workflow)
         self.assertIn('MARCHE_PAIRS = {"GOLD": "XAUUSD", "BTC": "XBTUSD"}', self.sniper_replay)
         self.assertIn('if a.marche not in MARCHE_PAIRS or a.pair != MARCHE_PAIRS[a.marche]:', self.sniper_replay)
+
+    def test_sniper_replay_rejects_nasdaq_before_fetching_market_data(self):
+        script = Path(__file__).parent / "replay_sniper.py"
+        result = subprocess.run(
+            [sys.executable, str(script), "--pair", "NAS100", "--marche", "NASDAQ"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("--marche et --pair doivent correspondre", result.stderr)
 
     def test_worker_rollover_recognizes_both_legacy_and_renamed_worker(self):
         self.assertIn("if run.get(\"name\") in {", self.rollover)
