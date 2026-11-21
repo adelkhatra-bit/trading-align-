@@ -68,11 +68,12 @@ Ne jamais publier dans ce dépôt, les issues, les commentaires ou les logs publ
 - Aucun ordre broker réel ; `AUTO_TRADE` et `TOPSTEP_REEL` restent à `0` tant que le propriétaire ne dit pas « réel ».
 - Ne jamais afficher, copier ou committer la valeur d'un secret.
 - Ne jamais modifier le design, les animations ou l'indicateur sans demande explicite.
-- Ne jamais supprimer un fichier, une branche ou une PR contenant du travail non int?gr? ou dont la provenance n'est pas ?tablie.
+- Ne jamais supprimer un fichier, une branche ou une PR contenant du travail non intégré ou dont la provenance n'est pas établie.
 
 ## 7. Accès et automatisation de code
 
 - Les relais Copilot CLI/cloud-agent, les profils GitHub Copilot personnalisés et l'assignation automatique d'agents de code sont retirés du périmètre actif ALIGN. Les signalements de panne restent des rapports destinés à un mainteneur humain.
 - Les clés GROQ/ANTHROPIC/GEMINI/OPENAI restent des fournisseurs IA runtime du BOT pour les commentaires de marché, avec plafond journalier et repli interne. Elles ne donnent aucun accès d'écriture au dépôt.
 - Le dépôt étant public, les fichiers restent lisibles par des services IA externes. Le code du dépôt ne peut pas interdire cette lecture ; cela nécessite de rendre le dépôt privé et de contrôler séparément les permissions GitHub. Ce changement de visibilité n'est pas effectué ici car il peut impacter Pages et la publication publique `live-data`.
+- Le secret historique COPILOT_GITHUB_TOKEN n'est plus référencé par les workflows ALIGN. Sa suppression des paramètres GitHub Actions reste à effectuer par un propriétaire du dépôt.
 - Le ruleset actif de `main` exige `validate` et aucun acteur ne peut le contourner ; les merges restent soumis à la revue humaine et à l'autorisation du propriétaire.

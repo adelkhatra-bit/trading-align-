@@ -10,8 +10,8 @@
 - Apply these rules only to work explicitly identified as ALIGN/TRADING. If the account user or project context is ambiguous, ask before acting.
 - Never assume a branch name, SHA, PR state, deployment state, or runtime health. Read it from GitHub immediately before acting.
 
-## Permanent project identity lock — Claude Chrome and ALIGN
-- The authorized recovery source identified by the owner is **Claude Chrome**. Do not rename it or substitute Claude Code, VS Code, Cowork, or another tool; keep their sessions and provenance distinct.
+## Historical provenance reference - Claude Chrome and ALIGN
+- Claude Chrome is preserved as a historical provenance/source-history reference only. It is not a repository-managed agent and grants no coding agent access or write authorization. Keep historical session provenance distinct; do not substitute another source or infer unverified history.
 - The only target repository is `adelkhatra-bit/trading-align-`. `main` is the production code branch and `live-data` is only the generated public-data branch.
 - The former `trading-auto` environment, its pages, servers, workers, Puppeteer sessions, ports, and similarly named local folders are out of scope. Do not inspect their operational data, connect to their ports, reuse their files, change their processes, or delete them during ALIGN work.
 - Prove project identity from the canonical GitHub repository, exact branch and SHA, and file provenance. An open port, process name, folder name, browser tab, or old branch label is not proof.
