@@ -58,10 +58,13 @@ def r_at(m1all, k, long=False, **kw):
 
 
 def premiere_proposition(m1all, long=False, debut=205, fin=284, **kw):
+    refus = {}
     for k in range(debut, fin):
-        sn = ab.entree_sniper(r_at(m1all, k, long, **kw))
+        sn, raison = ab._sniper(r_at(m1all, k, long, **kw))
         if sn:
             return k, sn
+        refus[raison] = refus.get(raison, 0) + 1
+    print("SNIPER_TEST_REFUSALS", sorted(refus.items(), key=lambda item: (-item[1], str(item[0])))[:8])
     return None, None
 
 
