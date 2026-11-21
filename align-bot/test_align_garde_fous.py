@@ -64,6 +64,16 @@ class GardeFousWorkflows(unittest.TestCase):
             self.assertIsNone(re.search(r"^\s*if:\s*(false|\$\{\{\s*false\s*\}\})\s*(#.*)?$", texte, re.M),
                               f"job désactivé par « if: false » dans {fichier}")
 
+    def test_watchdog_et_auto_repair_ne_se_declenchent_pas_en_boucle(self):
+        watchdog = (WF / "align-workflow-watchdog.yml").read_text(encoding="utf-8")
+        repair = (WF / "align-auto-repair.yml").read_text(encoding="utf-8")
+        watchdog_triggers = watchdog.split("\njobs:", 1)[0]
+        repair_triggers = repair.split("\njobs:", 1)[0]
+        self.assertNotIn("ALIGN Coordinateur de r\u00e9paration automatique", watchdog_triggers)
+        self.assertNotIn("ALIGN Workflow Watchdog", repair_triggers)
+        for triggers in (watchdog_triggers, repair_triggers):
+            self.assertNotIn("NASDAQ Telegram", triggers)
+
     def test_watchdog_reste_planifie(self):
         texte = (WF / "align-workflow-watchdog.yml").read_text(encoding="utf-8")
         self.assertRegex(texte, r"schedule:\s*\n\s*- cron:", "le watchdog n'est plus planifié")
