@@ -156,7 +156,8 @@ class LiveTikTok(unittest.TestCase):
     def test_boost_refuse_si_ecran_live_deconnecte(self):
         self.etat["live_on"] = True
         self.etat["live_screen_seen_t"] = __import__("time").time() - 120
-        ab.live_callback(self.etat, set(), {"id": "x"}, "liveboost", "x", "2")
+        with mock.patch.object(ab, "ecran_signal_frais", return_value=False):
+            ab.live_callback(self.etat, set(), {"id": "x"}, "liveboost", "x", "2")
         self.assertEqual(self.publie, [])
         self.assertIn("n'est pas connecté", self.envoye[-1][1]["text"])
 
@@ -188,8 +189,9 @@ class LiveTikTok(unittest.TestCase):
     def test_boost_limite_par_personne_et_prenom_apres_heartbeat(self):
         self.etat["live_on"] = True
         self.etat["live_screen_seen_t"] = __import__("time").time()
-        ab.live_callback(self.etat, set(), {"id": "x"}, "liveboost", "x", "2")
-        ab.live_callback(self.etat, set(), {"id": "y"}, "liveboost", "x", "2")
+        with mock.patch.object(ab, "ecran_signal_frais", return_value=True):
+            ab.live_callback(self.etat, set(), {"id": "x"}, "liveboost", "x", "2")
+            ab.live_callback(self.etat, set(), {"id": "y"}, "liveboost", "x", "2")
         self.assertEqual(self.publie, ["🙏 MERCI KARIM ! Karim BOOSTE LE LIVE 🚀 ABONNE-TOI • PARTAGE"])
         self.assertIn("Ton prénom doit apparaître", self.envoye[0][1]["text"])
         self.assertIn("2 min", self.envoye[1][1]["text"])
@@ -224,7 +226,8 @@ class LiveTikTok(unittest.TestCase):
 
     def test_admin_prend_la_main_sans_payer(self):
         self.etat["live_on"] = True
-        ab.live_callback(self.etat, set(), {"id": "x"}, "livemain", "15", "1")
+        with mock.patch.object(ab, "ecran_signal_frais", return_value=False):
+            ab.live_callback(self.etat, set(), {"id": "x"}, "livemain", "15", "1")
         self.assertFalse(any(m == "sendInvoice" for m, _ in self.tg))
         self.assertTrue(self.publie[-1].startswith("CMD:tf:15:"))
         self.assertIn("capture", self.envoye[-1][1]["text"])
@@ -255,20 +258,23 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("n'a pas répondu", self.envoye[-1][1]["text"])
 
     def test_admin_voit_le_code_ecran_et_le_statut_deconnexion(self):
-        ab.menu_live(self.etat, "1")
-        self.assertIn("Code écran (admin) : test-sujet", self.envoye[-1][1]["text"])
-        self.assertIn("Écran TradingView non connecté", self.envoye[-1][1]["text"])
-        ab.menu_live(self.etat, "2")
-        self.assertNotIn("Code écran", self.envoye[-1][1]["text"])
-        self.assertNotIn("Écran TradingView", self.envoye[-1][1]["text"])
+        with mock.patch.object(ab, "ecran_signal_frais", return_value=False):
+            ab.menu_live(self.etat, "1")
+            self.assertIn("Code écran (admin) : test-sujet", self.envoye[-1][1]["text"])
+            self.assertIn("Écran TradingView non connecté", self.envoye[-1][1]["text"])
+            ab.menu_live(self.etat, "2")
+            self.assertNotIn("Code écran", self.envoye[-1][1]["text"])
+            self.assertNotIn("Écran TradingView", self.envoye[-1][1]["text"])
 
     def test_admin_voit_ecran_tradingview_connecte_apres_heartbeat(self):
         self.etat["live_screen_seen_t"] = __import__("time").time()
-        ab.menu_live(self.etat, "1")
+        with mock.patch.object(ab, "ecran_signal_frais", return_value=True):
+            ab.menu_live(self.etat, "1")
         self.assertIn("Écran TradingView connecté", self.envoye[-1][1]["text"])
 
     def test_menu_live_admin_affiche_bridge_non_configure_sans_secrets(self):
-        with mock.patch.object(ab, "ALIGN_TV_API_URL", ""), \
+        with mock.patch.object(ab, "ecran_signal_frais", return_value=False), \
+             mock.patch.object(ab, "ALIGN_TV_API_URL", ""), \
              mock.patch.object(ab, "ALIGN_TV_READ_TOKEN", ""):
             ab.menu_live(self.etat, "1")
         self.assertIn("Bridge ROBOT V12 non connecté", self.envoye[-1][1]["text"])
@@ -277,7 +283,8 @@ class LiveTikTok(unittest.TestCase):
         self.assertNotIn("Yahoo", self.envoye[-1][1]["text"])
 
     def test_menu_live_admin_ne_confond_pas_configuration_et_connexion_bridge(self):
-        with mock.patch.object(ab, "ALIGN_TV_API_URL", "https://bridge.example"), \
+        with mock.patch.object(ab, "ecran_signal_frais", return_value=False), \
+             mock.patch.object(ab, "ALIGN_TV_API_URL", "https://bridge.example"), \
              mock.patch.object(ab, "ALIGN_TV_READ_TOKEN", "test-token"):
             ab.menu_live(self.etat, "1")
         self.assertIn("paramètres présents", self.envoye[-1][1]["text"])
@@ -957,6 +964,7 @@ class TestLiveBoostCallbackDispatch(unittest.TestCase):
             "data": "liveboost:x"
         }}
         with mock.patch.object(ab, "LIVE_SUJET", "test-sujet"), \
+             mock.patch.object(ab, "ecran_signal_frais", return_value=True), \
              mock.patch.object(ab, "live_publier", side_effect=lambda t: published.append(t) or True), \
              mock.patch.object(ab, "_envoi_sur", side_effect=lambda cid, **kw: sent.append((cid, kw)) or {"ok": True}), \
              mock.patch.object(ab, "telegram", return_value={"ok": True}):
