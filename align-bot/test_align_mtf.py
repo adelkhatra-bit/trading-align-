@@ -3749,10 +3749,10 @@ class PineOnlyEntryGateTests(unittest.TestCase):
 
     def test_manipulation_bridge_mode_never_publishes_local_entry_or_stop(self):
         bars = [
-            candle(i * 900, o=100.0, h=101.0, l=99.0, c=100.0, v=100)
+            dict(candle(i * 900, o=100.0, h=101.0, l=99.0, c=100.0), v=100)
             for i in range(21)
         ]
-        bars.append(candle(21 * 900, o=100.0, h=101.0, l=97.0, c=100.5, v=400))
+        bars.append(dict(candle(21 * 900, o=100.0, h=101.0, l=97.0, c=100.5), v=400))
         out = []
         stale_local_order = {"e": 100.0, "sl": 97.0, "tp1": 123.45, "n1": "ancien TP local"}
         align_bot.manipulation(out, "BTC", {
