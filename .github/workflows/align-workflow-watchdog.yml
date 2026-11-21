@@ -8,7 +8,6 @@ on:
       - "ALIGN worker rollover"
       - "ALIGN MTF validation"
       - "ALIGN MTF BOT (signaux BTC + Gold Telegram)"
-      - "ALIGN MTF BOT (signaux BTC + Gold + NASDAQ Telegram)"
       - "ALIGN audit des messages envoyés (manuel)"
       - "CI Integration Tests"
       - "ALIGN MetaApi vérification"
@@ -16,7 +15,6 @@ on:
       - "ALIGN Topstep vérification"
       - "pages build and deployment"
       - "ALIGN Copilot Issue Relay"
-      - "ALIGN Coordinateur de réparation automatique"
     types: [completed]
   schedule:
     - cron: "*/5 * * * *"
