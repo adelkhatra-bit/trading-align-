@@ -7,6 +7,8 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         self.workflow = (root / ".github" / "workflows" / "align-bot.yml").read_text(encoding="utf-8")
         self.rollover = (root / ".github" / "workflows" / "align-bot-rollover.yml").read_text(encoding="utf-8")
+        self.sniper_workflow = (root / ".github" / "workflows" / "sniper-replay.yml").read_text(encoding="utf-8")
+        self.sniper_replay = (Path(__file__).parent / "replay_sniper.py").read_text(encoding="utf-8")
         self.bot = (Path(__file__).parent / "align_bot.py").read_text(encoding="utf-8")
 
     def test_worker_operational_scope_is_btc_and_gold_only(self):
@@ -32,6 +34,17 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.assertNotIn('"NASDAQ": ("sym"', self.bot)
         self.assertIn('"GOLD et BTC", "GOLD and BTC"', self.bot)
         self.assertNotIn('"GOLD et BTC", "NASDAQ, GOLD and BTC"', self.bot)
+
+    def test_sniper_replay_exposes_and_accepts_only_btc_and_gold(self):
+        self.assertIn("type: choice", self.sniper_workflow)
+        self.assertIn("- XAUUSD", self.sniper_workflow)
+        self.assertIn("- XBTUSD", self.sniper_workflow)
+        self.assertIn("- GOLD", self.sniper_workflow)
+        self.assertIn("- BTC", self.sniper_workflow)
+        self.assertNotIn("NASDAQ", self.sniper_workflow)
+        self.assertNotIn("NAS100", self.sniper_workflow)
+        self.assertIn('MARCHE_PAIRS = {"GOLD": "XAUUSD", "BTC": "XBTUSD"}', self.sniper_replay)
+        self.assertIn('if a.marche not in MARCHE_PAIRS or a.pair != MARCHE_PAIRS[a.marche]:', self.sniper_replay)
 
     def test_worker_rollover_recognizes_both_legacy_and_renamed_worker(self):
         self.assertIn("if run.get(\"name\") in {", self.rollover)
