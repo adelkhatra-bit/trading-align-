@@ -17,6 +17,10 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.assertNotIn('report["nasdaq_auto_follow_count"]', self.workflow)
         self.assertIn('MARCHES = {"BTC": "XBTUSD", "GOLD": "XAUUSD"}', self.bot)
         self.assertIn('AUTO_MARCHES = ("BTC", "GOLD")', self.bot)
+        self.assertNotIn('"NASDAQ": "💠 NASDAQ"', self.bot)
+        self.assertIn("def marche_retiree_demande(txt):", self.bot)
+        self.assertIn("if marche_retiree_demande(txt):", self.bot)
+        self.assertIn('MARCHES_HISTORIQUES = (*MARCHES, "NASDAQ")', self.bot)  # historique uniquement pour clôture/nettoyage
         self.assertIn('LIVE_CHOIX = {', self.bot)
         self.assertNotIn('"NASDAQ": ("sym"', self.bot)
         self.assertIn('"GOLD et BTC", "GOLD and BTC"', self.bot)
