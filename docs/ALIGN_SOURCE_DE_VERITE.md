@@ -77,3 +77,15 @@ Ne jamais publier dans ce dépôt, les issues, les commentaires ou les logs publ
 - Le dépôt étant public, les fichiers restent lisibles par des services IA externes. Le code du dépôt ne peut pas interdire cette lecture ; cela nécessite de rendre le dépôt privé et de contrôler séparément les permissions GitHub. Ce changement de visibilité n'est pas effectué ici car il peut impacter Pages et la publication publique `live-data`.
 - Le secret historique COPILOT_GITHUB_TOKEN n'est plus référencé par les workflows ALIGN. Sa suppression des paramètres GitHub Actions reste à effectuer par un propriétaire du dépôt.
 - Le ruleset actif de `main` exige `validate` et aucun acteur ne peut le contourner ; les merges restent soumis à la revue humaine et à l'autorisation du propriétaire.
+
+
+## 8. Branches, rôles, lecteurs et écrivains — proposition documentaire (23/11/2026)
+
+| Branche | Rôle | Lecteurs / consommateurs | Écrivains |
+|---|---|---|---|
+| `main` | Code, workflows et validation canoniques | Workflow validation; worker `align-bot.yml` après validation push main; CI PR main | Mainteneurs via PR/merge; worker bot publie l'état sur `live-data` |
+| `live-data` | Données publiques/live (`live.json`) | Pages et consommateurs externes (configuration exacte Pages/Cloudflare NON VÉRIFIÉE) | Worker `align-bot.yml` via publication data; aucun code |
+| `audit/chatgpt-pilotage` | Rapports de vérification, audit, notes | Mainteneurs humains | Documentation audit seulement; aucun runtime |
+| `fix/ci-triggers` | Correctif E1 désormais intégré (historique) | — | — |
+
+**Précision:** Les lecteurs externes de `live-data` et la source/dossier GitHub Pages ne sont pas exhaustivement identifiés; Cloudflare Worker `align-tv-mailbox` reste NON VÉRIFIÉ. Cette matrice décrit les flux confirmés, pas un inventaire exhaustif.
