@@ -642,7 +642,7 @@
   // La bulle, le ping sur le prix et la lueur neutre signalent un commentaire du coach, pas un signal d'entrée.
   function afficherIA(texte) {
     const phrase = String(texte || '').trim();
-    if (!phrase || occupe || file.length) return false;
+    if (!phrase) return false; // Le vocal et la petite bulle IA sont indépendants de la file de la bande.
     const anglais = enAnglais(phrase), marche = codeMarche();
     const fr = { texte: '🇫🇷 ' + plateforme(phrase), source: 'ia', en: false, market: marche };
     const en = { texte: '🇬🇧 ' + plateforme(anglais), source: 'ia', en: true, anglaisTraduit: anglais !== phrase, market: marche };
