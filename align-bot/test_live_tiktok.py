@@ -324,7 +324,7 @@ class LiveTikTok(unittest.TestCase):
         # End-to-end linkage: bot IA payload -> ntfy receiver -> AI bubble -> voice narration.
         self.assertIn("if (txt.startsWith('IA:')) { recuIA(txt.slice(3)); return; }", source)
         self.assertIn("const fr = { texte: '🇫🇷 ' + plateforme(phrase), source: 'ia'", source)
-        self.assertIn("coeurs(1, ['🧠', '📡'], undefined, phrase, anglais)", source)", source)
+        self.assertIn("coeurs(1, ['🧠', '📡'], undefined, phrase, anglais)", source)
         self.assertIn("const voixDuree = 0;", source)
         self.assertIn("montrer(txt, bulle, 2, '', false, bulle ? 'marche' : 'live')", source)  # BULLE de marché envoyée au vocal
         self.assertIn("const traductionEN = enAnglais(texte), anglaisTraduit = traductionEN !== texte", source)
