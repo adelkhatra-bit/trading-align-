@@ -77,3 +77,15 @@ Ne jamais publier dans ce dépôt, les issues, les commentaires ou les logs publ
 - Le dépôt étant public, les fichiers restent lisibles par des services IA externes. Le code du dépôt ne peut pas interdire cette lecture ; cela nécessite de rendre le dépôt privé et de contrôler séparément les permissions GitHub. Ce changement de visibilité n'est pas effectué ici car il peut impacter Pages et la publication publique `live-data`.
 - Le secret historique COPILOT_GITHUB_TOKEN n'est plus référencé par les workflows ALIGN. Sa suppression des paramètres GitHub Actions reste à effectuer par un propriétaire du dépôt.
 - Le ruleset actif de `main` exige `validate` et aucun acteur ne peut le contourner ; les merges restent soumis à la revue humaine et à l'autorisation du propriétaire.
+
+
+## 8. Branches, rôles, lecteurs et écrivains — état vérifié le 23/11/2026 00:49 CET
+
+| Branche | Rôle | Lecteurs / consommateurs confirmés | Écrivains confirmés |
+|---|---|---|---|
+| `main` | Code canonique, workflows, validation et worker | `align-bot-validation.yml` (push/PR main), `align-bot.yml` (workflow_run depuis validation main, schedule, manuel); CI tests PR main | Mainteneurs via PR/merge. `align-bot.yml` a `contents: write` pour publier l'état/data, mais la cible de publication est `live-data` (d'après le workflow) |
+| `live-data` | Données de publication, dont `live.json` | Consommateurs de données identifiés partiellement; Pages source/dossier et Workers consommateurs non vérifiés | Workflow `align-bot.yml` peut écrire des données sur cette branche; aucune écriture manuelle/code autorisée |
+| `audit/chatgpt-pilotage` | Rapport de contrôle, notes et inventaire seulement | Mainteneurs humains | ChatGPT via commits documentaires autorisés; aucun code runtime |
+| `fix/ci-triggers` | Correctif isolé E1 : CI déclenchée uniquement sur main | CI PR vers main (tests d'intégration) | Aucun writer runtime; une PR est ouverte et non fusionnée |
+
+**Limites de preuve :** Pages, rulesets, files Cloudflare Worker `align-tv-mailbox` (branche/path de build) et déploiement restent NON VÉRIFIÉS faute d'accès API lisible. Le tableau ne prétend pas exhaustivité des lecteurs de `live-data`.
