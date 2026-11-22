@@ -280,3 +280,40 @@ Les items suivants restent à obtenir par commande/API et sortie sauvegardée; a
 ### Règles rappelées
 Tout merge sur `main` redémarre le bot : avertir Adel avant chaque merge. Aucun code dans `live-data`. Pas de suppression de branche sans manifeste (nom, SHA, bundle et SHA-256). Pas de réécriture d'historique sans accord écrit. Aucun ordre/trading réel, aucun changement à l'indicateur TradingView.
 
+
+
+## Addendum — reprise ordonnée P0 / E1 (23 novembre 2026, lecture 00:49 CET)
+
+### Étape 1 — run 45067670356 (lecture seule)
+- Commande/API connector : `fetch_workflow_run_jobs(run_id=45067670356)` puis `fetch_workflow_job_steps(job_id=137347565750)` et `fetch_workflow_job_logs(job_id=137347565750)`.
+- Heure de lecture : **2026-11-23 00:49:13 CET** (UTC+01:00).
+- Jobs : `signaux` = `in_progress`, conclusion `null`; `validate` = `skipped`.
+- Étape en cours : **Analyse BTC + Gold et envoi Telegram** (step 12). Les étapes 1 à 11 sont success; les steps 13 à 19 restent pending.
+- Dernière ligne de log disponible : **2026-11-22T23:28:42.5715692Z**. Le job est encore actif, mais aucun log n'a été produit depuis environ 20 min au moment de la lecture.
+- `timeout-minutes=355` et démarrage `2026-11-22 20:40 UTC` → échéance calculée **2026-11-23 02:35 UTC (03:35 CET)**. À 00:49 CET, le run n'a pas encore dépassé cette échéance; donc « in_progress » est inquiétant mais **pas encore une anomalie de dépassement du timeout**. Recontrôler après l'échéance.
+- Cache `state.json` : log de restauration indique `Cache restored from key: align-etat-45054398305-b1795380009`. C'est la clé effectivement restaurée par ce run. Elle correspond au run précédent et constitue le candidat de sauvegarde pré-run; la liste API de tous les caches n'est pas accessible ici, donc **dernière clé sauvegardée de manière absolue NON VÉRIFIÉE**.
+- **Note D6 préparée, sans annulation** : ne pas cancel. Le job est encore dans l'analyse/envoi, cache `state.json` restauré depuis la clé ci-dessus, sauvegarde finale non encore confirmée. Décision propriétaire requise après vérification de l'état final et des risques de double message; à ce stade la recommandation est de ne pas annuler.
+- Runs `align-bot.yml` en `queued` sur `main` depuis le 22/11 : **NON VÉRIFIÉ**. La liste des runs n'est pas exposée par le connecteur GitHub disponible; l'accès API direct via Web est inaccessible. Aucun run queued n'a été inventé.
+
+### Étape 2 — P0 restant, lecture seule
+- Pages (`GET /repos/adelkhatra-bit/trading-align-/pages`) : accès endpoint refusé/inaccessible par les outils disponibles; source branch et served folder **NON VÉRIFIÉS**.
+- Rulesets (`GET /repos/adelkhatra-bit/trading-align-/rulesets`) : endpoint inaccessible; règles actives main/live-data **NON VÉRIFIÉES**.
+- Cloudflare Worker `align-tv-mailbox` : aucun connecteur Cloudflare de lecture/configuration/déploiement disponible; build branch, path surveillé et dernier deployment **NON VÉRIFIÉS**.
+- Heure de lecture : 23/11/2026, 00:49 CET.
+
+
+### Étape 3 — E1 PR #779 (effectuée, non fusionnée)
+- Branche `fix/ci-triggers` créée depuis `main` (`main` SHA de base `fe9166d68eda44c10bbee1c9cdc4f6b0bc5d7ca4`).
+- Fichier unique modifié : `.github/workflows/ci-integration-tests.yml`.
+- Diff exact : `branches: [main, feature/**, deploy/**]` → `branches: [main]`. Le `pull_request.branches: [main]` et tous les autres chemins/contenus restent inchangés.
+- Blob avant : `210b8b3f092a07ffe7d641734877139dfb91d616`; blob après : `a05e96d75bb895ca68ceefbe3005b86a1a2927a9`.
+- Commit : `dc37d53f64a844e4275d47e18e5e56bf1afa74c9`.
+- Validation locale : PyYAML `safe_load` réussit; parse du YAML OK; push branches résolues = `[main]`; pull_request branches = `[main]`. `actionlint` absent de l'environnement (`ACTIONLINT_NOT_INSTALLED`).
+- Patch relu via API : un seul fichier, 1 addition / 1 suppression, exactement la ligne `push.branches`.
+- PR ouverte : https://github.com/adelkhatra-bit/trading-align-/pull/779 — base `main` SHA `fe9166d68eda44c10bbee1c9cdc4f6b0bc5d7ca4`, head `fix/ci-triggers` SHA `dc37d53f64a844e4275d47e18e5e56bf1afa74c9`. État open, non merged, changed_files=1.
+- Pas de relance production `align-bot.yml` attendue par ce PR : le bot est déclenché par `workflow_run` de validation main (branches main), schedule ou workflow_dispatch; PR validation sur la branche `fix/ci-triggers` n'est pas un `workflow_run` de main. Workflow `align-bot.yml` non modifié.
+
+### Mise à jour source de vérité (document existant seulement)
+- `docs/ALIGN_SOURCE_DE_VERITE.md` mis à jour sur la branche d'audit uniquement; tableau branches / rôle / lecteurs / écrivains ajouté, avec lecteurs Pages/Cloudflare explicitement marqués non vérifiés.
+- Commit : `324350d8bcd73d25ab334e53fd715a8cf824d0d9`; blob : `61b9f42f43af6ed569545f870dbacf31f7a43850`.
+- Aucun autre document de source de vérité créé. Aucun changement sur `main` ou `live-data`.
