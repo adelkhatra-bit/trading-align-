@@ -2,7 +2,7 @@ name: CI Integration Tests
 
 on:
   push:
-    branches: [main, feature/**, deploy/**]
+    branches: [main]
     paths:
       - "server.js"
       - "server-manager.js"
