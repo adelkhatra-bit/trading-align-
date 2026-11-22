@@ -3703,7 +3703,7 @@ def boutons_canal(etat, texte):
     # → 1 seul bouton sous chaque message : il ouvre le bot, où le VIP retrouve le MÊME menu que le gratuit.
     if position and est_entree(texte):
         lignes.append([{"text": "📍 Je prends cette position", "url": lien("rentre")}])
-        lignes.append([{"text": "🙅 Pas renté cette fois", "url": lien("pasrentre")}])
+        lignes.append([{"text": "🙅 Pas rentré cette fois", "url": lien("pasrentre")}])
     lignes.append([{"text": "🤖 Ouvrir mon menu ALIGN", "url": lien("boutons")}])
     
     
