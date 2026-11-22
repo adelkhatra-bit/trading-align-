@@ -75,7 +75,8 @@ class SuiviMarchesTest(unittest.TestCase):
             self.assertTrue(any("MON BOT" in label.upper() for label in labels))
             self.assertFalse(any("NASDAQ" in label.upper() for label in labels))
             self.assertFalse(any("TELEGRAM" in label.upper() for label in labels))
-        source = open(ab.__file__, encoding="utf-8").read()
+        with open(ab.__file__, encoding="utf-8") as source_file:
+            source = source_file.read()
         self.assertIn('"text": "🤖 Ouvrir mon menu ALIGN"', source)
         self.assertIn('"text": "🤖 Mon bot", "url": lien("mon_bot")', source)
 
