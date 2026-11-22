@@ -63,7 +63,16 @@ class TradingViewBridgeGateTests(unittest.TestCase):
         gate = 'os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "1") == "1"'
         self.assertEqual(BOT_SOURCE.count(gate), 2)
         self.assertNotIn('os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1"', BOT_SOURCE)
-
+    def test_relay_artifact_uploads_sanitized_copy_only(self):
+        sanitize = WORKFLOW_SOURCE[WORKFLOW_SOURCE.index("Sanitiser le journal du relais TradingView"):WORKFLOW_SOURCE.index("Archiver le journal du relais TradingView")]
+        artifact = WORKFLOW_SOURCE[WORKFLOW_SOURCE.index("Archiver le journal du relais TradingView"):]
+        self.assertIn("align_relais.safe.log", sanitize)
+        self.assertIn(r"(/ingest/)[A-Za-z0-9_-]{32,128}", sanitize)
+        self.assertIn(r"(Bearer\\s+)[A-Za-z0-9._-]{32,}", sanitize)
+        self.assertIn(r"(token[=: ]+)[A-Za-z0-9._-]{32,}", sanitize)
+        self.assertRegex(artifact, r"path: .*align_relais.safe.log")
+        self.assertNotIn("path: ${{ runner.temp }}/align_relais.log", artifact)
+        self.assertIn("Journal relais absent pour ce run.", sanitize)
 
 if __name__ == "__main__":
     unittest.main()
