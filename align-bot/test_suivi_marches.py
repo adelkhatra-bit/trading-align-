@@ -44,28 +44,26 @@ class SuiviMarchesTest(unittest.TestCase):
             self.assertFalse(any("TELEGRAM" in label.upper() for label in labels))
 
 
-    def test_visible_mon_bot_shortcut_is_removed_from_reply_and_inline_keyboards(self):
+    def test_visible_mon_bot_shortcut_kept_and_nasdaq_removed(self):
         for raw in (ab.CLAVIER, ab.CLAVIER_VISITEUR):
             labels = [
                 str(button.get("text", ""))
                 for row in json.loads(raw).get("keyboard", [])
                 for button in row
             ]
-            self.assertFalse(any(label == "🤖 Mon bot" for label in labels))
+            self.assertTrue(any(label == "🤖 Mon bot" for label in labels))
             self.assertFalse(any("TELEGRAM" in label.upper() for label in labels))
             self.assertFalse(any("NASDAQ" in label.upper() for label in labels))
         source = open(ab.__file__, encoding="utf-8").read()
-        self.assertNotIn('"text": "🤖 Mon bot"', source)
-        self.assertNotIn('"text": "🤖 Ouvrir mon menu ALIGN"', source)
-        self.assertIn('k = {"reply_markup": json.dumps({"inline_keyboard": rang})} if rang else {}', source)
-        self.assertIn('return json.dumps({"inline_keyboard": lignes}) if lignes else boutons_menu_rapide(etat)', source)
-        self.assertIn('"/mon_bot": "🤖 Mon bot"', source)  # commande texte conservée
+        self.assertIn('"text": "🤖 Mon bot"', source)
+        self.assertIn('"text": "🤖 Ouvrir mon menu ALIGN"', source)
+        self.assertIn('"/mon_bot": "🤖 Mon bot"', source)
 
     def test_channel_keyboard_is_not_empty_when_message_has_no_position_buttons(self):
         keyboard = json.loads(ab.boutons_canal(self.e, "BTC : marché calme"))
         labels = [button["text"] for row in keyboard["inline_keyboard"] for button in row]
         self.assertGreater(len(labels), 0)
-        self.assertFalse(any("MON BOT" in label.upper() for label in labels))
+        self.assertTrue(any("MON BOT" in label.upper() for label in labels))
         self.assertFalse(any("TELEGRAM" in label.upper() for label in labels))
         self.assertFalse(any("NASDAQ" in label.upper() for label in labels))
 
@@ -77,12 +75,12 @@ class SuiviMarchesTest(unittest.TestCase):
             self.assertEqual(len(sends), 1)
             keyboard = json.loads(sends[0]["reply_markup"])["keyboard"]
             labels = [button["text"] for row in keyboard for button in row]
-            self.assertFalse(any("MON BOT" in label.upper() for label in labels))
+            self.assertTrue(any("MON BOT" in label.upper() for label in labels))
             self.assertFalse(any("TELEGRAM" in label.upper() for label in labels))
             self.assertFalse(any("NASDAQ" in label.upper() for label in labels))
             self.assertTrue(any("BTC" in label.upper() for label in labels))
             self.assertTrue(any("GOLD" in label.upper() for label in labels))
-            self.assertEqual(state["clavier_v"]["42"], 3)
+            self.assertEqual(state["clavier_v"]["42"], 5)
             ab.renvoyer_claviers(state, {"42"})
             self.assertEqual(len([kw for method, kw in self.envois if method == "sendMessage"]), 1)
 
