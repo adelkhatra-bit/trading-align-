@@ -35,9 +35,12 @@ class ZeroMessageParDefaut(unittest.TestCase):
         self.assertEqual(appels, ["question_quotidienne(etat, chats, creneau=creneau_)"])
         self.assertRegex(SOURCE, r"if QUESTION_QUOTIDIENNE and creneau_:\n\s+question_quotidienne\(etat, chats, creneau=creneau_\)")
 
-    def test_migration_claviers_obsoletes_independante_des_push_spontanes(self):
-        appel = [line.strip() for line in SOURCE.splitlines() if line.strip().startswith("renvoyer_claviers(etat, chats)")]
-        self.assertEqual(appel, ["renvoyer_claviers(etat, chats)"])
+    def test_migration_claviers_obsoletes_only_on_private_interaction(self):
+        # Migration des claviers: jamais au démarrage, seulement sur message privé entrant.
+        self.assertNotIn("renvoyer_claviers(etat, chats)", SOURCE)
+        self.assertIn("def renvoyer_clavier_sur_interaction(etat, update):", SOURCE)
+        self.assertIn("renvoyer_clavier_sur_interaction(etat, update)", SOURCE)
+        self.assertIn('chat.get("type") != "private"', SOURCE)
         self.assertIn("CLAVIER_VERSION = 5", SOURCE)
         self.assertIn("if vus.get(cid) == CLAVIER_VERSION:", SOURCE)
 
