@@ -60,6 +60,19 @@ class SuiviMarchesTest(unittest.TestCase):
             ab.renvoyer_claviers(state, {"42"})
             self.assertEqual(len([kw for method, kw in self.envois if method == "sendMessage"]), 1)
 
+    def test_private_keyboard_migration_does_not_iterate_other_prospects(self):
+        state = {"clavier_v": {}, "prospects": ["99", "100"]}
+        delivered = []
+        old_envoi = ab._envoi_sur
+        self.addCleanup(setattr, ab, "_envoi_sur", old_envoi)
+        def faux_envoi(cid, **kw):
+            delivered.append(str(cid))
+            return {"ok": True}
+        with mock.patch.object(ab, "TOKEN", "test"), mock.patch.object(ab, "_envoi_sur", faux_envoi):
+            ab.renvoyer_clavier_sur_interaction(state, {"message": {"chat": {"id": 42, "type": "private"}}})
+        self.assertEqual(delivered, ["42"])
+        self.assertEqual(state["clavier_v"], {"42": 5})
+
     def test_keyboard_migration_is_blocked_without_private_user_interaction(self):
         state = {"clavier_v": {"42": 2}, "prospects": []}
         old_mode = ab.TELEGRAM_PULL_MODE
