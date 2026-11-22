@@ -11,12 +11,12 @@ WORKFLOW_SOURCE = pathlib.Path(__file__).resolve().parents[1].joinpath(".github"
 
 class TradingViewBridgeGateTests(unittest.TestCase):
     def test_bridge_failure_keeps_telegram_worker_alive_but_signals_fail_closed(self):
-        self.assertRegex(WORKFLOW_SOURCE, r"DUREE_SEC:.*steps\.bridge\.outputs\.ALIGN_TV_BRIDGE_PRET == '0'.*'120'.*'300'.*'21000'")
-        self.assertIn('ALIGN_TV_BRIDGE_PRET: ${{ steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == \'0\' && \'0\' || \'1\' }}', WORKFLOW_SOURCE)
+        self.assertRegex(WORKFLOW_SOURCE, r"DUREE_SEC:.*steps\.bridge\.outputs\.ALIGN_TV_BRIDGE_PRET != '1'.*'300'.*'120'.*'21000'")
+        self.assertIn('ALIGN_TV_BRIDGE_PRET: ${{ steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == \'1\' && \'1\' || \'0\' }}', WORKFLOW_SOURCE)
         self.assertIn('ALIGN_REQUIRE_TV_BRIDGE: "1"', WORKFLOW_SOURCE)
         self.assertRegex(
             WORKFLOW_SOURCE,
-            r"if:\s*\$\{\{\s*always\(\)\s*&&\s*steps\.bridge\.outputs\.ALIGN_TV_BRIDGE_PRET\s*==\s*'0'\s*\}\}",
+            r"if:\s*\$\{\{\s*always\(\)\s*&&\s*steps\.bridge\.outputs\.ALIGN_TV_BRIDGE_PRET\s*!=\s*'1'\s*\}\}",
         )
         self.assertIn("Bridge TradingView obligatoire — échec signalé", WORKFLOW_SOURCE)
         self.assertIn("exit 1", WORKFLOW_SOURCE)
