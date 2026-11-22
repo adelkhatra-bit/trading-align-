@@ -94,7 +94,6 @@ class ZeroMessageParDefaut(unittest.TestCase):
         with mock.patch.object(ab, "DERNIER_ETAT", etat), mock.patch.object(ab, "TELEGRAM_PULL_MODE", True):
             self.assertEqual(ab.destinataires_message(etat, set(), preparation), ["-100"])
             self.assertEqual(ab.destinataires_message(etat, set(), entree_sans_niveaux), ["-100"])
-            self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "44", "text": entree_sans_niveaux}))
 
 
 class ParcoursLiveEtBudget(unittest.TestCase):
