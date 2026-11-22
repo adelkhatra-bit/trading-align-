@@ -646,6 +646,7 @@
     const anglais = enAnglais(phrase), marche = codeMarche();
     const fr = { texte: '🇫🇷 ' + plateforme(phrase), source: 'ia', en: false, market: marche };
     const en = { texte: '🇬🇧 ' + plateforme(anglais), source: 'ia', en: true, anglaisTraduit: anglais !== phrase, market: marche };
+    fr.replayEN = en; // Si la voix FR arrive après voiceschanged, la lecture EN reste attachée au même commentaire.
     dernierCommentaireIA = { fr, en: en.anglaisTraduit ? en : null, market: marche };
     // Le commentaire IA apparaît dans la petite bulle et déclenche son vocal, jamais la bande défilante.
     coeurs(1, ['🧠', '📡'], undefined, phrase, anglais);
