@@ -58,7 +58,16 @@ class SuiviMarchesTest(unittest.TestCase):
         self.assertNotIn('"text": "🤖 Mon bot"', source)
         self.assertNotIn('"text": "🤖 Ouvrir mon menu ALIGN"', source)
         self.assertIn('k = {"reply_markup": json.dumps({"inline_keyboard": rang})} if rang else {}', source)
+        self.assertIn('return json.dumps({"inline_keyboard": lignes}) if lignes else boutons_menu_rapide(etat)', source)
         self.assertIn('"/mon_bot": "🤖 Mon bot"', source)  # commande texte conservée
+
+    def test_channel_keyboard_is_not_empty_when_message_has_no_position_buttons(self):
+        keyboard = json.loads(ab.boutons_canal(self.e, "BTC : marché calme"))
+        labels = [button["text"] for row in keyboard["inline_keyboard"] for button in row]
+        self.assertGreater(len(labels), 0)
+        self.assertFalse(any("MON BOT" in label.upper() for label in labels))
+        self.assertFalse(any("TELEGRAM" in label.upper() for label in labels))
+        self.assertFalse(any("NASDAQ" in label.upper() for label in labels))
 
     def test_keyboard_migration_sends_btc_gold_keyboard_and_marks_only_on_success(self):
         state = {"clavier_v": {"42": 2}, "prospects": []}
