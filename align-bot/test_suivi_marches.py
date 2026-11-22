@@ -54,7 +54,8 @@ class SuiviMarchesTest(unittest.TestCase):
             self.assertFalse(any(label == "🤖 Mon bot" for label in labels))
             self.assertFalse(any("TELEGRAM" in label.upper() for label in labels))
             self.assertFalse(any("NASDAQ" in label.upper() for label in labels))
-        source = open(ab.__file__, encoding="utf-8").read()
+        with open(ab.__file__, encoding="utf-8") as source_file:
+            source = source_file.read()
         self.assertNotIn('"text": "🤖 Mon bot"', source)
         self.assertNotIn('"text": "🤖 Ouvrir mon menu ALIGN"', source)
         self.assertIn('k = {"reply_markup": json.dumps({"inline_keyboard": rang})} if rang else {}', source)
