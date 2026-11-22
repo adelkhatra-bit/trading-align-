@@ -12,7 +12,11 @@ WORKFLOW_SOURCE = pathlib.Path(__file__).resolve().parents[1].joinpath(".github"
 
 class TradingViewBridgeGateTests(unittest.TestCase):
     def test_bridge_failure_keeps_telegram_worker_alive_but_signals_fail_closed(self):
-        self.assertRegex(WORKFLOW_SOURCE, r"DUREE_SEC:.*steps\.bridge\.outputs\.ALIGN_TV_BRIDGE_PRET != '1'.*'300'.*'120'.*'21000'")
+        duration_line = next(line for line in WORKFLOW_SOURCE.splitlines() if line.lstrip().startswith("DUREE_SEC:"))
+        self.assertIn("github.event_name == 'workflow_dispatch' && '300'", duration_line)
+        self.assertIn("steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET != '1' && '120'", duration_line)
+        self.assertIn("|| '21000'", duration_line)
+
         self.assertIn('ALIGN_TV_BRIDGE_PRET: ${{ steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == \'1\' && \'1\' || \'0\' }}', WORKFLOW_SOURCE)
         self.assertIn('ALIGN_REQUIRE_TV_BRIDGE: "1"', WORKFLOW_SOURCE)
         self.assertRegex(
