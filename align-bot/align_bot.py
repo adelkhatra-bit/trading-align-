@@ -3308,7 +3308,11 @@ def _telegram_sortant_autorise(methode, params):
             and texte.startswith("🚨 NEWS DE DERNIÈRE MINUTE")):
         return True
     if cid and cid in actifs and methode in ("sendMessage", "sendPhoto") and _telegram_position_attendue(texte):
-        return True
+        marches_signal = marches_message(texte)
+        silencieux = {str(x) for x in (etat.get("quiet") or [])}
+        if (bot_on(etat, cid) and cid not in silencieux
+                and any(m in marches_signal and m in marches_choisis(etat, cid) for m in MARCHES)):
+            return True
     # Les abonnements « Alertes BTC/GOLD » sont un opt-in explicite séparé de la recherche live.
     # Ils autorisent uniquement une entrée confirmée sur le marché coché, jamais un statut ou une autre UT.
     if cid and methode in ("sendMessage", "sendPhoto") and _telegram_position_attendue(texte):
@@ -9402,10 +9406,20 @@ def destinataires_message(etat, chats, texte):
     canal = str(etat.get("canal") or "")
     # Pas de diffusion privée pour news, agenda, DXY ou messages globaux :
     # l'utilisateur les consulte dans l'analyse demandée ou le live public.
-    prives = [str(c) for c in chats if str(c) != canal and ens
-              and any(m in marches_choisis(etat, c) and coach_actif(etat, c, m) for m in ens)]
+    # Recherche persistante : opt-in explicite via « Oui, chercher une position ».
+    # Les prospects ne sont pas dans chats ; on inclut uniquement ceux encore actifs, puis on
+    # exige une entrée confirmée avec niveaux et marché sélectionné avant de leur envoyer.
+    recherche_active = {str(x) for x in (etat.get("recherche_positions_active") or [])}
+    quiet = {str(x) for x in (etat.get("quiet") or [])}
+    cibles = {str(c) for c in chats} | recherche_active
+    prives_coach = [c for c in cibles if c != canal and ens
+                    and any(m in marches_choisis(etat, c) and coach_actif(etat, c, m) for m in ens)]
+    prives_recherche = [c for c in recherche_active if c != canal and c not in quiet and bot_on(etat, c)
+                        and ens and any(m in marches_choisis(etat, c) for m in ens)
+                        and _telegram_position_attendue(texte) and contient_niveaux(texte)]
+    prives = list(dict.fromkeys(prives_coach + prives_recherche))
     # Règle d'Adel : en privé, aucun niveau (entrée, SL, TP) tant que la position n'est pas validée.
-    # Les pré-alertes sans niveau passent ; les niveaux arrivent avec le signal d'entrée confirmé.
+    # Les pré-alertes sans niveau passent pour le coach ; les niveaux avant validation sont bloqués.
     if prives and not est_entree(texte) and contient_niveaux(texte):
         prives = []
     if canal:

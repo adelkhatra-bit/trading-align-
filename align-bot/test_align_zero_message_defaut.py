@@ -71,6 +71,31 @@ class ZeroMessageParDefaut(unittest.TestCase):
         self.assertEqual(dest, ["-100"])
 
 
+    def test_recherche_persistante_optin_recoit_entree_complete_sans_coach(self):
+        etat = {"canal": "-100", "marches_par_chat": {"44": ["BTC"], "55": ["GOLD"], "66": ["BTC"]},
+                 "recherche_positions_active": ["44", "55", "66"], "bot_off": ["66"]}
+        texte = "🟢 BTC - LONG\n📍 Entrée 65 000.0\n🛑 SL 64 500.0\n🎯 TP1 66 000.0"
+        with mock.patch.object(ab, "DERNIER_ETAT", etat), mock.patch.object(ab, "TELEGRAM_PULL_MODE", True):
+            dest = ab.destinataires_message(etat, {"11", "22"}, texte)
+            self.assertIn("44", dest)                 # recherche active, même hors chats/prospects
+            self.assertNotIn("55", dest)              # marché non choisi pour ce signal
+            self.assertNotIn("66", dest)              # opt-in désactivé par bot OFF
+            self.assertNotIn("11", dest)              # aucune inscription de recherche
+            self.assertNotIn("22", dest)              # aucun coach actif
+            self.assertTrue(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "44", "text": texte}))
+            self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "55", "text": texte}))
+            self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "66", "text": texte}))
+
+    def test_recherche_persistante_ne_recoit_pas_prealertes_ni_signal_sans_niveaux(self):
+        etat = {"canal": "-100", "marches_par_chat": {"44": ["BTC"]},
+                "recherche_positions_active": ["44"]}
+        preparation = "🔔 JE PRÉPARE UNE POSITION — BTC\n🛑 SL 64 980.5\n🎯 TP1 66 200.0"
+        entree_sans_niveaux = "🟢 BTC - LONG"
+        with mock.patch.object(ab, "DERNIER_ETAT", etat), mock.patch.object(ab, "TELEGRAM_PULL_MODE", True):
+            self.assertEqual(ab.destinataires_message(etat, set(), preparation), ["-100"])
+            self.assertEqual(ab.destinataires_message(etat, set(), entree_sans_niveaux), ["-100"])
+
+
 class ParcoursLiveEtBudget(unittest.TestCase):
     def test_bouton_live_commence_par_le_choix_du_marche_meme_sans_live(self):
         etat = {"live_on": False}
