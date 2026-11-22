@@ -24,8 +24,8 @@ class MemoireDuBot(unittest.TestCase):
         self.assertIn("if: always()", step)
         self.assertIn("actions/upload-artifact@v4", step)
         paths = [line.strip() for line in step.splitlines() if line.strip().startswith("path:")]
-        self.assertEqual(paths, ["path: ${{ runner.temp }}/align_relais.log"])
-        self.assertFalse(any("align_bridge.log" in path for path in paths))
+        self.assertEqual(paths, ["path: ${{ runner.temp }}/align_relais.safe.log"])
+        self.assertFalse(any("align_bridge.log" in path or path.endswith("/align_relais.log") for path in paths))
 
     def test_restauration_par_prefixe_et_attente_de_l_ancien_worker_avant(self):
         self.assertIn("restore-keys: align-etat-", self.t)                              # les nouvelles clés commencent par ce préfixe
