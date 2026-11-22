@@ -3354,6 +3354,7 @@ class TestMessagesPropres(unittest.TestCase):
 
 
 class CanonicalPineV25PlanParserTest(unittest.TestCase):
+    # Regression coverage for structured v25 payloads while retaining v24 compatibility.
     def _snapshot(self, robot, fresh=True, confirmed=True):
         return {"tv_indicator_mtf": {"available": True, "activeTimeframe": "M15", "snapshots": {
             "M15": {"fresh": fresh, "confirmed": confirmed, "robotV12": robot}
