@@ -10,12 +10,21 @@ class MemoireDuBot(unittest.TestCase):
         self.t = WF.read_text(encoding="utf-8")
 
     def test_sauvegarde_a_cles_uniques_jamais_la_cle_fixe(self):
-        save = self.t[self.t.index("Clé unique de sauvegarde de la mémoire"):]
+        start = self.t.index("Clé unique de sauvegarde de la mémoire")
+        end = self.t.index("Archiver le journal du relais TradingView", start)
+        save = self.t[start:end]
         self.assertNotIn("key: align-etat-${{ github.run_id }}\n", save)                 # clé fixe refusée à l'arrêt (cache immuable)
         self.assertIn("steps.cle_sauvegarde.outputs.a", save)
         self.assertIn("steps.cle_sauvegarde.outputs.b", save)                           # deuxième exemplaire
         self.assertEqual(save.count("actions/cache/save@v4"), 2)
         self.assertEqual(save.count("if: always()"), 3)                                 # clé + 2 sauvegardes, même sur annulation
+
+    def test_relay_log_artifact_is_always_uploaded_without_bridge_log(self):
+        step = self.t[self.t.index("Archiver le journal du relais TradingView"):]
+        self.assertIn("if: always()", step)
+        self.assertIn("actions/upload-artifact@v4", step)
+        self.assertIn("align_relais.log", step)
+        self.assertNotIn("align_bridge.log", step)
 
     def test_restauration_par_prefixe_et_attente_de_l_ancien_worker_avant(self):
         self.assertIn("restore-keys: align-etat-", self.t)                              # les nouvelles clés commencent par ce préfixe
