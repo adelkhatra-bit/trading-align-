@@ -38,12 +38,17 @@ UT = ["1", "3", "5", "10", "15", "30", "45", "1h", "2h", "4h", "D"]   # 3 min co
 POIDS = [1, 1, 1, 1, 2, 2, 2, 3, 3, 4, 5]
 
 # ───────── Données ─────────
-def http_json(url, data=None):
-    """Appel HTTP avec 3 essais en cas de coupure réseau (ex. « Connection reset by peer »)."""
-    for essai in range(3):
+HTTP_MARCHE_TIMEOUT_SEC = 12
+HTTP_MARCHE_ATTEMPTS = 1
+HTTP_NEWS_TIMEOUT_SEC = 15
+
+def http_json(url, data=None, *, timeout=70, attempts=3):
+    """Appel HTTP à budget réglable; défaut inchangé pour Telegram et les autres appels."""
+    attempts = max(1, int(attempts))
+    for essai in range(attempts):
         try:
             req = urllib.request.Request(url, data=data, headers={"User-Agent": "align-bot"})
-            with urllib.request.urlopen(req, timeout=70) as r:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
                 return json.loads(r.read().decode())
         except urllib.error.HTTPError as ex:
             # Lire le corps JSON : Telegram y donne la cause exacte (message non modifié,
@@ -60,7 +65,7 @@ def http_json(url, data=None):
                 description = corps or str(ex)
             raise RuntimeError(f"HTTP Error {ex.code}: {description}") from ex
         except Exception:
-            if essai == 2:
+            if essai == attempts - 1:
                 raise
             time.sleep(2 * (essai + 1))
 
@@ -294,7 +299,7 @@ def kraken(pair, interval):
 _CACHE_K = {}
 
 def _kraken(pair, interval):
-    j = http_json(f"https://api.kraken.com/0/public/OHLC?pair={pair}&interval={interval}")
+    j = http_json(f"https://api.kraken.com/0/public/OHLC?pair={pair}&interval={interval}", timeout=HTTP_MARCHE_TIMEOUT_SEC, attempts=HTTP_MARCHE_ATTEMPTS)
     if j.get("error"):
         raise RuntimeError(j["error"])
     rows = next(v for k, v in j["result"].items() if k != "last")
@@ -314,7 +319,7 @@ def or_spot():
     c = _CACHE.get("spot")
     if c and time.time() - c[0] < 5:
         return c[1]
-    j = http_json("https://forex-data-feed.swissquote.com/public-quotes/bboquotes/instrument/XAU/USD")
+    j = http_json("https://forex-data-feed.swissquote.com/public-quotes/bboquotes/instrument/XAU/USD", timeout=HTTP_MARCHE_TIMEOUT_SEC, attempts=HTTP_MARCHE_ATTEMPTS)
     q = j[0]["spreadProfilePrices"][0]
     v = (q["bid"] + q["ask"]) / 2
     _CACHE["spot"] = (time.time(), v)
@@ -331,7 +336,7 @@ def yahoo_or(interval):
         j = None
         for hote in ("query1", "query2"):
             try:
-                j = http_json(f"https://{hote}.finance.yahoo.com/v8/finance/chart/GC=F?interval={ui}&range={rg}")
+                j = http_json(f"https://{hote}.finance.yahoo.com/v8/finance/chart/GC=F?interval={ui}&range={rg}", timeout=HTTP_MARCHE_TIMEOUT_SEC, attempts=HTTP_MARCHE_ATTEMPTS)
                 break
             except Exception as ex:
                 print("yahoo", hote, ex)
@@ -627,7 +632,7 @@ def pivots(b, g=5):
 def direct_btc(m1, pair):
     """Ajoute la minute en cours au prix réel du moment (pas d'attente de la clôture de la bougie)."""
     try:
-        j = http_json(f"https://api.kraken.com/0/public/Ticker?pair={pair}")
+        j = http_json(f"https://api.kraken.com/0/public/Ticker?pair={pair}", timeout=HTTP_MARCHE_TIMEOUT_SEC, attempts=HTTP_MARCHE_ATTEMPTS)
         v = float(next(iter(j["result"].values()))["c"][0])
         t = int(time.time()) // 60 * 60
         if m1 and t > m1[-1]["t"]:
@@ -782,7 +787,7 @@ def prix_tradingview(pair):
     v = None
     for sym in TV_ETALON.get(pair, ()):
         try:
-            v = float(http_json("https://scanner.tradingview.com/symbol?symbol=" + urllib.parse.quote(sym, safe="") + "&fields=close")["close"])
+            v = float(http_json("https://scanner.tradingview.com/symbol?symbol=" + urllib.parse.quote(sym, safe="") + "&fields=close", timeout=HTTP_MARCHE_TIMEOUT_SEC, attempts=HTTP_MARCHE_ATTEMPTS)["close"])
             break
         except Exception:
             continue
@@ -6241,7 +6246,7 @@ def prix_actuel(m):
         symbole = MARCHES[m]
         if symbole == "XAUUSD":
             return or_spot()
-        j = http_json(f"https://api.kraken.com/0/public/Ticker?pair={symbole}")
+        j = http_json(f"https://api.kraken.com/0/public/Ticker?pair={symbole}", timeout=HTTP_MARCHE_TIMEOUT_SEC, attempts=HTTP_MARCHE_ATTEMPTS)
         return float(next(iter(j["result"].values()))["c"][0])
     except Exception as ex:
         print("prix", ex); return None
@@ -9427,7 +9432,7 @@ def calendrier(etat, maintenant):
     cache = etat.setdefault("cal", {})
     if maintenant - cache.get("t", 0) > 3600:
         try:
-            brut = http_json("https://nfs.faireconomy.media/ff_calendar_thisweek.json")
+            brut = http_json("https://nfs.faireconomy.media/ff_calendar_thisweek.json", timeout=HTTP_NEWS_TIMEOUT_SEC, attempts=1)
             cache["ev"] = [dict(titre=x["title"], pays=x["country"], t=int(datetime.datetime.fromisoformat(x["date"]).timestamp()),
                                 prev=x.get("forecast", ""), avant=x.get("previous", ""))
                            for x in brut if x.get("country") == "USD" and (x.get("impact") == "High" or (
@@ -10269,7 +10274,7 @@ def macro(etat):
         try:
             v = {}
             for a_, b_ in (("EUR", "USD"), ("USD", "JPY"), ("GBP", "USD"), ("USD", "CAD"), ("USD", "SEK"), ("USD", "CHF")):
-                q = http_json(f"https://forex-data-feed.swissquote.com/public-quotes/bboquotes/instrument/{a_}/{b_}")[0]["spreadProfilePrices"][0]
+                q = http_json(f"https://forex-data-feed.swissquote.com/public-quotes/bboquotes/instrument/{a_}/{b_}", timeout=HTTP_MARCHE_TIMEOUT_SEC, attempts=HTTP_MARCHE_ATTEMPTS)[0]["spreadProfilePrices"][0]
                 v[a_ + b_] = (q["bid"] + q["ask"]) / 2
             dx = (50.14348112 * v["EURUSD"] ** -0.576 * v["USDJPY"] ** 0.136 * v["GBPUSD"] ** -0.119
                   * v["USDCAD"] ** 0.091 * v["USDSEK"] ** 0.042 * v["USDCHF"] ** 0.036)
@@ -10286,7 +10291,7 @@ def macro(etat):
             an = datetime.datetime.now(PARIS).year
             req = urllib.request.Request(f"https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/{an}/all?type=daily_treasury_yield_curve&field_tdr_date_value={an}&page&_format=csv",
                                          headers={"User-Agent": "align-bot"})
-            lignes = urllib.request.urlopen(req, timeout=30).read().decode().splitlines()
+            lignes = urllib.request.urlopen(req, timeout=15).read().decode().splitlines()
             tete = [x.strip().strip('"') for x in lignes[0].split(",")]; i10 = tete.index("10 Yr")
             l0 = [x.strip().strip('"') for x in lignes[1].split(",")]
             l1 = [x.strip().strip('"') for x in lignes[2].split(",")]
