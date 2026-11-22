@@ -131,7 +131,7 @@ def plan_indicateur(r):
     # snapshot to the legacy single-TP format.
     structured = any(key in robot for key in (
         "planTimeframe", "entryTimeframe", "entryZoneLow", "entryZoneHigh",
-        "entryDecision", "entryBarTime", "entryTriggered", "tp1", "tp2"
+        "entryDecision", "entryBarTime", "entryTriggered"
     ))
     if structured:
         try:
@@ -219,6 +219,15 @@ def plan_indicateur(r):
             "zone_proche": robot.get("zone_proche"), "liq_haute_active": robot.get("liq_haute_active"),
             "liq_basse_active": robot.get("liq_basse_active"),
             "timestamp": robot.get("receivedAt") or snap.get("timestamp"), "ageMs": snap.get("ageMs")}
+
+
+def texte_plan_indicateur_tv(plan):
+    """Telegram-safe summary of legacy single-TP and structured Pine v25 plans."""
+    tp1 = plan.get("tp1", plan.get("tp"))
+    tp2 = plan.get("tp2")
+    targets = f"TP1 {px(tp1)} • TP2 {px(tp2)}" if tp2 is not None else f"TP {px(tp1)}"
+    trigger = (" • entrée déclenchée" if plan.get("triggered") else " • déclenchement en attente") if "triggered" in plan else ""
+    return f"Entrée {px(plan['entry'])} • SL {px(plan['sl'])} • {targets}{trigger}"
 
 
 TTL_KRAKEN = {1: 5, 5: 10, 15: 30, 30: 60, 60: 120, 240: 300, 1440: 900, 10080: 1800}
@@ -973,7 +982,7 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
     if tv_plan["available"]:
         l += ["━━━━━━━━━━━━━━━━━━", "📡 PLAN DE L'INDICATEUR TRADINGVIEW",
               f"Unité sélectionnée : {tv_plan['timeframe']}",
-              f"Entrée indicateur : {px(tv_plan['entry'])} • SL : {px(tv_plan['sl'])} • TP : {px(tv_plan['tp'])}",
+              f"Plan TradingView : {texte_plan_indicateur_tv(tv_plan)}",
               "Clôture confirmée par l'indicateur : " + ("OUI" if tv_plan["confirmed"] else "NON / NON FOURNIE"),
               "⚠️ Plan indicateur séparé du verdict de sécurité ALIGN."]
     elif r.get("tv_indicator_mtf", {}).get("available"):
@@ -3582,7 +3591,7 @@ def texte_cloture(m, tf, bougie, r, cle):
     if tv_plan.get("available"):
         sens_tv = "LONG" if tv_plan["direction"] == 1 else "SHORT"
         etat_tv = "snapshot confirmé" if tv_plan.get("confirmed") else "snapshot non confirmé"
-        lignes.append(f"📡 PLAN TV {tv_plan.get('timeframe') or '?'} {sens_tv} · E {px(tv_plan['entry'])} · SL {px(tv_plan['sl'])} · TP {px(tv_plan['tp'])} · {etat_tv}")
+        lignes.append(f"📡 PLAN TV {tv_plan.get('timeframe') or '?'} {sens_tv} · {texte_plan_indicateur_tv(tv_plan)} · {etat_tv}")
     tr = cle.get("trade")
     ordre = cle.get("ordre")
     niveau = lambda value: px(value) if value is not None else "—"
