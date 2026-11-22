@@ -11,7 +11,7 @@ class MemoireDuBot(unittest.TestCase):
 
     def test_sauvegarde_a_cles_uniques_jamais_la_cle_fixe(self):
         start = self.t.index("Clé unique de sauvegarde de la mémoire")
-        end = self.t.index("Archiver le journal du relais TradingView", start)
+        end = self.t.index("Sanitiser le journal du relais TradingView", start)
         save = self.t[start:end]
         self.assertNotIn("key: align-etat-${{ github.run_id }}\n", save)                 # clé fixe refusée à l'arrêt (cache immuable)
         self.assertIn("steps.cle_sauvegarde.outputs.a", save)
