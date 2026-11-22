@@ -5857,6 +5857,24 @@ def renvoyer_claviers(etat, chats):
         else:
             print("TELEGRAM_KEYBOARD_MIGRATION_FAILED", cid, flush=True)
 
+def renvoyer_clavier_sur_interaction(etat, update):
+    """Migre le clavier d'un chat privé en réponse à son message entrant."""
+    msg = update.get("message") or update.get("edited_message") or {}
+    chat = msg.get("chat") or {}
+    cid = str(chat.get("id") or "")
+    if not cid or chat.get("type") != "private":
+        return False
+    ancien_chat = getattr(TELEGRAM_PULL_CONTEXT, "chat_id", None)
+    ancien_prive = getattr(TELEGRAM_PULL_CONTEXT, "private", False)
+    TELEGRAM_PULL_CONTEXT.chat_id = cid
+    TELEGRAM_PULL_CONTEXT.private = True
+    try:
+        renvoyer_claviers(etat, {cid})
+    finally:
+        TELEGRAM_PULL_CONTEXT.chat_id = ancien_chat
+        TELEGRAM_PULL_CONTEXT.private = ancien_prive
+    return True
+
 def epingler_menus_chaines(etat):
     """Une fois par version : le menu de chaque chaîne est publié puis épinglé (échec = nouvel essai dans 1 h)."""
     if not TOKEN:
@@ -13012,6 +13030,7 @@ def boucle_polling_telegram(etat, chats):
                 TELEGRAM_PULL_CONTEXT.chat_id = str(chat_rapide.get("id") or "") if chat_rapide.get("type") == "private" else None
                 TELEGRAM_PULL_CONTEXT.private = chat_rapide.get("type") == "private"
                 try:
+                    renvoyer_clavier_sur_interaction(etat, update)
                     _traiter_lecture_rapide(etat, chats, update)
                 finally:
                     TELEGRAM_PULL_CONTEXT.chat_id = None
@@ -13501,8 +13520,8 @@ def un_tour(etat, chats):
             preparer_chaines(etat)
             epingler_menus_chaines(etat)
             epingler_compte_finance(etat)          # v8.9 : message « compte financé » épinglé
-            # Migration silencieuse des anciens claviers : versionnée, indépendante des pushes spontanés.
-            renvoyer_claviers(etat, chats)
+            # La migration est reportée à la prochaine interaction privée.
+            # Le mode pull interdit les envois proactifs à des utilisateurs inactifs.
         except Exception as ex:
             print("préparer chaînes", ex)
         for nom_marche in MARCHES:
