@@ -1,6 +1,6 @@
 """Regression tests for bounded market-data HTTP request budgets."""
 import unittest
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import align_bot as ab
 
@@ -27,7 +27,7 @@ class MarketHttpBudgetTests(unittest.TestCase):
         self.assertEqual(result, {"ok": True})
         self.assertEqual(request.call_count, 3)
         self.assertEqual([call.kwargs["timeout"] for call in request.call_args_list], [70, 70, 70])
-        self.assertEqual(sleep.call_args_list, [unittest.mock.call(2), unittest.mock.call(4)])
+        self.assertEqual(sleep.call_args_list, [call(2), call(4)])
 
     def test_single_attempt_short_timeout_does_not_retry(self):
         with patch(
