@@ -3431,14 +3431,14 @@ def telegram(methode, **params):
 INDICATEUR_EN_VENTE = os.environ.get("INDICATEUR_EN_VENTE", "0") == "1"
 CLAVIER = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}],
                                    [{"text": "📊 Faire une analyse"}, {"text": "📡 Mes marchés"}, {"text": "🎙 Mes chaînes"}],
-                                   [{"text": "🤖 Mon bot"}, {"text": "📈 Mes résultats"}, {"text": "📸 Partager mon gain"}],
+                                   [{"text": "📈 Mes résultats"}, {"text": "📸 Partager mon gain"}],
                                    ([{"text": "🧩 Indicateur TradingView"}] if INDICATEUR_EN_VENTE else []) + [{"text": "🌐 English"}],
                                    [{"text": "🔴 Live"}]],
                       "resize_keyboard": True, "is_persistent": True, "input_field_placeholder": "Choisis une action ALIGN"})
 # Bot gratuit = accueil / inscriptions : peu de boutons ; « 🎙 Mes chaînes » donne le lien de la chaîne du marché + le coach.
 # Les boutons qui vendent (VIP, Live) restent tout en bas, comme épinglés.
 CLAVIER_VISITEUR = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}, ],
-                                            [{"text": "🎙 Mes chaînes"}, {"text": "🤖 Mon bot"}, {"text": "🌐 English"}],
+                                            [{"text": "🎙 Mes chaînes"}, {"text": "🌐 English"}],
                                             [{"text": "💎 Devenir VIP"}, {"text": "🔴 Live"}]],
                                "resize_keyboard": True, "is_persistent": True, "input_field_placeholder": "Choisis une action ALIGN"})
 AVERTISSEMENT = ("ℹ️ Ce sont MES positions personnelles, partagées à titre informatif et éducatif. "
@@ -3704,7 +3704,7 @@ def boutons_canal(etat, texte):
     if position and est_entree(texte):
         lignes.append([{"text": "📍 Je prends cette position", "url": lien("rentre")}])
         lignes.append([{"text": "🙅 Pas rentré cette fois", "url": lien("pasrentre")}])
-    lignes.append([{"text": "🤖 Ouvrir mon menu ALIGN", "url": lien("boutons")}])
+    # Le raccourci de menu ALIGN est volontairement retiré des messages de chaîne.
     return json.dumps({"inline_keyboard": lignes})
 
 def boutons_auto_chaine(etat, cid):
@@ -3763,7 +3763,7 @@ def menu_canal_vip(etat):
     kb = json.dumps({"inline_keyboard": [
         [{"text": "🥇 Analyse Gold", "url": lien("analyse_gold")}, {"text": "🟠 Analyse BTC", "url": lien("analyse_btc")}],
         [{"text": "📊 Faire une analyse", "url": lien("faire_analyse")}, {"text": "📡 Mes marchés", "url": lien("marches")}],
-        [{"text": "🤖 Mon bot", "url": lien("mon_bot")}, {"text": "📈 Mes résultats", "url": lien("resultats")}],
+        [{"text": "📈 Mes résultats", "url": lien("resultats")}],
         [{"text": "📸 Partager mon gain", "url": lien("gain")}] + ([{"text": "🧩 Indicateur TradingView", "url": lien("indicateur")}] if INDICATEUR_EN_VENTE else []),
         [{"text": "🏆 Gagnantes", "url": lien("gagnantes")}, {"text": "❌ Perdantes", "url": lien("perdantes")}],
         [{"text": "🔴 Le live ALIGN", "url": LIVE_LIEN}]]})
@@ -5840,12 +5840,15 @@ def menu_chaine(etat, m):
 MENU_CHAINE_VERSION = 2
 CLAVIER_VERSION = 5  # Migration Telegram : supprimer le clavier NASDAQ conservé chez les anciens chats
 
-def renvoyer_claviers(etat, chats):
+def renvoyer_claviers(etat, chats, uniquement_chats=False):
     """Envoie le clavier courant aux chats dont la version est obsolète; valide la migration après succès Telegram."""
     if not TOKEN:
         return
     vus = etat.setdefault("clavier_v", {})
-    for cid in sorted(({str(c) for c in chats} | {str(c) for c in etat.get("prospects", [])}) - {str(etat.get("canal") or "")})[:30]:
+    cibles = {str(c) for c in chats}
+    if not uniquement_chats:
+        cibles |= {str(c) for c in etat.get("prospects", [])}
+    for cid in sorted(cibles - {str(etat.get("canal") or "")})[:30]:
         if vus.get(cid) == CLAVIER_VERSION:
             continue
         en = cid in LANG_EN
@@ -5856,6 +5859,24 @@ def renvoyer_claviers(etat, chats):
             vus[cid] = CLAVIER_VERSION
         else:
             print("TELEGRAM_KEYBOARD_MIGRATION_FAILED", cid, flush=True)
+
+def renvoyer_clavier_sur_interaction(etat, update):
+    """Migre le clavier d'un chat privé en réponse à son message entrant."""
+    msg = update.get("message") or update.get("edited_message") or {}
+    chat = msg.get("chat") or {}
+    cid = str(chat.get("id") or "")
+    if not cid or chat.get("type") != "private":
+        return False
+    ancien_chat = getattr(TELEGRAM_PULL_CONTEXT, "chat_id", None)
+    ancien_prive = getattr(TELEGRAM_PULL_CONTEXT, "private", False)
+    TELEGRAM_PULL_CONTEXT.chat_id = cid
+    TELEGRAM_PULL_CONTEXT.private = True
+    try:
+        renvoyer_claviers(etat, {cid}, uniquement_chats=True)
+    finally:
+        TELEGRAM_PULL_CONTEXT.chat_id = ancien_chat
+        TELEGRAM_PULL_CONTEXT.private = ancien_prive
+    return True
 
 def epingler_menus_chaines(etat):
     """Une fois par version : le menu de chaque chaîne est publié puis épinglé (échec = nouvel essai dans 1 h)."""
@@ -8992,7 +9013,7 @@ def envoyer_prospects(etat, texte, signal, clavier=None):
                       else "🎁 Tu as déjà ta position offerte en cours\n" if cid in deja else "⏸ Ton bot est sur OFF\n")
                    + "💎 VIP 49,90 € / mois 👇")
             rang = [[{"text": "💎 Devenir VIP", "url": etat["lien"]}]] if etat.get("lien") else []
-            k = {"reply_markup": json.dumps({"inline_keyboard": rang + [[{"text": "🤖 Mon bot", "callback_data": "botmenu:x"}]]})}
+            k = {"reply_markup": json.dumps({"inline_keyboard": rang})}
         try:
             telegram("sendMessage", chat_id=cid, text=txt, **k)
         except Exception as ex:
@@ -13012,6 +13033,7 @@ def boucle_polling_telegram(etat, chats):
                 TELEGRAM_PULL_CONTEXT.chat_id = str(chat_rapide.get("id") or "") if chat_rapide.get("type") == "private" else None
                 TELEGRAM_PULL_CONTEXT.private = chat_rapide.get("type") == "private"
                 try:
+                    renvoyer_clavier_sur_interaction(etat, update)
                     _traiter_lecture_rapide(etat, chats, update)
                 finally:
                     TELEGRAM_PULL_CONTEXT.chat_id = None
@@ -13501,8 +13523,8 @@ def un_tour(etat, chats):
             preparer_chaines(etat)
             epingler_menus_chaines(etat)
             epingler_compte_finance(etat)          # v8.9 : message « compte financé » épinglé
-            # Migration silencieuse des anciens claviers : versionnée, indépendante des pushes spontanés.
-            renvoyer_claviers(etat, chats)
+            # La migration est reportée à la prochaine interaction privée.
+            # Le mode pull interdit les envois proactifs à des utilisateurs inactifs.
         except Exception as ex:
             print("préparer chaînes", ex)
         for nom_marche in MARCHES:

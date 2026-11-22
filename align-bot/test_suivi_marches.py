@@ -46,7 +46,7 @@ class SuiviMarchesTest(unittest.TestCase):
     def test_keyboard_version_migrates_old_chat_to_btc_gold(self):
         state = {"clavier_v": {"42": 2}, "prospects": []}
         with mock.patch.object(ab, "TOKEN", "test"):
-            ab.renvoyer_claviers(state, {"42"})
+            ab.renvoyer_clavier_sur_interaction(state, {"message": {"chat": {"id": 42, "type": "private"}}})
             sends = [kw for method, kw in self.envois if method == "sendMessage"]
             self.assertEqual(len(sends), 1)
             keyboard = json.loads(sends[0]["reply_markup"])["keyboard"]
@@ -55,11 +55,55 @@ class SuiviMarchesTest(unittest.TestCase):
             self.assertFalse(any("TELEGRAM" in label.upper() for label in labels))
             self.assertTrue(any("BTC" in label.upper() for label in labels))
             self.assertTrue(any("GOLD" in label.upper() for label in labels))
-            self.assertTrue(any("MON BOT" in label.upper() for label in labels))
+            self.assertFalse(any("MON BOT" in label.upper() for label in labels))
             self.assertEqual(state["clavier_v"]["42"], 5)
             ab.renvoyer_claviers(state, {"42"})
             self.assertEqual(len([kw for method, kw in self.envois if method == "sendMessage"]), 1)
 
+    def test_private_keyboard_migration_does_not_iterate_other_prospects(self):
+        state = {"clavier_v": {}, "prospects": ["99", "100"]}
+        delivered = []
+        old_envoi = ab._envoi_sur
+        self.addCleanup(setattr, ab, "_envoi_sur", old_envoi)
+        def faux_envoi(cid, **kw):
+            delivered.append(str(cid))
+            return {"ok": True}
+        with mock.patch.object(ab, "TOKEN", "test"), mock.patch.object(ab, "_envoi_sur", faux_envoi):
+            ab.renvoyer_clavier_sur_interaction(state, {"message": {"chat": {"id": 42, "type": "private"}}})
+        self.assertEqual(delivered, ["42"])
+        self.assertEqual(state["clavier_v"], {"42": 5})
+
+    def test_keyboard_migration_is_blocked_without_private_user_interaction(self):
+        state = {"clavier_v": {"42": 2}, "prospects": []}
+        old_mode = ab.TELEGRAM_PULL_MODE
+        old_chat = getattr(ab.TELEGRAM_PULL_CONTEXT, "chat_id", None)
+        old_private = getattr(ab.TELEGRAM_PULL_CONTEXT, "private", False)
+        ab.TELEGRAM_PULL_MODE = True
+        ab.TELEGRAM_PULL_CONTEXT.chat_id = None
+        ab.TELEGRAM_PULL_CONTEXT.private = False
+        self.addCleanup(setattr, ab, "TELEGRAM_PULL_MODE", old_mode)
+        self.addCleanup(setattr, ab.TELEGRAM_PULL_CONTEXT, "chat_id", old_chat)
+        self.addCleanup(setattr, ab.TELEGRAM_PULL_CONTEXT, "private", old_private)
+        def faux_telegram_pull(methode, **kw):
+            if not ab._telegram_sortant_autorise(methode, kw):
+                return {"ok": False, "result": None, "blocked_by_pull_mode": True}
+            self.envois.append((methode, kw))
+            return {"ok": True, "result": {"message_id": 1}}
+        with mock.patch.object(ab, "TOKEN", "test"), mock.patch.object(ab, "telegram", faux_telegram_pull):
+            ab.renvoyer_claviers(state, {"42"})
+        self.assertEqual(self.envois, [])
+        self.assertEqual(state["clavier_v"]["42"], 2)
+
+    def test_keyboard_migration_ignores_non_private_interactions(self):
+        state = {"clavier_v": {"42": 2}, "prospects": []}
+        old_mode = ab.TELEGRAM_PULL_MODE
+        ab.TELEGRAM_PULL_MODE = True
+        self.addCleanup(setattr, ab, "TELEGRAM_PULL_MODE", old_mode)
+        with mock.patch.object(ab, "TOKEN", "test"):
+            result = ab.renvoyer_clavier_sur_interaction(state, {"message": {"chat": {"id": "-100123", "type": "group"}}})
+        self.assertFalse(result)
+        self.assertEqual(self.envois, [])
+        self.assertEqual(state["clavier_v"]["42"], 2)
     def test_keyboard_migration_failed_delivery_retries(self):
         state = {"clavier_v": {"42": 2}, "prospects": []}
         with mock.patch.object(ab, "TOKEN", "test"), mock.patch.object(ab, "_envoi_sur", return_value=None):
@@ -69,16 +113,18 @@ class SuiviMarchesTest(unittest.TestCase):
             ab.renvoyer_claviers(state, {"42"})
         self.assertEqual(state["clavier_v"]["42"], 5)
 
-    def test_coach_button_kept_in_reply_and_vip_menus(self):
+    def test_visible_mon_bot_shortcuts_removed_from_reply_and_inline_menus(self):
         for raw in (ab.CLAVIER, ab.CLAVIER_VISITEUR):
             labels = [str(button.get("text", "")) for row in json.loads(raw).get("keyboard", []) for button in row]
-            self.assertTrue(any("MON BOT" in label.upper() for label in labels))
+            self.assertFalse(any("MON BOT" in label.upper() for label in labels))
             self.assertFalse(any("NASDAQ" in label.upper() for label in labels))
             self.assertFalse(any("TELEGRAM" in label.upper() for label in labels))
         with open(ab.__file__, encoding="utf-8") as source_file:
             source = source_file.read()
-        self.assertIn('"text": "🤖 Ouvrir mon menu ALIGN"', source)
-        self.assertIn('"text": "🤖 Mon bot", "url": lien("mon_bot")', source)
+        self.assertNotIn('"text": "🤖 Ouvrir mon menu ALIGN"', source)
+        self.assertNotIn('"text": "🤖 Mon bot", "url": lien("mon_bot")', source)
+        self.assertNotIn('"callback_data": "botmenu:x"', source)
+        self.assertIn('"/mon_bot"', source)
 
     def test_ancien_bouton_nasdaq_est_refuse_et_remplace_par_menu_btc_gold(self):
         update = {
