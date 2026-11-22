@@ -3431,14 +3431,14 @@ def telegram(methode, **params):
 INDICATEUR_EN_VENTE = os.environ.get("INDICATEUR_EN_VENTE", "0") == "1"
 CLAVIER = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}],
                                    [{"text": "📊 Faire une analyse"}, {"text": "📡 Mes marchés"}, {"text": "🎙 Mes chaînes"}],
-                                   [{"text": "🤖 Mon bot"}, {"text": "📈 Mes résultats"}, {"text": "📸 Partager mon gain"}],
+                                   [{"text": "📈 Mes résultats"}, {"text": "📸 Partager mon gain"}],
                                    ([{"text": "🧩 Indicateur TradingView"}] if INDICATEUR_EN_VENTE else []) + [{"text": "🌐 English"}],
                                    [{"text": "🔴 Live"}]],
                       "resize_keyboard": True, "is_persistent": True, "input_field_placeholder": "Choisis une action ALIGN"})
 # Bot gratuit = accueil / inscriptions : peu de boutons ; « 🎙 Mes chaînes » donne le lien de la chaîne du marché + le coach.
 # Les boutons qui vendent (VIP, Live) restent tout en bas, comme épinglés.
 CLAVIER_VISITEUR = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}, ],
-                                            [{"text": "🎙 Mes chaînes"}, {"text": "🤖 Mon bot"}, {"text": "🌐 English"}],
+                                            [{"text": "🎙 Mes chaînes"}, {"text": "🌐 English"}],
                                             [{"text": "💎 Devenir VIP"}, {"text": "🔴 Live"}]],
                                "resize_keyboard": True, "is_persistent": True, "input_field_placeholder": "Choisis une action ALIGN"})
 AVERTISSEMENT = ("ℹ️ Ce sont MES positions personnelles, partagées à titre informatif et éducatif. "
@@ -3704,7 +3704,7 @@ def boutons_canal(etat, texte):
     if position and est_entree(texte):
         lignes.append([{"text": "📍 Je prends cette position", "url": lien("rentre")}])
         lignes.append([{"text": "🙅 Pas rentré cette fois", "url": lien("pasrentre")}])
-    lignes.append([{"text": "🤖 Ouvrir mon menu ALIGN", "url": lien("boutons")}])
+    
     return json.dumps({"inline_keyboard": lignes})
 
 def boutons_auto_chaine(etat, cid):
@@ -3763,7 +3763,7 @@ def menu_canal_vip(etat):
     kb = json.dumps({"inline_keyboard": [
         [{"text": "🥇 Analyse Gold", "url": lien("analyse_gold")}, {"text": "🟠 Analyse BTC", "url": lien("analyse_btc")}],
         [{"text": "📊 Faire une analyse", "url": lien("faire_analyse")}, {"text": "📡 Mes marchés", "url": lien("marches")}],
-        [{"text": "🤖 Mon bot", "url": lien("mon_bot")}, {"text": "📈 Mes résultats", "url": lien("resultats")}],
+        [{"text": "📈 Mes résultats", "url": lien("resultats")}],
         [{"text": "📸 Partager mon gain", "url": lien("gain")}] + ([{"text": "🧩 Indicateur TradingView", "url": lien("indicateur")}] if INDICATEUR_EN_VENTE else []),
         [{"text": "🏆 Gagnantes", "url": lien("gagnantes")}, {"text": "❌ Perdantes", "url": lien("perdantes")}],
         [{"text": "🔴 Le live ALIGN", "url": LIVE_LIEN}]]})
@@ -5838,7 +5838,7 @@ def menu_chaine(etat, m):
 
 
 MENU_CHAINE_VERSION = 2
-CLAVIER_VERSION = 2
+CLAVIER_VERSION = 3  # Migration : clavier BTC/GOLD sans raccourci Mon bot
 
 def renvoyer_claviers(etat, chats):
     """Nouveau clavier (moins de boutons, VIP / Live en bas) : envoyé UNE fois à chaque personne, sans son, puis plus jamais."""
@@ -5848,11 +5848,14 @@ def renvoyer_claviers(etat, chats):
     for cid in sorted(({str(c) for c in chats} | {str(c) for c in etat.get("prospects", [])}) - {str(etat.get("canal") or "")})[:30]:
         if vus.get(cid) == CLAVIER_VERSION:
             continue
-        vus[cid] = CLAVIER_VERSION               # marqué avant l'envoi : jamais 2 fois, même si Telegram répond mal
         en = cid in LANG_EN
         kb = CLAVIER if autorise(etat, cid, cid) else CLAVIER_VISITEUR
-        _envoi_sur(cid, text=("⬇️ New buttons, simpler 👇" if en else "⬇️ Nouveaux boutons, plus simples 👇"),
-                   reply_markup=traduire_clavier(kb) if en else kb, disable_notification="true")
+        res = _envoi_sur(cid, text=("⬇️ New buttons, simpler 👇" if en else "⬇️ Nouveaux boutons, plus simples 👇"),
+                         reply_markup=traduire_clavier(kb) if en else kb, disable_notification="true")
+        if isinstance(res, dict) and res.get("ok") is True:
+            vus[cid] = CLAVIER_VERSION
+        else:
+            print("TELEGRAM_KEYBOARD_MIGRATION_FAILED", cid, flush=True)
 
 def epingler_menus_chaines(etat):
     """Une fois par version : le menu de chaque chaîne est publié puis épinglé (échec = nouvel essai dans 1 h)."""
@@ -8989,7 +8992,7 @@ def envoyer_prospects(etat, texte, signal, clavier=None):
                       else "🎁 Tu as déjà ta position offerte en cours\n" if cid in deja else "⏸ Ton bot est sur OFF\n")
                    + "💎 VIP 49,90 € / mois 👇")
             rang = [[{"text": "💎 Devenir VIP", "url": etat["lien"]}]] if etat.get("lien") else []
-            k = {"reply_markup": json.dumps({"inline_keyboard": rang + [[{"text": "🤖 Mon bot", "callback_data": "botmenu:x"}]]})}
+            k = {"reply_markup": json.dumps({"inline_keyboard": rang})}
         try:
             telegram("sendMessage", chat_id=cid, text=txt, **k)
         except Exception as ex:
