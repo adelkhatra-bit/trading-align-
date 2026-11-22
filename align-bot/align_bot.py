@@ -3307,7 +3307,7 @@ def _telegram_sortant_autorise(methode, params):
     if (cid and cid == news_chat and methode == "sendMessage"
             and texte.startswith("🚨 NEWS DE DERNIÈRE MINUTE")):
         return True
-    if cid and cid in actifs and methode in ("sendMessage", "sendPhoto") and _telegram_position_attendue(texte) and contient_niveaux(texte):
+    if cid and cid in actifs and methode in ("sendMessage", "sendPhoto") and _telegram_position_attendue(texte):
         marches_signal = marches_message(texte)
         silencieux = {str(x) for x in (etat.get("quiet") or [])}
         if (bot_on(etat, cid) and cid not in silencieux
@@ -9413,7 +9413,7 @@ def destinataires_message(etat, chats, texte):
     quiet = {str(x) for x in (etat.get("quiet") or [])}
     cibles = {str(c) for c in chats} | recherche_active
     prives_coach = [c for c in cibles if c != canal and ens
-                    and any(m in marches_choisis(etat, c) and coach_actif(et, c, m) for m in ens)]
+                    and any(m in marches_choisis(etat, c) and coach_actif(etat, c, m) for m in ens)]
     prives_recherche = [c for c in recherche_active if c != canal and c not in quiet and bot_on(etat, c)
                         and ens and any(m in marches_choisis(etat, c) for m in ens)
                         and _telegram_position_attendue(texte) and contient_niveaux(texte)]
