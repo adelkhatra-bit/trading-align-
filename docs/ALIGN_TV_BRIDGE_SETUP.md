@@ -19,9 +19,9 @@ This service is isolated from the legacy `server.js`/port 4000 and from the `tra
 1. Two TradingView charts/alerts are configured: BTC and GOLD only. NASDAQ is not an accepted ALIGN market.
 2. In the canonical v25 indicator settings, verify **Envoyer les snapshots au ROBOT V12** is enabled (it is enabled by default) and select exactly one supported market: `BTCUSD` or `XAUUSD`.
 3. Create or recreate an alert with condition **Any alert() function call**. While the chart is receiving real-time updates, the bridge export sends a JSON snapshot every 20 seconds. Existing human-readable Pine alerts remain unchanged; the bridge ignores non-JSON alert messages.
-4. The payload contains the active chart timeframe, actual TradingView price, the indicator's current Entry/SL/TP1/TP2 plan, confirmation state, and independent MTF direction/RSI/bar-time data for M1, M5, M15, M30, H1, H2, H4, D1 and W1.
-5. The dedicated bridge validates the source, symbol, active timeframe, source timestamp, each timeframe's own candle timestamp, the fixed M15 plan, the green entry zone and its decision line, plus the strategy-specific closed trigger candle. It never places orders.
-6. The trigger timeframe is independent of the chart timeframe: SCALPING = M1, DAY = M5, SWING = H1. The plan levels remain anchored to the last closed M15 calculation.
+4. The payload is emitted only by the M15 chart. It contains the actual TradingView price, canonical Entry/SL/TP1/TP2 plan, confirmation state, and independent MTF direction/RSI/bar-time data for M1, M5, M15, M30, H1, H2, H4, D1 and W1.
+5. The dedicated bridge validates the source, symbol, M15 publishing timeframe, source timestamp, each timeframe's own candle timestamp, the fixed M15 plan, the green entry zone and its decision line, plus the strategy-specific closed trigger candle. It never places orders.
+6. The trigger timeframe is independent of the M15 publishing chart: SCALPING = M1, DAY = M5, SWING = H1. The plan levels and plan direction are taken from one canonical M15 chart context.
 7. The bridge accepts an entry trigger only when the strategy candle is recent and closed, its range retests the green zone, and its close is beyond the decision line in the plan direction while remaining on the safe side of the stop. Repeated 20-second webhook payloads for the same trigger candle retain the same `entryBarTime` and cannot authorize duplicate entries.
 8. When `ALIGN_REQUIRE_TV_BRIDGE=1` (the default for production markets), ROBOT V12 does not fall back to the local Python-generated entry levels. It uses the Pine M15 Entry/SL/TP1/TP2 only after the validated trigger. Existing open-trade follow-up remains unchanged; no broker order is sent by the bridge.
 9. The bot's existing news pause, Daily/Weekly extreme, risk/reward and risk-memory filters remain mandatory vetoes. These checks can block a Pine signal but do not rewrite its price levels.
@@ -58,7 +58,7 @@ For each supported market (BTC and GOLD):
 2. Open its settings and expand **Bridge ALIGN (optionnel)**.
 3. Enable **Envoyer les snapshots au ROBOT V12**.
 4. Set **Marché ALIGN** to the matching symbol: `BTCUSD` or `XAUUSD`.
-5. Use an active chart timeframe supported by the bridge: M1, M5, M15, M30, H1, H2, H4, D1 or W1. The Pine retains its internal calculations for the other timeframes.
+5. Set the TradingView chart to **M15**. This is the only timeframe from which Pine v25 emits the canonical plan. The same payload already includes the MTF readings for M1, M5, M15, M30, H1, H2, H4, D1 and W1; no separate alert per timeframe is required.
 6. Create one alert per market with condition **Any alert() function call** and webhook URL:
    `https://<dedicated-https-host>/ingest/<ALIGN_TV_INGEST_TOKEN>`
 

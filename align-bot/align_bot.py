@@ -198,6 +198,9 @@ def plan_indicateur(r):
     active_tf = str(bridge.get("activeTimeframe") or "").upper()
     snap = (bridge.get("snapshots") or {}).get(active_tf) or {}
     robot = snap.get("robotV12") or {}
+    if active_tf != "M15":
+        return {"timeframe": active_tf or None, "available": False,
+                "reason": "source du plan canonique attendue depuis le graphique M15"}
     try:
         entry, sl = float(robot.get("entry")), float(robot.get("sl"))
         raw_tp1 = robot.get("tp1")

@@ -312,6 +312,8 @@ jobs:
               active = str(payload.get("activeTimeframe") or "").upper()
               if payload.get("activeTimeframeFresh") is not True or active not in {"M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"}:
                   raise RuntimeError("ÉCHEC: aucune unité TradingView active et fraîche pour " + symbol)
+              if active != "M15":
+                  raise RuntimeError("ÉCHEC: le plan canonique doit provenir du graphique M15 pour " + symbol)
               snap = snapshots.get(active) or {}
               # Le prix affiché sur TradingView doit être présent, positif et reçu depuis moins de 90 secondes
               # (même limite que ACTIVE_MAX_AGE_MS du bridge : TradingView n'alerte qu'une fois par minute).

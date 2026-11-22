@@ -27,6 +27,13 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn('plan_tv["zone_high"]', agent)
         self.assertNotIn("plan_pine(", agent)
 
+    def test_bot_accepts_canonical_plan_only_from_m15_active_snapshot(self):
+        start = self.bot.index("def plan_indicateur(r):")
+        end = self.bot.index("\nTTL_KRAKEN", start)
+        plan = self.bot[start:end]
+        self.assertIn('if active_tf != "M15":', plan)
+        self.assertIn("source du plan canonique attendue depuis le graphique M15", plan)
+
     def test_bridge_derived_trigger_requires_closed_candle_zone_and_decision(self):
         self.assertIn("entry_triggered", self.bridge)
         self.assertIn('"entryTriggered": entry_triggered', self.bridge)

@@ -44,6 +44,13 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertIn("dirPlan = not isSupportedMarket or (isGold and not goldConfluence) ? 0 : dirStable", self.source)
         self.assertIn("bridgeDue = bridgeEnabled and isSupportedMarket", self.source)
 
+    def test_bridge_publishes_the_canonical_plan_only_from_m15(self):
+        self.assertIn('bridgeTfSeconds == 900 ? "M15"', self.source)
+        self.assertIn(
+            'bridgeDue = bridgeEnabled and isSupportedMarket and bridgeTf == "M15"',
+            self.source,
+        )
+
     def test_existing_human_alerts_are_preserved_and_bridge_exports_by_default(self):
         self.assertIn('alert(syminfo.ticker + " " + nomSigH', self.source)
         self.assertIn('alert(syminfo.ticker + " " + nomSigB', self.source)

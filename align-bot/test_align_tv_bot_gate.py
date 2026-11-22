@@ -34,6 +34,13 @@ class TradingViewBridgeGateTests(unittest.TestCase):
         source = textwrap.dedent(section[start:end])
         compile(source, "<align-tv-bridge-preflight>", "exec")
 
+    def test_preflight_requires_the_canonical_m15_publisher(self):
+        section = WORKFLOW_SOURCE.split(
+            "name: Vérifier le bridge TradingView ROBOT V12", 1
+        )[1].split("name: Analyse BTC + Gold et envoi Telegram", 1)[0]
+        self.assertIn('if active != "M15":', section)
+        self.assertIn("le plan canonique doit provenir du graphique M15", section)
+
     def test_preflight_waits_for_fresh_snapshots_without_relaxing_bridge_guards(self):
         self.assertIn("deadline = time.monotonic() + 120", WORKFLOW_SOURCE)
         self.assertIn("while True:", WORKFLOW_SOURCE)
