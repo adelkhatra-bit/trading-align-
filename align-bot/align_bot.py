@@ -120,11 +120,84 @@ def fusionne_lectures_tradingview(r):
 
 
 def plan_indicateur(r):
-    """Utilise le plan du timeframe réellement actif sur TradingView, jamais une UT supposée."""
+    """Parse legacy ROBOT V12 plans and the strict canonical Pine v25 M15 plan."""
     bridge = r.get("tv_indicator_mtf") or {}
     preferred = str(bridge.get("activeTimeframe") or "").upper()
     snap = (bridge.get("snapshots") or {}).get(preferred) or {}
     robot = snap.get("robotV12") or {}
+
+    # v25 structured payload: when any canonical-plan marker is present, require the
+    # entire M15 zone/trigger schema. Never silently downgrade an incomplete v25
+    # snapshot to the legacy single-TP format.
+    structured = any(key in robot for key in (
+        "planTimeframe", "entryTimeframe", "entryZoneLow", "entryZoneHigh",
+        "entryDecision", "entryBarTime", "entryTriggered", "tp1", "tp2"
+    ))
+    if structured:
+        try:
+            entry, sl = float(robot.get("entry")), float(robot.get("sl"))
+            raw_tp1 = robot.get("tp1")
+            if raw_tp1 in (None, ""):
+                raw_tp1 = robot.get("tp")
+            tp1 = float(raw_tp1)
+            raw_tp2 = robot.get("tp2")
+            tp2 = float(raw_tp2) if raw_tp2 not in (None, "") else None
+            zone_low, zone_high = float(robot.get("entryZoneLow")), float(robot.get("entryZoneHigh"))
+            decision = float(robot.get("entryDecision"))
+            entry_bar_time = int(robot.get("entryBarTime"))
+            entry_bar_open, entry_bar_high = float(robot.get("entryBarOpen")), float(robot.get("entryBarHigh"))
+            entry_bar_low, entry_bar_close = float(robot.get("entryBarLow")), float(robot.get("entryBarClose"))
+        except (TypeError, ValueError, KeyError):
+            return {"timeframe": preferred or None, "available": False,
+                    "reason": "plan Pine v25 M15 / zone / bougie de validation incomplets"}
+        if snap.get("fresh") is not True:
+            return {"timeframe": preferred, "available": False, "available": False,
+                    "reason": "snapshot TradingView actif périmé"}
+        if str(robot.get("planTimeframe") or "").upper() != "M15":
+            return {"timeframe": preferred, "available": False,
+                    "reason": "référence du plan différente de M15"}
+        strategy = str(robot.get("strategy") or "").upper()
+        expected_entry_tf = {"SCALPING": "M1", "DAY": "M5", "SWING": "H1"}.get(strategy)
+        entry_tf = str(robot.get("entryTimeframe") or "").upper()
+        if expected_entry_tf is None or entry_tf != expected_entry_tf:
+            return {"timeframe": preferred, "available": False,
+                    "reason": "unité de validation incohérente avec la stratégie"}
+        direction = _direction_tv(str(robot.get("signal") or robot.get("verdict") or "").upper())
+        if direction not in (-1, 1) or min(entry, sl, tp1, zone_low, zone_high, decision) <= 0 or (tp2 is not None and tp2 <= 0):
+            return {"timeframe": preferred, "available": False,
+                    "reason": "direction ou niveaux M15 invalides"}
+        risk = abs(entry - sl)
+        tol = risk * 0.001
+        if direction == 1:
+            geometry = sl < entry < tp1 and (tp2 is None or tp2 > tp1) and zone_low < decision < zone_high and zone_low <= entry <= zone_high and zone_low >= sl + 0.25 * risk - tol
+        else:
+            geometry = tp1 < entry < sl and (tp2 is None or tp2 < tp1) and zone_low < decision < zone_high and zone_low <= entry <= zone_high and zone_high <= sl - 0.25 * risk + tol
+        if not geometry:
+            return {"timeframe": preferred, "available": False,
+                    "reason": "géométrie zone / entrée / SL / TP incohérente"}
+        if not (entry_bar_low <= min(entry_bar_open, entry_bar_close) <= max(entry_bar_open, entry_bar_close) <= entry_bar_high):
+            return {"timeframe": preferred, "available": False,
+                    "reason": "bougie de validation OHLC incohérente"}
+        retested_zone = entry_bar_high >= zone_low and entry_bar_low <= zone_high
+        candle_trigger = entry_bar_close > decision if direction == 1 else entry_bar_close < decision
+        candle_before_stop = entry_bar_close > sl if direction == 1 else entry_bar_close < sl
+        confirmed = snap.get("confirmed") is True and robot.get("confirmed") is True
+        triggered = confirmed and robot.get("entryTriggered") is True and retested_zone and candle_trigger and candle_before_stop
+        return {
+            "timeframe": preferred, "plan_timeframe": "M15", "entry_timeframe": entry_tf,
+            "strategy": strategy, "available": True, "direction": direction,
+            "entry": entry, "sl": sl, "tp": tp1, "tp1": tp1, "tp2": tp2,
+            "zone_low": zone_low, "zone_high": zone_high, "decision": decision,
+            "entry_bar_time": entry_bar_time, "entry_bar_open": entry_bar_open,
+            "entry_bar_high": entry_bar_high, "entry_bar_low": entry_bar_low,
+            "entry_bar_close": entry_bar_close, "triggered": triggered,
+            "confirmed": confirmed, "verdict": robot.get("verdict"),
+            "long_score": robot.get("long_score"), "short_score": robot.get("short_score"),
+            "timestamp": robot.get("receivedAt") or snap.get("timestamp"),
+            "ageMs": robot.get("ageMs"),
+        }
+
+    # Legacy v24 payload: preserve the previous single TP behavior.
     try:
         entry, sl, tp = float(robot.get("entry")), float(robot.get("sl")), float(robot.get("tp"))
     except (TypeError, ValueError):
