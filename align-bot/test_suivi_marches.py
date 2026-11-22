@@ -46,7 +46,7 @@ class SuiviMarchesTest(unittest.TestCase):
     def test_keyboard_version_migrates_old_chat_to_btc_gold(self):
         state = {"clavier_v": {"42": 2}, "prospects": []}
         with mock.patch.object(ab, "TOKEN", "test"):
-            ab.renvoyer_claviers(state, {"42"})
+            ab.renvoyer_clavier_sur_interaction(state, {"message": {"chat": {"id": 42, "type": "private"}}})
             sends = [kw for method, kw in self.envois if method == "sendMessage"]
             self.assertEqual(len(sends), 1)
             keyboard = json.loads(sends[0]["reply_markup"])["keyboard"]
@@ -60,6 +60,32 @@ class SuiviMarchesTest(unittest.TestCase):
             ab.renvoyer_claviers(state, {"42"})
             self.assertEqual(len([kw for method, kw in self.envois if method == "sendMessage"]), 1)
 
+    def test_keyboard_migration_is_blocked_without_private_user_interaction(self):
+        state = {"clavier_v": {"42": 2}, "prospects": []}
+        old_mode = ab.TELEGRAM_PULL_MODE
+        old_chat = getattr(ab.TELEGRAM_PULL_CONTEXT, "chat_id", None)
+        old_private = getattr(ab.TELEGRAM_PULL_CONTEXT, "private", False)
+        ab.TELEGRAM_PULL_MODE = True
+        ab.TELEGRAM_PULL_CONTEXT.chat_id = None
+        ab.TELEGRAM_PULL_CONTEXT.private = False
+        self.addCleanup(setattr, ab, "TELEGRAM_PULL_MODE", old_mode)
+        self.addCleanup(setattr, ab.TELEGRAM_PULL_CONTEXT, "chat_id", old_chat)
+        self.addCleanup(setattr, ab.TELEGRAM_PULL_CONTEXT, "private", old_private)
+        with mock.patch.object(ab, "TOKEN", "test"):
+            ab.renvoyer_claviers(state, {"42"})
+        self.assertEqual(self.envois, [])
+        self.assertEqual(state["clavier_v"]["42"], 2)
+
+    def test_keyboard_migration_ignores_non_private_interactions(self):
+        state = {"clavier_v": {"42": 2}, "prospects": []}
+        old_mode = ab.TELEGRAM_PULL_MODE
+        ab.TELEGRAM_PULL_MODE = True
+        self.addCleanup(setattr, ab, "TELEGRAM_PULL_MODE", old_mode)
+        with mock.patch.object(ab, "TOKEN", "test"):
+            result = ab.renvoyer_clavier_sur_interaction(state, {"message": {"chat": {"id": "-100123", "type": "group"}}})
+        self.assertFalse(result)
+        self.assertEqual(self.envois, [])
+        self.assertEqual(state["clavier_v"]["42"], 2)
     def test_keyboard_migration_failed_delivery_retries(self):
         state = {"clavier_v": {"42": 2}, "prospects": []}
         with mock.patch.object(ab, "TOKEN", "test"), mock.patch.object(ab, "_envoi_sur", return_value=None):
