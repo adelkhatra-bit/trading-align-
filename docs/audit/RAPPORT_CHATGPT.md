@@ -324,3 +324,71 @@ Tout merge sur `main` redémarre le bot : avertir Adel avant chaque merge. Aucun
 - `ALIGN MTF validation` run **45085342088** : `in_progress`. Job `validate`; steps 1–12 success, step 13 **Run complete MTF regression suite** in progress. URL : https://github.com/adelkhatra-bit/trading-align-/actions/runs/45085342088
 - Fetch des workflow runs associés au commit PR `dc37d53f64a844e4275d47e18e5e56bf1afa74c9` ne retourne que CI Integration Tests et ALIGN MTF validation; aucun run `align-bot.yml` n'apparaît dans cette liste de runs PR. Cela confirme qu'aucune relance bot production n'a été observée associée au commit PR à cette heure.
 - **PR #779 reste ouverte, non fusionnée.** Attendre la conclusion du MTF validation; ne pas merger.
+
+
+## CORRIGENDUM — PR #779 fusionnée et suivi rollover (lecture 23/11/2026 00:56 CET)
+
+Correction explicite du rapport précédent : **la PR #779 n'est plus ouverte. Elle est fusionnée dans `main`** via le commit `0a38036e1bd9a6244d6d1a7c0634eb1731fef4c6`. Le diff API du commit confirme uniquement la ligne `push.branches` de `.github/workflows/ci-integration-tests.yml`, de `[main, feature/**, deploy/**]` à `[main]`. Les 1139 tests OK / 1 skipped / exit 0 sont la vérification rapportée par Claude, pas une sortie de test exécutée dans cette session.
+
+**Heures de lecture des données GitHub :** 23/11/2026 00:54–00:56 CET (UTC+1), horodatages API/log en UTC ci-dessous.
+
+### 1. Rollover associé au commit `0a38036e`
+
+Run `45085640005` (#378), workflow `ALIGN worker rollover`, déclenché sur `main` et SHA `0a38036e1bd9a6244d6d1a7c0634eb1731fef4c6`. Conclusion `success`; job `retire_previous_worker` success. Log relu à 00:55:28 CET.
+
+Lignes émises par le rollover (UTC; +1 h pour CET) :
+- `2026-11-22T23:53:40.0140425Z ROLLING_OVER old_run=45067670356 old_sha=fe9166d68eda` → 23/11 00:53:40.014 CET
+- `2026-11-22T23:53:40.0141211Z ALIGN_OLD_WORKERS_STOPPED_GRACEFULLY validated_sha=0a38036e1bd9` → 00:53:40.014 CET
+- `2026-11-22T23:53:40.0141668Z ALIGN_OLD_WORKERS_STOPPED validated_sha=0a38036e1bd9` → 00:53:40.014 CET
+- `ROLLING_OVER_RETRY` : **aucune ligne émise** dans le log récupéré.
+- `FORCE_RETIRING` : **aucune ligne émise**.
+- `ROLL_OVER_RACE` : **aucune ligne émise**.
+
+Le log montre donc un arrêt gracieux confirmé, pas une retraite forcée ni une course de rollover. Run : https://github.com/adelkhatra-bit/trading-align-/actions/runs/45085640005
+
+### 2. Run 45067670356 (#1038) — cancelled, sauvegarde exécutée
+
+Lecture API run : 00:56:02 CET; `status=completed`, `conclusion=cancelled`, `updated_at=2026-11-22T23:53:32Z` (23/11 00:53:32 CET). Le job `signaux` a néanmoins `conclusion=success`; le job `validate` est `skipped`.
+
+Le log confirme l'étape d'arrêt `ALIGN_STATE_SAVED_ON_SHUTDOWN` à `2026-11-22T23:53:26.7843294Z` (23/11 00:53:26.784 CET), puis deux sauvegardes cache :
+- `Cache saved with key: align-etat-45067670356-a1795391607` à `2026-11-22T23:53:27.6076482Z` (00:53:27.607 CET).
+- `Cache saved with key: align-etat-45067670356-b1795391607` à `2026-11-22T23:53:27.9461231Z` (00:53:27.946 CET).
+Les deux actions de sauvegarde sont `if: always()` dans le workflow relu. **Sauvegarde finale state.json : preuve positive dans le log**. La cancellation a eu lieu après les sauvegardes; le rollover a ensuite confirmé l'arrêt gracieux.
+
+Run #1038 : https://github.com/adelkhatra-bit/trading-align-/actions/runs/45067670356
+
+### 3. Worker suivant — run 45085640139 (#1039)
+
+Lecture API à 00:56:02 CET : `in_progress`, conclusion `null`, SHA `0a38036e1bd9a6244d6d1a7c0634eb1731fef4c6`, événement `workflow_run`, started_at `2026-11-22T23:53:13Z` (23/11 00:53:13 CET). Job `signaux` actif; étape 12 `Analyse BTC + Gold et envoi Telegram` est `in_progress`; étapes 1–11 success. L'étape 4 `Attendre la fin de l'ancien worker (sa sauvegarde de mémoire)` est `completed`, donc l'attente de concurrence est terminée et le worker ne paraît pas bloqué derrière #1038. Les logs du job actif n'ont pas été récupérés (404 BlobNotFound); durée exacte de l'attente **NON VÉRIFIÉE**.
+Run : https://github.com/adelkhatra-bit/trading-align-/actions/runs/45085640139
+
+### 4. Cache `align-etat-*`
+
+- Cache le plus récent dont la sauvegarde est prouvée dans les logs récupérés : `align-etat-45067670356-b1795391607`, save à 00:53:27.946 CET.
+- Une sauvegarde a également été confirmée avec clé `align-etat-45067670356-a1795391607`, à 00:53:27.607 CET.
+- L'inventaire API `GET /repos/adelkhatra-bit/trading-align-/actions/caches?per_page=100` est refusé par le fetcher (endpoint non autorisé). La clé la plus récente parmi **tous** les caches du dépôt et sa date de création API : **NON VÉRIFIÉ**.
+
+### 5. Pages, rulesets, Cloudflare — lecture seule
+
+- Pages : `GET /repos/adelkhatra-bit/trading-align-/pages` — fetch GitHub API rejeté (endpoint non autorisé). Le navigateur sur `/settings/pages` affiche une page not found/sign-in; ce n'est pas une preuve de configuration Pages. Source branch et folder **NON VÉRIFIÉS**. Lecture 00:55–00:56 CET.
+- Rulesets : `GET /repos/adelkhatra-bit/trading-align-/rulesets` et `GET /repos/adelkhatra-bit/trading-align-/rulesets/27552606` — réponse lue à 00:55:55 CET : un ruleset `ALIGN main - aucune fusion sans tests verts`, `enforcement=active`, `include=[~DEFAULT_BRANCH]`, règles deletion, non-fast-forward et status `validate` requis, `bypass_actors=[]`, `current_user_can_bypass=never`. Cela cible la branche par défaut (main), **pas de ruleset live-data retourné**. Aucun changement.
+- Cloudflare Worker `align-tv-mailbox` : aucune API/connexion Cloudflare disponible; branche build, path surveillé et dernier déploiement **NON VÉRIFIÉS**. Lecture 00:56 CET.
+
+### 6. PR #779 — statut corrigé
+
+PR #779 est merged, pas ouverte. Commit de merge : `0a38036e1bd9a6244d6d1a7c0634eb1731fef4c6`. Compare API confirme le seul changement E1; main est maintenant à ce SHA selon l'information fournie et le commit relu. URL : https://github.com/adelkhatra-bit/trading-align-/pull/779
+
+### 7. Source de vérité — PR documentaire proposée
+
+Une PR documentaire unique **#780** a été ouverte depuis `docs/align-source-truth-readers-writers-20261123` vers `main`, basée exactement sur `0a38036e1bd9a6244d6d1a7c0634eb1731fef4c6`. Elle ajoute une table branche/rôle/lecteurs/écrivains dans le document existant `docs/ALIGN_SOURCE_DE_VERITE.md` (un seul fichier, 12 additions, 0 deletion). Aucun code, workflow, live-data ou autre document n'est modifié. Diff relu et vérifié.
+- Commit PR : `aaffd65ec80a15abe7963a30d5d24fb71c403437`
+- Blob : `1551046315311e08b8da83525dcd9dc7cdf9eec2`
+- PR : https://github.com/adelkhatra-bit/trading-align-/pull/780
+- État : open, **non fusionnée**. Le champ mergeable n'est pas interprété comme une autorisation. Aucun merge effectué.
+
+### 8. Risques et décisions
+
+- **D6 : fait établi** — rollover a annulé #1038; les deux caches de state.json ont été sauvegardés avant la cancellation, et le rollover log confirme l'arrêt gracieux. Pas besoin d'une décision cancel maintenant; le run est déjà cancelled.
+- **D7 : toujours à Adel** — garder ou supprimer la logique d'annulation/retrait automatique du worker actif. Le rollover actuellement configuré a arrêté #1038 gracieusement; aucune modification du workflow `align-bot-rollover.yml` n'a été faite.
+- Runs queued depuis le 22/11 : **NON VÉRIFIÉ** (endpoint list workflow runs non accessible; page publique affiche seulement les runs récents).
+- Aucune annulation, relance, merge, écriture live-data, suppression, trading ou message Telegram réel n'a été effectué dans cette reprise.
