@@ -20,6 +20,17 @@ class TradingViewBridgeGateTests(unittest.TestCase):
         )
         self.assertIn("Bridge TradingView obligatoire — échec signalé", WORKFLOW_SOURCE)
         self.assertIn("exit 1", WORKFLOW_SOURCE)
+
+    def test_preflight_waits_for_fresh_snapshots_without_relaxing_bridge_guards(self):
+        self.assertIn("deadline = time.monotonic() + 120", WORKFLOW_SOURCE)
+        self.assertIn("while True:", WORKFLOW_SOURCE)
+        self.assertIn("BRIDGE_WAIT symbol=", WORKFLOW_SOURCE)
+        self.assertIn("time.sleep(min(10.0, remaining))", WORKFLOW_SOURCE)
+        self.assertIn("last_rejection=", WORKFLOW_SOURCE)
+        self.assertIn("price_age_ms > 90000", WORKFLOW_SOURCE)
+        self.assertIn("snapshots TradingView absents/périmés pour", WORKFLOW_SOURCE)
+        self.assertIn("ALIGN_TV_BRIDGE_PRET=0", WORKFLOW_SOURCE)
+
     def test_preflight_requires_btc_always_and_gold_only_during_cme_session(self):
         saturday_closed = datetime(2026, 11, 21, 12, 48, tzinfo=timezone.utc).timestamp()
         sunday_open = datetime(2026, 11, 22, 23, 30, tzinfo=timezone.utc).timestamp()
