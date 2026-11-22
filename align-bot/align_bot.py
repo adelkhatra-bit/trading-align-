@@ -7734,7 +7734,7 @@ def traiter(etat, chats, updates):
                 menu_marches(etat, cid)
             elif "analyse" in txtv:
                 if marche_retiree_demande(txtv):
-                    refuser_marche_retire(cid)
+                    refuser_marche_retire(cid, etat)
                 else:
                     analyse_visiteur(etat, cid, marche_demande(txtv))
             elif "vip" in txtv or "/start" in txtv:
