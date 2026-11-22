@@ -35,9 +35,11 @@ class ZeroMessageParDefaut(unittest.TestCase):
         self.assertEqual(appels, ["question_quotidienne(etat, chats, creneau=creneau_)"])
         self.assertRegex(SOURCE, r"if QUESTION_QUOTIDIENNE and creneau_:\n\s+question_quotidienne\(etat, chats, creneau=creneau_\)")
 
-    def test_nouveaux_boutons_envoyes_seulement_si_rallumes(self):
-        self.assertRegex(SOURCE, r"if ENVOI_CLAVIER_SPONTANE:\n\s+renvoyer_claviers\(etat, chats\)")
-        self.assertEqual(len(re.findall(r"^\s+renvoyer_claviers\(etat, chats\)", SOURCE, re.M)), 1)
+    def test_migration_claviers_obsoletes_independante_des_push_spontanes(self):
+        appel = [line.strip() for line in SOURCE.splitlines() if line.strip().startswith("renvoyer_claviers(etat, chats)")]
+        self.assertEqual(appel, ["renvoyer_claviers(etat, chats)"])
+        self.assertIn("CLAVIER_VERSION = 5", SOURCE)
+        self.assertIn("if vus.get(cid) == CLAVIER_VERSION:", SOURCE)
 
     def test_regles_epinglees_en_prive_seulement_si_rallumees(self):
         self.assertRegex(SOURCE, r"if str\(cid\) == canal_ or REGLES_PRIVEES_SPONTANEES:\n\s+epingler\(etat, cid\)")
