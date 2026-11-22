@@ -3309,6 +3309,15 @@ def _telegram_sortant_autorise(methode, params):
         return True
     if cid and cid in actifs and methode in ("sendMessage", "sendPhoto") and _telegram_position_attendue(texte):
         return True
+    # Les abonnements « Alertes BTC/GOLD » sont un opt-in explicite séparé de la recherche live.
+    # Ils autorisent uniquement une entrée confirmée sur le marché coché, jamais un statut ou une autre UT.
+    if cid and methode in ("sendMessage", "sendPhoto") and _telegram_position_attendue(texte):
+        marches_message_ = marches_message(params.get("text") or params.get("caption") or "")
+        for marche in MARCHES:
+            abonnes = {str(x) for x in (etat.get("auto", {}).get(marche) or [])}
+            if (marche in marches_message_ and cid in abonnes
+                    and marche in marches_choisis(etat, cid) and coach_actif(etat, cid, marche)):
+                return True
     # Règle d'Adel (18/11) : chaînes silencieuses SAUF une ENTRÉE validée, et Telegram reste le lieu où l'on
     # reçoit les positions. Une chaîne configurée (VIP / marché) reçoit donc l'entrée ; rien d'autre ne passe.
     chaines = {str(etat.get("canal") or ""), str(etat.get("canal_preuves") or "")}

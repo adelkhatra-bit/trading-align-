@@ -85,6 +85,40 @@ class TelegramPullAuthorization(unittest.TestCase):
         ))
 
 
+    def test_confirmed_entry_reaches_explicit_market_alert_subscriber(self):
+        ab.TELEGRAM_PULL_CONTEXT.chat_id = None
+        ab.TELEGRAM_PULL_CONTEXT.private = False
+        state = {
+            "auto": {"BTC": ["42"], "GOLD": []},
+            "marches_par_chat": {"42": ["BTC"]},
+            "quiet": [],
+            "bot_off": [],
+        }
+        entry_btc = "🟢 BTC - LONG\n📍 Entrée 65000\n🛑 SL 64000\n🎯 TP1 67000"
+        entry_gold = "🟢 GOLD - LONG\n📍 Entrée 4000\n🛑 SL 3980\n🎯 TP1 4040"
+        with mock.patch.object(ab, "DERNIER_ETAT", state):
+            self.assertTrue(ab._telegram_sortant_autorise(
+                "sendMessage", {"chat_id": "42", "text": entry_btc}
+            ))
+            self.assertFalse(ab._telegram_sortant_autorise(
+                "sendMessage", {"chat_id": "42", "text": entry_gold}
+            ))
+            self.assertFalse(ab._telegram_sortant_autorise(
+                "sendMessage", {"chat_id": "43", "text": entry_btc}
+            ))
+            self.assertFalse(ab._telegram_sortant_autorise(
+                "sendMessage", {"chat_id": "42", "text": "📊 BTC : attente de confirmation"}
+            ))
+            state["quiet"] = ["42"]
+            self.assertFalse(ab._telegram_sortant_autorise(
+                "sendMessage", {"chat_id": "42", "text": entry_btc}
+            ))
+            state["quiet"] = []
+            state["bot_off"] = ["42"]
+            self.assertFalse(ab._telegram_sortant_autorise(
+                "sendMessage", {"chat_id": "42", "text": entry_btc}
+            ))
+
     def test_validated_entry_only_reaches_requested_user_and_configured_market_channel(self):
         ab.TELEGRAM_PULL_CONTEXT.chat_id = None
         ab.TELEGRAM_PULL_CONTEXT.private = False
