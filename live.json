@@ -1,1 +1,1 @@
-{"v": 1, "maj": 1795365706, "bot": "@align_mtf_adel_bot", "marches": [{"m": "BTC", "etat": "preparation", "biais": "indecis", "ut": 8, "seuil": 8, "profil": "INTRADAY"}, {"m": "GOLD", "etat": "ferme", "biais": "haussier", "ut": 6, "seuil": 8, "profil": "aucun"}]}
+{"v": 1, "maj": 1795365958, "bot": "@align_mtf_adel_bot", "marches": [{"m": "BTC", "etat": "preparation", "biais": "indecis", "ut": 8, "seuil": 8, "profil": "INTRADAY"}, {"m": "GOLD", "etat": "ferme", "biais": "haussier", "ut": 5, "seuil": 8, "profil": "aucun"}]}
