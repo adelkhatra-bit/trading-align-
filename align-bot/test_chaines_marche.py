@@ -121,7 +121,7 @@ class TpFrole(unittest.TestCase):
 
     def test_nouveau_clavier_envoye_une_seule_fois(self):
         env = []
-        with mock.patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: env.append(c)), mock.patch.object(ab, "TOKEN", "x"):
+        with mock.patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: env.append(c) or {"ok": True}), mock.patch.object(ab, "TOKEN", "x"):
             etat = {"prospects": ["5"]}
             ab.renvoyer_claviers(etat, {"5", "6"})
             ab.renvoyer_claviers(etat, {"5", "6"})
