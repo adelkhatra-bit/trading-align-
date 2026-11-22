@@ -155,7 +155,7 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn("source: source || 'live'", self.js)
         self.assertIn("const fr = { texte: '🇫🇷 ' + plateforme(phrase), source: 'ia'", self.js)
         self.assertIn("const dureeFR = parlerLive(fr);", self.js)
-        self.assertIn("if (dureeFR > 0 && en.anglaisTraduit) parlerLive(en);", self.js)", self.js)
+        self.assertIn("if (dureeFR > 0 && en.anglaisTraduit) parlerLive(en);", self.js)
         self.assertIn("item.source !== 'ia'", self.js)
         self.assertIn("if (!anglais && maintenant - voixDerniere < 12000 && !forcer) return 0;", self.js)
         self.assertIn("const voixDuree = 0;", self.js)
