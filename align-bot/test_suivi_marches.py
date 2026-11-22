@@ -57,6 +57,7 @@ class SuiviMarchesTest(unittest.TestCase):
         source = open(ab.__file__, encoding="utf-8").read()
         self.assertNotIn('"text": "🤖 Mon bot"', source)
         self.assertNotIn('"text": "🤖 Ouvrir mon menu ALIGN"', source)
+        self.assertIn('k = {"reply_markup": json.dumps({"inline_keyboard": rang})} if rang else {}', source)
         self.assertIn('"/mon_bot": "🤖 Mon bot"', source)  # commande texte conservée
 
     def test_keyboard_migration_sends_btc_gold_keyboard_and_marks_only_on_success(self):
