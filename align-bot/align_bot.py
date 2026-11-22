@@ -3693,19 +3693,18 @@ def analyse_marche(etat, pair):
     return r
 
 def boutons_canal(etat, texte):
-    """Boutons sous chaque message de la chaîne VIP : ils ouvrent le coach en privé, au bon endroit."""
+    """Boutons de suivi de position sous les messages VIP; aucun raccourci « Mon bot »."""
     bot = etat.get("bot") or "align_mtf_adel_bot"
     m = next((x for x in MARCHES if x in texte.split("\n")[0]), None)
     lien = lambda p: f"https://t.me/{bot}?start={p}"
     lignes = []
     position = m and (est_entree(texte) or any(k in texte for k in ("TP1", "TP2", "BE", "STOP", "Stop", "SL", "parti")))
-    # Chaîne VIP épurée : Telegram n'autorise pas le bouton bleu « Menu » ni le clavier dans une chaîne.
-    # → 1 seul bouton sous chaque message : il ouvre le bot, où le VIP retrouve le MÊME menu que le gratuit.
+    # Chaîne VIP : boutons de suivi seulement sur une entrée; autres messages utilisent le menu rapide sans raccourci « Mon bot ».
     if position and est_entree(texte):
         lignes.append([{"text": "📍 Je prends cette position", "url": lien("rentre")}])
         lignes.append([{"text": "🙅 Pas rentré cette fois", "url": lien("pasrentre")}])
     
-    return json.dumps({"inline_keyboard": lignes})
+    return json.dumps({"inline_keyboard": lignes}) if lignes else boutons_menu_rapide(etat)
 
 def boutons_auto_chaine(etat, cid):
     """Toute publication dans une chaîne ALIGN reçoit des boutons dessous (Telegram interdit le clavier du bas dans une chaîne).
