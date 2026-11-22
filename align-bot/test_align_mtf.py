@@ -3436,3 +3436,10 @@ class CanonicalPineTelegramPlanSummaryTest(unittest.TestCase):
         self.assertIn("SL 99", summary)
         self.assertIn("TP 105", summary)
         self.assertNotIn("TP2", summary)
+
+    def test_legacy_payload_with_tp1_tp2_metadata_still_uses_legacy_parser(self):
+        robot = {"signal": "LONG", "entry": 100, "sl": 98, "tp": 104, "tp1": 103, "tp2": 106}
+        plan = align_bot.plan_indicateur(self._snapshot(robot))
+        self.assertTrue(plan["available"], plan.get("reason"))
+        self.assertEqual(plan["tp"], 104)
+        self.assertNotIn("plan_timeframe", plan)
