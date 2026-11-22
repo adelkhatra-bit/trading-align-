@@ -3417,3 +3417,22 @@ class CanonicalPineV25PlanParserTest(unittest.TestCase):
         robot = self._long_plan()
         robot["tp2"] = 104
         self.assertFalse(align_bot.plan_indicateur(self._snapshot(robot))["available"])
+
+
+class CanonicalPineTelegramPlanSummaryTest(unittest.TestCase):
+    def test_telegram_plan_summary_shows_tp1_tp2_and_trigger_status(self):
+        plan = {"available": True, "entry": 101, "sl": 99, "tp": 105, "tp1": 105,
+                 "tp2": 108, "triggered": False}
+        summary = align_bot.texte_plan_indicateur_tv(plan)
+        self.assertIn("Entrée 101", summary)
+        self.assertIn("SL 99", summary)
+        self.assertIn("TP1 105 • TP2 108", summary)
+        self.assertIn("déclenchement en attente", summary)
+
+    def test_legacy_plan_summary_keeps_single_target_format(self):
+        plan = {"available": True, "entry": 101, "sl": 99, "tp": 105}
+        summary = align_bot.texte_plan_indicateur_tv(plan)
+        self.assertIn("Entrée 101", summary)
+        self.assertIn("SL 99", summary)
+        self.assertIn("TP 105", summary)
+        self.assertNotIn("TP2", summary)
