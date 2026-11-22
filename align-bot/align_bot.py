@@ -8992,7 +8992,7 @@ def envoyer_prospects(etat, texte, signal, clavier=None):
                       else "🎁 Tu as déjà ta position offerte en cours\n" if cid in deja else "⏸ Ton bot est sur OFF\n")
                    + "💎 VIP 49,90 € / mois 👇")
             rang = [[{"text": "💎 Devenir VIP", "url": etat["lien"]}]] if etat.get("lien") else []
-            k = {"reply_markup": json.dumps({"inline_keyboard": rang})}
+            k = {"reply_markup": json.dumps({"inline_keyboard": rang})} if rang else {}
         try:
             telegram("sendMessage", chat_id=cid, text=txt, **k)
         except Exception as ex:
