@@ -350,7 +350,7 @@ jobs:
         env:
           ALIGN_AI_HEALTHY_PROVIDER: ${{ steps.ia_preflight.outputs.provider }}
           ALIGN_REQUIRE_TV_BRIDGE: "1"
-          ALIGN_TV_BRIDGE_PRET: ${{ steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == '0' && '0' || '1' }}
+          ALIGN_TV_BRIDGE_PRET: ${{ steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == '1' && '1' || '0' }}
           ALIGN_EXIGER_MEMOIRE: "1"     # jamais de redémarrage silencieux à vide (mémoire non restaurée = arrêt préventif)
           ALIGN_ETAT_VIERGE_OK: ${{ vars.ALIGN_ETAT_VIERGE_OK }}
           ALIGN_FERMES_LIVE_DATA: "1"   # #556 : clôtures notées hors du cache (live-data/fermes.json, empreintes seulement)
@@ -379,7 +379,7 @@ jobs:
           # Bridge absent/invalide : conserver Telegram/commandes 120 s puis laisser le gate final échouer.
           # Garder le poller Telegram disponible pendant le cycle complet.
           # Le bridge reste obligatoire pour toute entrée ; le gate final échoue si le préflight est invalide.
-          DUREE_SEC: "${{ steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == '0' && '120' || (github.event_name == 'workflow_dispatch' && '300' || '21000') }}"
+          DUREE_SEC: "${{ steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET != '1' && (github.event_name == 'workflow_dispatch' && '300' || '120') || '21000' }}"
           PAUSE_SEC: "5"
         run: exec python3 align_bot.py
 
@@ -472,7 +472,7 @@ jobs:
 
       - name: Bridge TradingView obligatoire — échec signalé
         # Le bot a tourné sans émettre de signal ; le run reste rouge tant que le bridge n'est pas branché.
-        if: ${{ always() && steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == '0' }}
+        if: ${{ always() && steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET != '1' }}
         run: |
           echo "ÉCHEC: bridge TradingView ROBOT V12 indisponible (secrets ALIGN_TV_* absents ou données invalides). Aucun signal n'a été émis."
           exit 1
