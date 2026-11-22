@@ -3575,13 +3575,32 @@ def marche_retiree_demande(txt):
     return bool(re.search(r"\b(?:NASDAQ|NAS100|NQ)\b", str(txt or ""), re.IGNORECASE))
 
 
-def refuser_marche_retire(cid):
-    """Explique le périmètre actif sans lancer d'analyse ni activer de suivi."""
+def refuser_marche_retire(cid, etat=None):
+    """Refuse NASDAQ et réapplique le clavier courant pour remplacer les anciens boutons persistants."""
     anglais = str(cid) in LANG_EN
     texte = ("⛔ NASDAQ a été retiré d'ALIGN. Les seuls marchés actifs sont BTC et GOLD. Demande une analyse BTC ou GOLD."
              if not anglais else
              "⛔ NASDAQ has been retired from ALIGN. Only BTC and GOLD are active. Request a BTC or GOLD analysis.")
-    _envoi_sur(cid, text=texte)
+    options = {}
+    if etat is not None:
+        try:
+            clavier = CLAVIER if autorise(etat, str(cid), str(cid)) else CLAVIER_VISITEUR
+        except Exception:
+            clavier = CLAVIER_VISITEUR
+        options["reply_markup"] = clavier
+    _envoi_sur(cid, text=texte, **options)
+
+
+def retirer_clavier_inline_marche_retire(cid, callback):
+    """Supprime les boutons NASDAQ d'un ancien message inline lorsqu'il est encore cliquable."""
+    message_id = (callback.get("message") or {}).get("message_id")
+    if not message_id:
+        return
+    try:
+        telegram("editMessageReplyMarkup", chat_id=cid, message_id=message_id,
+                 reply_markup=json.dumps({"inline_keyboard": []}))
+    except Exception as ex:
+        print("nettoyage ancien clavier NASDAQ", type(ex).__name__)
 
 
 def marche_demande(txt):
@@ -7170,7 +7189,9 @@ def traiter(etat, chats, updates):
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="NASDAQ retiré — BTC / GOLD uniquement")
                 except Exception:
                     pass
-                refuser_marche_retire(qui)
+                retirer_clavier_inline_marche_retire(qui, cb)
+                _menu_analyse_rapide(qui)
+                refuser_marche_retire(qui, etat)
                 continue
             if choix == "analysechoice" and (mk in MARCHES or mk == "BOTH"):
                 try:
@@ -7267,6 +7288,15 @@ def traiter(etat, chats, updates):
                 except Exception:
                     pass
                 menu_marches(etat, qui, (cb.get("message") or {}).get("message_id"))
+                continue
+            if choix == "followmarket" and marche_retiree_demande(mk):
+                try:
+                    telegram("answerCallbackQuery", callback_query_id=cb["id"], text="NASDAQ retiré — BTC / GOLD uniquement")
+                except Exception:
+                    pass
+                retirer_clavier_inline_marche_retire(qui, cb)
+                menu_suivi(etat, qui)
+                refuser_marche_retire(qui, etat)
                 continue
             if choix == "followmarket" and (mk in MARCHES or mk == "BOTH"):
                 if not (autorise(etat, qui, cb.get("from", {}).get("id")) or qui not in etat.get("bienvenue", {})):
@@ -7663,6 +7693,11 @@ def traiter(etat, chats, updates):
             continue
         if tx in INVERSE:
             msg["text"] = tx = INVERSE[tx]
+        if marche_retiree_demande(tx):
+            # Un ancien clavier de réponse peut encore afficher NASDAQ : le clic remet
+            # immédiatement le clavier courant BTC/GOLD (VIP ou visiteur).
+            refuser_marche_retire(cid, etat)
+            continue
         bas = tx.lower()
         if "live tiktok" in bas or bas.strip() == "🔴 live" or cmd == "/live":
             menu_live(etat, cid)
@@ -7699,7 +7734,7 @@ def traiter(etat, chats, updates):
                 menu_marches(etat, cid)
             elif "analyse" in txtv:
                 if marche_retiree_demande(txtv):
-                    refuser_marche_retire(cid)
+                    refuser_marche_retire(cid, etat)
                 else:
                     analyse_visiteur(etat, cid, marche_demande(txtv))
             elif "vip" in txtv or "/start" in txtv:
@@ -7755,7 +7790,7 @@ def traiter(etat, chats, updates):
                        ]}))
         elif "analyse" in txt or "etat" in txt:
             if marche_retiree_demande(txt):
-                refuser_marche_retire(cid)
+                refuser_marche_retire(cid, etat)
                 continue
             md_ = marche_demande(txt)
             if any(k in txt for k in ("btc", "bitcoin", "gold", "xau")):
@@ -7787,7 +7822,7 @@ AUTO_MARCHES = ("BTC", "GOLD")
 def commande_auto(etat, cid, txt):
     """Admin (propriétaire) : /auto = état + boutons BTC/GOLD, tout arrêter ou tout relancer."""
     if txt.strip().lower() in {"/auto_nasdaq", "/auto_nas100", "/auto_nq"}:
-        refuser_marche_retire(cid)
+        refuser_marche_retire(cid, etat)
         return
     am = etat.setdefault("auto_marches", {})
     for m in AUTO_MARCHES:

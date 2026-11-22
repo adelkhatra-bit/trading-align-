@@ -51,6 +51,67 @@ class SuiviMarchesTest(unittest.TestCase):
         self.assertTrue(any("GOLD" in label for label in labels))
         self.assertFalse(any("NASDAQ" in label for label in labels))
 
+    def test_ancien_bouton_analyse_nasdaq_est_retire_et_menu_actuel_affiche(self):
+        update = {
+            "update_id": 911,
+            "callback_query": {
+                "id": "old-nasdaq-analysis",
+                "data": "analysechoice:NASDAQ",
+                "from": {"id": 42, "first_name": "Test"},
+                "message": {"message_id": 100, "chat": {"id": 42, "type": "private"}},
+            },
+        }
+        ab.traiter(self.e, {"42"}, [update])
+        edits = [(m, kw) for m, kw in self.envois if m == "editMessageReplyMarkup"]
+        self.assertEqual(len(edits), 1)
+        self.assertEqual(edits[0][1]["message_id"], 100)
+        self.assertEqual(json.loads(edits[0][1]["reply_markup"]), {"inline_keyboard": []})
+        menus = [kw for method, kw in self.envois if method == "sendMessage"
+                 and kw.get("reply_markup") and "inline_keyboard" in json.loads(kw["reply_markup"])]
+        self.assertTrue(menus)
+        callbacks = [b["callback_data"] for row in json.loads(menus[0]["reply_markup"])["inline_keyboard"] for b in row]
+        self.assertEqual(callbacks, ["analysechoice:GOLD", "analysechoice:BTC", "analysechoice:BOTH"])
+
+    def test_ancien_bouton_suivi_nasdaq_est_retire_et_menu_actuel_affiche(self):
+        update = {
+            "update_id": 912,
+            "callback_query": {
+                "id": "old-nasdaq-follow",
+                "data": "followmarket:NASDAQ",
+                "from": {"id": 42, "first_name": "Test"},
+                "message": {"message_id": 101, "chat": {"id": 42, "type": "private"}},
+            },
+        }
+        ab.traiter(self.e, {"42"}, [update])
+        edits = [(m, kw) for m, kw in self.envois if m == "editMessageReplyMarkup"]
+        self.assertEqual(len(edits), 1)
+        self.assertEqual(edits[0][1]["message_id"], 101)
+        self.assertEqual(json.loads(edits[0][1]["reply_markup"]), {"inline_keyboard": []})
+        menus = [kw for method, kw in self.envois if method == "sendMessage"
+                 and kw.get("reply_markup") and "inline_keyboard" in json.loads(kw["reply_markup"])]
+        self.assertTrue(menus)
+        callbacks = [b["callback_data"] for row in json.loads(menus[0]["reply_markup"])["inline_keyboard"] for b in row]
+        self.assertEqual(callbacks, ["followmarket:BTC", "followmarket:GOLD", "followmarket:BOTH"])
+
+    def test_ancien_bouton_nasdaq_du_clavier_reponse_est_remplace(self):
+        update = {
+            "update_id": 913,
+            "message": {
+                "text": "💠 NASDAQ",
+                "from": {"id": 42, "first_name": "Test"},
+                "chat": {"id": 42, "type": "private"},
+            },
+        }
+        ab.traiter(self.e, {"42"}, [update])
+        sends = [kw for method, kw in self.envois if method == "sendMessage"]
+        self.assertTrue(sends)
+        self.assertIn("NASDAQ a été retiré", sends[0]["text"])
+        keyboard = json.loads(sends[0]["reply_markup"])["keyboard"]
+        labels = [button["text"] for row in keyboard for button in row]
+        self.assertFalse(any("NASDAQ" in label for label in labels))
+        self.assertTrue(any("Analyse BTC" in label for label in labels))
+        self.assertTrue(any("Analyse Gold" in label for label in labels))
+
     def test_ou_en_est_avec_vraies_donnees(self):
         ab.selectionner_marches_suivi(self.e, "42", ["GOLD"])
         with mock.patch.object(ab, "DERNIERS", {"GOLD": {"prix": 3975.2, "dirPlan": -1, "bear": 11, "strat": "SWING", "atr": 5}}), \
