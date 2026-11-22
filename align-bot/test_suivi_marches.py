@@ -53,7 +53,7 @@ class SuiviMarchesTest(unittest.TestCase):
         self.assertFalse(any("NASDAQ" in label.upper() for label in labels))
         self.assertTrue(any("BTC" in label.upper() for label in labels))
         self.assertTrue(any("GOLD" in label.upper() for label in labels))
-        self.assertEqual(state["clavier_v"]["42"], 3)
+        self.assertEqual(state["clavier_v"]["42"], 4)
         ab.renvoyer_claviers(state, {"42"})
         self.assertEqual(len([kw for method, kw in self.envois if method == "sendMessage"]), 1)
 
@@ -64,7 +64,23 @@ class SuiviMarchesTest(unittest.TestCase):
         self.assertEqual(state["clavier_v"]["42"], 2)
         with mock.patch.object(ab, "_envoi_sur", return_value={"ok": True}):
             ab.renvoyer_claviers(state, {"42"})
-        self.assertEqual(state["clavier_v"]["42"], 3)
+        self.assertEqual(state["clavier_v"]["42"], 4)
+
+
+    def test_visible_telegram_bot_shortcut_is_removed_from_all_menus(self):
+        for raw in (ab.CLAVIER, ab.CLAVIER_VISITEUR):
+            labels = [
+                str(button.get("text", ""))
+                for row in json.loads(raw).get("keyboard", [])
+                for button in row
+            ]
+            self.assertFalse(any("MON BOT" in label.upper() for label in labels))
+            self.assertFalse(any("TELEGRAM" in label.upper() for label in labels))
+        # The shortcut also existed as inline buttons in channel/VIP menus.
+        source = open(ab.__file__, encoding="utf-8").read()
+        self.assertNotIn('"text": "🤖 Mon bot"', source)
+        self.assertNotIn('"text": "🤖 Ouvrir mon menu ALIGN"', source)
+        self.assertIn("CLAVIER_VERSION = 4", source)
 
     def test_ancien_bouton_nasdaq_est_refuse_et_remplace_par_menu_btc_gold(self):
         update = {
