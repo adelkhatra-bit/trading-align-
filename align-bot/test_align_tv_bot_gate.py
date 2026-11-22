@@ -25,8 +25,8 @@ class TradingViewBridgeGateTests(unittest.TestCase):
 
     def test_bridge_preflight_embedded_python_compiles(self):
         section = WORKFLOW_SOURCE.split("name: Vérifier le bridge TradingView ROBOT V12", 1)[1]
-        start = section.index("if python3 - <<'PY'\\n") + len("if python3 - <<'PY'\\n")
-        end = section.index("\\n          PY\\n          then", start)
+        start = section.index("if python3 - <<'PY'\n") + len("if python3 - <<'PY'\n")
+        end = section.index("\n          PY\n          then", start)
         source = textwrap.dedent(section[start:end])
         compile(source, "<align-tv-bridge-preflight>", "exec")
 
