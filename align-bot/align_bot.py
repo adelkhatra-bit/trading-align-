@@ -3431,14 +3431,14 @@ def telegram(methode, **params):
 INDICATEUR_EN_VENTE = os.environ.get("INDICATEUR_EN_VENTE", "0") == "1"
 CLAVIER = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}],
                                    [{"text": "📊 Faire une analyse"}, {"text": "📡 Mes marchés"}, {"text": "🎙 Mes chaînes"}],
-                                   [{"text": "📈 Mes résultats"}, {"text": "📸 Partager mon gain"}],
+                                   [{"text": "🤖 Mon bot"}, {"text": "📈 Mes résultats"}, {"text": "📸 Partager mon gain"}],
                                    ([{"text": "🧩 Indicateur TradingView"}] if INDICATEUR_EN_VENTE else []) + [{"text": "🌐 English"}],
                                    [{"text": "🔴 Live"}]],
                       "resize_keyboard": True, "is_persistent": True, "input_field_placeholder": "Choisis une action ALIGN"})
 # Bot gratuit = accueil / inscriptions : peu de boutons ; « 🎙 Mes chaînes » donne le lien de la chaîne du marché + le coach.
 # Les boutons qui vendent (VIP, Live) restent tout en bas, comme épinglés.
 CLAVIER_VISITEUR = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}, ],
-                                            [{"text": "🎙 Mes chaînes"}, {"text": "🌐 English"}],
+                                            [{"text": "🎙 Mes chaînes"}, {"text": "🤖 Mon bot"}, {"text": "🌐 English"}],
                                             [{"text": "💎 Devenir VIP"}, {"text": "🔴 Live"}]],
                                "resize_keyboard": True, "is_persistent": True, "input_field_placeholder": "Choisis une action ALIGN"})
 AVERTISSEMENT = ("ℹ️ Ce sont MES positions personnelles, partagées à titre informatif et éducatif. "
@@ -3703,7 +3703,8 @@ def boutons_canal(etat, texte):
     # → 1 seul bouton sous chaque message : il ouvre le bot, où le VIP retrouve le MÊME menu que le gratuit.
     if position and est_entree(texte):
         lignes.append([{"text": "📍 Je prends cette position", "url": lien("rentre")}])
-        lignes.append([{"text": "🙅 Pas rentré cette fois", "url": lien("pasrentre")}])
+        lignes.append([{"text": "🙅 Pas renté cette fois", "url": lien("pasrentre")}])
+    lignes.append([{"text": "🤖 Ouvrir mon menu ALIGN", "url": lien("boutons")}])
     
     
     return json.dumps({"inline_keyboard": lignes})
@@ -3764,7 +3765,7 @@ def menu_canal_vip(etat):
     kb = json.dumps({"inline_keyboard": [
         [{"text": "🥇 Analyse Gold", "url": lien("analyse_gold")}, {"text": "🟠 Analyse BTC", "url": lien("analyse_btc")}],
         [{"text": "📊 Faire une analyse", "url": lien("faire_analyse")}, {"text": "📡 Mes marchés", "url": lien("marches")}],
-        [{"text": "📈 Mes résultats", "url": lien("resultats")}],
+        [{"text": "🤖 Mon bot", "url": lien("mon_bot")}, {"text": "📈 Mes résultats", "url": lien("resultats")}],
         [{"text": "📸 Partager mon gain", "url": lien("gain")}] + ([{"text": "🧩 Indicateur TradingView", "url": lien("indicateur")}] if INDICATEUR_EN_VENTE else []),
         [{"text": "🏆 Gagnantes", "url": lien("gagnantes")}, {"text": "❌ Perdantes", "url": lien("perdantes")}],
         [{"text": "🔴 Le live ALIGN", "url": LIVE_LIEN}]]})
@@ -8993,7 +8994,7 @@ def envoyer_prospects(etat, texte, signal, clavier=None):
                       else "🎁 Tu as déjà ta position offerte en cours\n" if cid in deja else "⏸ Ton bot est sur OFF\n")
                    + "💎 VIP 49,90 € / mois 👇")
             rang = [[{"text": "💎 Devenir VIP", "url": etat["lien"]}]] if etat.get("lien") else []
-            k = {"reply_markup": json.dumps({"inline_keyboard": rang})}
+            k = {"reply_markup": json.dumps({"inline_keyboard": rang + [[{"text": "🤖 Mon bot", "callback_data": "botmenu:x"}]]})}
         try:
             telegram("sendMessage", chat_id=cid, text=txt, **k)
         except Exception as ex:
