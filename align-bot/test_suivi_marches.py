@@ -43,6 +43,42 @@ class SuiviMarchesTest(unittest.TestCase):
             self.assertFalse(any("NASDAQ" in label.upper() for label in labels))
             self.assertFalse(any("TELEGRAM" in label.upper() for label in labels))
 
+    def test_keyboard_version_migrates_old_chat_to_btc_gold(self):
+        state = {"clavier_v": {"42": 2}, "prospects": []}
+        with mock.patch.object(ab, "TOKEN", "test"):
+            ab.renvoyer_claviers(state, {"42"})
+            sends = [kw for method, kw in self.envois if method == "sendMessage"]
+            self.assertEqual(len(sends), 1)
+            keyboard = json.loads(sends[0]["reply_markup"])["keyboard"]
+            labels = [button["text"] for row in keyboard for button in row]
+            self.assertFalse(any("NASDAQ" in label.upper() for label in labels))
+            self.assertFalse(any("TELEGRAM" in label.upper() for label in labels))
+            self.assertTrue(any("BTC" in label.upper() for label in labels))
+            self.assertTrue(any("GOLD" in label.upper() for label in labels))
+            self.assertTrue(any("MON BOT" in label.upper() for label in labels))
+            self.assertEqual(state["clavier_v"]["42"], 5)
+            ab.renvoyer_claviers(state, {"42"})
+            self.assertEqual(len([kw for method, kw in self.envois if method == "sendMessage"]), 1)
+
+    def test_keyboard_migration_failed_delivery_retries(self):
+        state = {"clavier_v": {"42": 2}, "prospects": []}
+        with mock.patch.object(ab, "TOKEN", "test"), mock.patch.object(ab, "_envoi_sur", return_value=None):
+            ab.renvoyer_claviers(state, {"42"})
+        self.assertEqual(state["clavier_v"]["42"], 2)
+        with mock.patch.object(ab, "TOKEN", "test"), mock.patch.object(ab, "_envoi_sur", return_value={"ok": True}):
+            ab.renvoyer_claviers(state, {"42"})
+        self.assertEqual(state["clavier_v"]["42"], 5)
+
+    def test_coach_button_kept_in_reply_and_vip_menus(self):
+        for raw in (ab.CLAVIER, ab.CLAVIER_VISITEUR):
+            labels = [str(button.get("text", "")) for row in json.loads(raw).get("keyboard", []) for button in row]
+            self.assertTrue(any("MON BOT" in label.upper() for label in labels))
+            self.assertFalse(any("NASDAQ" in label.upper() for label in labels))
+            self.assertFalse(any("TELEGRAM" in label.upper() for label in labels))
+        source = open(ab.__file__, encoding="utf-8").read()
+        self.assertIn('"text": "🤖 Ouvrir mon menu ALIGN"', source)
+        self.assertIn('"text": "🤖 Mon bot", "url": lien("mon_bot")', source)
+
     def test_ancien_bouton_nasdaq_est_refuse_et_remplace_par_menu_btc_gold(self):
         update = {
             "update_id": 910,
