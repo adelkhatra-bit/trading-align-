@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import pathlib
+import textwrap
 import unittest
 
 import align_bot as ab
@@ -20,6 +21,14 @@ class TradingViewBridgeGateTests(unittest.TestCase):
         )
         self.assertIn("Bridge TradingView obligatoire — échec signalé", WORKFLOW_SOURCE)
         self.assertIn("exit 1", WORKFLOW_SOURCE)
+
+
+    def test_bridge_preflight_embedded_python_compiles(self):
+        section = WORKFLOW_SOURCE.split("name: Vérifier le bridge TradingView ROBOT V12", 1)[1]
+        start = section.index("if python3 - <<'PY'\\n") + len("if python3 - <<'PY'\\n")
+        end = section.index("\\n          PY\\n          then", start)
+        source = textwrap.dedent(section[start:end])
+        compile(source, "<align-tv-bridge-preflight>", "exec")
 
     def test_preflight_waits_for_fresh_snapshots_without_relaxing_bridge_guards(self):
         self.assertIn("deadline = time.monotonic() + 120", WORKFLOW_SOURCE)
