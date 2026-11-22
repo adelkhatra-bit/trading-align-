@@ -24,7 +24,7 @@ class LiveVoiceNarration(unittest.TestCase):
     def test_ai_comments_still_spoken(self):
         self.assertIn("coeurs(1, ['🧠', '📡'], undefined, phrase, anglais)", self.source)
         self.assertIn("const dureeFR = parlerLive(fr);", self.source)
-        self.assertIn("if (dureeFR > 0 && en.anglaisTraduit) parlerLive(en);", self.source)", self.source)
+        self.assertIn("if (dureeFR > 0 && en.anglaisTraduit) parlerLive(en);", self.source)
 
 
 if __name__ == "__main__":
