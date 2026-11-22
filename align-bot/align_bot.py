@@ -5840,12 +5840,15 @@ def menu_chaine(etat, m):
 MENU_CHAINE_VERSION = 2
 CLAVIER_VERSION = 5  # Migration Telegram : supprimer le clavier NASDAQ conservé chez les anciens chats
 
-def renvoyer_claviers(etat, chats):
+def renvoyer_claviers(etat, chats, uniquement_chats=False):
     """Envoie le clavier courant aux chats dont la version est obsolète; valide la migration après succès Telegram."""
     if not TOKEN:
         return
     vus = etat.setdefault("clavier_v", {})
-    for cid in sorted(({str(c) for c in chats} | {str(c) for c in etat.get("prospects", [])}) - {str(etat.get("canal") or "")})[:30]:
+    cibles = {str(c) for c in chats}
+    if not uniquement_chats:
+        cibles |= {str(c) for c in etat.get("prospects", [])}
+    for cid in sorted(cibles - {str(etat.get("canal") or "")})[:30]:
         if vus.get(cid) == CLAVIER_VERSION:
             continue
         en = cid in LANG_EN
@@ -5869,7 +5872,7 @@ def renvoyer_clavier_sur_interaction(etat, update):
     TELEGRAM_PULL_CONTEXT.chat_id = cid
     TELEGRAM_PULL_CONTEXT.private = True
     try:
-        renvoyer_claviers(etat, {cid})
+        renvoyer_claviers(etat, {cid}, uniquement_chats=True)
     finally:
         TELEGRAM_PULL_CONTEXT.chat_id = ancien_chat
         TELEGRAM_PULL_CONTEXT.private = ancien_prive
