@@ -30,6 +30,19 @@ class SuiviMarchesTest(unittest.TestCase):
         self.assertNotIn("NASDAQ", t)
         self.assertIn("🟠 BTC : ⬜ non suivi", t)
 
+
+    def test_reply_keyboards_have_no_nasdaq_or_telegram_button(self):
+        for raw in (ab.CLAVIER, ab.CLAVIER_VISITEUR):
+            labels = [
+                str(button.get("text", ""))
+                for row in json.loads(raw).get("keyboard", [])
+                for button in row
+            ]
+            self.assertTrue(any("BTC" in label.upper() for label in labels))
+            self.assertTrue(any("GOLD" in label.upper() for label in labels))
+            self.assertFalse(any("NASDAQ" in label.upper() for label in labels))
+            self.assertFalse(any("TELEGRAM" in label.upper() for label in labels))
+
     def test_ancien_bouton_nasdaq_est_refuse_et_remplace_par_menu_btc_gold(self):
         update = {
             "update_id": 910,
