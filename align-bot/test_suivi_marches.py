@@ -43,6 +43,29 @@ class SuiviMarchesTest(unittest.TestCase):
             self.assertFalse(any("NASDAQ" in label.upper() for label in labels))
             self.assertFalse(any("TELEGRAM" in label.upper() for label in labels))
 
+    def test_keyboard_version_bump_replaces_legacy_nasdaq_for_existing_chat(self):
+        state = {"clavier_v": {"42": 2}, "prospects": []}
+        ab.renvoyer_claviers(state, {"42"})
+        sends = [kw for method, kw in self.envois if method == "sendMessage"]
+        self.assertEqual(len(sends), 1)
+        keyboard = json.loads(sends[0]["reply_markup"])["keyboard"]
+        labels = [button["text"] for row in keyboard for button in row]
+        self.assertFalse(any("NASDAQ" in label.upper() for label in labels))
+        self.assertTrue(any("BTC" in label.upper() for label in labels))
+        self.assertTrue(any("GOLD" in label.upper() for label in labels))
+        self.assertEqual(state["clavier_v"]["42"], 3)
+        ab.renvoyer_claviers(state, {"42"})
+        self.assertEqual(len([kw for method, kw in self.envois if method == "sendMessage"]), 1)
+
+    def test_keyboard_migration_failed_send_does_not_mark_version_and_retries(self):
+        state = {"clavier_v": {"42": 2}, "prospects": []}
+        with mock.patch.object(ab, "_envoi_sur", return_value=None):
+            ab.renvoyer_claviers(state, {"42"})
+        self.assertEqual(state["clavier_v"]["42"], 2)
+        with mock.patch.object(ab, "_envoi_sur", return_value={"ok": True}):
+            ab.renvoyer_claviers(state, {"42"})
+        self.assertEqual(state["clavier_v"]["42"], 3)
+
     def test_ancien_bouton_nasdaq_est_refuse_et_remplace_par_menu_btc_gold(self):
         update = {
             "update_id": 910,
