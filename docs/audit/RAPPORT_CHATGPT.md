@@ -247,3 +247,36 @@ ALIGN_TV_LOCAL_URL
 ALIGN_TV_MAILBOX_URL
 ALIGN_TV_RELAY_INTERVAL
 ```
+
+
+## Addendum — corrections obligatoires et inventaire P0 (23 novembre 2026)
+
+### Corrections des chiffres
+- **live-data :** SHA de tête confirmé par Adel = `73c28134`; compteur indiqué = **4 563 commits**. Les anciennes valeurs `9ab907af` / `4 209` du rapport précédent sont obsolètes et doivent être remplacées. Le SHA complet et le nombre de commits restent **NON VÉRIFIÉS par lecture API dans ce addendum**.
+- **PR #770 :** selon les informations fournies par Adel, elle a été fusionnée dans `live-data` au commit `100a89e1`, avec modifications de `align_bot.py` et `test_align_mtf.py`. Ceci est un écart à la règle « aucun code dans live-data ». À traiter comme incident de gouvernance/historique : ne pas réécrire ni supprimer; préserver la preuve; proposer à Adel une stratégie corrective (snapshot de la ref, analyse du diff, puis décision explicite de restauration/reconstruction uniquement après autorisation écrite). Aucun cherry-pick/merge automatique vers `main`.
+- **Fichiers racine :** référence annoncée par Adel = **95 fichiers .md/.bat/.json**, dont **80 non cités par nom** dans le relevé antérieur. Le relevé précédent ne contient que **78 noms** dans l'annexe A; il ne réconcilie donc pas le décompte et ne peut être considéré comme la liste exacte des 80. Les 78 noms déjà listés restent un relevé provisoire, sans suppression ni archivage. L'extraction complète de 95 noms, puis la comparaison nom par nom avec les 80 attendus, est **NON VÉRIFIÉE**.
+
+### P0 — Inventaire de branchements, lecture seule obligatoire
+
+Les items suivants restent à obtenir par commande/API et sortie sauvegardée; aucune configuration n'est modifiée :
+
+1. **GitHub Pages** — GET `/repos/adelkhatra-bit/trading-align-/pages`: branche source et dossier servi. **NON VÉRIFIÉ** dans ce addendum.
+2. **Cloudflare Worker `align-tv-mailbox`** — branche de build et chemin surveillé; configuration textuelle/capture de texte à fournir. Aucun accès Cloudflare ni preuve de configuration n'est établi ici. **NON VÉRIFIÉ**.
+3. **Workflows** — extraire chaque `branches:` de tous les fichiers `.github/workflows/*.yml` et noter l'événement/branche attendue. **NON VÉRIFIÉ**.
+4. **Rulesets** — règles actives ciblant `main` et `live-data`. Lecture API des rulesets requise; règles actives **NON VÉRIFIÉES**.
+5. **Dernier run `align-bot.yml` sur `main`** — conclusion, URL/run ID et job/étape en échec (ou preuve de succès). **NON VÉRIFIÉ**; en l'absence de cette preuve, l'état « ça fonctionne » demeure NON VÉRIFIÉ.
+
+### Plan P0–P8 (sans exécution avant accord écrit)
+- **P0** Inventaire ci-dessus, rapport uniquement.
+- **P1** `live-data`: plan de réécriture vers les seuls `live.json` et `fermes.json`, chemins inchangés; soumettre à Adel. Aucun write avant accord.
+- **P2** `state.json`: migration générique BTC/GOLD seulement, sans nommer le marché retiré; fixtures préférences, archives et clés hors marché; production uniquement après merge.
+- **P3** callbacks inconnus: route générique vers menu BTC/GOLD; aucun bouton sans action.
+- **P4** retrait ciblé du marché retiré dans `align_bot.py`, `align-bot.yml`, `scripts/align_workflow_watchdog.py`, une PR par bloc.
+- **P5** remplacer tests « marché retiré refusé » par « marché inconnu refusé »; aucune protection retirée sans remplacement.
+- **P6** docs/archives seulement après accord d'Adel.
+- **P7** Telegram réel uniquement sur canal de test explicitement autorisé, après merge; jamais sur canal client.
+- **P8** rapport final avec preuves vérifiables.
+
+### Règles rappelées
+Tout merge sur `main` redémarre le bot : avertir Adel avant chaque merge. Aucun code dans `live-data`. Pas de suppression de branche sans manifeste (nom, SHA, bundle et SHA-256). Pas de réécriture d'historique sans accord écrit. Aucun ordre/trading réel, aucun changement à l'indicateur TradingView.
+
