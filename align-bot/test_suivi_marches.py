@@ -53,7 +53,7 @@ class SuiviMarchesTest(unittest.TestCase):
         self.assertFalse(any("NASDAQ" in label.upper() for label in labels))
         self.assertTrue(any("BTC" in label.upper() for label in labels))
         self.assertTrue(any("GOLD" in label.upper() for label in labels))
-        self.assertEqual(state["clavier_v"]["42"], 4)
+        self.assertEqual(state["clavier_v"]["42"], 5)
         ab.renvoyer_claviers(state, {"42"})
         self.assertEqual(len([kw for method, kw in self.envois if method == "sendMessage"]), 1)
 
@@ -64,24 +64,25 @@ class SuiviMarchesTest(unittest.TestCase):
         self.assertEqual(state["clavier_v"]["42"], 2)
         with mock.patch.object(ab, "_envoi_sur", return_value={"ok": True}):
             ab.renvoyer_claviers(state, {"42"})
-        self.assertEqual(state["clavier_v"]["42"], 4)
+        self.assertEqual(state["clavier_v"]["42"], 5)
 
 
-    def test_coach_menu_shortcuts_remain_available_while_nasdaq_is_removed(self):
+    def test_visible_mon_bot_shortcut_removed_but_commands_still_available(self):
         for raw in (ab.CLAVIER, ab.CLAVIER_VISITEUR):
             labels = [
                 str(button.get("text", ""))
                 for row in json.loads(raw).get("keyboard", [])
                 for button in row
             ]
-            self.assertTrue(any("MON BOT" in label.upper() for label in labels))
-            self.assertFalse(any("NASDAQ" in label.upper() for label in labels))
+            self.assertFalse(any(label == "🤖 Mon bot" for label in labels))
             self.assertFalse(any("TELEGRAM" in label.upper() for label in labels))
-        # Keep the channel/VIP shortcuts that open the same bot menu.
+            self.assertFalse(any("NASDAQ" in label.upper() for label in labels))
         source = open(ab.__file__, encoding="utf-8").read()
-        self.assertIn('"text": "🤖 Mon bot", "url": lien("mon_bot")', source)
-        self.assertIn('"text": "🤖 Ouvrir mon menu ALIGN", "url": lien("boutons")', source)
-        self.assertIn("CLAVIER_VERSION = 4", source)
+        self.assertNotIn('"text": "🤖 Mon bot"', source)
+        self.assertNotIn('"text": "🤖 Ouvrir mon menu ALIGN"', source)
+        self.assertIn("CLAVIER_VERSION = 5", source)
+        # The /mon_bot command remains available to users who prefer commands.
+        self.assertIn('"/mon_bot": "🤖 Mon bot"', source)
 
     def test_ancien_bouton_nasdaq_est_refuse_et_remplace_par_menu_btc_gold(self):
         update = {
