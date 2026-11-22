@@ -80,7 +80,7 @@ class SuiviMarchesTest(unittest.TestCase):
         source = open(ab.__file__, encoding="utf-8").read()
         self.assertIn('"text": "🤖 Mon bot"', source)
         self.assertIn('"text": "🤖 Ouvrir mon menu ALIGN"', source)
-        self.assertIn('"text": "🤖 Mon bot", "callback_data": "botmenu:x"', source)
+        self.assertIn('"text": "🤖 Mon bot", "url": lien("mon_bot")', source)
         self.assertIn("CLAVIER_VERSION = 5", source)
         self.assertIn('"/mon_bot": "🤖 Mon bot"', source)
 
