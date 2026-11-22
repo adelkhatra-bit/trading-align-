@@ -5841,7 +5841,7 @@ def menu_chaine(etat, m):
 
 
 MENU_CHAINE_VERSION = 2
-CLAVIER_VERSION = 5  # Migration Telegram : NASDAQ et raccourcis « Mon bot » retirés
+CLAVIER_VERSION = 5  # Migration Telegram : NASDAQ retiré; raccourci Coach / Mon bot conservé
 
 def renvoyer_claviers(etat, chats):
     """Envoie le clavier courant aux personnes dont la version est ancienne; ne valide la version qu'après succès Telegram."""
