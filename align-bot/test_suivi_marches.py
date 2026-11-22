@@ -69,16 +69,18 @@ class SuiviMarchesTest(unittest.TestCase):
             ab.renvoyer_claviers(state, {"42"})
         self.assertEqual(state["clavier_v"]["42"], 5)
 
-    def test_coach_button_kept_in_reply_and_vip_menus(self):
+    def test_visible_mon_bot_shortcuts_removed_from_reply_and_inline_menus(self):
         for raw in (ab.CLAVIER, ab.CLAVIER_VISITEUR):
             labels = [str(button.get("text", "")) for row in json.loads(raw).get("keyboard", []) for button in row]
-            self.assertTrue(any("MON BOT" in label.upper() for label in labels))
+            self.assertFalse(any("MON BOT" in label.upper() for label in labels))
             self.assertFalse(any("NASDAQ" in label.upper() for label in labels))
             self.assertFalse(any("TELEGRAM" in label.upper() for label in labels))
         with open(ab.__file__, encoding="utf-8") as source_file:
             source = source_file.read()
-        self.assertIn('"text": "🤖 Ouvrir mon menu ALIGN"', source)
-        self.assertIn('"text": "🤖 Mon bot", "url": lien("mon_bot")', source)
+        self.assertNotIn('"text": "🤖 Ouvrir mon menu ALIGN"', source)
+        self.assertNotIn('"text": "🤖 Mon bot", "url": lien("mon_bot")', source)
+        self.assertNotIn('"callback_data": "botmenu:x"', source)
+        self.assertIn('"/mon_bot"', source)
 
     def test_ancien_bouton_nasdaq_est_refuse_et_remplace_par_menu_btc_gold(self):
         update = {
