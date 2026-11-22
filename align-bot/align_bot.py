@@ -13501,8 +13501,9 @@ def un_tour(etat, chats):
             preparer_chaines(etat)
             epingler_menus_chaines(etat)
             epingler_compte_finance(etat)          # v8.9 : message « compte financé » épinglé
-            if ENVOI_CLAVIER_SPONTANE:
-                renvoyer_claviers(etat, chats)
+            # Migration silencieuse des claviers retirés : versionnée, non répétée, indépendante
+            # du réglage de messages spontanés. La fonction ne renvoie rien si la version est actuelle.
+            renvoyer_claviers(etat, chats)
         except Exception as ex:
             print("préparer chaînes", ex)
         for nom_marche in MARCHES:
