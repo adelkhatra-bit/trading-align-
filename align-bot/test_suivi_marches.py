@@ -71,7 +71,12 @@ class SuiviMarchesTest(unittest.TestCase):
         self.addCleanup(setattr, ab, "TELEGRAM_PULL_MODE", old_mode)
         self.addCleanup(setattr, ab.TELEGRAM_PULL_CONTEXT, "chat_id", old_chat)
         self.addCleanup(setattr, ab.TELEGRAM_PULL_CONTEXT, "private", old_private)
-        with mock.patch.object(ab, "TOKEN", "test"):
+        def faux_telegram_pull(methode, **kw):
+            if not ab._telegram_sortant_autorise(methode, kw):
+                return {"ok": False, "result": None, "blocked_by_pull_mode": True}
+            self.envois.append((methode, kw))
+            return {"ok": True, "result": {"message_id": 1}}
+        with mock.patch.object(ab, "TOKEN", "test"), mock.patch.object(ab, "telegram", faux_telegram_pull):
             ab.renvoyer_claviers(state, {"42"})
         self.assertEqual(self.envois, [])
         self.assertEqual(state["clavier_v"]["42"], 2)
