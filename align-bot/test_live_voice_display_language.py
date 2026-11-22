@@ -47,8 +47,10 @@ class LiveVoiceDisplayLanguage(unittest.TestCase):
         source = LIVE_JS.read_text(encoding="utf-8")
         self.assertIn("function parlerLive(item, forcer = false)", source)
         self.assertIn("if (!voixActive || !item", source)
-        self.assertIn("const voixDuree = parlerLive(m);", source)
+        self.assertIn("const voixDuree = 0;", source)
         self.assertIn("item.source !== 'ia'", source)
+        self.assertIn("const dureeFR = parlerLive(fr);", source)
+        self.assertNotIn("parlerLive(m)", source)
         self.assertIn("Math.max(4000, (W + w) / 0.38, voixDuree)", source)
         self.assertIn("window.speechSynthesis.speak(utterance)", source)
 
