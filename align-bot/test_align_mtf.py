@@ -3351,3 +3351,95 @@ class TestMessagesPropres(unittest.TestCase):
         r["dirs"][:5] = [-1, -1, -1, -1, -1]
         self.assertIsNone(align_bot.alerte_retournement("BTC", r, tr))
         self.assertNotIn("ret_dit", tr)
+
+
+class CanonicalPineV25PlanParserTest(unittest.TestCase):
+    # Regression coverage for structured v25 payloads while retaining v24 compatibility.
+    def _snapshot(self, robot, fresh=True, confirmed=True):
+        return {"tv_indicator_mtf": {"available": True, "activeTimeframe": "M15", "snapshots": {
+            "M15": {"fresh": fresh, "confirmed": confirmed, "robotV12": robot}
+        }}}
+
+    def _long_plan(self):
+        return {
+            "signal": "LONG", "entry": 101, "sl": 99, "tp1": 105, "tp2": 108,
+            "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+            "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
+            "entryBarTime": 900000, "entryBarOpen": 100.5, "entryBarHigh": 102.5,
+            "entryBarLow": 99.5, "entryBarClose": 101.5, "entryTriggered": True,
+            "confirmed": True,
+        }
+
+    def test_v25_plan_parses_m15_entry_sl_tp_zone_and_confirmed_trigger(self):
+        plan = align_bot.plan_indicateur(self._snapshot(self._long_plan()))
+        self.assertTrue(plan["available"], plan.get("reason"))
+        self.assertEqual((plan["plan_timeframe"], plan["entry_timeframe"], plan["strategy"]), ("M15", "M5", "DAY"))
+        self.assertEqual((plan["entry"], plan["sl"], plan["tp1"], plan["tp2"]), (101, 99, 105, 108))
+        self.assertEqual((plan["zone_low"], plan["decision"], plan["zone_high"]), (100, 101, 102))
+        self.assertTrue(plan["triggered"])
+        self.assertTrue(plan["confirmed"])
+
+    def test_v25_short_plan_uses_short_geometry_and_trigger(self):
+        robot = {
+            "signal": "SHORT", "entry": 100, "sl": 102, "tp1": 96, "tp2": 92,
+            "planTimeframe": "M15", "entryTimeframe": "M1", "strategy": "SCALPING",
+            "entryZoneLow": 99, "entryZoneHigh": 101, "entryDecision": 100,
+            "entryBarTime": 900000, "entryBarOpen": 100.5, "entryBarHigh": 101.0,
+            "entryBarLow": 99.0, "entryBarClose": 99.5, "entryTriggered": True,
+            "confirmed": True,
+        }
+        plan = align_bot.plan_indicateur(self._snapshot(robot))
+        self.assertTrue(plan["available"], plan.get("reason"))
+        self.assertEqual((plan["entry"], plan["sl"], plan["tp1"], plan["tp2"]), (100, 102, 96, 92))
+        self.assertTrue(plan["triggered"])
+
+    def test_v25_incomplete_or_wrong_timeframe_schema_fails_closed(self):
+        robot = self._long_plan()
+        robot.pop("entryBarHigh")
+        self.assertFalse(align_bot.plan_indicateur(self._snapshot(robot))["available"])
+        robot = self._long_plan()
+        robot["entryTimeframe"] = "H1"
+        self.assertFalse(align_bot.plan_indicateur(self._snapshot(robot))["available"])
+
+    def test_v25_unconfirmed_plan_is_available_but_not_triggered(self):
+        robot = self._long_plan()
+        robot["entryTriggered"] = False
+        robot["confirmed"] = False
+        plan = align_bot.plan_indicateur(self._snapshot(robot, confirmed=False))
+        self.assertTrue(plan["available"], plan.get("reason"))
+        self.assertFalse(plan["triggered"])
+        self.assertFalse(plan["confirmed"])
+
+    def test_v25_invalid_zone_or_tp_order_fails_closed(self):
+        robot = self._long_plan()
+        robot["entryZoneLow"] = 98.5
+        self.assertFalse(align_bot.plan_indicateur(self._snapshot(robot))["available"])
+        robot = self._long_plan()
+        robot["tp2"] = 104
+        self.assertFalse(align_bot.plan_indicateur(self._snapshot(robot))["available"])
+
+
+class CanonicalPineTelegramPlanSummaryTest(unittest.TestCase):
+    def test_telegram_plan_summary_shows_tp1_tp2_and_trigger_status(self):
+        plan = {"available": True, "entry": 101, "sl": 99, "tp": 105, "tp1": 105,
+                 "tp2": 108, "triggered": False}
+        summary = align_bot.texte_plan_indicateur_tv(plan)
+        self.assertIn("Entrée 101", summary)
+        self.assertIn("SL 99", summary)
+        self.assertIn("TP1 105 • TP2 108", summary)
+        self.assertIn("déclenchement en attente", summary)
+
+    def test_legacy_plan_summary_keeps_single_target_format(self):
+        plan = {"available": True, "entry": 101, "sl": 99, "tp": 105}
+        summary = align_bot.texte_plan_indicateur_tv(plan)
+        self.assertIn("Entrée 101", summary)
+        self.assertIn("SL 99", summary)
+        self.assertIn("TP 105", summary)
+        self.assertNotIn("TP2", summary)
+
+    def test_legacy_payload_with_tp1_tp2_metadata_still_uses_legacy_parser(self):
+        robot = {"signal": "LONG", "entry": 100, "sl": 98, "tp": 104, "tp1": 103, "tp2": 106}
+        plan = align_bot.plan_indicateur(self._snapshot(robot))
+        self.assertTrue(plan["available"], plan.get("reason"))
+        self.assertEqual(plan["tp"], 104)
+        self.assertNotIn("plan_timeframe", plan)
