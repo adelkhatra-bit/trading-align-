@@ -55,7 +55,7 @@ class SuiviMarchesTest(unittest.TestCase):
             self.assertFalse(any("TELEGRAM" in label.upper() for label in labels))
             self.assertTrue(any("BTC" in label.upper() for label in labels))
             self.assertTrue(any("GOLD" in label.upper() for label in labels))
-            self.assertTrue(any("MON BOT" in label.upper() for label in labels))
+            self.assertFalse(any("MON BOT" in label.upper() for label in labels))
             self.assertEqual(state["clavier_v"]["42"], 5)
             ab.renvoyer_claviers(state, {"42"})
             self.assertEqual(len([kw for method, kw in self.envois if method == "sendMessage"]), 1)
