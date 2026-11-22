@@ -528,7 +528,7 @@
     flash.innerHTML = '<span>' + esc(m.texte) + '</span>';   // le message défile vite (lisible sur téléphone, même si TikTok coupe les bords)
     flash.className = 'flash' + (m.g ? ' ' + m.g : m.bulle ? ' bulle' : '') + (m.en ? ' en' : '');
     bande.classList.add('on');
-    const voixDuree = parlerLive(m); // seule la narration IA est prononcée ; la durée visuelle suit sa lecture
+    const voixDuree = 0; // La voix IA est déclenchée par afficherIA au moment de la petite bulle, jamais par la bande.
     const sp = flash.firstChild, W = bande.clientWidth, w = sp.offsetWidth;
     const dur = Math.max(4000, (W + w) / 0.38, voixDuree);      // v5.4 : plus rapide (info en temps réel), toujours lisible
     animCur = sp.animate([{ transform: 'translateX(' + W + 'px)' }, { transform: 'translateX(' + (-w) + 'px)' }], { duration: dur, easing: 'linear' });
@@ -642,9 +642,16 @@
   // La bulle, le ping sur le prix et la lueur neutre signalent un commentaire du coach, pas un signal d'entrée.
   function afficherIA(texte) {
     const phrase = String(texte || '').trim();
-    if (!phrase || occupe || file.length) return false;
-    montrer('🧠 ' + phrase, false, 2, 'membre', false, 'ia');
-    coeurs(1, ['🧠', '📡']);
+    if (!phrase) return false; // Le vocal et la petite bulle IA sont indépendants de la file de la bande.
+    const anglais = enAnglais(phrase), marche = codeMarche();
+    const fr = { texte: '🇫🇷 ' + plateforme(phrase), source: 'ia', en: false, market: marche };
+    const en = { texte: '🇬🇧 ' + plateforme(anglais), source: 'ia', en: true, anglaisTraduit: anglais !== phrase, market: marche };
+    fr.replayEN = en; // Si la voix FR arrive après voiceschanged, la lecture EN reste attachée au même commentaire.
+    dernierCommentaireIA = { fr, en: en.anglaisTraduit ? en : null, market: marche };
+    // Le commentaire IA apparaît dans la petite bulle et déclenche son vocal, jamais la bande défilante.
+    coeurs(1, ['🧠', '📡'], undefined, phrase, anglais);
+    const dureeFR = parlerLive(fr);
+    if (dureeFR > 0 && en.anglaisTraduit) parlerLive(en);
     lueur(0);
     return true;
   }
@@ -1119,7 +1126,7 @@
     ['🧲 LE PRIX CHERCHE LA LIQUIDITÉ', '🧲 PRICE IS HUNTING LIQUIDITY'],
   ];
   let titreN = 0;
-  function coeurs(n, liste, sensForce) {
+  function coeurs(n, liste, sensForce, commentaireIA, commentaireIAEN) {
     try {
       const cle = (liste || []).join(''), g = PUNCH.find(x => x[0].test(cle)) || PUNCH[PUNCH.length - 1];
       const [fr, en] = g[1 + (punchN++ % (g.length - 1))], tok = ++punchTok;
@@ -1127,7 +1134,7 @@
       if (g === PUNCH[PUNCH.length - 1] || /😊|😏|⏰|👆|🙏|💬|📢/.test(cle)) e.dataset.bas = '1';   // v8.1 : pastille de motivation → en bas vers le tableau de bord
       // v7.8 (demande d'Adel) : la pastille parle la MÊME langue que la bande du haut (FR avec FR, EN avec EN) pour éviter les confusions
       const parts = (txt, defEmo) => { const m = txt.split(' '); const em = /^\p{Extended_Pictographic}/u.test(m[0]) ? m.shift() : defEmo; return [em, m.join(' ')]; };
-      const [emoFr, txtFr] = parts(fr, '💬'), [emoEn, txtEn] = parts(en, emoFr);
+      const [emoFr, txtFr] = commentaireIA ? parts(commentaireIA, '🧠') : parts(fr, '💬'), [emoEn, txtEn] = commentaireIAEN ? parts(commentaireIAEN, emoFr) : parts(en, emoFr);
       let lgCour = null; titreN++;
       const affiche = lg => { lgCour = lg; e.classList.toggle('en', lg === 'en'); const [em, tx] = lg === 'en' ? [emoEn, txtEn] : [emoFr, txtFr];
         e.innerHTML = '<span class="qui">' + TITRES_PUNCH[titreN % TITRES_PUNCH.length][lg === 'en' ? 1 : 0] + '</span><span class="emo">' + esc(em) + '</span> <span class="txt">' + esc(tx) + '</span>';
