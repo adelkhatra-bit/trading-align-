@@ -3311,7 +3311,6 @@ def _telegram_sortant_autorise(methode, params):
         marches_signal = marches_message(texte)
         silencieux = {str(x) for x in (etat.get("quiet") or [])}
         if (bot_on(etat, cid) and cid not in silencieux
-                and contient_niveaux(texte)
                 and any(m in marches_signal and m in marches_choisis(etat, cid) for m in MARCHES)):
             return True
     # Les abonnements « Alertes BTC/GOLD » sont un opt-in explicite séparé de la recherche live.
