@@ -317,3 +317,10 @@ Tout merge sur `main` redémarre le bot : avertir Adel avant chaque merge. Aucun
 - `docs/ALIGN_SOURCE_DE_VERITE.md` mis à jour sur la branche d'audit uniquement; tableau branches / rôle / lecteurs / écrivains ajouté, avec lecteurs Pages/Cloudflare explicitement marqués non vérifiés.
 - Commit : `324350d8bcd73d25ab334e53fd715a8cf824d0d9`; blob : `61b9f42f43af6ed569545f870dbacf31f7a43850`.
 - Aucun autre document de source de vérité créé. Aucun changement sur `main` ou `live-data`.
+
+
+### E1 — checks GitHub du PR #779 (lecture du 23/11/2026 00:49 CET)
+- `CI Integration Tests` run **45085342038** : completed / success. Job `integration_tests`, steps 1–9 et cleanup success; test backend smoke passed. URL : https://github.com/adelkhatra-bit/trading-align-/actions/runs/45085342038
+- `ALIGN MTF validation` run **45085342088** : `in_progress`. Job `validate`; steps 1–12 success, step 13 **Run complete MTF regression suite** in progress. URL : https://github.com/adelkhatra-bit/trading-align-/actions/runs/45085342088
+- Fetch des workflow runs associés au commit PR `dc37d53f64a844e4275d47e18e5e56bf1afa74c9` ne retourne que CI Integration Tests et ALIGN MTF validation; aucun run `align-bot.yml` n'apparaît dans cette liste de runs PR. Cela confirme qu'aucune relance bot production n'a été observée associée au commit PR à cette heure.
+- **PR #779 reste ouverte, non fusionnée.** Attendre la conclusion du MTF validation; ne pas merger.
