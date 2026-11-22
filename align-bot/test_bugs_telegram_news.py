@@ -94,7 +94,7 @@ class TelegramPullAuthorization(unittest.TestCase):
             "quiet": [],
             "bot_off": [],
         }
-        entry_btc = "🟠 BTC - LONG\n📍 Entrée 65000\n🛑 SL 64000\n🎯 TP1 67000"
+        entry_btc = "🟢 BTC - LONG\n📍 Entrée 65000\n🛑 SL 64000\n🎯 TP1 67000"
         entry_gold = "🟢 GOLD - LONG\n📍 Entrée 4000\n🛑 SL 3980\n🎯 TP1 4040"
         with mock.patch.object(ab, "DERNIER_ETAT", state):
             self.assertTrue(ab._telegram_sortant_autorise(
