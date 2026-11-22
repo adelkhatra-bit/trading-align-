@@ -5838,21 +5838,24 @@ def menu_chaine(etat, m):
 
 
 MENU_CHAINE_VERSION = 2
-CLAVIER_VERSION = 2
+CLAVIER_VERSION = 5  # Migration Telegram : supprimer le clavier NASDAQ conservé chez les anciens chats
 
 def renvoyer_claviers(etat, chats):
-    """Nouveau clavier (moins de boutons, VIP / Live en bas) : envoyé UNE fois à chaque personne, sans son, puis plus jamais."""
+    """Envoie le clavier courant aux chats dont la version est obsolète; valide la migration après succès Telegram."""
     if not TOKEN:
         return
     vus = etat.setdefault("clavier_v", {})
     for cid in sorted(({str(c) for c in chats} | {str(c) for c in etat.get("prospects", [])}) - {str(etat.get("canal") or "")})[:30]:
         if vus.get(cid) == CLAVIER_VERSION:
             continue
-        vus[cid] = CLAVIER_VERSION               # marqué avant l'envoi : jamais 2 fois, même si Telegram répond mal
         en = cid in LANG_EN
         kb = CLAVIER if autorise(etat, cid, cid) else CLAVIER_VISITEUR
-        _envoi_sur(cid, text=("⬇️ New buttons, simpler 👇" if en else "⬇️ Nouveaux boutons, plus simples 👇"),
-                   reply_markup=traduire_clavier(kb) if en else kb, disable_notification="true")
+        res = _envoi_sur(cid, text=("⬇️ New buttons, simpler 👇" if en else "⬇️ Nouveaux boutons, plus simples 👇"),
+                         reply_markup=traduire_clavier(kb) if en else kb, disable_notification="true")
+        if isinstance(res, dict) and res.get("ok") is True:
+            vus[cid] = CLAVIER_VERSION
+        else:
+            print("TELEGRAM_KEYBOARD_MIGRATION_FAILED", cid, flush=True)
 
 def epingler_menus_chaines(etat):
     """Une fois par version : le menu de chaque chaîne est publié puis épinglé (échec = nouvel essai dans 1 h)."""
@@ -13498,8 +13501,8 @@ def un_tour(etat, chats):
             preparer_chaines(etat)
             epingler_menus_chaines(etat)
             epingler_compte_finance(etat)          # v8.9 : message « compte financé » épinglé
-            if ENVOI_CLAVIER_SPONTANE:
-                renvoyer_claviers(etat, chats)
+            # Migration silencieuse des anciens claviers : versionnée, indépendante des pushes spontanés.
+            renvoyer_claviers(etat, chats)
         except Exception as ex:
             print("préparer chaînes", ex)
         for nom_marche in MARCHES:
