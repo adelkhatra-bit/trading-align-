@@ -67,19 +67,20 @@ class SuiviMarchesTest(unittest.TestCase):
         self.assertEqual(state["clavier_v"]["42"], 4)
 
 
-    def test_visible_telegram_bot_shortcut_is_removed_from_all_menus(self):
+    def test_coach_menu_shortcuts_remain_available_while_nasdaq_is_removed(self):
         for raw in (ab.CLAVIER, ab.CLAVIER_VISITEUR):
             labels = [
                 str(button.get("text", ""))
                 for row in json.loads(raw).get("keyboard", [])
                 for button in row
             ]
-            self.assertFalse(any("MON BOT" in label.upper() for label in labels))
+            self.assertTrue(any("MON BOT" in label.upper() for label in labels))
+            self.assertFalse(any("NASDAQ" in label.upper() for label in labels))
             self.assertFalse(any("TELEGRAM" in label.upper() for label in labels))
-        # The shortcut also existed as inline buttons in channel/VIP menus.
+        # Keep the channel/VIP shortcuts that open the same bot menu.
         source = open(ab.__file__, encoding="utf-8").read()
-        self.assertNotIn('"text": "🤖 Mon bot"', source)
-        self.assertNotIn('"text": "🤖 Ouvrir mon menu ALIGN"', source)
+        self.assertIn('"text": "🤖 Mon bot", "url": lien("mon_bot")', source)
+        self.assertIn('"text": "🤖 Ouvrir mon menu ALIGN", "url": lien("boutons")', source)
         self.assertIn("CLAVIER_VERSION = 4", source)
 
     def test_ancien_bouton_nasdaq_est_refuse_et_remplace_par_menu_btc_gold(self):
