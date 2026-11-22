@@ -151,7 +151,7 @@ def plan_indicateur(r):
             return {"timeframe": preferred or None, "available": False,
                     "reason": "plan Pine v25 M15 / zone / bougie de validation incomplets"}
         if snap.get("fresh") is not True:
-            return {"timeframe": preferred, "available": False, "available": False,
+            return {"timeframe": preferred, "available": False,
                     "reason": "snapshot TradingView actif périmé"}
         if str(robot.get("planTimeframe") or "").upper() != "M15":
             return {"timeframe": preferred, "available": False,
