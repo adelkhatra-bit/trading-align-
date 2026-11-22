@@ -476,3 +476,13 @@ jobs:
         run: |
           echo "ÉCHEC: bridge TradingView ROBOT V12 indisponible (secrets ALIGN_TV_* absents ou données invalides). Aucun signal n'a été émis."
           exit 1
+
+      - name: Archiver le journal du relais TradingView (diagnostic sans payload)
+        # Ne pas archiver align_bridge.log : il peut contenir le token d'ingestion dans les chemins.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: align-tv-relay-log-${{ github.run_id }}
+          path: ${{ runner.temp }}/align_relais.log
+          if-no-files-found: warn
+          retention-days: 3
