@@ -3431,14 +3431,14 @@ def telegram(methode, **params):
 INDICATEUR_EN_VENTE = os.environ.get("INDICATEUR_EN_VENTE", "0") == "1"
 CLAVIER = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}],
                                    [{"text": "📊 Faire une analyse"}, {"text": "📡 Mes marchés"}, {"text": "🎙 Mes chaînes"}],
-                                   [{"text": "📈 Mes résultats"}, {"text": "📸 Partager mon gain"}],
+                                   [{"text": "🤖 Mon bot"}, {"text": "📈 Mes résultats"}, {"text": "📸 Partager mon gain"}],
                                    ([{"text": "🧩 Indicateur TradingView"}] if INDICATEUR_EN_VENTE else []) + [{"text": "🌐 English"}],
                                    [{"text": "🔴 Live"}]],
                       "resize_keyboard": True, "is_persistent": True, "input_field_placeholder": "Choisis une action ALIGN"})
 # Bot gratuit = accueil / inscriptions : peu de boutons ; « 🎙 Mes chaînes » donne le lien de la chaîne du marché + le coach.
 # Les boutons qui vendent (VIP, Live) restent tout en bas, comme épinglés.
 CLAVIER_VISITEUR = json.dumps({"keyboard": [[{"text": "🥇 Analyse Gold"}, {"text": "🟠 Analyse BTC"}, ],
-                                            [{"text": "🎙 Mes chaînes"}, {"text": "🌐 English"}],
+                                            [{"text": "🎙 Mes chaînes"}, {"text": "🤖 Mon bot"}, {"text": "🌐 English"}],
                                             [{"text": "💎 Devenir VIP"}, {"text": "🔴 Live"}]],
                                "resize_keyboard": True, "is_persistent": True, "input_field_placeholder": "Choisis une action ALIGN"})
 AVERTISSEMENT = ("ℹ️ Ce sont MES positions personnelles, partagées à titre informatif et éducatif. "
@@ -3693,18 +3693,19 @@ def analyse_marche(etat, pair):
     return r
 
 def boutons_canal(etat, texte):
-    """Boutons de suivi de position sous les messages VIP; aucun raccourci « Mon bot »."""
+    """Boutons de suivi et raccourci vers le Coach sous chaque message VIP."""
     bot = etat.get("bot") or "align_mtf_adel_bot"
     m = next((x for x in MARCHES if x in texte.split("\n")[0]), None)
     lien = lambda p: f"https://t.me/{bot}?start={p}"
     lignes = []
     position = m and (est_entree(texte) or any(k in texte for k in ("TP1", "TP2", "BE", "STOP", "Stop", "SL", "parti")))
-    # Chaîne VIP : boutons de suivi seulement sur une entrée; autres messages utilisent le menu rapide sans raccourci « Mon bot ».
+    # Bouton de suivi sur entrée, et accès Coach toujours présent.
     if position and est_entree(texte):
         lignes.append([{"text": "📍 Je prends cette position", "url": lien("rentre")}])
         lignes.append([{"text": "🙅 Pas rentré cette fois", "url": lien("pasrentre")}])
-    
-    return json.dumps({"inline_keyboard": lignes}) if lignes else boutons_menu_rapide(etat)
+
+    lignes.append([{"text": "🤖 Ouvrir mon menu ALIGN", "url": lien("boutons")}])
+    return json.dumps({"inline_keyboard": lignes})
 
 def boutons_auto_chaine(etat, cid):
     """Toute publication dans une chaîne ALIGN reçoit des boutons dessous (Telegram interdit le clavier du bas dans une chaîne).
@@ -3762,7 +3763,7 @@ def menu_canal_vip(etat):
     kb = json.dumps({"inline_keyboard": [
         [{"text": "🥇 Analyse Gold", "url": lien("analyse_gold")}, {"text": "🟠 Analyse BTC", "url": lien("analyse_btc")}],
         [{"text": "📊 Faire une analyse", "url": lien("faire_analyse")}, {"text": "📡 Mes marchés", "url": lien("marches")}],
-        [{"text": "📈 Mes résultats", "url": lien("resultats")}],
+        [{"text": "🤖 Mon bot", "url": lien("mon_bot")}, {"text": "📈 Mes résultats", "url": lien("resultats")}],
         [{"text": "📸 Partager mon gain", "url": lien("gain")}] + ([{"text": "🧩 Indicateur TradingView", "url": lien("indicateur")}] if INDICATEUR_EN_VENTE else []),
         [{"text": "🏆 Gagnantes", "url": lien("gagnantes")}, {"text": "❌ Perdantes", "url": lien("perdantes")}],
         [{"text": "🔴 Le live ALIGN", "url": LIVE_LIEN}]]})
@@ -5837,7 +5838,7 @@ def menu_chaine(etat, m):
 
 
 MENU_CHAINE_VERSION = 2
-CLAVIER_VERSION = 3  # Migration : clavier BTC/GOLD sans raccourci Mon bot
+CLAVIER_VERSION = 5  # Migration Telegram : NASDAQ retiré; raccourci Coach / Mon bot conservé
 
 def renvoyer_claviers(etat, chats):
     """Nouveau clavier (moins de boutons, VIP / Live en bas) : envoyé UNE fois à chaque personne, sans son, puis plus jamais."""
@@ -13500,8 +13501,8 @@ def un_tour(etat, chats):
             preparer_chaines(etat)
             epingler_menus_chaines(etat)
             epingler_compte_finance(etat)          # v8.9 : message « compte financé » épinglé
-            if ENVOI_CLAVIER_SPONTANE:
-                renvoyer_claviers(etat, chats)
+            # Migration silencieuse des anciens claviers : versionnée, indépendante des pushes spontanés.
+            renvoyer_claviers(etat, chats)
         except Exception as ex:
             print("préparer chaînes", ex)
         for nom_marche in MARCHES:
