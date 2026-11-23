@@ -68,3 +68,39 @@ class TelegramObservabiliteLogs(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TelegramPollerLifecycle(unittest.TestCase):
+    def run_tracee(self):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            ab.boucle_polling_telegram_tracee({}, {})
+        return out.getvalue().strip().splitlines()
+
+    def test_started_then_normal_stop(self):
+        ab.TELEGRAM_POLL_STOP.clear()
+        with patch.object(ab, "boucle_polling_telegram", return_value=None):
+            lignes = self.run_tracee()
+        self.assertEqual(lignes, ["TELEGRAM_POLLER_STARTED", "TELEGRAM_POLLER_STOPPED reason=normal"])
+
+    def test_stop_requested_reason(self):
+        ab.TELEGRAM_POLL_STOP.set()
+        try:
+            with patch.object(ab, "boucle_polling_telegram", return_value=None):
+                lignes = self.run_tracee()
+        finally:
+            ab.TELEGRAM_POLL_STOP.clear()
+        self.assertEqual(lignes[-1], "TELEGRAM_POLLER_STOPPED reason=stop_requested")
+
+    def test_exception_logged_then_reraised(self):
+        ab.TELEGRAM_POLL_STOP.clear()
+        out = io.StringIO()
+        with patch.object(ab, "boucle_polling_telegram", side_effect=RuntimeError("boom")):
+            with redirect_stdout(out):
+                with self.assertRaises(RuntimeError):
+                    ab.boucle_polling_telegram_tracee({}, {})
+        self.assertIn("TELEGRAM_POLLER_STOPPED reason=exception", out.getvalue())
+
+
+if __name__ == "__main__":
+    unittest.main()

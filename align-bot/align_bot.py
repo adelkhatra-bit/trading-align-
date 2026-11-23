@@ -13076,6 +13076,17 @@ def boucle_polling_telegram(etat, chats):
             TELEGRAM_UPDATES.put(update)
 
 
+def boucle_polling_telegram_tracee(etat, chats):
+    """Journalise le cycle de vie du thread de réception ; le comportement du polling reste celui de boucle_polling_telegram."""
+    print("TELEGRAM_POLLER_STARTED", flush=True)
+    try:
+        boucle_polling_telegram(etat, chats)
+    except BaseException:
+        print("TELEGRAM_POLLER_STOPPED reason=exception", flush=True)
+        raise
+    raison = "stop_requested" if TELEGRAM_POLL_STOP.is_set() else "normal"
+    print(f"TELEGRAM_POLLER_STOPPED reason={raison}", flush=True)
+
 def recevoir_updates_telegram(etat, chats, demandes):
     """Traite sur le thread principal les mises à jour reçues par le poller indépendant."""
     if not TOKEN:
@@ -13751,7 +13762,7 @@ def main():
     # Un seul poller lit getUpdates. Il accuse réception des callbacks et répond aux
     # menus simples pendant que le thread principal calcule les marchés.
     if TOKEN:
-        threading.Thread(target=boucle_polling_telegram, args=(etat, chats),
+        threading.Thread(target=boucle_polling_telegram_tracee, args=(etat, chats),
                          name="ALIGN-Telegram-Poller", daemon=True).start()
         threading.Thread(target=boucle_chronos, args=(etat,),
                          name="ALIGN-Telegram-Chrono", daemon=True).start()
