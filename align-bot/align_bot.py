@@ -13155,24 +13155,37 @@ def _demander_arret(signum, frame):
         threading.Thread(target=_arret_garanti, name="ALIGN-Arret-Garanti", daemon=True).start()
 
 
-RELEVE_VERIF_SEC = 30     # toutes les 30 s : un worker plus récent attend-il ? (GitHub n'a pas toujours transmis le SIGINT d'annulation)
+RELEVE_VERIF_SEC = 30     # toutes les 30 s : un worker plus récent attend-il ?
+ALIGN_BOT_WORKFLOW_PATH = ".github/workflows/align-bot.yml"
+
 
 def releve_en_attente(runs, mon_id):
-    """Vrai si un run plus récent du worker ALIGN est en file / en cours : l'ancien doit s'arrêter LUI-MÊME pour sauver sa mémoire.
-    Cause réelle constatée (13/11) : annulation douce jamais reçue → annulation forcée → mémoire non sauvée → doublons au redémarrage."""
+    """Ne détecte que les runs plus récents du workflow ALIGN BOT exact, jamais Watchdog/Coordinator."""
     actifs = {"queued", "in_progress", "waiting", "pending", "requested"}
-    return any(int(r.get("id") or 0) > mon_id and r.get("status") in actifs for r in runs or [])
+    for run in runs or []:
+        if not isinstance(run, dict) or run.get("path") != ALIGN_BOT_WORKFLOW_PATH:
+            continue
+        try:
+            run_id = int(run.get("id") or 0)
+        except (TypeError, ValueError):
+            continue
+        if run_id > mon_id and run.get("status") in actifs:
+            return True
+    return False
+
 
 def surveiller_releve():
-    """Thread : demande l'arrêt propre (sauvegarde puis sortie) dès qu'un nouveau worker est lancé."""
+    """Arrête proprement uniquement si un autre run ALIGN BOT est effectivement en file ou actif."""
     try:
-        mon_id = int(os.environ.get("GITHUB_RUN_ID") or 0)
-    except ValueError:
+        mon_id = int(os.environ.get("ALIGN_WORKER_RUN_ID") or os.environ.get("GITHUB_RUN_ID") or 0)
+    except (TypeError, ValueError):
         mon_id = 0
     repo, jeton = os.environ.get("GITHUB_REPOSITORY"), os.environ.get("GITHUB_TOKEN")
     if not mon_id or not repo or not jeton:
+        print("ALIGN_RELEVE_DISABLED reason=worker_identity_unavailable", flush=True)
         return
-    url = f"https://api.github.com/repos/{repo}/actions/workflows/align-bot.yml/runs?branch=main&per_page=10"
+    url = f"https://api.github.com/repos/{repo}/actions/workflows/align-bot.yml/runs?branch=main&per_page=20"
+    print(f"ALIGN_WORKER_ID run={mon_id} path={ALIGN_BOT_WORKFLOW_PATH}", flush=True)
     while not SHUTDOWN_REQUESTED.is_set():
         time.sleep(RELEVE_VERIF_SEC)
         try:
@@ -13180,8 +13193,21 @@ def surveiller_releve():
                                                        "User-Agent": "ALIGN-worker"})
             with urllib.request.urlopen(req, timeout=15) as rep_:
                 runs = json.loads(rep_.read().decode("utf-8")).get("workflow_runs", [])
-            if releve_en_attente(runs, mon_id):
-                print("ALIGN_RELEVE_DETECTEE : arrêt propre + sauvegarde de la mémoire", flush=True)
+            pending = [
+                run for run in (runs or [])
+                if isinstance(run, dict)
+                and run.get("path") == ALIGN_BOT_WORKFLOW_PATH
+                and releve_en_attente([run], mon_id)
+            ]
+            if pending:
+                newer = max(pending, key=lambda item: int(item.get("id") or 0))
+                print(
+                    "ALIGN_RELEVE_DETECTEE "
+                    f"current_run={mon_id} newer_run={newer.get('id')} "
+                    f"status={newer.get('status')} path={newer.get('path')} "
+                    "action=graceful_save_and_stop",
+                    flush=True,
+                )
                 _demander_arret(0, None)
                 return
         except Exception as ex:
