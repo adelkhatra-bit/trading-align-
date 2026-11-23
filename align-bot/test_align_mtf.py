@@ -3907,3 +3907,155 @@ class TelegramTp1Tp2BridgeTests(unittest.TestCase):
         self.assertIn("TP2 non disponible (plan incomplet)", message)
         self.assertNotIn("TP2 67600", message)
 
+
+class TelegramPullChronometerTest(unittest.TestCase):
+    def setUp(self):
+        self.old_pull = align_bot.TELEGRAM_PULL_MODE
+        self.old_state = align_bot.DERNIER_ETAT
+        self.old_context = {
+            name: getattr(align_bot.TELEGRAM_PULL_CONTEXT, name, None)
+            for name in (
+                "chat_id", "private", "chrono_chat_id", "chrono_market",
+                "chrono_message_id", "chrono_state",
+            )
+        }
+        align_bot.TELEGRAM_PULL_MODE = True
+        align_bot.DERNIER_ETAT = {}
+        for name, value in self.old_context.items():
+            setattr(align_bot.TELEGRAM_PULL_CONTEXT, name, None if name != "private" else False)
+
+    def tearDown(self):
+        align_bot.TELEGRAM_PULL_MODE = self.old_pull
+        align_bot.DERNIER_ETAT = self.old_state
+        for name, value in self.old_context.items():
+            setattr(align_bot.TELEGRAM_PULL_CONTEXT, name, value)
+
+    def _active_state(self):
+        chrono = {"mid": 77, "t0": 1.0, "maj": 1.0}
+        state = {
+            "auto": {"BTC": ["123"], "GOLD": []},
+            "marches_par_chat": {"123": ["BTC"]},
+            "bot_off": [],
+            "quiet": [],
+            "chrono": {"BTC": {"123": chrono}},
+            "BTC": {},
+        }
+        return state, chrono
+
+    def test_pull_gate_allows_only_the_exact_active_chronometer_message(self):
+        state, chrono = self._active_state()
+        align_bot.DERNIER_ETAT = {}  # le poller peut ne pas avoir fini son premier cycle
+        align_bot.TELEGRAM_PULL_CONTEXT.chrono_chat_id = "123"
+        align_bot.TELEGRAM_PULL_CONTEXT.chrono_market = "BTC"
+        align_bot.TELEGRAM_PULL_CONTEXT.chrono_message_id = "77"
+        align_bot.TELEGRAM_PULL_CONTEXT.chrono_state = state
+
+        self.assertTrue(align_bot._telegram_sortant_autorise(
+            "editMessageText", {"chat_id": "123", "message_id": 77, "text": "chrono"}
+        ))
+        self.assertFalse(align_bot._telegram_sortant_autorise(
+            "editMessageText", {"chat_id": "123", "message_id": 78, "text": "chrono"}
+        ))
+        self.assertFalse(align_bot._telegram_sortant_autorise(
+            "editMessageText", {"chat_id": "124", "message_id": 77, "text": "chrono"}
+        ))
+        self.assertFalse(align_bot._telegram_sortant_autorise(
+            "sendMessage", {"chat_id": "123", "text": "message spontané"}
+        ))
+        state["marches_par_chat"]["123"] = ["GOLD"]
+        self.assertFalse(align_bot._telegram_sortant_autorise(
+            "editMessageText", {"chat_id": "123", "message_id": 77, "text": "chrono BTC"}
+        ))
+        self.assertEqual(chrono["mid"], 77)
+
+    def test_open_position_keeps_its_chronometer_after_new_alerts_are_disabled(self):
+        chrono = {"mid": 91, "t0": 1.0, "maj": 1.0}
+        state = {
+            "auto": {"BTC": []},
+            "marches_par_chat": {"123": ["BTC"]},
+            "bot_off": ["123"],
+            "quiet": ["123"],
+            "chrono": {"BTC": {"123": chrono}},
+            "BTC": {"trade": {"qui": {"123": {"e": 100.0, "fini": False}}}},
+        }
+        align_bot.DERNIER_ETAT = {}
+        align_bot.TELEGRAM_PULL_CONTEXT.chrono_chat_id = "123"
+        align_bot.TELEGRAM_PULL_CONTEXT.chrono_market = "BTC"
+        align_bot.TELEGRAM_PULL_CONTEXT.chrono_message_id = "91"
+        align_bot.TELEGRAM_PULL_CONTEXT.chrono_state = state
+
+        self.assertTrue(align_bot._chrono_suivi_actif(state, "BTC", "123"))
+        self.assertTrue(align_bot._telegram_sortant_autorise(
+            "editMessageText", {"chat_id": "123", "message_id": 91, "text": "suivi position"}
+        ))
+
+    def test_active_chronometer_uses_scoped_pull_edit(self):
+        state, chrono = self._active_state()
+        align_bot.DERNIER_ETAT = {}  # le thread chrono dispose de son état explicite
+        calls = []
+
+        def fake_telegram(method, **params):
+            calls.append((method, params))
+            return {"ok": align_bot._telegram_sortant_autorise(method, params)}
+
+        with unittest.mock.patch.object(align_bot, "telegram", side_effect=fake_telegram):
+            ok = align_bot._editer_chrono_ou_recreer(
+                "123", chrono, "mise à jour chrono", etat=state, marche="BTC"
+            )
+
+        self.assertTrue(ok)
+        self.assertEqual([method for method, _ in calls], ["editMessageText"])
+        self.assertEqual(calls[0][1]["message_id"], "77")
+        self.assertIsNone(getattr(align_bot.TELEGRAM_PULL_CONTEXT, "chrono_chat_id", None))
+
+    def test_stale_chronometer_is_pruned_without_telegram_push(self):
+        chrono = {"mid": 88, "t0": 1.0, "maj": 1.0}
+        state = {
+            "auto": {"BTC": []},
+            "marches_par_chat": {"123": ["BTC"]},
+            "bot_off": [],
+            "quiet": [],
+            "chrono": {"BTC": {"123": chrono}},
+            "BTC": {},
+        }
+        align_bot.DERNIER_ETAT = state
+        with unittest.mock.patch.object(align_bot.time, "time", return_value=200.0), \
+             unittest.mock.patch.object(align_bot, "telegram") as send:
+            align_bot.maj_chronos(state, "BTC", {})
+
+        self.assertEqual(state["chrono"]["BTC"], {})
+        send.assert_not_called()
+
+    def test_missing_chrono_message_is_not_recreated_as_unsolicited_push_in_pull_mode(self):
+        state, chrono = self._active_state()
+        align_bot.DERNIER_ETAT = state
+        calls = []
+
+        def missing_edit(method, **params):
+            calls.append(method)
+            raise RuntimeError("Bad Request: message to edit not found")
+
+        with unittest.mock.patch.object(align_bot, "telegram", side_effect=missing_edit):
+            ok = align_bot._editer_chrono_ou_recreer(
+                "123", chrono, "mise à jour chrono", etat=state, marche="BTC"
+            )
+
+        self.assertFalse(ok)
+        self.assertEqual(calls, ["editMessageText"])
+
+    def test_timeout_edits_while_opt_in_is_active_then_removes_it(self):
+        state, chrono = self._active_state()
+        align_bot.DERNIER_ETAT = {}
+        observed_scope = []
+
+        def scoped_edit(cid, current, text, **kwargs):
+            observed_scope.append(align_bot._chrono_suivi_actif(state, "BTC", cid))
+            return True
+
+        with unittest.mock.patch.object(align_bot.time, "time", return_value=align_bot.CHRONO_MAX + 2), \
+             unittest.mock.patch.object(align_bot, "_editer_chrono_ou_recreer", side_effect=scoped_edit):
+            align_bot.maj_chronos(state, "BTC", {})
+
+        self.assertEqual(observed_scope, [True])
+        self.assertEqual(state["chrono"]["BTC"], {})
+        self.assertEqual(state["auto"]["BTC"], [])
