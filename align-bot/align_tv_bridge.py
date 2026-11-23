@@ -36,13 +36,16 @@ def tickerid_matches_symbol(symbol, tickerid):
         return False
     hits = [m for m, marks in TICKER_MARKERS.items() if any(k in ticker for k in marks)]
     return hits == [symbol]
-ACTIVE_TIMEFRAMES = {"M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"}
-REQUIRED_TIMEFRAMES = ("M5", "M15", "H1", "H4", "D1", "W1")
+ACTIVE_TIMEFRAMES = {"M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1"}
+REQUIRED_TIMEFRAMES = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1")
 TIMEFRAME_MS = {
     "M1": 60_000,
+    "M3": 180_000,
     "M5": 300_000,
+    "M10": 600_000,
     "M15": 900_000,
     "M30": 1_800_000,
+    "M45": 2_700_000,
     "H1": 3_600_000,
     "H2": 7_200_000,
     "H4": 14_400_000,
