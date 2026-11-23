@@ -11678,10 +11678,14 @@ def toast_callback(data, anglais=False):
 
 
 def _ack_callback_rapide(cb, text):
+    data = str(cb.get("data", "")).replace(chr(10), " ").replace(chr(13), " ")[:200]
     try:
-        telegram("answerCallbackQuery", callback_query_id=cb["id"], text=text)
+        result = telegram("answerCallbackQuery", callback_query_id=cb["id"], text=text)
+        success = isinstance(result, dict) and result.get("ok") is True
+        print(f"TELEGRAM_CALLBACK_ACK callback_id={cb.get('id', '')} data={data!r} result={'ok' if success else 'failed'}", flush=True)
         CALLBACKS_ACKNOWLEDGED.add(str(cb["id"]))
     except Exception as ex:
+        print(f"TELEGRAM_CALLBACK_ACK callback_id={cb.get('id', '')} data={data!r} result=failed", flush=True)
         print("callback ack", ex)
 
 
@@ -13012,12 +13016,29 @@ def _traiter_paiement_rapide(etat, update):
         TELEGRAM_PULL_CONTEXT.private = ancien_prive
 
 
+def _log_telegram_batch(updates, empty_batches, last_empty_log, now=None):
+    """Logs les lots non vides et résume les lots vides au maximum toutes les 5 minutes."""
+    if updates:
+        callbacks = sum(1 for update in updates if update.get("callback_query"))
+        print(f"TELEGRAM_GETUPDATES_BATCH updates={len(updates)} callbacks={callbacks}", flush=True)
+        return 0, last_empty_log
+    now = time.monotonic() if now is None else now
+    empty_batches += 1
+    if now - last_empty_log >= 300:
+        print(f"TELEGRAM_GETUPDATES_EMPTY_SUMMARY empty_batches={empty_batches} interval_seconds=300", flush=True)
+        return 0, now
+    return empty_batches, last_empty_log
+
+
 def boucle_polling_telegram(etat, chats):
     """Poll Telegram indépendamment des analyses longues; les actions d'écriture restent dans le thread principal."""
     offset = int(etat.get("offset", 0) or 0)
+    empty_batches = 0
+    last_empty_log = time.monotonic()
     while TOKEN and not TELEGRAM_POLL_STOP.is_set():
         try:
             updates = telegram("getUpdates", offset=offset, timeout=1).get("result", [])
+            empty_batches, last_empty_log = _log_telegram_batch(updates, empty_batches, last_empty_log)
         except Exception as ex:
             if not TELEGRAM_POLL_STOP.is_set():
                 print("poller Telegram", ex)
