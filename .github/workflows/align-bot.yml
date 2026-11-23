@@ -205,6 +205,12 @@ jobs:
               avertir("getMe sans réponse après 3 essais (60 s chacun) : le bot démarre et réessaiera lui-même.")
           if not payload.get("ok"):
               raise SystemExit("ÉCHEC: API Telegram indisponible")
+          BOT_USERNAME_ATTENDU = "align_mtf_adel_bot"
+          username = str((payload.get("result") or {}).get("username") or "").lstrip("@").lower()
+          if username != BOT_USERNAME_ATTENDU:
+              raise SystemExit("ÉCHEC: le secret TELEGRAM_TOKEN ne correspond pas au bot ALIGN attendu")
+          if (payload.get("result") or {}).get("is_bot") is not True:
+              raise SystemExit("ÉCHEC: l'identité Telegram authentifiée n'est pas un bot")
           info = appel("getWebhookInfo")
           if info is None:
               avertir("getWebhookInfo sans réponse : webhook non vérifié, le bot démarre quand même.")
@@ -223,7 +229,7 @@ jobs:
                   avertir("getWebhookInfo sans réponse après suppression du webhook : réception Telegram non vérifiée.")
               if not verified.get("ok") or (verified.get("result") or {}).get("url", "").strip():
                   raise SystemExit("ÉCHEC: le webhook Telegram est toujours actif après suppression.")
-          print("TELEGRAM_API_OK bot=@" + payload["result"].get("username", "unknown"))
+          print("TELEGRAM_API_OK bot=@" + username)
           print("TELEGRAM_RECEIVE_MODE=polling webhook=none")
           print("Aucun message de démarrage envoyé aux utilisateurs.")
           PY
