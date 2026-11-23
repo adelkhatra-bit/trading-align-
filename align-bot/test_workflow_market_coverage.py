@@ -19,7 +19,7 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.assertIn('if (payload.get("result") or {}).get("is_bot") is not True:', self.workflow)
         self.assertIn('ÉCHEC: le secret TELEGRAM_TOKEN ne correspond pas au bot ALIGN attendu', self.workflow)
         self.assertIn('is_bot") is not True', self.workflow)
-        self.assertIn('TELEGRAM_API_OK bot=@' + username, self.workflow)
+        self.assertIn('TELEGRAM_API_OK bot=@' + username', self.workflow)
 
     def test_worker_operational_scope_is_btc_and_gold_only(self):
         self.assertIn("required_symbols = align_bot.symboles_bridge_obligatoires(time.time())", self.workflow)
