@@ -12,6 +12,7 @@ from urllib.request import Request, urlopen
 import align_tv_bridge as bridge
 from align_tv_bridge import (
     ACTIVE_MAX_AGE_MS,
+    ENTRY_BAR_GRACE_MS,
     MAX_FUTURE_SKEW_MS,
     MTF_BAR_GRACE_MS,
     TIMEFRAME_MS,
