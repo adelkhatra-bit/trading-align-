@@ -11632,6 +11632,10 @@ def _traiter_lecture_rapide(etat, chats, update):
     if cmd == "/start":
         # L'accueil unique est envoyé par le handler principal ; pas de second message rapide.
         return False
+    if cmd == "/statut" and cid in {str(x) for x in proprio(etat)}:
+        _envoi_sur(cid, text=texte_statut(etat, DERNIERS))
+        update["_align_fast_handled"] = True
+        return True
     if cmd == "/boutons":
         if not localement_autorise:
             return False
