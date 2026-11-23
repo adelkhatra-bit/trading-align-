@@ -8875,15 +8875,18 @@ def controles_statut(etat, derniers, now=None):
     now = time.time() if now is None else now
     out = [("ok", "📡 Telegram : connecté (je te réponds)")]
     for m in MARCHES:
-        r = (derniers or {}).get(m)
         ic = ICONE.get(m, "")
+        # CME closed is normal even before the worker has produced its first Gold snapshot.
+        if m != "BTC" and not cme_ouvert(int(now)):
+            reouverture = prochaine_ouverture_cme(now)
+            detail_reouverture = f", réouverture {quand_txt(reouverture)}" if reouverture else ""
+            out.append(("veille", f"{ic} {m} : marché fermé (normal){detail_reouverture}"))
+            continue
+        r = (derniers or {}).get(m)
         if not r or not r.get("m1"):
             out.append(("attention", f"{ic} {m} : pas encore d'analyse (premier tour en cours ou données indisponibles)"))
             continue
         age = now - float(r["m1"][-1]["t"])
-        if m != "BTC" and not cme_ouvert(int(now)):
-            out.append(("veille", f"{ic} {m} : marché fermé (normal)"))
-            continue
         if age > 600:
             out.append(("attention", f"{ic} {m} : données en retard de {int(age // 60)} min"))
             continue
@@ -8949,7 +8952,19 @@ def texte_diag(cid=None):
 
     # Interroge exactement la même route MTF que l'analyse du bot.
     # Deux lectures indépendantes : une pour BTC, une pour GOLD.
+    now = time.time()
     for pair, label in (("XBTUSD", "BTC"), ("XAUUSD", "GOLD")):
+        # Pendant la pause/week-end CME, aucun snapshot XAUUSD n'est requis.
+        # Le silence normal de la session ne doit pas apparaître comme une panne bridge.
+        if label == "GOLD" and not cme_ouvert(int(now)):
+            reouverture = prochaine_ouverture_cme(now)
+            suffixe = f" • réouverture {quand_txt(reouverture)}" if reouverture else ""
+            lignes.append(
+                libelle("GOLD : MARCHÉ CME FERMÉ (normal) — snapshot non requis",
+                        "GOLD: CME SESSION CLOSED (normal) — snapshot not required")
+                + suffixe
+            )
+            continue
         try:
             bridge = fetch_tv_mtf(pair)
         except Exception as exc:
@@ -9123,6 +9138,11 @@ def texte_audit_telegram(etat, derniers, now=None):
             lines.append(f"{market} : bougies M1 {market_age}s")
         else:
             lines.append(f"{market} : aucune bougie M1 dans le dernier calcul")
+        # /audit lit le bridge attaché au dernier calcul ; à la fermeture CME,
+        # l'absence d'un snapshot GOLD n'est pas une panne du bridge.
+        if market == "GOLD" and not cme_ouvert(int(now)):
+            lines.append("  Bridge TradingView : marché CME fermé (normal) • snapshot non requis")
+            continue
         bridge = market_state.get("tv_indicator_mtf") or {}
         if bridge:
             active = str(bridge.get("activeTimeframe") or "aucune")

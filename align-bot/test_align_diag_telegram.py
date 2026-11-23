@@ -67,7 +67,7 @@ class AlignTelegramDiagTests(unittest.TestCase):
             with open(path, "w", encoding="utf-8") as stream:
                 json.dump(diagnostic, stream)
             before = Path(path).read_text(encoding="utf-8")
-            with patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}), patch.object(ab, "fetch_tv_mtf", side_effect=[self.bridge_ok("M15"), self.bridge_ok("H4")]):
+            with patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}), patch.object(ab, "fetch_tv_mtf", side_effect=[self.bridge_ok("M15"), self.bridge_ok("H4")]), patch.object(ab, "cme_ouvert", return_value=True):
                 rendered = ab.texte_diag(str(OWNER_ID))
             after = Path(path).read_text(encoding="utf-8")
             self.assertIn("BTC", rendered)
@@ -83,7 +83,7 @@ class AlignTelegramDiagTests(unittest.TestCase):
             self.assertEqual(after, before)
 
     def test_diag_missing_stale_file_does_not_claim_bridge_is_down(self):
-        with tempfile.TemporaryDirectory() as runner_temp, patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}), patch.object(ab, "fetch_tv_mtf", side_effect=[self.bridge_ok("M15"), self.bridge_ok("H4")]):
+        with tempfile.TemporaryDirectory() as runner_temp, patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}), patch.object(ab, "fetch_tv_mtf", side_effect=[self.bridge_ok("M15"), self.bridge_ok("H4")]), patch.object(ab, "cme_ouvert", return_value=True):
             rendered = ab.texte_diag(str(OWNER_ID))
         self.assertIn("aucun rejet stale", rendered.lower())
         self.assertIn("BTC : BRIDGE CONNECTÉ", rendered)
@@ -94,7 +94,7 @@ class AlignTelegramDiagTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as runner_temp:
             with open(self.diag_file(runner_temp), "w", encoding="utf-8") as stream:
                 stream.write("{not-json")
-            with patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}), patch.object(ab, "fetch_tv_mtf", side_effect=[self.bridge_ok("M15"), self.bridge_ok("H4")]):
+            with patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}), patch.object(ab, "fetch_tv_mtf", side_effect=[self.bridge_ok("M15"), self.bridge_ok("H4")]), patch.object(ab, "cme_ouvert", return_value=True):
                 rendered = ab.texte_diag(str(OWNER_ID))
         self.assertIn("illisible", rendered.lower())
         self.assertIn("BTC : BRIDGE CONNECTÉ", rendered)
@@ -102,7 +102,7 @@ class AlignTelegramDiagTests(unittest.TestCase):
 
     def test_diag_shows_bridge_unavailable_for_each_market(self):
         unavailable = {"available": False, "reason": "bridge inaccessible", "snapshots": {}}
-        with tempfile.TemporaryDirectory() as runner_temp, patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}), patch.object(ab, "fetch_tv_mtf", side_effect=[unavailable, unavailable]):
+        with tempfile.TemporaryDirectory() as runner_temp, patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}), patch.object(ab, "fetch_tv_mtf", side_effect=[unavailable, unavailable]), patch.object(ab, "cme_ouvert", return_value=True):
             rendered = ab.texte_diag(str(OWNER_ID))
         self.assertIn("BTC : BRIDGE INDISPONIBLE", rendered)
         self.assertIn("GOLD : BRIDGE INDISPONIBLE", rendered)
@@ -110,7 +110,7 @@ class AlignTelegramDiagTests(unittest.TestCase):
     def test_diag_marks_bridge_partial_when_one_timeframe_is_stale(self):
         partial = self.bridge_ok()
         partial["snapshots"]["W1"]["fresh"] = False
-        with tempfile.TemporaryDirectory() as runner_temp, patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}), patch.object(ab, "fetch_tv_mtf", side_effect=[partial, partial]):
+        with tempfile.TemporaryDirectory() as runner_temp, patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}), patch.object(ab, "fetch_tv_mtf", side_effect=[partial, partial]), patch.object(ab, "cme_ouvert", return_value=True):
             rendered = ab.texte_diag(str(OWNER_ID))
         self.assertIn("BTC : BRIDGE PARTIEL", rendered)
         self.assertIn("GOLD : BRIDGE PARTIEL", rendered)
