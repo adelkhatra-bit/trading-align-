@@ -26,6 +26,16 @@ def message_update(text="/diag", chat_id=OWNER_ID, from_id=OWNER_ID, chat_type="
 
 
 class AlignTelegramDiagTests(unittest.TestCase):
+    @staticmethod
+    def bridge_ok(active="M15", fresh=True, age_ms=30_000):
+        required = ("M5", "M15", "H1", "H4", "D1", "W1")
+        return {
+            "available": True,
+            "reason": None,
+            "activeTimeframe": active,
+            "activeTimeframeAgeMs": age_ms,
+            "snapshots": {tf: {"fresh": fresh, "ageMs": age_ms} for tf in required},
+        }
     def diag_file(self, directory):
         return os.path.join(directory, "align_diag.json")
 
@@ -56,7 +66,7 @@ class AlignTelegramDiagTests(unittest.TestCase):
             with open(path, "w", encoding="utf-8") as stream:
                 json.dump(diagnostic, stream)
             before = Path(path).read_text(encoding="utf-8")
-            with patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}):
+            with patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}), patch.object(ab, "fetch_tv_mtf", side_effect=[self.bridge_ok("M15"), self.bridge_ok("H4")]):
                 rendered = ab.texte_diag(str(OWNER_ID))
             after = Path(path).read_text(encoding="utf-8")
             self.assertIn("BTC", rendered)
@@ -66,22 +76,35 @@ class AlignTelegramDiagTests(unittest.TestCase):
             self.assertIn("720", rendered)
             self.assertIn("630", rendered)
             self.assertIn("lecture seule", rendered.lower())
+            self.assertIn("BTC : BRIDGE CONNECTÉ", rendered)
+            self.assertIn("GOLD : BRIDGE CONNECTÉ", rendered)
+            self.assertIn("MTF 6/6", rendered)
             self.assertEqual(after, before)
 
-    def test_diag_missing_file_explains_no_event_or_bridge_not_started(self):
-        with tempfile.TemporaryDirectory() as runner_temp, patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}):
+    def test_diag_missing_stale_file_does_not_claim_bridge_is_down(self):
+        with tempfile.TemporaryDirectory() as runner_temp, patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}), patch.object(ab, "fetch_tv_mtf", side_effect=[self.bridge_ok("M15"), self.bridge_ok("H4")]):
             rendered = ab.texte_diag(str(OWNER_ID))
-        self.assertIn("aucun rejet", rendered.lower())
-        self.assertIn("bridge", rendered.lower())
-        self.assertIn("démarré", rendered.lower())
+        self.assertIn("aucun rejet stale", rendered.lower())
+        self.assertIn("BTC : BRIDGE CONNECTÉ", rendered)
+        self.assertIn("GOLD : BRIDGE CONNECTÉ", rendered)
+        self.assertNotIn("bridge ne s'est pas démarré", rendered.lower())
 
     def test_diag_corrupt_file_returns_safe_message_without_raising(self):
         with tempfile.TemporaryDirectory() as runner_temp:
             with open(self.diag_file(runner_temp), "w", encoding="utf-8") as stream:
                 stream.write("{not-json")
-            with patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}):
+            with patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}), patch.object(ab, "fetch_tv_mtf", side_effect=[self.bridge_ok("M15"), self.bridge_ok("H4")]):
                 rendered = ab.texte_diag(str(OWNER_ID))
         self.assertIn("illisible", rendered.lower())
+        self.assertIn("BTC : BRIDGE CONNECTÉ", rendered)
+        self.assertIn("GOLD : BRIDGE CONNECTÉ", rendered)
+
+    def test_diag_shows_bridge_unavailable_for_each_market(self):
+        unavailable = {"available": False, "reason": "bridge inaccessible", "snapshots": {}}
+        with tempfile.TemporaryDirectory() as runner_temp, patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}), patch.object(ab, "fetch_tv_mtf", side_effect=[unavailable, unavailable]):
+            rendered = ab.texte_diag(str(OWNER_ID))
+        self.assertIn("BTC : BRIDGE INDISPONIBLE", rendered)
+        self.assertIn("GOLD : BRIDGE INDISPONIBLE", rendered)
 
     def test_diag_owner_private_command_runs_before_first_visit_logic(self):
         state = {"proprio": [OWNER_ID], "prospects": []}
