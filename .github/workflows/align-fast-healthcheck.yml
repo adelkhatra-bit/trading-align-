@@ -1,0 +1,112 @@
+name: ALIGN FAST HEALTHCHECK (Telegram + IA + TradingView)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: align-fast-healthcheck
+  cancel-in-progress: true
+
+jobs:
+  healthcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: align-bot
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          sparse-checkout: align-bot
+
+      - name: Telegram identité + réception (lecture seule, sans getUpdates)
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          token = os.environ.get("TELEGRAM_TOKEN", "").strip()
+          if not token:
+              raise SystemExit("FAIL: TELEGRAM_TOKEN absent")
+          base = "https://api.telegram.org/bot" + token + "/"
+          def api(method):
+              req = urllib.request.Request(base + method, headers={"User-Agent":"ALIGN-fast-healthcheck"})
+              with urllib.request.urlopen(req, timeout=12) as response:
+                  data = json.loads(response.read().decode())
+              if data.get("ok") is not True:
+                  raise SystemExit("FAIL: Telegram API " + method)
+              return data.get("result") or {}
+          me = api("getMe")
+          expected = "align_mtf_adel_bot"
+          username = str(me.get("username") or "").lstrip("@").lower()
+          if username != expected or me.get("is_bot") is not True:
+              raise SystemExit("FAIL: identité bot inattendue")
+          webhook = api("getWebhookInfo")
+          if str(webhook.get("url") or "").strip():
+              raise SystemExit("FAIL: webhook actif; polling non confirmé")
+          print("TELEGRAM_IDENTITY_OK username=@" + username)
+          print("TELEGRAM_WEBHOOK_NONE=true")
+          print("NOTE: aucun getUpdates ni message envoyé; polling exclusif non testé.")
+          PY
+
+      - name: Test IA externe rapide
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+        run: python3 ai_healthcheck.py
+
+      - name: Test bridge TradingView ROBOT V12 BTC + GOLD
+        env:
+          ALIGN_TV_API_URL: ${{ secrets.ALIGN_TV_API_URL }}
+          ALIGN_TV_READ_TOKEN: ${{ secrets.ALIGN_TV_READ_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json, math, os, time, urllib.parse, urllib.request
+          base = os.environ.get("ALIGN_TV_API_URL", "").strip().rstrip("/")
+          token = os.environ.get("ALIGN_TV_READ_TOKEN", "").strip()
+          if not base or not token:
+              raise SystemExit("FAIL: secrets bridge absents")
+          required = ("M5","M15","H1","H4","D1","W1")
+          allowed = {"M1","M5","M15","M30","H1","H2","H4","D1","W1"}
+          for symbol, label in (("BTCUSD","BTC"),("XAUUSD","GOLD")):
+              url = base + "/bridge/robot-v12/mtf?symbol=" + urllib.parse.quote(symbol)
+              req = urllib.request.Request(url, headers={"Authorization":"Bearer "+token,"User-Agent":"ALIGN-fast-healthcheck"})
+              with urllib.request.urlopen(req, timeout=12) as response:
+                  p = json.loads(response.read().decode())
+              snaps = p.get("snapshots") if isinstance(p.get("snapshots"),dict) else {}
+              stale = [tf for tf in required if (snaps.get(tf) or snaps.get(tf.lower()) or {}).get("fresh") is not True]
+              active = str(p.get("activeTimeframe") or "").upper()
+              snap = snaps.get(active) or snaps.get(active.lower()) or {}
+              robot = snap.get("robotV12") or {}
+              timestamp = snap.get("updatedAt")
+              price = snap.get("price")
+              try:
+                  ts = float(timestamp)
+                  if ts < 100000000000: ts *= 1000
+                  age = time.time()*1000-ts
+                  price_ok = math.isfinite(float(price)) and float(price)>0 and 0<=age<=90000
+              except (TypeError,ValueError):
+                  price_ok = False
+                  age = -1
+              ok = (p.get("ok") is True and p.get("activeTimeframeFresh") is True
+                    and active in allowed and snap.get("fresh") is True
+                    and isinstance(robot,dict) and bool(robot)
+                    and any(robot.get(k) not in (None,"") for k in ("lecture_1m","lecture_5m","lecture_15m","lecture_60m"))
+                    and not stale and price_ok)
+              print(f"BRIDGE {label} ok={ok} active_tf={active or 'NONE'} age_ms={int(age) if age>=0 else 'INVALID'} stale_tf={','.join(stale) or 'none'}")
+              if not ok:
+                  raise SystemExit("FAIL: bridge MTF incomplet/périmé pour "+label)
+          PY
+
+      - name: Résumé santé
+        if: always()
+        run: |
+          echo "Ce check ne démarre pas le poller Telegram, ne modifie pas state.json et n'envoie aucun message." >> "$GITHUB_STEP_SUMMARY"
