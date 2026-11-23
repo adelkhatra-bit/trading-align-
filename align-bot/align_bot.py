@@ -23,10 +23,75 @@ TELEGRAM_UPDATES = queue.Queue()
 TELEGRAM_POLL_STOP = threading.Event()
 SHUTDOWN_REQUESTED = threading.Event()
 CALLBACKS_ACKNOWLEDGED = set()
+CALLBACKS_ACK_FAILED = set()
 # Mode Telegram « pull » : seuls les messages déclenchés par l'utilisateur ou une entrée demandée sont autorisés.
 TELEGRAM_PULL_CONTEXT = threading.local()
 TELEGRAM_LIVRES = [0]   # messages réellement acceptés par Telegram (compteur du journal)
 TELEGRAM_PULL_MODE = False  # activé par main(); les tests unitaires du wrapper restent isolés par défaut
+TELEGRAM_AUDIT_LOCK = threading.Lock()
+TELEGRAM_AUDIT = {
+    "updates_received": 0, "messages_received": 0, "callbacks_received": 0,
+    "callbacks_dispatched": 0, "callbacks_completed": 0,
+    "callbacks_unknown": 0, "callbacks_rejected": 0,
+    "callback_ack_ok": 0, "callback_ack_failed": 0,
+    "messages_sent": 0, "messages_edited": 0, "api_errors": 0,
+    "pull_blocks": {}, "actions_seen": {},
+    "last_callback": None, "last_callback_latency_ms": None,
+    "last_error": None, "last_block": None,
+}
+# Préfixes routés par traiter() ou live_callback(). Les compteurs indiquent ceux réellement cliqués.
+TELEGRAM_CALLBACK_HANDLER_PREFIXES = (
+    "analysechoice", "auto", "autoadm", "botmenu", "botoff", "boton",
+    "choixcanal", "coach", "coachlive", "coachstop", "details", "financeplus",
+    "followmarket", "history", "in", "jno", "jok", "levels", "likeobj",
+    "likeok", "liveboost", "livemain", "liveoff", "liveon", "livemenu",
+    "livemkt", "markets", "marketsmenu", "menulive", "next", "niveau",
+    "offrir", "out", "plateforme", "position", "previous", "pub", "quiet",
+    "rawdetails", "refus", "resume", "retirer", "results", "searchpos",
+    "son", "timeframes", "trade", "tvoffre", "tvok", "vuegratuit", "why",
+)
+
+
+def _telegram_audit(event, action=None, detail=None):
+    """Compteurs runtime sans identifiants de chat, contenu des messages ni secrets."""
+    now = time.time()
+    with TELEGRAM_AUDIT_LOCK:
+        # Les événements callback sont au singulier ; les compteurs publics au pluriel.
+        counter_key = {
+            "callback_received": "callbacks_received",
+            "callback_dispatched": "callbacks_dispatched",
+            "callback_completed": "callbacks_completed",
+            "callback_unknown": "callbacks_unknown",
+            "callback_rejected": "callbacks_rejected",
+        }.get(event, event)
+        if counter_key in TELEGRAM_AUDIT and isinstance(TELEGRAM_AUDIT[counter_key], int):
+            TELEGRAM_AUDIT[counter_key] += 1
+        if event in ("callback_received", "callback_dispatched", "callback_completed",
+                     "callback_unknown", "callback_rejected", "callback_ack_ok", "callback_ack_failed"):
+            prefix = str(action or "unknown").split(":", 1)[0][:40] or "unknown"
+            TELEGRAM_AUDIT["last_callback"] = {"action": prefix, "event": event, "at": now}
+            if event == "callback_dispatched":
+                actions = TELEGRAM_AUDIT["actions_seen"]
+                actions[prefix] = actions.get(prefix, 0) + 1
+        elif event == "callback_latency":
+            try:
+                TELEGRAM_AUDIT["last_callback_latency_ms"] = max(0, int(float(action)))
+            except (TypeError, ValueError, OverflowError):
+                pass
+        elif event == "pull_block":
+            method = str(action or "unknown")[:40]
+            blocks = TELEGRAM_AUDIT["pull_blocks"]
+            blocks[method] = blocks.get(method, 0) + 1
+            TELEGRAM_AUDIT["last_block"] = {
+                "method": method, "action": str(detail or "")[:40], "at": now,
+            }
+        elif event == "api_error":
+            TELEGRAM_AUDIT["last_error"] = {
+                "method": str(action or "unknown")[:40],
+                "reason": str(detail or "API error")[:100], "at": now,
+            }
+
+
 MARCHES = {"BTC": "XBTUSD", "GOLD": "XAUUSD"}  # Périmètre opérationnel ALIGN : BTC + GOLD uniquement
 MARCHES_HISTORIQUES = tuple(MARCHES)  # Seuls BTC et GOLD restent actifs, y compris dans le suivi des positions
 MIN_ALIGN, MIN_SQZ, MARGE_ATR, GAIN_MIN = 8, 4, 0.5, 1.5   # = réglages par défaut de l'indicateur ALIGN MTF PRO v24
@@ -3391,6 +3456,7 @@ def telegram(methode, **params):
     if not _telegram_sortant_autorise(methode, params):
         # Un envoi bloqué n'est PAS une livraison : les appelants ne doivent jamais
         # marquer le signal comme envoyé ni retirer la recherche de l'utilisateur.
+        _telegram_audit("pull_block", methode, getattr(TELEGRAM_PULL_CONTEXT, "callback_action", ""))
         return {"ok": False, "result": None, "blocked_by_pull_mode": True,
                 "description": "Envoi bloqué par le mode Telegram sur demande"}
     if methode in ("sendMessage", "editMessageText") and "%%AGENT:" in str(params.get("text", "")):
@@ -3432,6 +3498,8 @@ def telegram(methode, **params):
         _telegram_verifie_cooldown(cle_cooldown)
         resultat = http_json(url, urllib.parse.urlencode(params).encode())
     except Exception as ex:
+        code = re.search(r"HTTP Error \d+", str(ex))
+        _telegram_audit("api_error", methode, code.group(0) if code else type(ex).__name__)
         if "HTTP Error 429" in str(ex):
             delai = _telegram_enregistre_429(cle_cooldown, ex)
             if delai:
@@ -3441,6 +3509,14 @@ def telegram(methode, **params):
         ):
             _telegram_file_ajouter(params_initiaux)
         raise
+    if isinstance(resultat, dict) and resultat.get("ok") is True:
+        if methode in ("sendMessage", "sendPhoto", "copyMessage"):
+            _telegram_audit("messages_sent")
+        elif methode == "editMessageText":
+            _telegram_audit("messages_edited")
+    else:
+        description = (resultat.get("description") if isinstance(resultat, dict) else None) or "ok=false"
+        _telegram_audit("api_error", methode, str(description).split(":", 1)[0][:100])
     if methode in ("sendMessage", "sendPhoto", "copyMessage") and resultat.get("ok"):
         TELEGRAM_LIVRES[0] += 1
     if methode in ("sendMessage", "editMessageText", "sendPhoto", "copyMessage") and resultat.get("ok"):
@@ -7097,8 +7173,10 @@ def lien_validation(etat):
 def traiter(etat, chats, updates):
     """Boutons cliqués et messages reçus. Renvoie la liste des téléphones qui demandent une analyse."""
     demandes = []
+    callbacks_en_batch = [u for u in updates if isinstance(u, dict) and u.get("callback_query")]
     TELEGRAM_PULL_CONTEXT.chat_id = None
     TELEGRAM_PULL_CONTEXT.private = False
+    TELEGRAM_PULL_CONTEXT.callback_action = None
     for u in updates:
         etat["offset"] = u["update_id"] + 1
         message_recu = (u.get("message") or u.get("edited_message") or
@@ -7111,6 +7189,7 @@ def traiter(etat, chats, updates):
                      demande_recue.get("chat") or statut_recu.get("chat") or {})
         TELEGRAM_PULL_CONTEXT.chat_id = str(chat_recu.get("id") or "") if chat_recu.get("type") == "private" else None
         TELEGRAM_PULL_CONTEXT.private = chat_recu.get("type") == "private"
+        TELEGRAM_PULL_CONTEXT.callback_action = None
         type_message = next((k for k in ("photo", "document", "video", "voice", "audio",
                                          "sticker", "animation", "video_note", "location",
                                          "contact", "poll", "dice", "venue") if k in message_recu), "message")
@@ -7146,12 +7225,31 @@ def traiter(etat, chats, updates):
             cb_user = str((cb.get("from") or {}).get("id", ""))
             # Actions du coach uniquement en conversation privée appartenant au demandeur.
             if cb_chat.get("type") != "private" or str(cb_chat.get("id", "")) != cb_user:
+                _telegram_audit("callback_rejected", cb.get("data"))
                 try:
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="🔒 Ouvre le bot en conversation privée.")
                 except Exception:
                     pass
                 continue
             choix, _, mk = cb.get("data", "").partition(":")
+            callback_id = str(cb.get("id") or "")
+            if callback_id and callback_id in CALLBACKS_ACK_FAILED:
+                CALLBACKS_ACK_FAILED.discard(callback_id)
+                try:
+                    retry_ack = telegram("answerCallbackQuery", callback_query_id=callback_id)
+                    if isinstance(retry_ack, dict) and retry_ack.get("ok") is True:
+                        _telegram_audit("callback_ack_ok", cb.get("data"))
+                        CALLBACKS_ACKNOWLEDGED.add(callback_id)
+                    else:
+                        _telegram_audit("callback_ack_failed", cb.get("data"))
+                except Exception:
+                    _telegram_audit("callback_ack_failed", cb.get("data"))
+            u["_align_callback_dispatched"] = True
+            TELEGRAM_PULL_CONTEXT.callback_action = choix
+            _telegram_audit("callback_dispatched", cb.get("data"))
+            received_at = u.get("_align_callback_received_at")
+            if isinstance(received_at, (int, float)):
+                _telegram_audit("callback_latency", (time.time() - received_at) * 1000)
             qui = str(cb_chat["id"])
             retenir_prenom(etat, qui, cb.get("from"))
             if choix == "trade":
@@ -7694,6 +7792,7 @@ def traiter(etat, chats, updates):
             # Ne jamais interpréter un callback inconnu comme une sortie manuelle.
             # Seuls les boutons explicites in:<marché> et out:<marché> peuvent modifier une position.
             if choix not in ("in", "out") or mk not in MARCHES:
+                _telegram_audit("callback_unknown", cb.get("data"))
                 try:
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="Action inconnue ou expirée")
                 except Exception:
@@ -7846,6 +7945,9 @@ def traiter(etat, chats, updates):
         if txt.startswith("/statut") and str(cid) in {str(x) for x in proprio(etat)}:
             _envoi_sur(cid, text=texte_statut(etat, DERNIERS))
             continue
+        if cmd in ("/audit", "/diag") and str(cid) in {str(x) for x in proprio(etat)}:
+            _envoi_sur(cid, text=texte_audit_telegram(etat, DERNIERS))
+            continue
         if "me concentrer" in txt or "where to focus" in txt or txt.startswith("/focus") or txt.strip() == "focus":
             props = classer_marches(DERNIERS, etat, marches_choisis(etat, cid))
             msg = texte_radar(props, DERNIERS, bool(autorise(etat, cid, cid)), cid in LANG_EN) if len(props) >= 1 else None   # même logique que le RADAR (aucun doublon)
@@ -7887,8 +7989,18 @@ def traiter(etat, chats, updates):
         # Pas de conversation libre : seuls les boutons et retours explicitement sollicités
         # (photo de gain ou pseudo TradingView après demande) sont traités.
         # Tout texte libre est ignoré, pour les visiteurs comme pour les abonnés.
+    for update_callback in callbacks_en_batch:
+        cb_done = update_callback.get("callback_query") or {}
+        if update_callback.get("_align_callback_dispatched"):
+            _telegram_audit("callback_completed", cb_done.get("data"))
+        callback_id = str(cb_done.get("id") or "")
+        if callback_id:
+            # Libère les ACK rapides/retentés même si le bouton n'appelle pas lui-même answerCallbackQuery.
+            CALLBACKS_ACKNOWLEDGED.discard(callback_id)
+            CALLBACKS_ACK_FAILED.discard(callback_id)
     TELEGRAM_PULL_CONTEXT.chat_id = None
     TELEGRAM_PULL_CONTEXT.private = False
+    TELEGRAM_PULL_CONTEXT.callback_action = None
     return demandes
 AUTO_MARCHES = ("BTC", "GOLD")
 
@@ -8690,6 +8802,107 @@ def texte_statut(etat, derniers, now=None):
     sha = os.environ.get("GITHUB_SHA", "")[:7]
     l.append(f"🔧 Version {sha or 'inconnue'} • en route depuis {int((now - DEMARRE_T) // 60)} min")
     return "\n".join(l)
+
+
+
+def texte_audit_telegram(etat, derniers, now=None):
+    """Rapport propriétaire en lecture seule : réception, callbacks, envois, blocages et dépendances."""
+    now = time.time() if now is None else float(now)
+    with TELEGRAM_AUDIT_LOCK:
+        audit = {
+            key: (dict(value) if isinstance(value, dict) else value)
+            for key, value in TELEGRAM_AUDIT.items()
+        }
+        audit["pull_blocks"] = dict(TELEGRAM_AUDIT["pull_blocks"])
+        audit["actions_seen"] = dict(TELEGRAM_AUDIT["actions_seen"])
+
+    poller = any(t.name == "ALIGN-Telegram-Poller" and t.is_alive() for t in threading.enumerate())
+    run_id = os.environ.get("GITHUB_RUN_ID") or "local"
+    sha = (os.environ.get("GITHUB_SHA") or "")[:7] or "inconnu"
+    uptime = max(0, int(now - DEMARRE_T))
+    def age_txt(stamp):
+        if not isinstance(stamp, (int, float)) or not stamp:
+            return "jamais"
+        seconds = max(0, int(now - float(stamp)))
+        return f"{seconds}s" if seconds < 60 else f"{seconds // 60} min"
+
+    actions_seen = audit["actions_seen"]
+    actions_text = ", ".join(f"{k}={v}" for k, v in sorted(actions_seen.items())) or "aucun clic observé depuis ce démarrage"
+    blocks_text = ", ".join(f"{k}={v}" for k, v in sorted(audit["pull_blocks"].items())) or "aucun"
+    lines = [
+        "📊 AUDIT TECHNIQUE ALIGN — lecture seule",
+        f"Worker : run {run_id} • SHA {sha} • actif depuis {uptime // 60} min",
+        f"Poller Telegram : {'ACTIF' if poller else 'ARRÊTÉ'} • file en attente : {TELEGRAM_UPDATES.qsize()} • offset : {'présent' if etat.get('offset') is not None else 'absent'}",
+        f"Updates : {audit['updates_received']} • messages : {audit['messages_received']} • callbacks : {audit['callbacks_received']}",
+        f"Callbacks : dispatchés {audit['callbacks_dispatched']} • terminés {audit['callbacks_completed']} • rejetés {audit['callbacks_rejected']} • inconnus {audit['callbacks_unknown']}",
+        f"Accusés Telegram : {audit['callback_ack_ok']} OK • {audit['callback_ack_failed']} échec(s)",
+        f"Actions cliquées : {actions_text}",
+        f"Réponses envoyées : {audit['messages_sent']} • messages édités : {audit['messages_edited']} • erreurs API : {audit['api_errors']}",
+        f"Envois bloqués par le filtre pull : {blocks_text}",
+        f"Mémoire : {age_txt(etat.get('sauve_t'))} • outbox Telegram : {len(etat.get('telegram_outbox') or [])}",
+    ]
+
+    latency = audit.get("last_callback_latency_ms")
+    if latency is not None:
+        lines.append(f"Latence dernier clic avant dispatch : {latency} ms")
+    last_cb = audit.get("last_callback")
+    if last_cb:
+        lines.append(f"Dernier callback : {last_cb.get('action')} • {last_cb.get('event')} • il y a {age_txt(last_cb.get('at'))}")
+    last_block = audit.get("last_block")
+    if last_block:
+        lines.append(f"Dernier blocage : {last_block.get('method')} • action {last_block.get('action') or 'hors callback'} • il y a {age_txt(last_block.get('at'))}")
+    last_error = audit.get("last_error")
+    if last_error:
+        lines.append(f"Dernière erreur API : {last_error.get('method')} • {last_error.get('reason')} • il y a {age_txt(last_error.get('at'))}")
+
+    for market in ("BTC", "GOLD"):
+        market_state = (derniers or {}).get(market) or {}
+        bars = market_state.get("m1") or []
+        if bars:
+            market_age = max(0, int(now - float(bars[-1].get("t") or now)))
+            lines.append(f"{market} : bougies M1 {market_age}s")
+        else:
+            lines.append(f"{market} : aucune bougie M1 dans le dernier calcul")
+        bridge = market_state.get("tv_indicator_mtf") or {}
+        if bridge:
+            active = str(bridge.get("activeTimeframe") or "aucune")
+            bridge_age = bridge.get("activeTimeframeAgeMs")
+            bridge_age_txt = f"{int(bridge_age / 1000)}s" if isinstance(bridge_age, (int, float)) else "inconnue"
+            lines.append(f"  Bridge TradingView : {'disponible' if bridge.get('available') is True else 'indisponible'} • UT active {active} • âge {bridge_age_txt}")
+        else:
+            lines.append("  Bridge TradingView : aucun snapshot attaché au dernier calcul")
+
+    lines.append(f"IA : {etat.get('ia_dernier_statut') or 'non sollicitée'} • fournisseur {etat.get('ia_dernier_fournisseur') or 'aucun'}")
+    diag_path = os.path.join(os.environ.get("RUNNER_TEMP") or "/tmp", "align_diag.json")
+    try:
+        with open(diag_path, encoding="utf-8") as stream:
+            diag = json.load(stream)
+        stale = diag.get("triggerStale") if isinstance(diag, dict) else {}
+        if isinstance(stale, dict):
+            lines.append(f"Rejets trigger TradingView : BTC {((stale.get('BTCUSD') or {}).get('count', 0))} • GOLD {((stale.get('XAUUSD') or {}).get('count', 0))}")
+        else:
+            lines.append("Rejets trigger TradingView : fichier présent, format non reconnu")
+    except FileNotFoundError:
+        lines.append("Rejets trigger TradingView : compteur non disponible sur ce run")
+    except Exception:
+        lines.append("Rejets trigger TradingView : fichier illisible")
+
+    lines.append(f"Catalogue callbacks : {len(TELEGRAM_CALLBACK_HANDLER_PREFIXES)} préfixes routés connus • {len(actions_seen)} observés sur ce worker")
+    if audit["callback_ack_failed"]:
+        lines.append("⚠️ Au moins un accusé de clic a échoué ; le handler peut retenter l'accusé.")
+    if audit["callbacks_received"] == 0:
+        lines.append("ℹ️ Aucun clic reçu depuis le démarrage : les boutons ne sont pas déclarés testés.")
+    elif audit["callbacks_completed"] < audit["callbacks_dispatched"]:
+        lines.append("⚠️ Des callbacks dispatchés n'ont pas atteint la fin du traitement.")
+    if audit["callbacks_unknown"]:
+        lines.append("⚠️ Des callbacks inconnus/expirés ont été reçus.")
+    if audit["pull_blocks"]:
+        lines.append("ℹ️ Le filtre pull a bloqué des envois ; vérifier méthode et action avant de conclure à une panne.")
+    if not poller:
+        lines.append("❌ Le thread de réception Telegram n'est pas actif.")
+    lines.append("Aucun identifiant privé, contenu de message, secret ou ordre broker n'est exposé.")
+    return "\n".join(lines)
+
 
 # ───────── Modèle 3 : ouverture de marché ─────────
 def donnees_ouverture(etat, m, r, now):
@@ -11687,6 +11900,10 @@ def _traiter_lecture_rapide(etat, chats, update):
         _envoi_sur(cid, text=texte_statut(etat, DERNIERS))
         update["_align_fast_handled"] = True
         return True
+    if cmd in ("/audit", "/diag") and cid in {str(x) for x in proprio(etat)}:
+        _envoi_sur(cid, text=texte_audit_telegram(etat, DERNIERS))
+        update["_align_fast_handled"] = True
+        return True
     if cmd == "/boutons":
         if not localement_autorise:
             return False
@@ -11738,8 +11955,17 @@ def _ack_callback_rapide(cb, text):
         result = telegram("answerCallbackQuery", callback_query_id=cb["id"], text=text)
         success = isinstance(result, dict) and result.get("ok") is True
         print(f"TELEGRAM_CALLBACK_ACK callback_id={cb.get('id', '')} data={data!r} result={'ok' if success else 'failed'}", flush=True)
-        CALLBACKS_ACKNOWLEDGED.add(str(cb["id"]))
+        if success:
+            CALLBACKS_ACK_FAILED.discard(str(cb["id"]))
+            _telegram_audit("callback_ack_ok", data)
+            CALLBACKS_ACKNOWLEDGED.add(str(cb["id"]))
+        else:
+            # Le poller transmet l'échec au thread principal pour un nouvel essai avant l'action.
+            CALLBACKS_ACK_FAILED.add(str(cb["id"]))
+            _telegram_audit("callback_ack_failed", data)
     except Exception as ex:
+        CALLBACKS_ACK_FAILED.add(str(cb.get("id") or ""))
+        _telegram_audit("callback_ack_failed", data)
         print(f"TELEGRAM_CALLBACK_ACK callback_id={cb.get('id', '')} data={data!r} result=failed", flush=True)
         print("callback ack", ex)
 
@@ -13100,6 +13326,12 @@ def boucle_polling_telegram(etat, chats):
                 time.sleep(1)
             continue
         for update in updates:
+            _telegram_audit("updates_received")
+            if update.get("callback_query"):
+                _telegram_audit("callback_received", (update.get("callback_query") or {}).get("data"))
+                update["_align_callback_received_at"] = time.time()
+            elif update.get("message") or update.get("edited_message"):
+                _telegram_audit("messages_received")
             offset = max(offset, int(update.get("update_id", offset - 1)) + 1)
             if update.get("pre_checkout_query"):
                 live_pre_checkout(etat, update["pre_checkout_query"])
