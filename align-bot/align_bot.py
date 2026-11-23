@@ -8837,8 +8837,8 @@ def texte_diag(cid=None):
         return english if anglais else francais
 
     lignes = [
-        libelle("📡 ALIGN BRIDGE DIAGNOSTICS — read-only",
-                "📡 DIAGNOSTIC BRIDGE ALIGN — lecture seule")
+        libelle("📡 DIAGNOSTIC BRIDGE ALIGN — lecture seule",
+                "📡 ALIGN BRIDGE DIAGNOSTICS — read-only")
     ]
 
     # Interroge exactement la même route MTF que l'analyse du bot.
@@ -8880,7 +8880,7 @@ def texte_diag(cid=None):
             else libelle("BRIDGE PARTIEL", "BRIDGE PARTIAL")
         )
         lignes.append(
-            f"{label} : {state} • UT active {active} • MTF {len(fresh)}/{len(requis)}"
+            f"{label} : {state} • {libelle('UT active', 'active timeframe')} {active} • MTF {len(fresh)}/{len(requis)}"
             + age_text
         )
 
