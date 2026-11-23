@@ -13747,7 +13747,7 @@ def releve_en_attente(runs, mon_id):
     """Vrai si un run plus récent du worker ALIGN est en file / en cours : l'ancien doit s'arrêter LUI-MÊME pour sauver sa mémoire.
     Cause réelle constatée (13/11) : annulation douce jamais reçue → annulation forcée → mémoire non sauvée → doublons au redémarrage."""
     actifs = {"queued", "in_progress", "waiting", "pending", "requested"}
-    return any(int(r.get("id") or 0) > mon_id and r.get("status") in actifs for r in runs or [])
+    return any(int(r.get("id") or 0) > mon_id and r.get("status") in actifs and r.get("worker_job_status") not in {"skipped", "completed", "cancelled"} for r in runs or [])
 
 def surveiller_releve():
     """Thread : demande l'arrêt propre (sauvegarde puis sortie) dès qu'un nouveau worker est lancé."""
@@ -13766,6 +13766,17 @@ def surveiller_releve():
                                                        "User-Agent": "ALIGN-worker"})
             with urllib.request.urlopen(req, timeout=15) as rep_:
                 runs = json.loads(rep_.read().decode("utf-8")).get("workflow_runs", [])
+            # A workflow_run can be skipped (e.g. validation from a PR merge). Do not stop
+            # the current worker unless the replacement's actual signaux job is queued/running.
+            jobs_actifs = {"queued", "in_progress", "waiting", "pending"}
+            for run in runs or []:
+                if int(run.get("id") or 0) <= mon_id or run.get("status") not in jobs_actifs:
+                    continue
+                jobs_url = f"https://api.github.com/repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100"
+                jobs_req = urllib.request.Request(jobs_url, headers={"Authorization": "Bearer " + jeton, "Accept": "application/vnd.github+json", "User-Agent": "ALIGN-worker"})
+                with urllib.request.urlopen(jobs_req, timeout=15) as jobs_rep:
+                    jobs = json.loads(jobs_rep.read().decode("utf-8")).get("jobs", [])
+                run["worker_job_status"] = next((j.get("status") for j in jobs if j.get("name") == "signaux" and j.get("status") in jobs_actifs), "skipped")
             if releve_en_attente(runs, mon_id):
                 print("ALIGN_RELEVE_DETECTEE : arrêt propre + sauvegarde de la mémoire", flush=True)
                 _demander_arret(0, None)
