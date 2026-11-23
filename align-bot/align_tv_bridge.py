@@ -370,7 +370,7 @@ class BridgeStore:
             if entry_bar_age < -MAX_FUTURE_SKEW_MS or entry_bar_age > 2 * entry_tf_ms + ENTRY_BAR_GRACE_MS:
                 threshold_ms = 2 * entry_tf_ms + ENTRY_BAR_GRACE_MS
                 print(
-                    f"BTC_TRIGGER_STALE entry_tf_ms={entry_tf_ms} "
+                    f"TRIGGER_STALE symbol={_text(payload.get(\'symbol\'), 16).upper()} entry_tf_ms={entry_tf_ms} "
                     f"entry_bar_time_ms={entry_bar_time} now_ms={now_ms} "
                     f"age_ms={entry_bar_age} threshold_ms={threshold_ms} received_ms=absent",
                     flush=True,

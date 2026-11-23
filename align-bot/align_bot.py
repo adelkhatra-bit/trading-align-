@@ -7844,6 +7844,17 @@ def traiter(etat, chats, updates):
                 cmd = "/" + charge
         if cmd in COMMANDES:
             msg["text"] = tx = COMMANDES[cmd]
+        if cmd == "/diag":
+            chat_type = str((msg.get("chat") or {}).get("type", ""))
+            expediteur_id = str((msg.get("from") or {}).get("id", ""))
+            proprietaires = {str(x) for x in proprio(etat)}
+            if chat_type == "private" and expediteur_id == cid and cid in proprietaires:
+                _envoi_sur(cid, text=texte_diag(cid))
+            elif chat_type == "private" and expediteur_id == cid:
+                _envoi_sur(cid, text="🔒 Commande réservée au propriétaire.")
+            else:
+                print("ALIGN_DIAG_ACCESS_DENIED", flush=True)
+            continue
         if cmd == "/start":
             # Un seul accueil par utilisateur ; toutes les autres actions passent par ses boutons.
             deja = etat.setdefault("bienvenue_pull_v1", [])
@@ -8807,6 +8818,77 @@ def texte_statut(etat, derniers, now=None):
     l.append(f"🔧 Version {sha or 'inconnue'} • en route depuis {int((now - DEMARRE_T) // 60)} min")
     return "\n".join(l)
 
+
+
+def texte_diag(cid=None):
+    """Diagnostic bridge lecture seule : compteurs du run courant, aucun payload ni secret."""
+    runner_temp = os.environ.get("RUNNER_TEMP") or tempfile.gettempdir()
+    path = os.path.join(runner_temp, "align_diag.json")
+    try:
+        with open(path, encoding="utf-8") as stream:
+            diagnostic = json.load(stream)
+    except FileNotFoundError:
+        return ("📊 DIAGNOSTIC ALIGN — lecture seule\n"
+                "Aucun rejet STALE n'a encore été enregistré, ou le bridge ne s'est pas démarré sur ce run.")
+    except Exception as exc:
+        print(f"ALIGN_DIAG_READ_FAILED error={type(exc).__name__}", flush=True)
+        return "📊 DIAGNOSTIC ALIGN\nFichier diagnostic présent mais illisible."
+
+    if (not isinstance(diagnostic, dict) or diagnostic.get("version") != 1
+            or not isinstance(diagnostic.get("triggerStale"), dict)):
+        return "📊 DIAGNOSTIC ALIGN\nFichier diagnostic présent mais format invalide."
+
+    anglais = str(cid or "") in LANG_EN
+
+    def entier(value):
+        if isinstance(value, bool) or value is None:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+
+    def heure_locale(value):
+        timestamp = entier(value)
+        if timestamp is None or timestamp <= 0:
+            return None
+        try:
+            return datetime.datetime.fromtimestamp(timestamp / 1000, PARIS).strftime("%H:%M:%S")
+        except (OSError, OverflowError, ValueError):
+            return None
+
+    lignes = ["📊 ALIGN DIAGNOSTICS — read-only" if anglais else "📊 DIAGNOSTIC ALIGN — lecture seule"]
+    demarre = heure_locale(diagnostic.get("startedAtMs"))
+    if demarre:
+        lignes.append(("Bridge started: " if anglais else "Bridge démarré : ") + demarre)
+
+    labels = (("BTCUSD", "BTC"), ("XAUUSD", "GOLD"))
+    for symbol, label in labels:
+        item = diagnostic["triggerStale"].get(symbol)
+        if not isinstance(item, dict):
+            item = {}
+        count = entier(item.get("count"))
+        count = max(0, count if count is not None else 0)
+        if count == 0:
+            lignes.append(f"{label} : 0 " + ("TRIGGER_STALE rejection(s)" if anglais else "rejet TRIGGER_STALE"))
+            continue
+        age_ms = entier(item.get("lastAgeMs"))
+        threshold_ms = entier(item.get("lastThresholdMs"))
+        last_at = heure_locale(item.get("lastAtMs"))
+        details = []
+        if age_ms is not None:
+            details.append(("last age " if anglais else "dernier âge ") + f"{int(age_ms / 1000)} s")
+        if threshold_ms is not None:
+            details.append(("limit " if anglais else "seuil ") + f"{int(threshold_ms / 1000)} s")
+        if last_at:
+            details.append(("last " if anglais else "dernier ") + last_at)
+        suffix = " • " + " / ".join(details) if details else ""
+        lignes.append(f"{label} : {count} " +
+                      ("TRIGGER_STALE rejection(s)" if anglais else "rejet(s) TRIGGER_STALE") + suffix)
+
+    lignes.append("Counters reset at bridge restart." if anglais
+                  else "Compteurs remis à zéro à chaque redémarrage du bridge.")
+    return "\n".join(lignes)
 
 
 def texte_audit_telegram(etat, derniers, now=None):
