@@ -53,10 +53,10 @@ class AlignTelegramDiagTests(unittest.TestCase):
             }
             with open(path, "w", encoding="utf-8") as stream:
                 json.dump(diagnostic, stream)
-            before = open(path, encoding="utf-8").read()
+            before = Path(path).read_text(encoding="utf-8")
             with patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}):
                 rendered = ab.texte_diag(str(OWNER_ID))
-            after = open(path, encoding="utf-8").read()
+            after = Path(path).read_text(encoding="utf-8")
             self.assertIn("BTC", rendered)
             self.assertIn("GOLD", rendered)
             self.assertIn("3", rendered)
