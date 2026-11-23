@@ -84,10 +84,6 @@ class TelegramObservabiliteLogs(unittest.TestCase):
         self.assertIn("callback ack timeout", out.getvalue())
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TelegramPollerLifecycle(unittest.TestCase):
     def run_tracee(self):
         out = io.StringIO()
