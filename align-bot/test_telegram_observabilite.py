@@ -51,10 +51,10 @@ class TelegramObservabiliteLogs(unittest.TestCase):
     def test_callback_ack_logs_data_and_actual_ok_result(self):
         cb = {"id": "cb-17", "data": "marketsmenu:BTC" + chr(10) + "more"}
         out = io.StringIO()
-        with patch.object(ab, "telegram", return_value={"ok": True}), redirect_stdout(out):
+        with patch.object(ab, "telegram", return_value={"ok": True}) as mocked_telegram, redirect_stdout(out):
             ab._ack_callback_rapide(cb, "ack")
         self.assertIn("TELEGRAM_CALLBACK_ACK callback_id=cb-17 data='marketsmenu:BTC more' result=ok", out.getvalue())
-        self.assertIn("answerCallbackQuery", str(ab.telegram.call_args))
+        self.assertIn("answerCallbackQuery", str(mocked_telegram.call_args))
         self.assertIn("cb-17", ab.CALLBACKS_ACKNOWLEDGED)
 
     def test_callback_ack_logs_failed_result_when_request_raises(self):
