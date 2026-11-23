@@ -1,5 +1,7 @@
 import json
 import io
+import os
+import tempfile
 from contextlib import redirect_stdout
 from pathlib import Path
 import threading
@@ -472,6 +474,82 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertEqual(status, 200)
         _, data = self.store.read("BTCUSD", BASE_MS)
         self.assertFalse(data["snapshots"]["M1"]["robotV12"]["entryTriggered"])
+
+    def test_stale_trigger_counters_are_written_per_market_to_runner_temp(self):
+        self.assertTrue(
+            hasattr(bridge, "DIAG_TRIGGER_COUNT"),
+            "bridge must expose per-market stale trigger counters",
+        )
+        self.assertTrue(
+            hasattr(bridge, "DIAG_TRIGGER_LAST"),
+            "bridge must expose per-market last stale trigger details",
+        )
+        previous_counts = dict(bridge.DIAG_TRIGGER_COUNT)
+        previous_last = dict(getattr(bridge, "DIAG_TRIGGER_LAST", {}))
+        previous_started = getattr(bridge, "DIAG_STARTED_AT_MS", None)
+        old_runner_temp = os.environ.get("RUNNER_TEMP")
+        try:
+            with tempfile.TemporaryDirectory() as runner_temp:
+                os.environ["RUNNER_TEMP"] = runner_temp
+                bridge.DIAG_TRIGGER_COUNT.clear()
+                bridge.DIAG_TRIGGER_COUNT.update({"BTCUSD": 0, "XAUUSD": 0})
+                bridge.DIAG_TRIGGER_LAST.clear()
+
+                btc = valid_payload(symbol="BTCUSD")
+                btc["tickerid"] = "BINANCE:BTCUSDT"
+                btc["entryBarTime"] = BASE_MS - 2 * TIMEFRAME_MS["M5"] - ENTRY_BAR_GRACE_MS - 1
+                status, result = self.store.ingest(btc, INGEST, BASE_MS)
+                self.assertEqual(status, 200, result)
+
+                gold = valid_payload(symbol="XAUUSD")
+                gold["tickerid"] = "FOREXCOM:XAUUSD"
+                gold["entryBarTime"] = BASE_MS - 2 * TIMEFRAME_MS["M5"] - ENTRY_BAR_GRACE_MS - 2
+                status, result = self.store.ingest(gold, INGEST, BASE_MS + 1_000)
+                self.assertEqual(status, 200, result)
+
+                diagnostic_path = os.path.join(runner_temp, "align_diag.json")
+                with open(diagnostic_path, encoding="utf-8") as stream:
+                    diagnostic = json.load(stream)
+
+                self.assertEqual(diagnostic["version"], 1)
+                self.assertEqual(diagnostic["triggerStale"]["BTCUSD"]["count"], 1)
+                self.assertEqual(diagnostic["triggerStale"]["XAUUSD"]["count"], 1)
+                self.assertEqual(
+                    diagnostic["triggerStale"]["BTCUSD"]["lastAgeMs"],
+                    BASE_MS - btc["entryBarTime"],
+                )
+                self.assertEqual(
+                    diagnostic["triggerStale"]["XAUUSD"]["lastAgeMs"],
+                    BASE_MS + 1_000 - gold["entryBarTime"],
+                )
+                self.assertEqual(
+                    diagnostic["triggerStale"]["BTCUSD"]["lastThresholdMs"],
+                    2 * TIMEFRAME_MS["M5"] + ENTRY_BAR_GRACE_MS,
+                )
+
+                # Un snapshot frais suivant ne réinitialise pas les compteurs du run.
+                fresh_btc = valid_payload()
+                status, result = self.store.ingest(fresh_btc, INGEST, BASE_MS + 2_000)
+                self.assertEqual(status, 200, result)
+                with open(diagnostic_path, encoding="utf-8") as stream:
+                    after_fresh = json.load(stream)
+                self.assertEqual(after_fresh["triggerStale"]["BTCUSD"]["count"], 1)
+                self.assertEqual(after_fresh["triggerStale"]["XAUUSD"]["count"], 1)
+
+                rendered = json.dumps(diagnostic)
+                self.assertNotIn(INGEST, rendered)
+                self.assertNotIn(READ, rendered)
+        finally:
+            bridge.DIAG_TRIGGER_COUNT.clear()
+            bridge.DIAG_TRIGGER_COUNT.update(previous_counts)
+            bridge.DIAG_TRIGGER_LAST.clear()
+            bridge.DIAG_TRIGGER_LAST.update(previous_last)
+            if old_runner_temp is None:
+                os.environ.pop("RUNNER_TEMP", None)
+            else:
+                os.environ["RUNNER_TEMP"] = old_runner_temp
+            if previous_started is not None:
+                bridge.DIAG_STARTED_AT_MS = previous_started
 
     def test_stale_or_future_entry_trigger_downgrades_plan_and_keeps_fresh_mtf(self):
         for time_value in (BASE_MS - 2 * TIMEFRAME_MS["M5"] - MTF_BAR_GRACE_MS - 1,
