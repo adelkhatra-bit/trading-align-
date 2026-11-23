@@ -1,4 +1,6 @@
 import json
+import io
+from contextlib import redirect_stdout
 from pathlib import Path
 import threading
 import time
@@ -186,6 +188,22 @@ class BridgeStoreTests(unittest.TestCase):
         payload["entryBarTime"] = BASE_MS - 2 * 300_000 - 60_000  # DAY → M5
         status, result = self.store.ingest(payload, INGEST, BASE_MS)
         self.assertEqual(result["error"], "stale_or_future_entry_trigger_candle")
+    def test_stale_entry_trigger_rejection_emits_diagnostic_line(self):
+        payload = valid_payload()
+        payload["entryBarTime"] = BASE_MS - 2 * TIMEFRAME_MS["M5"] - ENTRY_BAR_GRACE_MS - 1
+        output = io.StringIO()
+        with redirect_stdout(output):
+            status, result = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 400)
+        self.assertEqual(result["error"], "stale_or_future_entry_trigger_candle")
+        log_line = output.getvalue().strip()
+        self.assertIn("BTC_TRIGGER_STALE entry_tf_ms=300000", log_line)
+        self.assertIn(f"entry_bar_time_ms={payload['entryBarTime']}", log_line)
+        self.assertIn(f"now_ms={BASE_MS}", log_line)
+        self.assertIn(f"age_ms={BASE_MS - payload['entryBarTime']}", log_line)
+        self.assertIn(f"threshold_ms={2 * TIMEFRAME_MS['M5'] + ENTRY_BAR_GRACE_MS}", log_line)
+        self.assertIn("received_ms=absent", log_line)
+
 
     def test_rejects_unsupported_symbol(self):
         status, result = self.store.ingest(valid_payload(symbol="EURUSD"), INGEST, BASE_MS)
