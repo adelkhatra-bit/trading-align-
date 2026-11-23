@@ -363,29 +363,13 @@ class BridgeStore:
             entry_bar_close = _finite_number(payload.get("entryBarClose"))
             entry_tf_ms = TIMEFRAME_MS[entry_timeframe]
             if entry_bar_time is None or None in (entry_bar_open, entry_bar_high, entry_bar_low, entry_bar_close):
-                return 400, {"ok": False, "error": "missing_entry_trigger_candle"}
-            entry_bar_age = now_ms - entry_bar_time
-            # Le Pine envoie l'heure d'OUVERTURE de la dernière bougie CLÔTURÉE (time[1]) :
-            # son âge va donc jusqu'à 2 UT (18/11 : SWING H1 refusé à 1 h 35 alors que valide).
-            if entry_bar_age < -MAX_FUTURE_SKEW_MS or entry_bar_age > 2 * entry_tf_ms + ENTRY_BAR_GRACE_MS:
-                threshold_ms = 2 * entry_tf_ms + ENTRY_BAR_GRACE_MS
-                print(
-                    f"TRIGGER_STALE symbol={_text(payload.get('symbol'), 16).upper()} entry_tf_ms={entry_tf_ms} "
-                    f"entry_bar_time_ms={entry_bar_time} now_ms={now_ms} "
-                    f"age_ms={entry_bar_age} threshold_ms={threshold_ms} received_ms=absent",
-                    flush=True,
-                )
-                # Le déclencheur périmé invalide uniquement le plan d'entrée.
-                # Le prix et les snapshots MTF, eux, sont toujours frais et doivent
-                # continuer à alimenter le bridge. Aucun niveau ni confirmation n'est conservé.
-                entry_trigger_rejection = {"error": "stale_or_future_entry_trigger_candle"}
-                _write_trigger_stale_diagnostic(
-                    symbol, now_ms, entry_bar_age, threshold_ms, entry_tf_ms
-                )
+                # Bougie de déclenchement manquante : invalider uniquement le plan,
+                # mais conserver les snapshots MTF/prix frais pour le bot.
+                entry_trigger_rejection = {"error": "missing_entry_trigger_candle"}
                 payload = {
                     **payload,
                     "signal": "WAIT",
-                    "verdict": "WAIT — bougie de déclenchement périmée",
+                    "verdict": "WAIT — bougie de déclenchement absente",
                     "confirmed": False,
                     "entry": None,
                     "sl": None,
@@ -396,13 +380,45 @@ class BridgeStore:
                 signal_direction = None
                 has_plan = False
             else:
-                if not (entry_bar_low <= min(entry_bar_open, entry_bar_close) <= max(entry_bar_open, entry_bar_close) <= entry_bar_high):
-                    return 400, {"ok": False, "error": "invalid_entry_trigger_ohlc"}
-                retested_zone = entry_bar_high >= entry_zone_low and entry_bar_low <= entry_zone_high
-                trigger_closed = entry_bar_close > entry_decision if signal_direction == 1 else entry_bar_close < entry_decision
-                entry_triggered = bool(payload.get("confirmed") is True and signal_direction in (-1, 1)
-                                       and retested_zone and trigger_closed
-                                       and (entry_bar_close > plan_sl if signal_direction == 1 else entry_bar_close < plan_sl))
+                entry_bar_age = now_ms - entry_bar_time
+                # Le Pine envoie l'heure d'OUVERTURE de la dernière bougie CLÔTÉE (time[1]) :
+                # son âge va donc jusqu'à 2 UT (18/11 : SWING H1 refusé à 1 h 35 alors que valide).
+                if entry_bar_age < -MAX_FUTURE_SKEW_MS or entry_bar_age > 2 * entry_tf_ms + ENTRY_BAR_GRACE_MS:
+                    threshold_ms = 2 * entry_tf_ms + ENTRY_BAR_GRACE_MS
+                    print(
+                        f"TRIGGER_STALE symbol={_text(payload.get('symbol'), 16).upper()} entry_tf_ms={entry_tf_ms} "
+                        f"entry_bar_time_ms={entry_bar_time} now_ms={now_ms} "
+                        f"age_ms={entry_bar_age} threshold_ms={threshold_ms} received_ms=absent",
+                        flush=True,
+                    )
+                    # Le déclencheur périmé invalide uniquement le plan d'entrée.
+                    # Le prix et les snapshots MTF, eux, sont toujours frais et doivent
+                    # continuer à alimenter le bridge. Aucun niveau ni confirmation n'est conservé.
+                    entry_trigger_rejection = {"error": "stale_or_future_entry_trigger_candle"}
+                    _write_trigger_stale_diagnostic(
+                        symbol, now_ms, entry_bar_age, threshold_ms, entry_tf_ms
+                    )
+                    payload = {
+                        **payload,
+                        "signal": "WAIT",
+                        "verdict": "WAIT — bougie de déclenchement périmée",
+                        "confirmed": False,
+                        "entry": None,
+                        "sl": None,
+                        "tp": None,
+                        "tp1": None,
+                        "tp2": None,
+                    }
+                    signal_direction = None
+                    has_plan = False
+                else:
+                    if not (entry_bar_low <= min(entry_bar_open, entry_bar_close) <= max(entry_bar_open, entry_bar_close) <= entry_bar_high):
+                        return 400, {"ok": False, "error": "invalid_entry_trigger_ohlc"}
+                    retested_zone = entry_bar_high >= entry_zone_low and entry_bar_low <= entry_zone_high
+                    trigger_closed = entry_bar_close > entry_decision if signal_direction == 1 else entry_bar_close < entry_decision
+                    entry_triggered = bool(payload.get("confirmed") is True and signal_direction in (-1, 1)
+                                           and retested_zone and trigger_closed
+                                           and (entry_bar_close > plan_sl if signal_direction == 1 else entry_bar_close < plan_sl))
 
         if not has_plan:
             # Pas de plan (WAIT) : la lecture MTF réelle reste publiée, aucun niveau, aucune entrée.
