@@ -451,6 +451,10 @@ class ReleveDuWorker(unittest.TestCase):
         self.assertTrue(ab.releve_en_attente([{"id": 10, "status": "in_progress"}, {"id": 12, "status": "pending"}], 10))
         self.assertTrue(ab.releve_en_attente([{"id": 12, "status": "queued"}], 10))
 
+    def test_ignore_un_run_en_cours_dont_le_job_signaux_est_skipped(self):
+        self.assertFalse(ab.releve_en_attente([{"id": 12, "status": "in_progress", "worker_job_status": "skipped"}], 10))
+        self.assertTrue(ab.releve_en_attente([{"id": 12, "status": "in_progress", "worker_job_status": "in_progress"}], 10))
+
     def test_ignore_les_anciens_et_les_termines(self):
         self.assertFalse(ab.releve_en_attente([{"id": 9, "status": "in_progress"}, {"id": 11, "status": "completed"}], 10))
         self.assertFalse(ab.releve_en_attente([], 10))
