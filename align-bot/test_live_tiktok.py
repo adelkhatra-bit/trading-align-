@@ -623,7 +623,8 @@ class LiveOutbox(unittest.TestCase):
             self.assertTrue(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "-1001", "text": entree}))
             # Chaîne : tout le reste reste bloqué (point de marché, commentaire, mise à jour).
             self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "-1002", "text": "📡 POINT DE MARCHÉ"}))
-            self.assertFalse(ab._telegram_sortant_autorise("editMessageText", {"chat_id": "-1002", "text": entree}))
+            self.assertTrue(ab._telegram_sortant_autorise("editMessageText", {"chat_id": "-1002", "text": entree}))
+            self.assertFalse(ab._telegram_sortant_autorise("editMessageText", {"chat_id": "-1002", "text": "📡 POINT DE MARCHÉ"}))
             # Chat inconnu : bloqué même pour une entrée.
             self.assertFalse(ab._telegram_sortant_autorise("sendMessage", {"chat_id": "-1999", "text": entree}))
 
