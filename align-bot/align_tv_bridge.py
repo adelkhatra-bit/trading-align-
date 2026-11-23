@@ -192,10 +192,16 @@ class BridgeStore:
         now_ms = int(now_ms if now_ms is not None else time.time() * 1000)
         status, body = self._ingest(payload, path_token, now_ms)
         symbol = _text(payload.get("symbol"), 16).upper() if isinstance(payload, dict) else ""
+        diagnostic_rejection = body.get("diagnosticRejection") if isinstance(body, dict) else None
         if symbol in ALLOWED_SYMBOLS and status != 401:
             with self._lock:
                 if status >= 400:
                     self._rejections[symbol] = {"error": _text(body.get("error"), 64), "atMs": now_ms}
+                elif status == 200 and isinstance(diagnostic_rejection, dict):
+                    self._rejections[symbol] = {
+                        "error": _text(diagnostic_rejection.get("error"), 64),
+                        "atMs": now_ms,
+                    }
                 elif status == 200:
                     self._rejections.pop(symbol, None)
         return status, body
@@ -261,6 +267,7 @@ class BridgeStore:
         # Sans stratégie alignée, le Pine envoie entryTimeframe « UNSUPPORTED » : ce n'est pas un plan.
         # Contrat : un plan non exploitable devient WAIT et la lecture MTF réelle reste publiée (jamais de rejet).
         has_plan = signal_direction in (-1, 1) and expected_entry_tf is not None
+        entry_trigger_rejection = None
         if signal_direction in (-1, 1) and not has_plan:
             payload = {**payload, "signal": "WAIT"}
         if has_plan:
@@ -309,16 +316,33 @@ class BridgeStore:
                     f"age_ms={entry_bar_age} threshold_ms={threshold_ms} received_ms=absent",
                     flush=True,
                 )
-                return 400, {"ok": False, "error": "stale_or_future_entry_trigger_candle"}
-            if not (entry_bar_low <= min(entry_bar_open, entry_bar_close) <= max(entry_bar_open, entry_bar_close) <= entry_bar_high):
-                return 400, {"ok": False, "error": "invalid_entry_trigger_ohlc"}
-            retested_zone = entry_bar_high >= entry_zone_low and entry_bar_low <= entry_zone_high
-            trigger_closed = entry_bar_close > entry_decision if signal_direction == 1 else entry_bar_close < entry_decision
-            entry_triggered = bool(payload.get("confirmed") is True and signal_direction in (-1, 1)
-                                   and retested_zone and trigger_closed
-                                   and (entry_bar_close > plan_sl if signal_direction == 1 else entry_bar_close < plan_sl))
+                # Le déclencheur périmé invalide uniquement le plan d'entrée.
+                # Le prix et les snapshots MTF, eux, sont toujours frais et doivent
+                # continuer à alimenter le bridge. Aucun niveau ni confirmation n'est conservé.
+                entry_trigger_rejection = {"error": "stale_or_future_entry_trigger_candle"}
+                payload = {
+                    **payload,
+                    "signal": "WAIT",
+                    "verdict": "WAIT — bougie de déclenchement périmée",
+                    "confirmed": False,
+                    "entry": None,
+                    "sl": None,
+                    "tp": None,
+                    "tp1": None,
+                    "tp2": None,
+                }
+                signal_direction = None
+                has_plan = False
+            else:
+                if not (entry_bar_low <= min(entry_bar_open, entry_bar_close) <= max(entry_bar_open, entry_bar_close) <= entry_bar_high):
+                    return 400, {"ok": False, "error": "invalid_entry_trigger_ohlc"}
+                retested_zone = entry_bar_high >= entry_zone_low and entry_bar_low <= entry_zone_high
+                trigger_closed = entry_bar_close > entry_decision if signal_direction == 1 else entry_bar_close < entry_decision
+                entry_triggered = bool(payload.get("confirmed") is True and signal_direction in (-1, 1)
+                                       and retested_zone and trigger_closed
+                                       and (entry_bar_close > plan_sl if signal_direction == 1 else entry_bar_close < plan_sl))
 
-        else:
+        if not has_plan:
             # Pas de plan (WAIT) : la lecture MTF réelle reste publiée, aucun niveau, aucune entrée.
             entry_zone_low = entry_zone_high = entry_decision = None
             entry_bar_time = entry_bar_open = entry_bar_high = entry_bar_low = entry_bar_close = None
@@ -373,13 +397,16 @@ class BridgeStore:
         }
         with self._lock:
             self._symbols[symbol] = state
-        return 200, {
+        result = {
             "ok": True,
             "accepted": True,
             "symbol": symbol,
             "activeTimeframe": timeframe,
             "receivedTimeframes": list(snapshots.keys()),
         }
+        if entry_trigger_rejection is not None:
+            result["diagnosticRejection"] = entry_trigger_rejection
+        return 200, result
 
     def read(self, symbol, now_ms=None):
         now_ms = int(now_ms if now_ms is not None else time.time() * 1000)
