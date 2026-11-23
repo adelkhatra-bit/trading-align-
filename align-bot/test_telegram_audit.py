@@ -1,6 +1,7 @@
 import os
 import sys
 import unittest
+import io
 from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -152,10 +153,10 @@ class TelegramAuditTests(unittest.TestCase):
         ab.TELEGRAM_PULL_BLOCK_LOGGED.clear()
         ab.TELEGRAM_PULL_MODE = True
         output = io.StringIO()
-        with patch.object(ab, "_telegram_sortant_autorise", return_value=False), \\
-             patch("sys.stdout", output):
-            ab.telegram("sendMessage", chat_id="111111111", text="private message one")
-            ab.telegram("sendMessage", chat_id="222222222", text="private message two")
+        with patch.object(ab, "_telegram_sortant_autorise", return_value=False):
+            with patch("sys.stdout", output):
+                ab.telegram("sendMessage", chat_id="111111111", text="private message one")
+                ab.telegram("sendMessage", chat_id="222222222", text="private message two")
         rendered = output.getvalue()
         self.assertEqual(rendered.count("TELEGRAM_PULL_BLOCK"), 1)
         self.assertIn("method=sendMessage action=outside_callback", rendered)
