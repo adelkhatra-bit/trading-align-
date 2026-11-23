@@ -114,5 +114,14 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.assertIn("snapshots TradingView absents/périmés", self.workflow)
 
 
+
+    def test_telegram_preflight_pins_canonical_bot_and_fail_closed_wording(self):
+        self.assertIn('BOT_USERNAME_ATTENDU = "align_mtf_adel_bot"', self.workflow)
+        self.assertIn('if username != BOT_USERNAME_ATTENDU:', self.workflow)
+        self.assertIn('identite.get("is_bot") is not True', self.workflow)
+        self.assertIn('TELEGRAM_TOKEN ne correspond pas au bot ALIGN attendu', self.workflow)
+        self.assertIn('polling non démarré', self.workflow)
+        self.assertIn('print("TELEGRAM_API_OK bot=@" + username)', self.workflow)
+
 if __name__ == "__main__":
     unittest.main()
