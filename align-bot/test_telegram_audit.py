@@ -21,6 +21,7 @@ class TelegramAuditTests(unittest.TestCase):
                 "last_error": None, "last_block": None,
             })
         ab.CALLBACKS_ACKNOWLEDGED.clear()
+        ab.CALLBACKS_ACK_FAILED.clear()
         self.old_pull_mode = ab.TELEGRAM_PULL_MODE
         self.old_token = ab.TOKEN
         ab.TELEGRAM_PULL_MODE = False
@@ -43,6 +44,29 @@ class TelegramAuditTests(unittest.TestCase):
         self.assertTrue(retry["ok"])
         self.assertEqual(http.call_count, 2)
         self.assertEqual(ab.TELEGRAM_AUDIT["callback_ack_failed"], 1)
+
+    def test_failed_fast_ack_is_retried_before_a_live_button_without_its_own_ack(self):
+        cb = {"id": "callback-retry", "data": "menulive:x"}
+        update = {
+            "update_id": 56,
+            "callback_query": {
+                "id": cb["id"], "data": cb["data"],
+                "from": {"id": 42, "first_name": "Tester"},
+                "message": {"message_id": 9, "chat": {"id": 42, "type": "private"}},
+            },
+        }
+        with patch.object(ab, "http_json", side_effect=[
+            {"ok": False, "description": "temporary failure"},
+            {"ok": True, "result": True},
+        ]) as http, patch.object(ab, "live_callback", return_value=True):
+            ab._ack_callback_rapide(cb, "ack")
+            self.assertIn("callback-retry", ab.CALLBACKS_ACK_FAILED)
+            ab.traiter({"proprio": [42], "prospects": []}, set(), [update])
+        self.assertEqual(http.call_count, 2)
+        self.assertEqual(ab.TELEGRAM_AUDIT["callback_ack_failed"], 1)
+        self.assertEqual(ab.TELEGRAM_AUDIT["callback_ack_ok"], 1)
+        self.assertNotIn("callback-retry", ab.CALLBACKS_ACK_FAILED)
+        self.assertNotIn("callback-retry", ab.CALLBACKS_ACKNOWLEDGED)
 
     def test_successful_fast_ack_is_cached_until_handler_consumes_it(self):
         cb = {"id": "callback-ok", "data": "markets:BTC"}
