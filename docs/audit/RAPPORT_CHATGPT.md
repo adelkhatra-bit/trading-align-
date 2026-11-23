@@ -666,6 +666,8 @@ Une PR documentaire unique **#780** a été ouverte depuis `docs/align-source-tr
 
 Les PR précédentes #781 et #782 avaient déjà été fusionnées sur audit/chatgpt-pilotage, pas sur main; elles ne pouvaient pas être réécrites. Deux PR de remplacement sont créées à partir de main:
 
+**État de cette section au 02:09 CET (historique, supersédé par l'addendum post-merge ci-dessous).**
+
 ### PR #784 — T1 observabilité Telegram
 - URL: https://github.com/adelkhatra-bit/trading-align-/pull/784
 - Branche: fix/telegram-observabilite-main-clean-20261123
@@ -685,14 +687,14 @@ Les PR précédentes #781 et #782 avaient déjà été fusionnées sur audit/cha
 - Compare main...head: 1 fichier, align-bot/align_bot.py, exactement 1 ligne modifiée (+1/-1), commentaire uniquement.
 - git diff --check réussi.
 - Suite complète depuis racine: python -m unittest discover -s align-bot -p "test_*.py" — Ran 1139 tests in 78.429s; OK (skipped=1), code 0.
-- **Attendu utilisateur: 1140; résultat observé sur main: 1139 — écart de 1, non résolu.** Aucun test d'audit n'a été ajouté à la PR pour maquiller ce décalage.
+- Le résultat de cette exécution était 1139 tests sur la branche de test. Il ne doit pas être présenté comme la baseline officielle de main : baseline officielle = **1144 exécutés, 1 skipped, exit 0** (correction confirmée dans l'addendum post-merge). Aucun test d'audit n'a été ajouté pour maquiller le décompte.
 
 ### T2 — correction de terminologie
 - Le 90,9340 % est désormais décrit comme **couverture théorique des intervalles de workflows** (65,4725 h sur 72 h).
 - Ce chiffre **n'est pas la disponibilité Telegram, ni la disponibilité du lecteur**. Disponibilité réelle: **NON VÉRIFIÉ**.
 
 ### Garde-fous
-- Les deux PR de remplacement sont ouvertes, mergeable=true, non fusionnées.
+- À l'instant de cette ancienne lecture, les PR étaient ouvertes/mergeable. **Statut actuel : #784 et #783 fusionnées**, voir addendum post-merge.
 - Aucun run GitHub Actions relancé ou annulé.
 - Aucun changement à align-bot-rollover.yml, releve_en_attente, _demander_arret, live-data, TradingView, message Telegram réel ou ordre.
 - G1/G2 suspendus.
