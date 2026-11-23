@@ -38,12 +38,34 @@ def jeton_lecture(env=None):
     return hmac.new(racine.encode(), _LABEL_LECTURE, hashlib.sha256).hexdigest()
 
 
+def fetch_mailbox_with_retry(fetch_mailbox, symbol, attempts=3, delay=0.5, sleeper=time.sleep):
+    """Retry bounded transient mailbox transport/HTTP failures; never retry auth/4xx."""
+    attempts = max(1, int(attempts))
+    last_error = None
+    for attempt in range(attempts):
+        try:
+            result = fetch_mailbox(symbol)
+            status = result.get("_http_status", 200) if isinstance(result, dict) else None
+            if status == 429 or (isinstance(status, int) and 500 <= status <= 599):
+                last_error = RuntimeError("mailbox transient HTTP " + str(status))
+                if attempt + 1 < attempts:
+                    sleeper(max(0.0, float(delay)))
+                    continue
+            return result
+        except Exception as exc:
+            last_error = exc
+            if attempt + 1 < attempts:
+                sleeper(max(0.0, float(delay)))
+    if last_error is not None and isinstance(last_error, Exception):
+        raise last_error
+    return {}
+
 def relay_once(fetch_mailbox, ingest, symbols=SYMBOLS):
     """Transmet le dernier message de chaque marché. Retourne {symbole: statut}."""
     results = {}
     for symbol in symbols:
         try:
-            box = fetch_mailbox(symbol)
+            box = fetch_mailbox_with_retry(fetch_mailbox, symbol)
         except Exception as exc:  # réseau : on le signale, on ne fabrique rien
             results[symbol] = "mailbox_error:" + type(exc).__name__
             continue
