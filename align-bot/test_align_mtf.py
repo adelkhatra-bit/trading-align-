@@ -1332,16 +1332,28 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertNotIn("gemini-flash-latest", message)
         self.assertIn("Gold is neutral", message)
 
-    def test_ai_daily_limit_reports_when_no_free_fallback_is_available(self):
+    def test_ai_daily_limit_reports_when_free_fallback_providers_fail(self):
         from unittest.mock import patch
         jour = align_bot.datetime.datetime.now(align_bot.PARIS).strftime("%Y-%m-%d")
         state = {"ia_jour": {jour: align_bot.IA_MAX_JOUR}}
-        with patch.object(align_bot, "_appel_ia") as call:
+        free = [
+            ("OVH Llama", "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions", "Meta-Llama-3_3-70B-Instruct", "", False),
+            ("OVH Mistral", "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions", "Mistral-Small-3.2-24B-Instruct-2506", "", False),
+            ("Pollinations", "https://text.pollinations.ai/openai", "openai", "", False),
+            ("LLM7", "https://api.llm7.io/v1/chat/completions", "default", "", False),
+        ]
+        paid = [
+            ("OpenAI", "https://api.openai.com/v1/chat/completions", "test-model", "fake-openai-key", True),
+            ("Anthropic", "https://api.anthropic.com/v1/messages", "test-model", "fake-anthropic-key", True),
+        ]
+        with patch.object(align_bot, "IA_FOURNISSEURS", free + paid), \
+             patch.object(align_bot, "_appel_ia", side_effect=RuntimeError("provider offline")) as call:
             answer = align_bot.ia(state, "Explain", {"market": "GOLD"})
         self.assertEqual(answer, "")
         self.assertEqual(state["ia_dernier_fournisseur"], "INTERNAL_FALLBACK")
         self.assertEqual(state["ia_dernier_statut"], "DAILY_LIMIT_FREE_FALLBACK_UNAVAILABLE")
-        call.assert_not_called()
+        self.assertEqual([c.args[1] for c in call.call_args_list], [p[2] for p in free])
+        self.assertTrue(state.get("ia_err"))
 
 
 
