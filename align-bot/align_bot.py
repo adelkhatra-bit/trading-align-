@@ -3389,6 +3389,13 @@ def _telegram_sortant_autorise(methode, params):
     prive = bool(getattr(TELEGRAM_PULL_CONTEXT, "private", False))
     if cid and prive and cid == contexte:
         return True
+    # Jauge persistante : autorisée uniquement depuis maj_jauge(), pour le même chat
+    # déjà retenu par l'opt-in (coach privé) ou le canal configuré. Jamais un push libre.
+    live_gauge_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "live_gauge_chat_id", "") or "")
+    live_gauge_market = str(getattr(TELEGRAM_PULL_CONTEXT, "live_gauge_market", "") or "")
+    if (cid and cid == live_gauge_chat and methode in ("sendMessage", "editMessageText")
+            and live_gauge_market in MARCHES and live_gauge_market in marches_message(texte)):
+        return True
     etat = DERNIER_ETAT or {}
     actifs = {str(x) for x in etat.get("recherche_positions_active", [])}
     texte = str(params.get("text") or params.get("caption") or "")
@@ -9903,6 +9910,19 @@ def jauge(m, r, cle, cid=None, canal=False):
     return (f"{tete}\n🔌 Prochaine position   {SENS[d]}\n{barre_pct(pct)}\n"
             f"🟨 Zone   {px(o.get('za', o['e']))} – {px(o.get('zb', o['e']))}\n{etape}")
 
+def _telegram_jauge_scope(methode, cid, marche, **params):
+    """Autorisation temporaire et strictement limitée à la jauge issue de maj_jauge()."""
+    ancien_chat = getattr(TELEGRAM_PULL_CONTEXT, "live_gauge_chat_id", None)
+    ancienne_marche = getattr(TELEGRAM_PULL_CONTEXT, "live_gauge_market", None)
+    TELEGRAM_PULL_CONTEXT.live_gauge_chat_id = str(cid)
+    TELEGRAM_PULL_CONTEXT.live_gauge_market = str(marche)
+    try:
+        return telegram(methode, chat_id=cid, **params)
+    finally:
+        TELEGRAM_PULL_CONTEXT.live_gauge_chat_id = ancien_chat
+        TELEGRAM_PULL_CONTEXT.live_gauge_market = ancienne_marche
+
+
 def maj_jauge(etat, m, r, cle, chats, canal=None):
     for cid in list(chats) + ([canal] if canal else []):
         if cid != canal and (not marche_autorise(etat, cid, m) or
@@ -9913,24 +9933,50 @@ def maj_jauge(etat, m, r, cle, chats, canal=None):
                 try: telegram("deleteMessage", chat_id=cid, message_id=mid)
                 except Exception: pass
             continue
+
+        # Les anciennes versions mémorisaient le texte même quand PULL_MODE bloquait l'édition.
+        # Une migration unique force un rafraîchissement réel sans créer de doublon si le message existe.
+        versions = cle.setdefault("jauge_pull_gate_v1", {})
+        if versions.get(cid) != 1:
+            cle.setdefault("jauge_txt", {}).pop(cid, None)
+            versions[cid] = 1
+
         txt = jauge(m, r, cle, cid, cid == canal)
         mid = cle.get("jauge", {}).get(cid)
+        derniere_tentative = cle.setdefault("jauge_t", {}).get(cid, 0)
+        maintenant = time.time()
         try:
             if txt and mid:
-                derniere_maj = cle.setdefault("jauge_t", {}).get(cid, 0)
-                if cle.setdefault("jauge_txt", {}).get(cid) != txt and time.time() - derniere_maj >= JAUGE_REFRESH_SEC:
-                    telegram("editMessageText", chat_id=cid, message_id=mid, text=txt)
-                    cle["jauge_t"][cid] = time.time()
-                else:
+                if (cle.setdefault("jauge_txt", {}).get(cid) == txt
+                        or maintenant - derniere_tentative < JAUGE_REFRESH_SEC):
                     continue
+                # Le timestamp mesure la tentative, pas une livraison supposée : un échec sera retenté.
+                cle["jauge_t"][cid] = maintenant
+                res = _telegram_jauge_scope(
+                    "editMessageText", cid, m, message_id=mid, text=txt
+                )
+                description = str((res or {}).get("description") or "").lower()
+                if isinstance(res, dict) and (
+                    res.get("ok") is True or "message is not modified" in description
+                ):
+                    cle.setdefault("jauge_txt", {})[cid] = txt
             elif txt:
-                res = telegram("sendMessage", chat_id=cid, text=txt, disable_notification="true")
-                cle.setdefault("jauge", {})[cid] = res["result"]["message_id"]
-            if txt:
-                cle.setdefault("jauge_txt", {})[cid] = txt
+                if maintenant - derniere_tentative < JAUGE_REFRESH_SEC:
+                    continue
+                cle["jauge_t"][cid] = maintenant
+                res = _telegram_jauge_scope(
+                    "sendMessage", cid, m, text=txt, disable_notification="true"
+                )
+                payload = res.get("result") if isinstance(res, dict) else None
+                if (isinstance(res, dict) and res.get("ok") is True
+                        and isinstance(payload, dict) and payload.get("message_id") is not None):
+                    cle.setdefault("jauge", {})[cid] = payload["message_id"]
+                    cle.setdefault("jauge_txt", {})[cid] = txt
             elif mid:
-                telegram("deleteMessage", chat_id=cid, message_id=mid)
-                cle["jauge"].pop(cid, None)
+                res = telegram("deleteMessage", chat_id=cid, message_id=mid)
+                if isinstance(res, dict) and res.get("ok") is True:
+                    cle["jauge"].pop(cid, None)
+                    cle.setdefault("jauge_txt", {}).pop(cid, None)
         except Exception as ex:
             print("jauge", ex)
 
