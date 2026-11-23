@@ -224,3 +224,62 @@ class RetoursALaLigne(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CallbackButtonOfflineAudit(unittest.TestCase):
+    """Offline callback regression coverage: acknowledgement plus response message."""
+
+    def test_all_suspect_callbacks_ack_and_update_message_without_network(self):
+        cases = [
+            "autoadm:menu", "son:piece", "next:yes", "results:x",
+            "marketsmenu:x", "livemenu:x", "botoff:x", "choixcanal:BTC",
+            "searchpos:BOTH", "vuegratuit:on",
+        ]
+        for index, data in enumerate(cases):
+            with self.subTest(callback_data=data):
+                state = {
+                    "proprio": ["42"], "chats": ["42"],
+                    "auto": {"BTC": [], "GOLD": []},
+                    "marches_par_chat": {"42": ["BTC", "GOLD"]},
+                    "bot_off": [], "quiet": [], "coach_pending": [],
+                    "telegram_outbox": [],
+                }
+                chats = {"42"}
+                calls = []
+
+                def fake_telegram(method, **params):
+                    calls.append((method, params))
+                    return {"ok": True, "result": {"message_id": 700 + index}}
+
+                def fake_send(chat_id, **params):
+                    calls.append(("sendMessage", {"chat_id": chat_id, **params}))
+                    return {"ok": True, "result": {"message_id": 700 + index}}
+
+                with mock.patch.object(ab, "telegram", side_effect=fake_telegram), \
+                     mock.patch.object(ab, "_envoi_sur", side_effect=fake_send), \
+                     mock.patch.object(ab, "proprio", return_value=["42"]), \
+                     mock.patch.object(ab, "commande_auto", side_effect=lambda *a, **k: fake_send("42", text="auto admin status")), \
+                     mock.patch.object(ab, "envoyer_son_piece", side_effect=lambda chat: fake_telegram("sendAudio", chat_id=chat, audio="offline fixture")), \
+                     mock.patch.object(ab, "demarrer_recherche_positions", return_value=["BTC"]), \
+                     mock.patch.object(ab, "menu_marches", side_effect=lambda *a, **k: fake_send("42", text="markets menu")), \
+                     mock.patch.object(ab, "menu_live", side_effect=lambda *a, **k: fake_send("42", text="live menu")), \
+                     mock.patch.object(ab, "accueil_liens", side_effect=lambda *a, **k: fake_send("42", text="links menu")), \
+                     mock.patch.object(ab, "texte_resultats", return_value="results text"):
+                    update = {
+                        "update_id": 9000 + index,
+                        "callback_query": {
+                            "id": "cb-audit-" + str(index), "data": data,
+                            "from": {"id": 42},
+                            "message": {
+                                "message_id": 100 + index,
+                                "chat": {"id": 42, "type": "private"},
+                            },
+                        },
+                    }
+                    ab.traiter(state, chats, [update])
+
+                methods = [method for method, _ in calls]
+                self.assertIn("answerCallbackQuery", methods,
+                              f"{data}: missing answerCallbackQuery; calls={methods}")
+                self.assertTrue(set(methods) & {"sendMessage", "sendAudio", "editMessageText"},
+                                f"{data}: no message update captured; calls={methods}")
