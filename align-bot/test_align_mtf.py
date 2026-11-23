@@ -1332,7 +1332,7 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertNotIn("gemini-flash-latest", message)
         self.assertIn("Gold is neutral", message)
 
-    def test_ai_daily_limit_is_explicitly_marked_as_internal_fallback(self):
+    def test_ai_daily_limit_reports_when_no_free_fallback_is_available(self):
         from unittest.mock import patch
         jour = align_bot.datetime.datetime.now(align_bot.PARIS).strftime("%Y-%m-%d")
         state = {"ia_jour": {jour: align_bot.IA_MAX_JOUR}}
@@ -1340,7 +1340,7 @@ class AlignMtfRulesTest(unittest.TestCase):
             answer = align_bot.ia(state, "Explain", {"market": "GOLD"})
         self.assertEqual(answer, "")
         self.assertEqual(state["ia_dernier_fournisseur"], "INTERNAL_FALLBACK")
-        self.assertEqual(state["ia_dernier_statut"], "DAILY_LIMIT_INTERNAL_FALLBACK")
+        self.assertEqual(state["ia_dernier_statut"], "DAILY_LIMIT_FREE_FALLBACK_UNAVAILABLE")
         call.assert_not_called()
 
 
