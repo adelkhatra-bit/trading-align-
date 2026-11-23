@@ -11,6 +11,26 @@ class AIProviderModelConfig(unittest.TestCase):
         self.assertEqual(provider[2], "Mistral-Small-3.2-24B-Instruct-2506")
 
 
+    def test_global_daily_cap_still_tries_free_provider_and_skips_paid_providers(self):
+        import datetime
+        from unittest.mock import patch
+        jour = datetime.datetime.now(ab.PARIS).strftime("%Y-%m-%d")
+        etat = {"ia_jour": {jour: ab.IA_MAX_JOUR}, "ia_cache": {}}
+        free_provider = ("OVH Llama", "https://free.example/v1/chat/completions", "llama-free", "", False)
+        paid_openai = ("OpenAI", "https://api.openai.com/v1/chat/completions", "paid-model", "key", True)
+        paid_anthropic = ("Anthropic", "https://api.anthropic.com/v1/messages", "claude", "key", True)
+        with patch.object(ab, "IA_FOURNISSEURS", [free_provider, paid_openai, paid_anthropic]), \
+             patch.object(ab, "_appel_ia", return_value="Analyse gratuite de test valide." ) as call, \
+             patch.dict("os.environ", {"ALIGN_AI_HEALTHY_PROVIDER": ""}):
+            result = ab.ia(etat, "Analyse", {"symbol": "BTC"}, cle_cache=None)
+        self.assertEqual(result, "Analyse gratuite de test valide.")
+        self.assertEqual(call.call_count, 1)
+        self.assertEqual(call.call_args.args[0], free_provider[1])
+        self.assertEqual(etat["ia_dernier_fournisseur"], "OVH Llama")
+        self.assertEqual(etat["ia_dernier_statut"], "CONNECTED")
+        self.assertEqual(etat["ia_jour"][jour], ab.IA_MAX_JOUR + 1)
+
+
     def test_ai_provider_http_timeout_is_bounded(self):
         import json
         from unittest.mock import patch

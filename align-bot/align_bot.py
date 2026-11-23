@@ -4050,12 +4050,7 @@ def ia(etat, consigne, donnees, cle_cache=None, duree=600, premium=False, recher
     maintenant = time.time()
     jour = datetime.datetime.now(PARIS).strftime("%Y-%m-%d")
     compte = etat.setdefault("ia_jour", {})
-    if compte.get(jour, 0) >= IA_MAX_JOUR:
-        etat["ia_dernier_fournisseur"] = "INTERNAL_FALLBACK"
-        etat["ia_dernier_modele"] = None
-        etat["ia_dernier_statut"] = "DAILY_LIMIT_INTERNAL_FALLBACK"
-        print("AI_PROVIDER_USED=INTERNAL_FALLBACK reason=DAILY_LIMIT", flush=True)
-        return ""
+    plafond_global_atteint = compte.get(jour, 0) >= IA_MAX_JOUR
     txt, erreurs = "", []
     par_jour = etat.setdefault("ia_fournisseur_jour", {})
     claude_t = etat.setdefault("ia_claude_t", {})
@@ -4076,6 +4071,10 @@ def ia(etat, consigne, donnees, cle_cache=None, duree=600, premium=False, recher
     elif sain and any(f[0] == sain for f in IA_FOURNISSEURS):
         ordre.sort(key=lambda f: 0 if f[0] == sain else 1)  # fournisseur confirmé en premier
     for nom, url, modele, cle, besoin_cle in ordre:
+        # Après le plafond global, on garde uniquement les fournisseurs gratuits : les services sans clé
+        # et les API gratuites configurées. Les providers payants ne sont plus sollicités.
+        if plafond_global_atteint and nom in {"OpenAI", "Anthropic"}:
+            continue
         if besoin_cle and not cle:
             continue
         compteur = par_jour.setdefault(nom, {})
@@ -4137,8 +4136,13 @@ def ia(etat, consigne, donnees, cle_cache=None, duree=600, premium=False, recher
             print("ia", nom, modele, detail, flush=True)
     if not txt:
         etat["ia_dernier_fournisseur"] = "INTERNAL_FALLBACK"
-        etat["ia_dernier_statut"] = "ALL_EXTERNAL_PROVIDERS_FAILED"
-        print("AI_PROVIDER_USED=INTERNAL_FALLBACK", flush=True)
+        etat["ia_dernier_statut"] = (
+            "DAILY_LIMIT_FREE_FALLBACK_UNAVAILABLE"
+            if plafond_global_atteint
+            else "ALL_EXTERNAL_PROVIDERS_FAILED"
+        )
+        reason = etat["ia_dernier_statut"]
+        print(f"AI_PROVIDER_USED=INTERNAL_FALLBACK reason={reason}", flush=True)
         etat["ia_err"] = " | ".join(erreurs)
         # Panne IA : uniquement dans les journaux techniques, jamais dans Telegram (rien à voir avec le trading).
         print("AI_ALL_PROVIDERS_FAILED", etat["ia_err"][:250], flush=True)
@@ -8873,6 +8877,14 @@ def texte_audit_telegram(etat, derniers, now=None):
             lines.append("  Bridge TradingView : aucun snapshot attaché au dernier calcul")
 
     lines.append(f"IA : {etat.get('ia_dernier_statut') or 'non sollicitée'} • fournisseur {etat.get('ia_dernier_fournisseur') or 'aucun'}")
+    jour_ia = datetime.datetime.now(PARIS).strftime("%Y-%m-%d")
+    ia_total = (etat.get("ia_jour") or {}).get(jour_ia, 0)
+    lines.append(f"IA appels réussis aujourd'hui : {ia_total}/{IA_MAX_JOUR} • {'plafond atteint' if ia_total >= IA_MAX_JOUR else 'plafond restant'}")
+    if ia_total >= IA_MAX_JOUR:
+        lines.append("IA mode : fournisseurs gratuits uniquement (OpenAI/Anthropic désactivés après plafond)")
+    compteurs_fournisseurs = etat.get("ia_fournisseur_jour") or {}
+    detail_fournisseurs = [f"{nom}={compteurs.get(jour_ia, 0)}" for nom, compteurs in compteurs_fournisseurs.items() if isinstance(compteurs, dict) and compteurs.get(jour_ia, 0)]
+    lines.append("IA fournisseurs aujourd'hui : " + (", ".join(detail_fournisseurs) if detail_fournisseurs else "aucun compteur disponible"))
     diag_path = os.path.join(os.environ.get("RUNNER_TEMP") or "/tmp", "align_diag.json")
     try:
         with open(diag_path, encoding="utf-8") as stream:
