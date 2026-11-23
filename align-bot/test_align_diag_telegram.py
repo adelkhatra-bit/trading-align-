@@ -36,6 +36,7 @@ class AlignTelegramDiagTests(unittest.TestCase):
             "activeTimeframeAgeMs": age_ms,
             "snapshots": {tf: {"fresh": fresh, "ageMs": age_ms} for tf in required},
         }
+
     def diag_file(self, directory):
         return os.path.join(directory, "align_diag.json")
 
@@ -105,6 +106,15 @@ class AlignTelegramDiagTests(unittest.TestCase):
             rendered = ab.texte_diag(str(OWNER_ID))
         self.assertIn("BTC : BRIDGE INDISPONIBLE", rendered)
         self.assertIn("GOLD : BRIDGE INDISPONIBLE", rendered)
+
+    def test_diag_marks_bridge_partial_when_one_timeframe_is_stale(self):
+        partial = self.bridge_ok()
+        partial["snapshots"]["W1"]["fresh"] = False
+        with tempfile.TemporaryDirectory() as runner_temp, patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}), patch.object(ab, "fetch_tv_mtf", side_effect=[partial, partial]):
+            rendered = ab.texte_diag(str(OWNER_ID))
+        self.assertIn("BTC : BRIDGE PARTIEL", rendered)
+        self.assertIn("GOLD : BRIDGE PARTIEL", rendered)
+        self.assertIn("MTF 5/6", rendered)
 
     def test_diag_owner_private_command_runs_before_first_visit_logic(self):
         state = {"proprio": [OWNER_ID], "prospects": []}
