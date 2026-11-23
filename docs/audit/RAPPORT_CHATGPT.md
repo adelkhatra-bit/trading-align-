@@ -422,3 +422,58 @@ Une PR documentaire unique **#780** a été ouverte depuis `docs/align-source-tr
 - G2 Cerebras : après G1 verte seulement. Vérifier endpoint/model exclusivement dans la documentation officielle Cerebras; fournisseur après Groq; clé `CEREBRAS_API_KEY` et plafond journalier; clé créée par Adel.
 - G3 OpenRouter :free : optionnel, après G2 verte; modèle épinglé depuis `openrouter.ai/models`, clé `OPENROUTER_API_KEY`.
 - Aucun fournisseur ajouté/réinstallé, aucun secret créé/affiché, aucun merge, aucune annulation ou relance, aucun changement rollover, aucun message Telegram réel, aucune écriture `live-data`.
+
+
+## Addendum — boutons Telegram, runs #1038/#1039, test offline (23/11/2026)
+
+### Horodatage de lecture GitHub
+- Dernière lecture GitHub : **2026-11-23 01:22:25 CET**.
+- Branche `main` vérifiée : `006280ef214f5c82ea010f5647e9d444b93b5417`.
+- Branche d'audit avant cet ajout : `bc5c41f2df177cbb4a4e38535eb4ccfb94f8aac8`.
+- Aucun code du bot sur `main` modifié durant cette investigation.
+
+### 1. Logs du run #1039 (ID 45085640139) — lecture seule
+- Run commencé : `2026-11-22T23:53:13Z` (00:53:13 CET), terminé : `2026-11-23T00:13:31Z` (01:13:31 CET), conclusion `success`. Jobs : `signaux=success`, `validate=skipped`.
+- `2026-11-23T00:53:42.1208671Z` — `TELEGRAM_API_OK bot=@align_mtf_adel_bot`.
+- `2026-11-23T00:53:42.1209904Z` — `TELEGRAM_RECEIVE_MODE=polling webhook=none`.
+- Les logs runtime ne contiennent pas de ligne `getUpdates`, callback reçu/ack, `TELEGRAM_RETRY` ni erreur de poller. Le code du workflow démarre bien le thread `ALIGN-Telegram-Poller`, mais ces logs ne prouvent pas qu'une réponse getUpdates a été reçue ni que les callbacks ont été traités.
+- Activité de sortie/message visible jusqu'à `2026-11-23T00:13:17.8719476Z` (01:13:17.871 CET), puis `ALIGN_RELEVE_DETECTEE` à 01:13:23.604 CET, `ALIGN_SHUTDOWN_REQUESTED signal=0`, et `ALIGN_STATE_SAVED_ON_SHUTDOWN` à 01:13:24.123 CET.
+- **Le lecteur n'est plus en cours actuellement** : le run #1039 est terminé. Pendant son exécution, le mode polling et le démarrage du thread sont attestés, mais l'activité de lecture getUpdates reste NON VÉRIFIÉE.
+
+### 2. 404 BlobNotFound
+- Le téléchargement des logs de #1039 a d'abord retourné `404 BlobNotFound` dans la lecture précédente. Lors de cette nouvelle lecture, les logs complets du job ont été récupérés avec succès.
+- Le run est récent et ses logs sont encore accessibles. Cela soutient un **problème transitoire de récupération du blob/log**, pas une expiration de rétention. Le 404 précédent ne prouvait ni un job bloqué ni une rétention expirée.
+
+### 3. Run #1038 (ID 45067670356) — dernière activité Telegram
+- Run démarré `2026-11-22T20:39:35Z` (21:39:35 CET), terminé `2026-11-22T23:53:32Z` (00:53:32 CET), conclusion `cancelled`; `signaux=success`, `validate=skipped`. Checkout worker SHA : `fe9166d68eda44c10bbee1c9cdc4f6b0bc5d7ca4`.
+- Dernière activité Telegram/message visible avant shutdown : `2026-11-22T23:53:23.7074007Z` (00:53:23.707 CET), 10 messages Telegram livrés depuis le démarrage indiqués par le journal.
+- `ALIGN_RELEVE_DETECTEE` : 00:53:25.882 CET; `ALIGN_SHUTDOWN_REQUESTED signal=0`; sauvegarde `ALIGN_STATE_SAVED_ON_SHUTDOWN` : 00:53:26.784 CET.
+- Run #1038 a donc fini par arrêt propre avec sauvegarde. Il ne prouve pas qu'un poller reste actif après la fin du job.
+
+### 4. Test offline callbacks — sans Telegram réel
+- Test ajouté à un fichier existant : `align-bot/test_bugs_telegram_news.py`, classe `CallbackButtonOfflineAudit`.
+- 10 callback_data testées : `autoadm:menu`, `son:piece`, `next:yes`, `results:x`, `marketsmenu:x`, `livemenu:x`, `botoff:x`, `choixcanal:BTC`, `searchpos:BOTH`, `vuegratuit:on`.
+- Le dispatcher `traiter()` est exercé avec updates simulés; `telegram()` et `_envoi_sur()` sont faux/mocks et enregistrent les appels. Helpers à effets réseau/audio/menu sont isolés. Aucun message réel, getUpdates réel ou action de trading n'est appelé par ce test.
+- Test ciblé : `Ran 1 test ... OK`, code de sortie **0**.
+- Suite du fichier de test : `Ran 18 tests ... OK`, code de sortie **0**. Baseline du fichier original (17 tests, avant ajout) : **17 tests OK**, code 0.
+- Clone de travail isolé sur l'appareil autorisé, sous le dossier Temp, main SHA vérifié `006280ef214f5c82ea010f5647e9d444b93b5417`. Aucun workspace existant réutilisé. Le test a été commité **uniquement sur la branche d'audit**, pas sur main.
+- Blob du test : `75654d07225a466b1aec60c9e671a1b6256d1f41`. Commit de test audit : `0bfbf00b6373bd4914a4a9f5e3a1a0bcfe9b2226`.
+- Résultat : la régression des 10 callbacks **n'est pas reproduite** dans le test hors ligne. Cela ne prouve pas leur fonctionnement réel côté Telegram : l'accusé et les messages sont simulés.
+
+### 5. OVH — réponse réellement observée
+- Run #1038 : `2026-11-22T23:00:35.1656283Z` (00:00:35.165 CET) — `AI_PROVIDER_USED=OVH Llama model=Meta-Llama-3_3-70B-Instruct`.
+- Run #1038 : `2026-11-22T23:00:44.3733787Z` (00:00:44.373 CET) — `AI_PROVIDER_USED=OVH Mistral model=Mistral-Small-3.2-24B-Instruct-2506`.
+- Run #1039 : **NON VÉRIFIÉ** — aucune ligne `AI_PROVIDER_USED=OVH` trouvée; Groq 429 quota et échecs IA ultérieurs apparaissent dans les logs.
+
+### 6. Bisect / commits suspects
+- Non exécuté : le test offline répond correctement pour les 10 callbacks, donc la condition demandée pour lancer `git bisect` (callback non répondant dans le test) n'est pas remplie.
+- Les commits `4942da35`, `9a3907d4`, `3f315159`, `c3f8ab6c` ne sont pas désignés comme fautifs. La cause des boutons qui ne répondent pas **reste non établie**.
+
+### 7. Modifications et preuves
+- Test uniquement sur `audit/chatgpt-pilotage`; code bot/Telegram de `main` inchangé. SHA du test : `75654d07225a466b1aec60c9e671a1b6256d1f41`; commit : `0bfbf00b6373bd4914a4a9f5e3a1a0bcfe9b2226`.
+- Ce rapport mis à jour sur la branche d'audit après ce commit. Main SHA reste `006280ef214f5c82ea010f5647e9d444b93b5417`.
+
+### 8. Reste à faire / risques / interdictions respectées
+- Cause réelle des boutons : **NON ÉTABLIE**; le test hors ligne ne reproduit pas l'échec.
+- Poller : démarrage/mode attestés dans #1039, mais réception getUpdates/callbacks non tracée; lecteur absent après fin du run.
+- Aucun merge, aucune annulation/relance de workflow, aucune modification de `align-bot-rollover.yml`, aucune modification de `main` ou `live-data`, aucun message Telegram réel, aucun changement TradingView, aucun ordre broker, aucun G1/G2.
