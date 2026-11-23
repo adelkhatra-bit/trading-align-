@@ -3286,6 +3286,31 @@ def _telegram_position_attendue(texte):
     return est_entree(str(texte or "")) or "POSITION ALIGN DÉTECTÉE" in str(texte or "")
 
 
+def _telegram_envoyer_coach_prealerte(etat, cid, texte, marches):
+    """Envoie une pré-alerte sans niveaux uniquement au coach privé qui a opté pour ce marché."""
+    cid = str(cid)
+    chaines = {str(etat.get("canal") or ""), str(etat.get("canal_preuves") or "")}
+    chaines |= {str(v) for v in (etat.get("canaux_marche") or {}).values()}
+    chaines.discard("")
+    marches_autorises = {
+        str(m).upper() for m in (marches or set())
+        if str(m).upper() in MARCHES and coach_actif(etat, cid, str(m).upper())
+    }
+    if (not cid.isdecimal() or cid in chaines or not marches_autorises
+            or _telegram_position_attendue(texte) or contient_niveaux(texte)):
+        return _envoi_sur(cid, text=texte)
+
+    ancien_chat = getattr(TELEGRAM_PULL_CONTEXT, "coach_prealert_chat_id", None)
+    anciens_marches = getattr(TELEGRAM_PULL_CONTEXT, "coach_prealert_markets", None)
+    TELEGRAM_PULL_CONTEXT.coach_prealert_chat_id = cid
+    TELEGRAM_PULL_CONTEXT.coach_prealert_markets = frozenset(marches_autorises)
+    try:
+        return _envoi_sur(cid, text=texte)
+    finally:
+        TELEGRAM_PULL_CONTEXT.coach_prealert_chat_id = ancien_chat
+        TELEGRAM_PULL_CONTEXT.coach_prealert_markets = anciens_marches
+
+
 def _telegram_sortant_autorise(methode, params):
     """Aucun push spontané : réponse privée à une action explicite, ou entrée attendue après demande."""
     if not TELEGRAM_PULL_MODE:
@@ -3302,6 +3327,18 @@ def _telegram_sortant_autorise(methode, params):
     etat = DERNIER_ETAT or {}
     actifs = {str(x) for x in etat.get("recherche_positions_active", [])}
     texte = str(params.get("text") or params.get("caption") or "")
+    # Pré-alerte privée : autorisation temporaire accordée par le routeur des abonnés coach.
+    # Uniquement sendMessage, même chat privé, marché opt-in actif, sans Entry/SL/TP.
+    prealerte_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "coach_prealert_chat_id", "") or "")
+    prealerte_marches = set(getattr(TELEGRAM_PULL_CONTEXT, "coach_prealert_markets", ()) or ())
+    if (methode == "sendMessage" and cid and cid.isdecimal() and cid == prealerte_chat
+            and not _telegram_position_attendue(texte) and not contient_niveaux(texte)):
+        if any(
+            m in MARCHES and m in prealerte_marches
+            and m in marches_choisis(etat, cid) and coach_actif(etat, cid, m)
+            for m in prealerte_marches
+        ):
+            return True
     # NEWS urgente : autoriser uniquement le canal sélectionné pendant son envoi.
     news_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "news_chat_id", "") or "")
     if (cid and cid == news_chat and methode == "sendMessage"
@@ -8260,8 +8297,11 @@ def regrouper_alertes(blocs):
 
 def diffuser_alerte(etat, chats, fr, en):
     """VIP (chaîne + privés qui ont coché le marché) : langue de chaque destinataire ; l'en-tête sert au filtre par marché."""
-    for cid in destinataires_message(etat, chats, "\n".join(fr)):
-        _envoi_sur(cid, text="\n".join(en if str(cid) in LANG_EN else fr))
+    texte_fr = "\n".join(fr)
+    marches = marches_message(texte_fr)
+    for cid in destinataires_message(etat, chats, texte_fr):
+        texte = "\n".join(en if str(cid) in LANG_EN else fr)
+        _telegram_envoyer_coach_prealerte(etat, cid, texte, marches)
 
 def _liste_marches(noms, anglais=False):
     """Formate uniquement la liste des marchés actifs BTC et GOLD."""
@@ -8708,13 +8748,16 @@ def diffuser_messages(etat, chats, msgs):
     for m, texte in msgs:
         t = Msg(texte); t.marches = frozenset({m})
         for cid in destinataires_message(etat, chats, t):
-            par_cid.setdefault(cid, []).append(texte)
-    for cid, textes in par_cid.items():
+            cible = par_cid.setdefault(cid, {"textes": [], "marches": set()})
+            cible["textes"].append(texte)
+            cible["marches"].add(m)
+    for cid, cible in par_cid.items():
         groupes = {}
-        for tx in textes:
+        for tx in cible["textes"]:
             groupes.setdefault(tx.split("\n")[0], []).append(tx)
         for g in groupes.values():
-            _envoi_sur(cid, text=fusion_ouvertures(g))
+            texte = fusion_ouvertures(g)
+            _telegram_envoyer_coach_prealerte(etat, cid, texte, cible["marches"])
 
 def diffuser_evenements(etat, chats, evts):
     """evts = [(marches, lignes_fr, lignes_en[, (mk_fr, mk_en)])] : marches = {"GOLD"} pour un évènement de marché, {"*"} pour une session (global).
@@ -8722,6 +8765,7 @@ def diffuser_evenements(etat, chats, evts):
     (liste de marchés d'une session et ligne « comprimé » réduites à ses marchés ; session sans aucun de ses marchés : non envoyée)."""
     evts = [tuple(e) + (None,) * (4 - len(e)) for e in evts]
     dest_evt = []
+    marches_evt = []
     for marches, fr, en, _mk in evts:
         # Une session est globale dans le calendrier, mais son alerte privée reste
         # limitée aux marchés explicitement concernés par cette session.
@@ -8730,7 +8774,13 @@ def diffuser_evenements(etat, chats, evts):
         cibles = (set(marches) - {"*"}) or mk_names
         t = Msg("\n".join(fr)); t.marches = frozenset(cibles)
         dest_evt.append(set(destinataires_message(etat, chats, t)))
+        marches_evt.append(set(cibles) & set(MARCHES))
     canal = str(etat.get("canal") or "")
+    marches_par_cid = {}
+    for cibles, destinataires_evt in zip(marches_evt, dest_evt):
+        for destinataire in destinataires_evt:
+            if str(destinataire).isdecimal():
+                marches_par_cid.setdefault(str(destinataire), set()).update(cibles)
     for cid in sorted(set().union(*dest_evt) if dest_evt else set()):
         choix = etat.get("marches_par_chat", {}).get(str(cid))
         choisis = marches_choisis(etat, cid) if (choix is not None and cid != canal) else None
@@ -8747,7 +8797,8 @@ def diffuser_evenements(etat, chats, evts):
             if lignes:
                 blocs.append(lignes)
         if blocs:
-            _envoi_sur(cid, text="\n".join(regrouper_alertes(blocs)))
+            texte = "\n".join(regrouper_alertes(blocs))
+            _telegram_envoyer_coach_prealerte(etat, cid, texte, marches_par_cid.get(str(cid), set()))
 
 def alertes_courtes(etat, chats, derniers, now=None):
     """Appelé à chaque tour : sessions + évènements Pine du moment. Gratuit : préavis 15 min des grandes ouvertures seulement."""
