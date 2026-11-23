@@ -1,6 +1,7 @@
 import os
 import sys
 import unittest
+import io
 from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -147,6 +148,21 @@ class TelegramAuditTests(unittest.TestCase):
         self.assertTrue(result["blocked_by_pull_mode"])
         self.assertEqual(ab.TELEGRAM_AUDIT["pull_blocks"]["sendMessage"], 1)
         self.assertNotIn("123456789", repr(ab.TELEGRAM_AUDIT))
+
+    def test_pull_mode_blocks_are_logged_once_without_chat_id_and_aggregate_counts(self):
+        ab.TELEGRAM_PULL_BLOCK_LOGGED.clear()
+        ab.TELEGRAM_PULL_MODE = True
+        output = io.StringIO()
+        with patch("sys.stdout", output):
+            ab.telegram("sendMessage", chat_id="111111111", text="private message one")
+            ab.telegram("sendMessage", chat_id="222222222", text="private message two")
+        rendered = output.getvalue()
+        self.assertEqual(rendered.count("TELEGRAM_PULL_BLOCK"), 1)
+        self.assertIn("method=sendMessage action=outside_callback", rendered)
+        self.assertNotIn("111111111", rendered)
+        self.assertNotIn("222222222", rendered)
+        self.assertEqual(ab.TELEGRAM_AUDIT["pull_blocks"]["sendMessage"], 2)
+        ab.TELEGRAM_PULL_BLOCK_LOGGED.clear()
 
     def test_audit_marks_gold_cme_closed_as_normal_without_snapshot(self):
         state = {
