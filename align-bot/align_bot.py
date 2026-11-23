@@ -8833,7 +8833,7 @@ def texte_diag(cid=None):
         except (TypeError, ValueError, OverflowError):
             return None
 
-    def libelle(value, francais, english):
+    def libelle(francais, english):
         return english if anglais else francais
 
     lignes = [
@@ -8865,7 +8865,8 @@ def texte_diag(cid=None):
         snapshots = snapshots if isinstance(snapshots, dict) else {}
         fresh = [
             tf for tf in requis
-            if isinstance(snapshots.get(tf), dict) and snapshots[tf].get("fresh") is True
+            if isinstance(snapshots.get(tf) or snapshots.get(tf.lower()), dict)
+            and (snapshots.get(tf) or snapshots.get(tf.lower())).get("fresh") is True
         ]
         active = str(bridge.get("activeTimeframe") or "—").upper()
         age_ms = entier(bridge.get("activeTimeframeAgeMs"))
@@ -8889,9 +8890,11 @@ def texte_diag(cid=None):
     runner_temp = os.environ.get("RUNNER_TEMP") or tempfile.gettempdir()
     path = os.path.join(runner_temp, "align_diag.json")
     diagnostic = None
+    diagnostic_read = False
     try:
         with open(path, encoding="utf-8") as stream:
             diagnostic = json.load(stream)
+            diagnostic_read = True
     except FileNotFoundError:
         lignes.append(libelle(
             "Aucun rejet STALE enregistré pendant ce run.",
@@ -8904,7 +8907,7 @@ def texte_diag(cid=None):
             "STALE counter file exists but is unreadable."
         ))
 
-    if diagnostic is not None:
+    if diagnostic_read:
         if (not isinstance(diagnostic, dict) or diagnostic.get("version") != 1
                 or not isinstance(diagnostic.get("triggerStale"), dict)):
             lignes.append(libelle(
