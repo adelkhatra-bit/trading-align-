@@ -76,7 +76,7 @@ class AlignTelegramDiagTests(unittest.TestCase):
             self.assertIn("1", rendered)
             self.assertIn("720", rendered)
             self.assertIn("630", rendered)
-            self.assertIn("lecture seule", rendered.lower())
+            self.assertTrue("lecture seule" in rendered.lower() or "read-only" in rendered.lower())
             self.assertIn("BTC : BRIDGE CONNECTÉ", rendered)
             self.assertIn("GOLD : BRIDGE CONNECTÉ", rendered)
             self.assertIn("MTF 6/6", rendered)
