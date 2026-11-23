@@ -17,12 +17,16 @@ class TelegramCoachPrealertPullGate(unittest.TestCase):
         self.old_private = getattr(ab.TELEGRAM_PULL_CONTEXT, "private", False)
         self.old_prealert_chat = getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_prealert_chat_id", None)
         self.old_prealert_markets = getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_prealert_markets", None)
+        self.old_live_gauge_chat = getattr(ab.TELEGRAM_PULL_CONTEXT, "live_gauge_chat_id", None)
+        self.old_live_gauge_market = getattr(ab.TELEGRAM_PULL_CONTEXT, "live_gauge_market", None)
         ab.TELEGRAM_PULL_MODE = True
         ab.TOKEN = "test-token"
         ab.TELEGRAM_PULL_CONTEXT.chat_id = None
         ab.TELEGRAM_PULL_CONTEXT.private = False
         ab.TELEGRAM_PULL_CONTEXT.coach_prealert_chat_id = None
         ab.TELEGRAM_PULL_CONTEXT.coach_prealert_markets = frozenset()
+        ab.TELEGRAM_PULL_CONTEXT.live_gauge_chat_id = None
+        ab.TELEGRAM_PULL_CONTEXT.live_gauge_market = None
         self.state = {
             "canal": "-1001",
             "canaux_marche": {"BTC": "-1002", "GOLD": "-1003"},
@@ -41,6 +45,8 @@ class TelegramCoachPrealertPullGate(unittest.TestCase):
         ab.TELEGRAM_PULL_CONTEXT.private = self.old_private
         ab.TELEGRAM_PULL_CONTEXT.coach_prealert_chat_id = self.old_prealert_chat
         ab.TELEGRAM_PULL_CONTEXT.coach_prealert_markets = self.old_prealert_markets
+        ab.TELEGRAM_PULL_CONTEXT.live_gauge_chat_id = self.old_live_gauge_chat
+        ab.TELEGRAM_PULL_CONTEXT.live_gauge_market = self.old_live_gauge_market
 
     def send_via_real_telegram(self, callback):
         sent = []
@@ -139,6 +145,86 @@ class TelegramCoachPrealertPullGate(unittest.TestCase):
             lambda: ab.diffuser_alerte(self.state, {"42"}, texte.split("\n"), texte.split("\n"))
         )
         self.assertEqual(sent, [])
+
+    def test_live_gauge_scope_allows_only_its_chat_and_market(self):
+        texte_btc = "🟠 BTC 65000\\n🧭 Alignement 2/3 ⏳"
+        texte_gold = "🥇 GOLD 3655\\n🧭 Alignement 1/3 ⏳"
+
+        self.assertFalse(ab._telegram_sortant_autorise(
+            "sendMessage", {"chat_id": "-1001", "text": texte_btc}
+        ))
+        ab.TELEGRAM_PULL_CONTEXT.live_gauge_chat_id = "-1001"
+        ab.TELEGRAM_PULL_CONTEXT.live_gauge_market = "BTC"
+        self.assertTrue(ab._telegram_sortant_autorise(
+            "sendMessage", {"chat_id": "-1001", "text": texte_btc}
+        ))
+        self.assertTrue(ab._telegram_sortant_autorise(
+            "editMessageText", {"chat_id": "-1001", "text": texte_btc}
+        ))
+        self.assertFalse(ab._telegram_sortant_autorise(
+            "sendMessage", {"chat_id": "-1002", "text": texte_btc}
+        ))
+        self.assertFalse(ab._telegram_sortant_autorise(
+            "sendMessage", {"chat_id": "-1001", "text": texte_gold}
+        ))
+        self.assertFalse(ab._telegram_sortant_autorise(
+            "sendPhoto", {"chat_id": "-1001", "caption": texte_btc}
+        ))
+
+    def test_market_gauge_sends_one_silent_persistent_message_to_configured_channel(self):
+        texte = "🟠 BTC 65000\\n🧭 Alignement 2/3 ⏳"
+        cle = {}
+        with patch.object(ab, "jauge", return_value=texte):
+            sent = self.send_via_real_telegram(
+                lambda: ab.maj_jauge(self.state, "BTC", {}, cle, set(), canal="-1001")
+            )
+
+        self.assertEqual(len(sent), 1)
+        url, params = sent[0]
+        self.assertTrue(url.endswith("/sendMessage"))
+        self.assertEqual(params["chat_id"], ["-1001"])
+        self.assertEqual(params["disable_notification"], ["true"])
+        self.assertEqual(cle["jauge"]["-1001"], 55)
+        self.assertEqual(cle["jauge_txt"]["-1001"], texte)
+        self.assertIsNone(ab.TELEGRAM_PULL_CONTEXT.live_gauge_chat_id)
+        self.assertIsNone(ab.TELEGRAM_PULL_CONTEXT.live_gauge_market)
+
+    def test_market_gauge_edits_existing_message_without_creating_a_second_one(self):
+        texte = "🟠 BTC 65001\\n🧭 Alignement 3/3 ⏳"
+        cle = {
+            "jauge": {"-1001": 55},
+            "jauge_txt": {"-1001": "ancien contenu"},
+            "jauge_t": {"-1001": 1},
+        }
+        with patch.object(ab, "jauge", return_value=texte):
+            sent = self.send_via_real_telegram(
+                lambda: ab.maj_jauge(self.state, "BTC", {}, cle, set(), canal="-1001")
+            )
+
+        self.assertEqual(len(sent), 1)
+        url, params = sent[0]
+        self.assertTrue(url.endswith("/editMessageText"))
+        self.assertEqual(params["chat_id"], ["-1001"])
+        self.assertEqual(params["message_id"], ["55"])
+        self.assertEqual(cle["jauge"]["-1001"], 55)
+        self.assertEqual(cle["jauge_txt"]["-1001"], texte)
+        self.assertIsNone(ab.TELEGRAM_PULL_CONTEXT.live_gauge_chat_id)
+        self.assertIsNone(ab.TELEGRAM_PULL_CONTEXT.live_gauge_market)
+
+    def test_blocked_or_failed_gauge_send_is_not_recorded_as_delivered(self):
+        texte = "🟠 BTC 65000\\n🧭 Alignement 2/3 ⏳"
+        cle = {}
+        with patch.object(ab, "jauge", return_value=texte), \\
+             patch.object(ab, "http_json", return_value={
+                 "ok": False, "result": None, "description": "Envoi refusé"
+             }):
+            ab.maj_jauge(self.state, "BTC", {}, cle, set(), canal="-1001")
+
+        self.assertNotIn("-1001", cle.get("jauge", {}))
+        self.assertNotIn("-1001", cle.get("jauge_txt", {}))
+        self.assertIn("-1001", cle.get("jauge_t", {}))
+        self.assertIsNone(ab.TELEGRAM_PULL_CONTEXT.live_gauge_chat_id)
+        self.assertIsNone(ab.TELEGRAM_PULL_CONTEXT.live_gauge_market)
 
     def test_channel_prealerts_and_edit_operations_remain_blocked(self):
         self.assertFalse(ab._telegram_sortant_autorise(
