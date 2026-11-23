@@ -12,6 +12,7 @@ import math
 import os
 import re
 import sys
+import tempfile
 import threading
 import time
 from datetime import datetime, timezone
@@ -59,6 +60,64 @@ MAX_FUTURE_SKEW_MS = 5_000
 MAX_BODY_BYTES = 32_768
 TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
 FORBIDDEN_PORTS = {3000, 4000, 5001}
+
+# Compteurs diagnostics locaux au processus bridge : remise à zéro à chaque run.
+# Le fichier est partagé avec le bot dans le même runner GitHub Actions via RUNNER_TEMP.
+DIAG_LOCK = threading.Lock()
+DIAG_STARTED_AT_MS = int(time.time() * 1000)
+DIAG_TRIGGER_COUNT = {symbol: 0 for symbol in ALLOWED_SYMBOLS}
+DIAG_TRIGGER_LAST = {}
+
+
+def _write_trigger_stale_diagnostic(symbol, now_ms, age_ms, threshold_ms, entry_tf_ms):
+    """Compte un déclencheur Pine périmé et publie un JSON atomique sans payload ni secret."""
+    symbol = _text(symbol, 16).upper()
+    if symbol not in ALLOWED_SYMBOLS:
+        return
+    with DIAG_LOCK:
+        DIAG_TRIGGER_COUNT[symbol] = DIAG_TRIGGER_COUNT.get(symbol, 0) + 1
+        DIAG_TRIGGER_LAST[symbol] = {
+            "atMs": int(now_ms),
+            "ageMs": int(age_ms),
+            "thresholdMs": int(threshold_ms),
+            "entryTfMs": int(entry_tf_ms),
+        }
+        trigger_stale = {}
+        for market in sorted(ALLOWED_SYMBOLS):
+            last = DIAG_TRIGGER_LAST.get(market) or {}
+            trigger_stale[market] = {
+                "count": int(DIAG_TRIGGER_COUNT.get(market, 0)),
+                "lastAtMs": last.get("atMs"),
+                "lastAgeMs": last.get("ageMs"),
+                "lastThresholdMs": last.get("thresholdMs"),
+                "lastEntryTfMs": last.get("entryTfMs"),
+            }
+        diagnostic = {
+            "version": 1,
+            "startedAtMs": DIAG_STARTED_AT_MS,
+            "updatedAtMs": int(now_ms),
+            "triggerStale": trigger_stale,
+        }
+        runner_temp = os.environ.get("RUNNER_TEMP") or tempfile.gettempdir()
+        diagnostic_path = os.path.join(runner_temp, "align_diag.json")
+        temporary_path = diagnostic_path + f".{os.getpid()}.{threading.get_ident()}.tmp"
+        try:
+            os.makedirs(runner_temp, exist_ok=True)
+            with open(temporary_path, "w", encoding="utf-8") as stream:
+                json.dump(diagnostic, stream, ensure_ascii=False, sort_keys=True)
+                stream.write("\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary_path, diagnostic_path)
+        except Exception as exc:
+            try:
+                os.unlink(temporary_path)
+            except OSError:
+                pass
+            # La télémétrie ne doit jamais interrompre la validation du snapshot.
+            print(f"ALIGN_DIAG_WRITE_FAILED error={type(exc).__name__}", flush=True)
+
+
 
 
 def _finite_number(value):
@@ -320,6 +379,9 @@ class BridgeStore:
                 # Le prix et les snapshots MTF, eux, sont toujours frais et doivent
                 # continuer à alimenter le bridge. Aucun niveau ni confirmation n'est conservé.
                 entry_trigger_rejection = {"error": "stale_or_future_entry_trigger_candle"}
+                _write_trigger_stale_diagnostic(
+                    symbol, now_ms, entry_bar_age, threshold_ms, entry_tf_ms
+                )
                 payload = {
                     **payload,
                     "signal": "WAIT",
