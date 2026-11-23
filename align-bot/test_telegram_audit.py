@@ -148,6 +148,54 @@ class TelegramAuditTests(unittest.TestCase):
         self.assertEqual(ab.TELEGRAM_AUDIT["pull_blocks"]["sendMessage"], 1)
         self.assertNotIn("123456789", repr(ab.TELEGRAM_AUDIT))
 
+    def test_audit_marks_gold_cme_closed_as_normal_without_snapshot(self):
+        state = {
+            "BTC": {},
+            "GOLD": {
+                "m1": [{"t": 1990, "c": 2000.0}],
+                "tv_indicator_mtf": {
+                    "available": False,
+                    "activeTimeframe": None,
+                    "activeTimeframeAgeMs": None,
+                },
+            },
+        }
+        with patch.object(ab, "cme_ouvert", return_value=False):
+            report = ab.texte_audit_telegram(
+                {"offset": 12, "sauve_t": 1000, "telegram_outbox": []},
+                state,
+                now=2000,
+            )
+        self.assertIn("GOLD : bougies M1", report)
+        self.assertIn(
+            "Bridge TradingView : marché CME fermé (normal) • snapshot non requis",
+            report,
+        )
+        self.assertNotIn("Bridge TradingView : indisponible • UT active aucune", report)
+
+    def test_audit_keeps_gold_bridge_failure_visible_when_cme_is_open(self):
+        state = {
+            "BTC": {},
+            "GOLD": {
+                "m1": [{"t": 1990, "c": 2000.0}],
+                "tv_indicator_mtf": {
+                    "available": False,
+                    "activeTimeframe": None,
+                    "activeTimeframeAgeMs": None,
+                },
+            },
+        }
+        with patch.object(ab, "cme_ouvert", return_value=True):
+            report = ab.texte_audit_telegram(
+                {"offset": 12, "sauve_t": 1000, "telegram_outbox": []},
+                state,
+                now=2000,
+            )
+        self.assertIn(
+            "Bridge TradingView : indisponible • UT active aucune • âge inconnue",
+            report,
+        )
+
     def test_report_displays_runtime_evidence_without_private_ids(self):
         ab._telegram_audit("callback_received", "markets:BTC")
         ab._telegram_audit("callback_dispatched", "markets:BTC")
