@@ -550,3 +550,112 @@ Une PR documentaire unique **#780** a été ouverte depuis `docs/align-source-tr
 - Une commande de nettoyage a supprimé par erreur des fichiers suivis **dans le clone local temporaire uniquement**. Aucun commit/push GitHub n'a eu lieu.
 - Restauration immédiate : `git reset --hard origin/main`, nettoyage des artefacts temporaires, puis récupération du test d'audit depuis `origin/audit/chatgpt-pilotage`.
 - Vérification après restauration : clone local `HEAD=006280ef214f5c82ea010f5647e9d444b93b5417`; `git status` ne montre que `align-bot/test_bugs_telegram_news.py` comme modification d'audit; `git diff -- align-bot/align_bot.py` vide. Aucun fichier de production ou workflow n'est modifié dans le clone; main GitHub reste inchangé.
+
+
+## Addendum — T1 observabilité Telegram, T2 fenêtre lecteur, T3 commentaire (23/11/2026)
+
+### T1 — PR observabilité Telegram (log-only)
+- PR **#781** ouverte, non fusionnée : https://github.com/adelkhatra-bit/trading-align-/pull/781
+- Branche : `fix/telegram-observabilite-20261123`
+- Commit head SHA : `20672801887fa5da83112a012044da59d3f7e8c9`
+- Base : `audit/chatgpt-pilotage`, SHA `7c4de787e75afdce28c574b654d720decb6243dc`
+- Diff : 2 fichiers, +75/-2. Ajout d'une ligne par lot getUpdates (compte updates/callbacks), log callback avec data et résultat answerCallbackQuery, log d'arrêt avec identifiant/statut du run plus récent. Test dédié : 4 assertions. Aucun workflow ni logique de rollover changé.
+- Tests ciblés : `python -m unittest align-bot.test_telegram_observabilite` — `Ran 4 tests; OK`, exit 0.
+- Suite complète T1, depuis la racine du dépôt : `python -m unittest discover -s align-bot -p "test_*.py"` — `Ran 1144 tests in 73.751s; OK (skipped=1)`, exit 0.
+- Un premier run complet a échoué sur une assertion liée à la chaîne newline du logger (1144, 1 failure, 1 skipped, exit 1). Correctif de sanitation CR/LF en `chr(10)/chr(13)`, test adapté à un data multilignes; ciblé 4/4 vert, suite complète relancée et verte.
+- Aucun merge/CI rerun.
+
+### T2 — API runs main align-bot.yml (72 heures)
+- Lecture API locale à **2026-11-23 01:49:18 CET** / `2026-11-23T00:49:18Z`.
+- Endpoint : `GET /repos/adelkhatra-bit/trading-align-/actions/workflows/align-bot.yml/runs?branch=main&per_page=100`.
+- Réponse : total repository `1037`, 100 runs reçus sur la page, **68 runs main dans la fenêtre de 72 h** (du 20 nov. 00:49:18 UTC au 23 nov. 00:49:18 UTC).
+- Méthode disponibilité : union des intervalles run_started_at→updated_at de ces runs; durée couverte **235 701 s = 65,4725 h**, **90,9340 %** de la fenêtre 72 h. Ceci est une **borne supérieure au niveau workflow**, pas une mesure exacte du poller. Les heures de démarrage/fin du job signaux et du thread getUpdates ne sont pas retournées dans cette lecture; le temps réel de lecteur est **NON VÉRIFIÉ**. Runs qui se chevauchent sont comptés une seule fois dans l'union.
+- Liste des runs (heures UTC; toutes les lignes sont completed au moment de la lecture) :
+
+| Run | ID | Début UTC | Fin UTC | Conclusion |
+|---|---:|---|---|---|
+| 973 | 44643750381 | 11-20 00:49:18 | 11-20 06:02:48 | success |
+| 974 | 44685657907 | 11-20 06:08:10 | 11-20 12:00:04 | success |
+| 975 | 44733035137 | 11-20 12:06:36 | 11-20 12:23:14 | cancelled |
+| 976 | 44735276977 | 11-20 12:22:42 | 11-20 13:07:35 | cancelled |
+| 977 | 44741507599 | 11-20 13:07:11 | 11-20 13:14:10 | success |
+| 978 | 44742446689 | 11-20 13:13:39 | 11-20 13:13:57 | cancelled |
+| 979 | 44742488930 | 11-20 13:13:56 | 11-20 13:14:18 | skipped |
+| 980 | 44742744324 | 11-20 13:15:37 | 11-20 13:34:58 | cancelled |
+| 981 | 44745520640 | 11-20 13:34:40 | 11-20 14:02:10 | cancelled |
+| 982 | 44749520388 | 11-20 14:01:35 | 11-20 14:12:55 | cancelled |
+| 983 | 44751191978 | 11-20 14:12:15 | 11-20 14:41:34 | cancelled |
+| 984 | 44755834093 | 11-20 14:41:12 | 11-20 18:06:28 | success |
+| 985 | 44789562496 | 11-20 18:06:05 | 11-20 18:14:04 | cancelled |
+| 986 | 44790741506 | 11-20 18:13:36 | 11-20 21:33:45 | cancelled |
+| 987 | 44821340842 | 11-20 21:33:15 | 11-20 21:56:37 | cancelled |
+| 988 | 44824673864 | 11-20 21:56:21 | 11-20 23:52:17 | cancelled |
+| 989 | 44839879699 | 11-20 23:52:02 | 11-20 23:56:20 | cancelled |
+| 990 | 44840314528 | 11-20 23:55:47 | 11-21 00:04:25 | cancelled |
+| 991 | 44841261678 | 11-21 00:03:54 | 11-21 00:12:05 | failure |
+| 992 | 44842148923 | 11-21 00:11:33 | 11-21 00:50:09 | cancelled |
+| 993 | 44846388076 | 11-21 00:49:50 | 11-21 01:50:42 | cancelled |
+| 994 | 44852494166 | 11-21 01:50:17 | 11-21 02:15:02 | cancelled |
+| 995 | 44854786162 | 11-21 02:14:39 | 11-21 02:30:19 | cancelled |
+| 996 | 44856209669 | 11-21 02:29:54 | 11-21 02:59:40 | cancelled |
+| 997 | 44858763506 | 11-21 02:59:18 | 11-21 03:08:52 | cancelled |
+| 998 | 44859565653 | 11-21 03:08:34 | 11-21 06:07:41 | failure |
+| 999 | 44874026751 | 11-21 06:07:14 | 11-21 11:59:38 | failure |
+| 1000 | 44902246211 | 11-21 12:06:19 | 11-21 12:43:29 | cancelled |
+| 1001 | 44905306085 | 11-21 12:43:19 | 11-21 12:45:58 | failure |
+| 1002 | 44905672050 | 11-21 12:47:49 | 11-21 12:50:16 | failure |
+| 1003 | 44907533915 | 11-21 13:10:32 | 11-21 13:13:00 | failure |
+| 1004 | 44929228532 | 11-21 17:17:31 | 11-21 17:33:18 | cancelled |
+| 1005 | 44930630066 | 11-21 17:32:44 | 11-21 17:47:35 | cancelled |
+| 1006 | 44931907369 | 11-21 17:46:55 | 11-21 18:05:52 | success |
+| 1007 | 44933577539 | 11-21 18:05:20 | 11-21 18:19:14 | cancelled |
+| 1008 | 44934843993 | 11-21 18:18:59 | 11-21 18:26:17 | cancelled |
+| 1009 | 44935464462 | 11-21 18:25:38 | 11-21 18:47:13 | cancelled |
+| 1010 | 44937357523 | 11-21 18:46:38 | 11-21 19:08:34 | cancelled |
+| 1011 | 44939300135 | 11-21 19:08:16 | 11-21 19:24:43 | success |
+| 1012 | 44940776483 | 11-21 19:24:34 | 11-21 19:24:44 | skipped |
+| 1013 | 44941574113 | 11-21 19:33:33 | 11-21 19:36:31 | success |
+| 1014 | 44941794589 | 11-21 19:35:56 | 11-21 19:48:45 | cancelled |
+| 1015 | 44942894539 | 11-21 19:48:24 | 11-21 19:53:15 | cancelled |
+| 1016 | 44943301037 | 11-21 19:52:58 | 11-21 21:21:39 | cancelled |
+| 1017 | 44951105493 | 11-21 21:21:22 | 11-21 21:54:07 | cancelled |
+| 1018 | 44953897094 | 11-21 21:53:52 | 11-21 22:15:26 | cancelled |
+| 1019 | 44955753288 | 11-21 22:15:02 | 11-21 22:51:00 | cancelled |
+| 1020 | 44958799044 | 11-21 22:50:29 | 11-21 23:01:47 | cancelled |
+| 1021 | 44959668837 | 11-21 23:01:08 | 11-21 23:53:00 | cancelled |
+| 1022 | 44963881444 | 11-21 23:52:22 | 11-22 00:13:21 | success |
+| 1023 | 44965524687 | 11-22 00:12:54 | 11-22 01:18:20 | cancelled |
+| 1024 | 44970788602 | 11-22 01:17:56 | 11-22 06:08:30 | success |
+| 1025 | 44992348662 | 11-22 06:07:52 | 11-22 12:00:22 | success |
+| 1026 | 45020538131 | 11-22 12:06:00 | 11-22 12:10:21 | cancelled |
+| 1027 | 45020863314 | 11-22 12:09:55 | 11-22 12:50:50 | cancelled |
+| 1028 | 45024344211 | 11-22 12:50:21 | 11-22 12:54:25 | cancelled |
+| 1029 | 45024669738 | 11-22 12:54:13 | 11-22 13:15:14 | cancelled |
+| 1030 | 45026479826 | 11-22 13:15:03 | 11-22 13:50:48 | cancelled |
+| 1031 | 45029576162 | 11-22 13:50:19 | 11-22 14:01:31 | cancelled |
+| 1033 | 45033708691 | 11-22 14:36:07 | 11-22 15:15:01 | cancelled |
+| 1034 | 45037191895 | 11-22 15:50:46 | 11-22 15:57:59 | cancelled |
+| 1035 | 45041119900 | 11-22 16:03:18 | 11-22 18:05:47 | success |
+| 1036 | 45053078240 | 11-22 18:05:30 | 11-22 18:19:58 | cancelled |
+| 1037 | 45054398305 | 11-22 18:19:19 | 11-22 20:40:15 | cancelled |
+| 1038 | 45067670356 | 11-22 20:39:35 | 11-22 23:53:32 | cancelled |
+| 1039 | 45085640139 | 11-22 23:53:13 | 11-23 00:13:31 | success |
+| 1040 | 45087449133 | 11-23 00:13:00 | 11-23 00:27:27 | success |
+| 1041 | 45088862984 | 11-23 00:27:16 | 11-23 00:34:18 | success |
+
+### T3 — Comment corrigé
+- PR **#782** ouverte, non fusionnée : https://github.com/adelkhatra-bit/trading-align-/pull/782
+- Branche : `docs/fix-worker-duration-comment-20261123`
+- Head SHA : `d19d616a98582e665428fe6ee8080b3fa4c511a8`
+- Diff comment-only : 1 fichier, +1/-1; `git diff --check` exit 0; assertion `COMMENT_ASSERT=PASS`. Le code exécutable est inchangé.
+
+### T4 — Baseline single-command
+- Exécution terminée et relue à **2026-11-23 01:54:49 CET**.
+- Worktree détaché, SHA audit 7c4de787e75afdce28c574b654d720decb6243dc, état clean confirmé avant exécution.
+- Commande unique depuis la racine du dépôt : `python -m unittest discover -s align-bot -p "test_*.py"`.
+- Sortie : `Ran 1140 tests in 75.095s` puis `OK (skipped=1)`. Code de sortie **0**.
+- Baseline confirmée : **1139 tests OK + 1 skipped**, aucune failure, aucun error.
+
+### État des PR à la relecture
+- PR #781 : ouverte, non fusionnée, head SHA 20672801887fa5da83112a012044da59d3f7e8c9. Relecture automatique Codex n'a pas pu se terminer (limite d'usage); revue humaine requise.
+- PR #782 : ouverte, non fusionnée, head SHA d19d616a98582e665428fe6ee8080b3fa4c511a8. Relecture automatique Codex non terminée (limite d'usage); revue humaine requise.
