@@ -746,3 +746,29 @@ Lignes runtime réellement présentes (UTC; les équivalents CET sont UTC+1) :
 
 ### Garde-fous de cet addendum
 Rapport seulement sur `audit/chatgpt-pilotage`. Aucun merge, annulation ou relance de workflow, aucune modification de `align-bot-rollover.yml` ou `releve_en_attente`, aucun nouveau code, aucun message Telegram réel, aucun ordre, aucune modification TradingView. G1/G2 restent suspendus. D7 reste **NON TRANCHÉ**.
+
+
+## Addendum — LOT1 poller lifecycle PR #785 (23 novembre 2026)
+
+### État GitHub vérifié après conclusion
+- PR #785 : **fusionnée et fermée** le 2026-11-23 à 01:33:05 UTC (02:33:05 CET).
+- Branche : `telegram-poller-lifecycle`; head `cf32537f4a3ef30e488f3cb533abae12752859ab`.
+- SHA de merge : `6939da4deda27d1554855a25cced20ed6a015ec4`.
+- `main` pointe actuellement sur ce SHA de merge. `live-data` reste séparée et pointe sur `f2caeec2f1c5e7cbc8bdfc8296f60aa1726c9c6c` (lecture Git refs).
+- PR : https://github.com/adelkhatra-bit/trading-align-/pull/785
+
+### CI
+- Run MTF validation `45095023766`, job `validate` ID `137432824589`: **completed / success**.
+- Étapes clés : compilation Python, validation JS overlay, Worker mailbox, actionlint, tests ciblés et suite MTF complète réussies.
+- Log final : `Ran 1147 tests in 62.750s; OK` (pas de skipped indiqué dans cette sortie).
+- Aucun rerun effectué.
+
+### Relecture technique — points à suivre, non corrigés
+- Le wrapper utilise `except BaseException`, qui intercepte aussi les exceptions de contrôle `SystemExit` et `KeyboardInterrupt`; préférer à terme `Exception` si l'objectif est journaliser les erreurs applicatives sans capturer les interruptions.
+- Les nouveaux tests de lifecycle sont déclarés après le bloc `if __name__ == "__main__": unittest.main()`. La découverte CI (`unittest discover`) les a exécutés et réussis, mais une exécution directe du fichier test peut appeler `unittest.main()` avant que la classe ne soit définie. À vérifier/corriger dans un lot minimal séparé.
+- La revue automatique Codex sur la PR a échoué par limite d'utilisation; cette fusion n'est donc pas équivalente à une revue automatique réussie.
+
+### Garde-fous et interprétation
+- Cette PR est déjà fusionnée par le compte GitHub `adelkhatra-bit`; je n'ai pas exécuté l'action de merge.
+- Le CI vert valide le patch et les tests, mais ne prouve pas que le poller Telegram reçoit réellement des updates en production ni qu'un message Telegram a été délivré.
+- Aucune modification de code, workflow, live-data, TradingView, message Telegram réel ou ordre n'est effectuée dans cet addendum. LOT3 reste un document d'audit uniquement.
