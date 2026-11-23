@@ -3580,7 +3580,7 @@ POSITIONS_GRATUITES = os.environ.get("POSITIONS_GRATUITES", "0") == "1"   # 0 = 
 LIEN_INDICATEUR = os.environ.get("LIEN_INDICATEUR", "")   # lien du script TradingView « invite-only » (à remplir après publication)
 PRIX_STARS = int(os.environ.get("PRIX_STARS", "2500"))   # abonnement VIP mensuel : 2 500 ⭐ ≈ 49,90 €
 ECOUTE_SEC = int(os.environ.get("ECOUTE_SEC", "200"))   # (ancien réglage, gardé pour compatibilité)
-DUREE_SEC = int(os.environ.get("DUREE_SEC", str(ECOUTE_SEC)))   # durée d'un lancement (5 h 40 sur GitHub = bot toujours allumé)
+DUREE_SEC = int(os.environ.get("DUREE_SEC", str(ECOUTE_SEC)))   # durée maximale du worker; un run plus récent en file déclenche un arrêt anticipé via surveiller_releve
 PAUSE_SEC = int(os.environ.get("PAUSE_SEC", "5"))    # surveillance des setups toutes les 5 s ; les sources de marché restent mises en cache
 
 def marche_retiree_demande(txt):
