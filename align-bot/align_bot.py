@@ -3290,8 +3290,22 @@ def _telegram_file_ajouter(params):
         return False
     prive = (bool(getattr(TELEGRAM_PULL_CONTEXT, "private", False))
              and str(getattr(TELEGRAM_PULL_CONTEXT, "chat_id", "") or "") == cid)
-    file.append({"key": cle, "chat_id": cid, "method": "sendMessage", "params": dict(params),
-                 "tries": 0, "next_t": float(TELEGRAM_RETRY_UNTIL.get(cid, 0)), "prive": prive})
+    # Conserver les autorisations temporaires qui ont permis le premier envoi.
+    # Elles seront réévaluées contre l'état courant lors de la reprise, jamais élargies.
+    prealerte_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "coach_prealert_chat_id", "") or "")
+    prealerte_marches = sorted({
+        str(m).upper() for m in (getattr(TELEGRAM_PULL_CONTEXT, "coach_prealert_markets", ()) or ())
+        if str(m).upper() in MARCHES
+    }) if prealerte_chat == cid else []
+    news_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "news_chat_id", "") or "")
+    news_urgente = bool(news_chat == cid and str(params.get("text") or "").startswith("🚨 NEWS DE DERNIÈRE MINUTE"))
+    file.append({
+        "key": cle, "chat_id": cid, "method": "sendMessage", "params": dict(params),
+        "tries": 0, "next_t": float(TELEGRAM_RETRY_UNTIL.get(cid, 0)),
+        "prive": prive,
+        "coach_prealert_markets": prealerte_marches,
+        "news_urgente": news_urgente,
+    })
     print(f"TELEGRAM_OUTBOX_QUEUED chat={cid} pending={len(file)}", flush=True)
     return True
 
@@ -3312,13 +3326,33 @@ def traiter_file_telegram(etat, maintenant=None, limite=20):
         try:
             # Une réponse privée mise en attente après un 429 est rejouée dans SON contexte privé :
             # sans cela, le mode pull la bloque (elle n'est plus « la réponse en cours »).
-            prec = (getattr(TELEGRAM_PULL_CONTEXT, "chat_id", ""), getattr(TELEGRAM_PULL_CONTEXT, "private", False))
+            prec = (
+                getattr(TELEGRAM_PULL_CONTEXT, "chat_id", None),
+                getattr(TELEGRAM_PULL_CONTEXT, "private", False),
+                getattr(TELEGRAM_PULL_CONTEXT, "coach_prealert_chat_id", None),
+                getattr(TELEGRAM_PULL_CONTEXT, "coach_prealert_markets", None),
+                getattr(TELEGRAM_PULL_CONTEXT, "news_chat_id", None),
+            )
             if item.get("prive"):
                 TELEGRAM_PULL_CONTEXT.chat_id, TELEGRAM_PULL_CONTEXT.private = cid, True
+            prealerte_marches = item.get("coach_prealert_markets") or []
+            if prealerte_marches:
+                TELEGRAM_PULL_CONTEXT.coach_prealert_chat_id = cid
+                TELEGRAM_PULL_CONTEXT.coach_prealert_markets = frozenset(
+                    str(m).upper() for m in prealerte_marches if str(m).upper() in MARCHES
+                )
+            if item.get("news_urgente"):
+                TELEGRAM_PULL_CONTEXT.news_chat_id = cid
             try:
                 res_ = telegram(item.get("method") or "sendMessage", **(item.get("params") or {}))
             finally:
-                TELEGRAM_PULL_CONTEXT.chat_id, TELEGRAM_PULL_CONTEXT.private = prec
+                (
+                    TELEGRAM_PULL_CONTEXT.chat_id,
+                    TELEGRAM_PULL_CONTEXT.private,
+                    TELEGRAM_PULL_CONTEXT.coach_prealert_chat_id,
+                    TELEGRAM_PULL_CONTEXT.coach_prealert_markets,
+                    TELEGRAM_PULL_CONTEXT.news_chat_id,
+                ) = prec
             if isinstance(res_, dict) and res_.get("blocked_by_pull_mode"):
                 file.remove(item)
                 print(f"TELEGRAM_OUTBOX_DROP chat={cid} reason=blocked_by_pull_mode", flush=True)
@@ -3406,7 +3440,8 @@ def _telegram_sortant_autorise(methode, params):
             return True
     # NEWS urgente : autoriser uniquement le canal sélectionné pendant son envoi.
     news_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "news_chat_id", "") or "")
-    if (cid and cid == news_chat and methode == "sendMessage"
+    canaux_news = {str(v) for v in (etat.get("canaux_marche") or {}).values() if v}
+    if (cid and cid == news_chat and cid in canaux_news and methode == "sendMessage"
             and texte.startswith("🚨 NEWS DE DERNIÈRE MINUTE")):
         return True
     if cid and cid in actifs and methode in ("sendMessage", "sendPhoto", "editMessageText") and _telegram_position_attendue(texte):

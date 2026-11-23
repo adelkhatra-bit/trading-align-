@@ -2,6 +2,7 @@
 import os
 import sys
 import time
+import urllib.parse
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -64,6 +65,7 @@ class TelegramPullAuthorization(unittest.TestCase):
                            getattr(ab.TELEGRAM_PULL_CONTEXT, "news_chat_id", None), autorise))
             return {"ok": autorise}
         with mock.patch.object(ab, "TOKEN", "token-test"), \
+             mock.patch.object(ab, "DERNIER_ETAT", etat), \
              mock.patch.object(ab, "titres_urgents", return_value=["Fed rate decision affects Bitcoin"]), \
              mock.patch.object(ab, "ia", return_value=decision), \
              mock.patch.object(ab, "telegram", side_effect=telegram_simule), \
@@ -164,6 +166,87 @@ class FileTelegram(unittest.TestCase):
             self.assertEqual(ab.traiter_file_telegram(etat, maintenant=10), 0)
         self.assertEqual(len(etat["telegram_outbox"]), 1)
         self.assertEqual(etat["telegram_outbox"][0]["tries"], 1)
+
+
+class TelegramOutboxScopedRetry(unittest.TestCase):
+    def setUp(self):
+        self.old_mode = ab.TELEGRAM_PULL_MODE
+        self.old_token = ab.TOKEN
+        self.old_state = ab.DERNIER_ETAT
+        self.old_news_chat = getattr(ab.TELEGRAM_PULL_CONTEXT, "news_chat_id", None)
+        self.old_current_state = ab._ETAT_COURANT.get("etat")
+        self.old_current_chats = ab._ETAT_COURANT.get("chats")
+        self.old_retry = dict(ab.TELEGRAM_RETRY_UNTIL)
+        ab.TELEGRAM_PULL_MODE = True
+        ab.TOKEN = "test-token"
+        ab.TELEGRAM_RETRY_UNTIL.clear()
+        ab.TELEGRAM_PULL_CONTEXT.chat_id = None
+        ab.TELEGRAM_PULL_CONTEXT.private = False
+        ab.TELEGRAM_PULL_CONTEXT.news_chat_id = None
+        self.state = {"canaux_marche": {"BTC": "-100123"}, "telegram_outbox": []}
+        ab.DERNIER_ETAT = self.state
+        ab._ETAT_COURANT["etat"] = self.state
+        ab._ETAT_COURANT["chats"] = set()
+
+    def tearDown(self):
+        ab.TELEGRAM_PULL_MODE = self.old_mode
+        ab.TOKEN = self.old_token
+        ab.DERNIER_ETAT = self.old_state
+        ab.TELEGRAM_PULL_CONTEXT.news_chat_id = self.old_news_chat
+        ab.TELEGRAM_RETRY_UNTIL.clear()
+        ab.TELEGRAM_RETRY_UNTIL.update(self.old_retry)
+        if self.old_current_state is None:
+            ab._ETAT_COURANT.pop("etat", None)
+        else:
+            ab._ETAT_COURANT["etat"] = self.old_current_state
+        if self.old_current_chats is None:
+            ab._ETAT_COURANT.pop("chats", None)
+        else:
+            ab._ETAT_COURANT["chats"] = self.old_current_chats
+
+    def _queue_news_after_429(self):
+        ab.TELEGRAM_PULL_CONTEXT.news_chat_id = "-100123"
+        with mock.patch.object(ab, "http_json", side_effect=RuntimeError("HTTP Error 429: retry after 30")):
+            ab._envoi_sur("-100123", text="🚨 NEWS DE DERNIÈRE MINUTE\n📰 Test news")
+        self.assertEqual(len(self.state["telegram_outbox"]), 1)
+        self.assertTrue(self.state["telegram_outbox"][0].get("news_urgente"))
+        ab.TELEGRAM_PULL_CONTEXT.news_chat_id = None
+        ab.TELEGRAM_RETRY_UNTIL.clear()
+        self.state["telegram_outbox"][0]["next_t"] = 0
+
+    def test_429_retry_preserves_configured_urgent_news_channel_scope(self):
+        self._queue_news_after_429()
+        sent = []
+
+        def fake_http(url, data=None, **kwargs):
+            sent.append((url, urllib.parse.parse_qs(data.decode("utf-8"))))
+            return {"ok": True, "result": {"message_id": 56, "chat": {"id": -100123}}}
+
+        with mock.patch.object(ab, "http_json", side_effect=fake_http):
+            delivered = ab.traiter_file_telegram(self.state, maintenant=time.time() + 60)
+
+        self.assertEqual(delivered, 1)
+        self.assertEqual(len(sent), 1)
+        self.assertTrue(sent[0][0].endswith("/sendMessage"))
+        self.assertEqual(sent[0][1]["chat_id"], ["-100123"])
+        self.assertEqual(self.state["telegram_outbox"], [])
+        self.assertIsNone(ab.TELEGRAM_PULL_CONTEXT.news_chat_id)
+
+    def test_429_retry_does_not_send_to_news_channel_removed_before_retry(self):
+        self._queue_news_after_429()
+        self.state["canaux_marche"].clear()
+        sent = []
+
+        def fake_http(url, data=None, **kwargs):
+            sent.append(url)
+            return {"ok": True, "result": {"message_id": 57}}
+
+        with mock.patch.object(ab, "http_json", side_effect=fake_http):
+            delivered = ab.traiter_file_telegram(self.state, maintenant=time.time() + 60)
+
+        self.assertEqual(delivered, 0)
+        self.assertEqual(sent, [])
+        self.assertEqual(self.state["telegram_outbox"], [])
 
 
 class CalendrierInconnu(unittest.TestCase):
