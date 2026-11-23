@@ -619,10 +619,32 @@ bridgeConfirmed = bridgePlanValid and etatS == "CONFIRMÉ" and scoreV >= 75 and 
 bridgeZone = zoneBas ? "SUPPORT" : zoneHaut ? "RESISTANCE" : "PLAN"
 
 // Chaque timeframe transporte l'heure d'ouverture de SA propre bougie.
-// Sur un chart supérieur, time("5") peut rester sur le premier intrabar :
-// request.security(..., time, lookahead_off) suit le dernier intrabar en temps réel.
+// Sur un chart supérieur, request.security() ne restitue qu'un intrabar ;
+// request.security_lower_tf() donne les intrabars et permet de prendre le dernier clôturé.
 bridgeEntryTf = strat == "SWING" ? "60" : strat == "DAY" ? "5" : strat == "SCALPING" ? "1" : ""
-[bridgeEntryOpen, bridgeEntryHigh, bridgeEntryLow, bridgeEntryClose, bridgeEntryTime] = request.security(syminfo.tickerid, bridgeEntryTf == "" ? timeframe.period : bridgeEntryTf, [open[1], high[1], low[1], close[1], time[1]], lookahead=barmerge.lookahead_on)
+float bridgeEntryOpen = na
+float bridgeEntryHigh = na
+float bridgeEntryLow = na
+float bridgeEntryClose = na
+int bridgeEntryTime = na
+if bridgeEntryTf != ""
+    if timeframe.in_seconds(bridgeEntryTf) < timeframe.in_seconds()
+        [bridgeEntryOpenArray, bridgeEntryHighArray, bridgeEntryLowArray, bridgeEntryCloseArray, bridgeEntryTimeArray] = request.security_lower_tf(syminfo.tickerid, bridgeEntryTf, [open[1], high[1], low[1], close[1], time[1]])
+        int bridgeEntryCount = array.size(bridgeEntryTimeArray)
+        if bridgeEntryCount > 0
+            int bridgeEntryLast = bridgeEntryCount - 1
+            bridgeEntryOpen := array.get(bridgeEntryOpenArray, bridgeEntryLast)
+            bridgeEntryHigh := array.get(bridgeEntryHighArray, bridgeEntryLast)
+            bridgeEntryLow := array.get(bridgeEntryLowArray, bridgeEntryLast)
+            bridgeEntryClose := array.get(bridgeEntryCloseArray, bridgeEntryLast)
+            bridgeEntryTime := array.get(bridgeEntryTimeArray, bridgeEntryLast)
+    else
+        [bridgeEntryOpenRequested, bridgeEntryHighRequested, bridgeEntryLowRequested, bridgeEntryCloseRequested, bridgeEntryTimeRequested] = request.security(syminfo.tickerid, bridgeEntryTf, [open[1], high[1], low[1], close[1], time[1]], lookahead=barmerge.lookahead_on)
+        bridgeEntryOpen := bridgeEntryOpenRequested
+        bridgeEntryHigh := bridgeEntryHighRequested
+        bridgeEntryLow := bridgeEntryLowRequested
+        bridgeEntryClose := bridgeEntryCloseRequested
+        bridgeEntryTime := bridgeEntryTimeRequested
 bridgeEntryTimeSafe = bridgeEntryTf == "" ? na : bridgeEntryTime
 bridgeTimeM1 = request.security(syminfo.tickerid, "1", time, lookahead=barmerge.lookahead_off)
 bridgeTimeM5 = request.security(syminfo.tickerid, "5", time, lookahead=barmerge.lookahead_off)
