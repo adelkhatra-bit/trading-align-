@@ -294,7 +294,7 @@ class BridgeStore:
         mtf = payload.get("mtf")
         if not isinstance(mtf, dict):
             return 400, {"ok": False, "error": "missing_mtf_snapshots"}
-        required = set(REQUIRED_TIMEFRAMES) | {timeframe}
+        required = list(REQUIRED_TIMEFRAMES) + ([timeframe] if timeframe not in REQUIRED_TIMEFRAMES else [])
         normalized_mtf = {}
         for tf in required:
             item = mtf.get(tf)
