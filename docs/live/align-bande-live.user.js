@@ -902,25 +902,39 @@
   // v12.2.11 : le heartbeat passe par GM_xmlhttpRequest (hors de la page TradingView, sans CORS ni blocage réseau de la page).
   // Repli sur fetch si le gestionnaire de scripts ne fournit pas GM_xmlhttpRequest.
   let ecranRetryTimer = null;
+  let ecranInFlight = false;
+  let ecranRetryAttempt = 0;
   function envoyerEcran(corps, ok, ko) {
     const url = 'https://ntfy.sh/' + SUJET + '-ecran';
+    let settled = false;
+    const success = () => { if (settled) return; settled = true; if (ok) ok(); };
+    const failure = err => { if (settled) return; settled = true; if (ko) ko(err || new Error('network error')); };
     try {
       if (typeof GM_xmlhttpRequest === 'function') {
         GM_xmlhttpRequest({ method: 'POST', url: url, data: corps, timeout: 8000,
-          onload: r => { if (r && r.status >= 200 && r.status < 300) { if (ok) ok(); } else if (ko) ko(new Error('HTTP ' + (r && r.status))); },
-          onerror: e => { if (ko) ko(e || new Error('network error')); },
-          ontimeout: () => { if (ko) ko(new Error('timeout')); } });
+          onload: r => { if (r && r.status >= 200 && r.status < 300) success(); else failure(new Error('HTTP ' + (r && r.status))); },
+          onerror: err => failure(err || new Error('network error')),
+          ontimeout: () => failure(new Error('timeout')) });
       } else {
-        fetch(url, { method: 'POST', body: corps, keepalive: true }).then(r => { if (r.ok) { if (ok) ok(); } else if (ko) ko(new Error('HTTP ' + r.status)); }).catch(e => { if (ko) ko(e); });
+        fetch(url, { method: 'POST', body: corps, keepalive: true }).then(r => { if (r.ok) success(); else failure(new Error('HTTP ' + r.status)); }).catch(err => failure(err));
       }
-    } catch (e) { if (ko) ko(e); }
+    } catch (err) { failure(err); }
   }
-  function pingEcran(tentative = 0) {
+  function pingEcran() {
+    if (!vivant || ecranInFlight || ecranRetryTimer) return;
+    ecranInFlight = true;
     const message = 'PING|LIVE_SCREEN|' + Date.now();
-    envoyerEcran(message, () => { if (ecranRetryTimer) clearTimeout(ecranRetryTimer); ecranRetryTimer = null; }, () => {
-      if (tentative >= 3 || !vivant || ecranRetryTimer) return;
+    envoyerEcran(message, () => {
+      ecranInFlight = false;
+      ecranRetryAttempt = 0;
+      if (ecranRetryTimer) clearTimeout(ecranRetryTimer);
+      ecranRetryTimer = null;
+    }, () => {
+      ecranInFlight = false;
+      if (ecranRetryAttempt >= 3 || !vivant || ecranRetryTimer) return;
       const delais = [5000, 10000, 20000];
-      ecranRetryTimer = setTimeout(() => { ecranRetryTimer = null; pingEcran(tentative + 1); }, delais[tentative]);
+      const delay = delais[ecranRetryAttempt++];
+      ecranRetryTimer = setTimeout(() => { ecranRetryTimer = null; pingEcran(); }, delay);
     });
   }
   function ecouter() {
