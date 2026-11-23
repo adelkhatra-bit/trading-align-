@@ -2,6 +2,7 @@ import json
 import os
 import tempfile
 import unittest
+import urllib.parse
 from pathlib import Path
 from unittest.mock import patch
 
@@ -114,6 +115,25 @@ class AlignTelegramDiagTests(unittest.TestCase):
             ab.traiter(state, set(), [message_update("/diag", OWNER_ID, OWNER_ID + 5)])
         send.assert_not_called()
         self.assertEqual(state["prospects"], [])
+
+    def test_diag_owner_private_reply_passes_real_telegram_pull_gate(self):
+        state = {"proprio": [OWNER_ID], "prospects": []}
+        request_update = message_update("/diag@align_mtf_adel_bot")
+        with patch.object(ab, "TOKEN", "test-token"), \
+             patch.object(ab, "TELEGRAM_PULL_MODE", True), \
+             patch.object(ab, "texte_diag", return_value="📊 DIAGNOSTIC TEST"), \
+             patch.object(ab, "http_json", return_value={
+                 "ok": True, "result": {"message_id": 55}
+             }) as http:
+            result = ab.traiter(state, set(), [request_update])
+
+        self.assertEqual(result, [])
+        http.assert_called_once()
+        url, body = http.call_args.args[:2]
+        self.assertTrue(url.endswith("/sendMessage"))
+        params = urllib.parse.parse_qs(body.decode("utf-8"))
+        self.assertEqual(params.get("chat_id"), [str(OWNER_ID)])
+        self.assertIn("DIAGNOSTIC TEST", params.get("text", [""])[0])
 
     def test_diag_in_group_is_ignored_without_public_reply(self):
         state = {"proprio": [OWNER_ID], "prospects": []}
