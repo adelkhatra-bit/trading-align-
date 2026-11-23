@@ -202,28 +202,35 @@ jobs:
 
           payload = appel("getMe")
           if payload is None:
-              avertir("getMe sans réponse après 3 essais (60 s chacun) : le bot démarre et réessaiera lui-même.")
+              avertir("getMe sans réponse après 3 essais : worker bloqué, le polling ne démarre pas.")
           if not payload.get("ok"):
               raise SystemExit("ÉCHEC: API Telegram indisponible")
+          BOT_USERNAME_ATTENDU = "align_mtf_adel_bot"
+          identite = payload.get("result") or {}
+          username = str(identite.get("username") or "").lstrip("@").lower()
+          if username != BOT_USERNAME_ATTENDU:
+              raise SystemExit("ÉCHEC: TELEGRAM_TOKEN ne correspond pas au bot ALIGN attendu")
+          if identite.get("is_bot") is not True:
+              raise SystemExit("ÉCHEC: l'identité Telegram authentifiée n'est pas un bot")
           info = appel("getWebhookInfo")
           if info is None:
-              avertir("getWebhookInfo sans réponse : webhook non vérifié, le bot démarre quand même.")
+              avertir("getWebhookInfo sans réponse : mode de réception non vérifié, worker bloqué, polling non démarré.")
           if not info.get("ok"):
               raise SystemExit("ÉCHEC: impossible de vérifier le mode de réception Telegram")
           webhook = (info.get("result") or {}).get("url", "").strip()
           if webhook:
               deleted = appel("deleteWebhook?drop_pending_updates=false")
               if deleted is None:
-                  avertir("deleteWebhook sans réponse : un webhook est actif, le polling peut être bloqué tant qu'il n'est pas retiré.")
+                  avertir("deleteWebhook sans réponse : retrait du webhook non confirmé, worker bloqué, polling non démarré.")
               if not deleted.get("ok"):
                   raise SystemExit("ÉCHEC: webhook Telegram actif et suppression impossible; le polling ne peut pas démarrer.")
               print("TELEGRAM_WEBHOOK_REMOVED pending_updates_preserved=true")
               verified = appel("getWebhookInfo")
               if verified is None:
-                  avertir("getWebhookInfo sans réponse après suppression du webhook : réception Telegram non vérifiée.")
+                  avertir("getWebhookInfo sans réponse après suppression : mode polling non confirmé, worker bloqué.")
               if not verified.get("ok") or (verified.get("result") or {}).get("url", "").strip():
                   raise SystemExit("ÉCHEC: le webhook Telegram est toujours actif après suppression.")
-          print("TELEGRAM_API_OK bot=@" + payload["result"].get("username", "unknown"))
+          print("TELEGRAM_API_OK bot=@" + username)
           print("TELEGRAM_RECEIVE_MODE=polling webhook=none")
           print("Aucun message de démarrage envoyé aux utilisateurs.")
           PY
