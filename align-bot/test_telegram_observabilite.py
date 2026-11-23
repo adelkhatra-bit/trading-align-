@@ -11,6 +11,24 @@ import align_bot as ab
 
 
 class TelegramObservabiliteLogs(unittest.TestCase):
+    def test_statut_command_is_fast_and_owner_only(self):
+        update = {"message": {"chat": {"id": "owner-1", "type": "private"}, "text": "/statut"}}
+        with patch.object(ab, "proprio", return_value=["owner-1"]), \
+             patch.object(ab, "texte_statut", return_value="🩺 STATUT ALIGN"), \
+             patch.object(ab, "DERNIERS", {}), \
+             patch.object(ab, "_envoi_sur") as send:
+            handled = ab._traiter_lecture_rapide({}, set(), update)
+        self.assertTrue(handled)
+        self.assertTrue(update["_align_fast_handled"])
+        send.assert_called_once_with("owner-1", text="🩺 STATUT ALIGN")
+
+    def test_statut_command_ignored_for_non_owner_in_fast_path(self):
+        update = {"message": {"chat": {"id": "guest-1", "type": "private"}, "text": "/statut"}}
+        with patch.object(ab, "proprio", return_value=[]), patch.object(ab, "_envoi_sur") as send:
+            handled = ab._traiter_lecture_rapide({}, set(), update)
+        self.assertFalse(handled)
+        send.assert_not_called()
+
     def capture(self, fn, *args):
         out = io.StringIO()
         with redirect_stdout(out):
