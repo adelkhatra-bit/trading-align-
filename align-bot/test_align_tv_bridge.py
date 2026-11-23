@@ -184,21 +184,46 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertIsNone(robot["entry"])
         self.assertFalse(robot["entryTriggered"])
 
-    def test_entry_candle_older_than_two_timeframes_rejected(self):
+    def test_stale_entry_trigger_keeps_fresh_mtf_but_downgrades_plan_to_wait(self):
         payload = valid_payload()
         payload["entryBarTime"] = BASE_MS - 2 * 300_000 - 60_000  # DAY → M5
         status, result = self.store.ingest(payload, INGEST, BASE_MS)
-        self.assertEqual(result["error"], "stale_or_future_entry_trigger_candle")
+        self.assertEqual(status, 200, result)
+        self.assertTrue(result["accepted"])
+        self.assertEqual(
+            result["diagnosticRejection"]["error"],
+            "stale_or_future_entry_trigger_candle",
+        )
+
+        status, data = self.store.read("BTCUSD", BASE_MS + 1_000)
+        self.assertEqual(status, 200)
+        self.assertTrue(data["ok"])
+        self.assertTrue(data["activeTimeframeFresh"])
+        self.assertEqual(
+            data["lastRejection"]["error"],
+            "stale_or_future_entry_trigger_candle",
+        )
+        robot = data["snapshots"]["M1"]["robotV12"]
+        self.assertEqual(robot["signal"], "WAIT")
+        self.assertFalse(robot["confirmed"])
+        self.assertFalse(robot["entryTriggered"])
+        for field in ("entry", "sl", "tp", "tp1", "tp2", "entryZoneLow",
+                      "entryZoneHigh", "entryDecision", "entryBarTime"):
+            self.assertIsNone(robot[field], field)
+
     def test_stale_entry_trigger_rejection_emits_diagnostic_line(self):
         payload = valid_payload()
         payload["entryBarTime"] = BASE_MS - 2 * TIMEFRAME_MS["M5"] - ENTRY_BAR_GRACE_MS - 1
         output = io.StringIO()
         with redirect_stdout(output):
             status, result = self.store.ingest(payload, INGEST, BASE_MS)
-        self.assertEqual(status, 400)
-        self.assertEqual(result["error"], "stale_or_future_entry_trigger_candle")
+        self.assertEqual(status, 200, result)
+        self.assertEqual(
+            result["diagnosticRejection"]["error"],
+            "stale_or_future_entry_trigger_candle",
+        )
         log_line = output.getvalue().strip()
-        self.assertIn("BTC_TRIGGER_STALE entry_tf_ms=300000", log_line)
+        self.assertIn("entry_tf_ms=300000", log_line)
         self.assertIn(f"entry_bar_time_ms={payload['entryBarTime']}", log_line)
         self.assertIn(f"now_ms={BASE_MS}", log_line)
         self.assertIn(f"age_ms={BASE_MS - payload['entryBarTime']}", log_line)
@@ -448,15 +473,34 @@ class BridgeStoreTests(unittest.TestCase):
         _, data = self.store.read("BTCUSD", BASE_MS)
         self.assertFalse(data["snapshots"]["M1"]["robotV12"]["entryTriggered"])
 
-    def test_ingest_rejects_stale_or_future_entry_trigger_candle(self):
+    def test_stale_or_future_entry_trigger_downgrades_plan_and_keeps_fresh_mtf(self):
         for time_value in (BASE_MS - 2 * TIMEFRAME_MS["M5"] - MTF_BAR_GRACE_MS - 1,
                            BASE_MS + MAX_FUTURE_SKEW_MS + 1):
             with self.subTest(entryBarTime=time_value):
                 payload = valid_payload()
                 payload["entryBarTime"] = time_value
                 status, result = self.store.ingest(payload, INGEST, BASE_MS)
-                self.assertEqual(status, 400)
-                self.assertEqual(result["error"], "stale_or_future_entry_trigger_candle")
+                self.assertEqual(status, 200, result)
+                self.assertTrue(result["accepted"])
+                self.assertEqual(
+                    result["diagnosticRejection"]["error"],
+                    "stale_or_future_entry_trigger_candle",
+                )
+                status, data = self.store.read("BTCUSD", BASE_MS + 1_000)
+                self.assertEqual(status, 200)
+                self.assertTrue(data["ok"])
+                self.assertEqual(
+                    data["lastRejection"]["error"],
+                    "stale_or_future_entry_trigger_candle",
+                )
+                robot = data["snapshots"]["M1"]["robotV12"]
+                self.assertEqual(robot["signal"], "WAIT")
+                self.assertFalse(robot["confirmed"])
+                self.assertFalse(robot["entryTriggered"])
+                self.assertIsNone(robot["entry"])
+                self.assertIsNone(robot["sl"])
+                self.assertIsNone(robot["tp1"])
+                self.assertIsNone(robot["entryBarTime"])
 
     def test_read_response_never_contains_either_token(self):
         self.store.ingest(valid_payload(), INGEST, BASE_MS)
