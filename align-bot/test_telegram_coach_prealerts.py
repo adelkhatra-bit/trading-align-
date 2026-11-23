@@ -70,6 +70,36 @@ class TelegramCoachPrealertPullGate(unittest.TestCase):
         self.assertIsNone(ab.TELEGRAM_PULL_CONTEXT.coach_prealert_chat_id)
         self.assertFalse(ab.TELEGRAM_PULL_CONTEXT.coach_prealert_markets)
 
+    def test_diffuser_messages_uses_the_same_private_coach_scope(self):
+        sent = self.send_via_real_telegram(
+            lambda: ab.diffuser_messages(
+                self.state, {"42"},
+                [("BTC", "📊 BTC : marché en préparation, signal à confirmer.")],
+            )
+        )
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sent[0][1]["chat_id"], ["42"])
+
+    def test_diffuser_evenements_uses_the_same_private_coach_scope(self):
+        sent = self.send_via_real_telegram(
+            lambda: ab.diffuser_evenements(
+                self.state, {"42"},
+                [({"BTC"}, ["📊 BTC : configuration en approche."],
+                  ["📊 BTC: setup approaching."])],
+            )
+        )
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sent[0][1]["chat_id"], ["42"])
+
+    def test_prealert_scope_is_restored_even_when_send_raises(self):
+        with patch.object(ab, "_envoi_sur", side_effect=RuntimeError("simulated send failure")):
+            with self.assertRaises(RuntimeError):
+                ab._telegram_envoyer_coach_prealerte(
+                    self.state, "42", "📊 BTC : configuration à surveiller", {"BTC"}
+                )
+        self.assertIsNone(ab.TELEGRAM_PULL_CONTEXT.coach_prealert_chat_id)
+        self.assertIsNone(ab.TELEGRAM_PULL_CONTEXT.coach_prealert_markets)
+
     def test_market_scope_denies_gold_only_subscriber_from_btc_prealert(self):
         self.state["auto"] = {"BTC": [], "GOLD": ["42"]}
         self.state["marches_par_chat"] = {"42": ["GOLD"]}
