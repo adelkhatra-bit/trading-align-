@@ -83,4 +83,3 @@ Le 100 % signifie **100 % des contrôles définis passent sur le SHA concerné e
 - Aucun merge/déploiement sans approbation explicite.
 - Aucune suppression de fichier, branche, PR ou donnée dont l'utilité/provenance n'est pas établie.
 - CI verte seule n'est pas une preuve de fonctionnement live.
-
