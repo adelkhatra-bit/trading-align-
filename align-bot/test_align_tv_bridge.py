@@ -32,7 +32,7 @@ REAL_TV_PAYLOAD_BTC_SWING_20261118 = r'''{"source":"ALIGN_MTF_PRO_V25","symbol":
 
 
 def valid_payload(now_ms=BASE_MS, symbol="BTCUSD", timeframe="M1"):
-    frames = ("M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1")
+    frames = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1")
     mtf = {
         tf: {"direction": 1, "rsi": 58.5, "bar_time": now_ms - 60_000}
         for tf in frames
@@ -96,9 +96,12 @@ class BridgeStoreTests(unittest.TestCase):
         pine = pine_path.read_text(encoding="utf-8")
         expected = {
             "bridgeTimeM1": 'request.security(syminfo.tickerid, "1", time, lookahead=barmerge.lookahead_off)',
+            "bridgeTimeM3": 'request.security(syminfo.tickerid, "3", time, lookahead=barmerge.lookahead_off)',
             "bridgeTimeM5": 'request.security(syminfo.tickerid, "5", time, lookahead=barmerge.lookahead_off)',
+            "bridgeTimeM10": 'request.security(syminfo.tickerid, "10", time, lookahead=barmerge.lookahead_off)',
             "bridgeTimeM15": 'request.security(syminfo.tickerid, "15", time, lookahead=barmerge.lookahead_off)',
             "bridgeTimeM30": 'request.security(syminfo.tickerid, "30", time, lookahead=barmerge.lookahead_off)',
+            "bridgeTimeM45": 'request.security(syminfo.tickerid, "45", time, lookahead=barmerge.lookahead_off)',
             "bridgeTimeH1": 'request.security(syminfo.tickerid, "60", time, lookahead=barmerge.lookahead_off)',
             "bridgeTimeH2": 'request.security(syminfo.tickerid, "120", time, lookahead=barmerge.lookahead_off)',
             "bridgeTimeH4": 'request.security(syminfo.tickerid, "240", time, lookahead=barmerge.lookahead_off)',
@@ -240,9 +243,16 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertEqual(result["error"], "unsupported_symbol")
 
     def test_rejects_unsupported_active_timeframe(self):
-        status, result = self.store.ingest(valid_payload(timeframe="M3"), INGEST, BASE_MS)
+        status, result = self.store.ingest(valid_payload(timeframe="M2"), INGEST, BASE_MS)
         self.assertEqual(status, 400)
         self.assertEqual(result["error"], "unsupported_active_timeframe")
+
+    def test_accepts_new_indicator_timeframes_m3_m10_m45(self):
+        for tf in ("M3", "M10", "M45"):
+            with self.subTest(timeframe=tf):
+                status, result = self.store.ingest(valid_payload(timeframe=tf), INGEST, BASE_MS)
+                self.assertEqual(status, 200, result)
+                self.assertTrue(result["accepted"])
 
     def test_rejects_missing_required_timeframe_instead_of_fabricating_it(self):
         payload = valid_payload()
