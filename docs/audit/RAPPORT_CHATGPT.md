@@ -477,3 +477,70 @@ Une PR documentaire unique **#780** a été ouverte depuis `docs/align-source-tr
 - Cause réelle des boutons : **NON ÉTABLIE**; le test hors ligne ne reproduit pas l'échec.
 - Poller : démarrage/mode attestés dans #1039, mais réception getUpdates/callbacks non tracée; lecteur absent après fin du run.
 - Aucun merge, aucune annulation/relance de workflow, aucune modification de `align-bot-rollover.yml`, aucune modification de `main` ou `live-data`, aucun message Telegram réel, aucun changement TradingView, aucun ordre broker, aucun G1/G2.
+
+
+## Addendum D8 / bridge, rollover, mutation test, baseline complet (23/11/2026)
+
+### Heure de lecture GitHub
+- Les données GitHub ci-dessous (workflow, main, audit) ont été relues à **2026-11-23 01:40:06 CET**.
+- `main` : `006280ef214f5c82ea010f5647e9d444b93b5417` (inchangé).
+- Workflow `.github/workflows/align-bot.yml` blob SHA : `ec84dcce7f18f4f5f12651f8bc5fa00018354e21`.
+- Run #1039 : `45085640139`, SHA du run `0a38036e1bd9a6244d6d1a7c0634eb1731fef4c6`.
+
+### 1. Logs #1039 — bridge et fin du job
+- `2026-11-22T23:53:55.4936491Z` (**00:53:55.493 CET**) — `BRIDGE_CONFIRMED symbol=BTCUSD ... fresh_snapshot=true robot_v12=true`.
+- `2026-11-22T23:53:55.4945043Z` (**00:53:55.494 CET**) — `BRIDGE_CONFIRMED symbol=XAUUSD ... fresh_snapshot=true robot_v12=true`.
+- `2026-11-22T23:53:55.5149322Z` (**00:53:55.514 CET**) — `ALIGN_TV_BRIDGE_PRET: 1`.
+- Le bridge est donc prêt : la branche `120 s` ne s'applique pas. Pour le run non manuel, `DUREE_SEC` est évalué à **21000 secondes (5 h 50)**, conformément au workflow.
+- Le run a commencé à `23:53:13Z` (**00:53:13 CET**) et s'est terminé à `00:13:31Z` (**01:13:31 CET**). Le bot a commencé à `23:53:55Z` (**00:53:55 CET**).
+- Dernière ligne IA du bot : `2026-11-23T00:13:17.8718061Z` (**01:13:17.871 CET**) — `AI_PROVIDER_USED=INTERNAL_FALLBACK`.
+- `2026-11-23T00:13:23.6049089Z` (**01:13:23.604 CET**) — `ALIGN_RELEVE_DETECTEE : arrêt propre + sauvegarde de la mémoire`; immédiatement après `ALIGN_SHUTDOWN_REQUESTED signal=0`.
+- `2026-11-23T00:13:24.1232922Z` (**01:13:24.123 CET**) — `ALIGN_STATE_SAVED_ON_SHUTDOWN`.
+- **Cause de la fin du job #1039 établie :** le thread `surveiller_releve` détecte un run plus récent queued/in_progress/waiting/pending/requested et appelle `_demander_arret(0, None)`. Le `signal=0` correspond à cet arrêt interne de rollover. Le run s'est donc arrêté après environ 19 min 28 s de bot, et non à cause du bridge ou de la durée 120 s. L'identité du run suivant n'est pas vérifiée ici.
+
+### 2. Logs getUpdates — interprétation corrigée
+- Le poller appelle `telegram("getUpdates", offset=offset, timeout=1)` dans sa boucle, mais **ne journalise pas chaque appel getUpdates réussi ni son résultat**. Il écrit `poller Telegram <exception>` uniquement en cas d'erreur.
+- Par conséquent, absence de lignes getUpdates/callback dans #1039 **ne prouve pas l'absence d'activité de lecture**. Elle signifie seulement que les appels réussis ne sont pas observables dans ce journal.
+- Le thread démarre sous `ALIGN-Telegram-Poller`; l'exécution #1039 terminée signifie qu'il n'existe plus après la fin du job.
+
+### 3. Test mutation — capacité à détecter une panne
+- Mutation dans une **copie temporaire** `ALIGN-callback-mutation/align_bot.py` : insertion d'un `continue` au début de la branche réelle `next`, ce qui court-circuite volontairement le callback.
+- Le test unitaire a échoué exactement sur `next:yes` : `answerCallbackQuery` absent, liste d'appels vide.
+- Sortie : `Ran 1 test ... FAILED (failures=1)`; `MUTATION_TEST_EXIT_CODE=1` (échec attendu du test, donc mutation détectée).
+- La mutation est restée dans la copie temporaire et n'a pas touché le clone principal, GitHub, `main`, ni la branche d'audit.
+- Le test non muté appelle `ab.traiter(...)`, le dispatcher de callbacks réel de `align_bot.py`, pas une copie de son code. La production fait passer les updates par le poller et `recevoir_updates_telegram()`, qui invoque ensuite `traiter()`. Le test exercé appelle directement `traiter()` : il couvre le dispatch, mais **ne couvre pas le transport getUpdates, la queue Telegram ni la fonction receiver entière**.
+
+### 4. Baseline — suite complète exécutée en batches depuis la racine
+- La commande monolithique a été interrompue par la limite de durée du terminal distant avant d'écrire son résumé. Aucun échec n'a été retenu de cette tentative incomplète.
+- Pour couvrir la suite complète, les 70 fichiers `test_*.py` ont été exécutés en groupes depuis la racine du clone, avec le même `PYTHONPATH`, puis le test de simulation long de `test_parite_pine.py` exécuté seul en processus détaché.
+- Résultats agrégés (exit 0 pour chaque groupe) :
+  - Batches 1–4 : 397 + 201 + 117 + 177 = **892 tests**, exit 0 pour chaque.
+  - Batch 5a : **44 tests**, exit 0.
+  - Batch 5b (`test_parite_pine.py`, sauf simulation longue) : **11 tests, 1 skipped**, 0 failure/error, exit 0.
+  - Test de simulation long `test_parite_pine_bougies_simulees` : **1 test OK en 49.947 s**, exit 0.
+  - Batch 6 : **68 tests**, exit 0.
+  - Batch 7 : **124 tests**, exit 0.
+- Total : **1140 tests exécutés, 0 failure, 0 error, 1 skipped** (1139 réussites + 1 skip réseau), aggregate exit **0**. Le skip reste le test de parité sur vraies bougies, qui exige `ALIGN_PARITE_RESEAU=1` et n'a pas été activé.
+- Les tests ont été exécutés depuis la racine du clone local, répartis en groupes pour éviter la limite du terminal distant. Le test de simulation long a été complété séparément et non omis.
+
+### 5. D8 — proposition à Adel, non implémentée
+**Objectif :** rendre le lecteur Telegram continu et indépendant du worker de signaux/bridge.
+
+**Architecture proposée**
+1. Héberger un service Telegram permanent sur VPS/serveur existant, séparé des Actions GitHub. Préférer `webhook` HTTPS à polling; garder un seul récepteur pour ce token.
+2. Le récepteur authentifie l'update, répond immédiatement aux `callback_query` (ack pour supprimer le spinner), puis dépose chaque update dans une queue durable avec `update_id`, timestamp, statut, tentatives et clé idempotente.
+3. Le worker de signaux (Actions) consomme cette queue et applique les actions; il reste libre de s'arrêter/rollover sans couper le lecteur. La mémoire/état doit passer par un stockage durable partagé et atomique (pas deux écrivains indépendants au même `state.json`).
+4. Superviser le service (restart automatique, heartbeat, dernière update reçue, queue depth, délai de traitement, erreurs webhook/polling, 409 conflit, 429 backoff). Alertes de santé uniquement, pas de messages trading autonomes.
+5. Migration en étapes : prototype isolé → tests callback/duplicate/offset/rate-limit → canary sans action financière → validation de 24 h → bascule unique du receiver → rollback documenté. Désactiver l'ancien polling seulement après preuve que le receiver permanent est stable.
+
+**Risques** : double receiver et `409 Conflict`; updates dupliquées/perdues à la bascule; offset/ack incorrect; queue qui croît; état partagé non atomique; callback acknowledgement tardif; 429; secrets/token sur nouveau service; compatibilité de version entre worker et receiver; latence et panne du VPS.
+
+**Coût indicatif** (non vérifié par devis) : 4–8 h d'ingénierie/test; serveur existant = coût marginal potentiellement nul; VPS dédié léger ≈ **5–15 €/mois** selon fournisseur et région. Ajouter supervision/backup si non déjà disponible.
+
+**Décision requise** : D8 est une proposition seulement. Aucun code, service, secret, workflow, configuration, merge ni déploiement n'a été modifié.
+
+### 6. État / garde-fous
+- Cause #1039 : rollover détecté, bridge prêt, arrêt interne prouvé.
+- Boutons : test dispatch OK + mutation test FAIL attendue; fonctionnement réel Telegram non vérifié.
+- Baseline : 1140 tests, 1 skip, aggregate exit 0.
+- Aucun merge, aucun workflow relancé/annulé, aucun fichier de production modifié, aucune modification de `align-bot-rollover.yml`, aucun message Telegram réel, aucun ordre, aucun changement TradingView; G1/G2 suspendus.
