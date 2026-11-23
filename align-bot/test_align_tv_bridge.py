@@ -225,7 +225,8 @@ class BridgeStoreTests(unittest.TestCase):
             "stale_or_future_entry_trigger_candle",
         )
         log_line = output.getvalue().strip()
-        self.assertIn("entry_tf_ms=300000", log_line)
+        self.assertIn("TRIGGER_STALE symbol=BTCUSD entry_tf_ms=300000", log_line)
+        self.assertNotIn("BTC_TRIGGER_STALE", log_line)
         self.assertIn(f"entry_bar_time_ms={payload['entryBarTime']}", log_line)
         self.assertIn(f"now_ms={BASE_MS}", log_line)
         self.assertIn(f"age_ms={BASE_MS - payload['entryBarTime']}", log_line)

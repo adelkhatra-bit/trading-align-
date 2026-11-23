@@ -32,6 +32,15 @@ TradingView (indicateur v25, alerte « Any alert() function call »)
 
 Règle : quand `ALIGN_REQUIRE_TV_BRIDGE=1`, **aucun repli** sur des niveaux calculés ailleurs.
 
+### Telegram : chemin applicatif unique
+
+- **Bot applicatif** : `align-bot/align_bot.py` (`@align_mtf_adel_bot`).
+- **Réception** : `boucle_polling_telegram` → `_traiter_lecture_rapide` pour les réponses immédiates → file d'updates → `traiter` pour les commandes et actions restantes.
+- **Sortie** : les appels applicatifs passent par `telegram()` puis `_telegram_sortant_autorise`; un blocage `TELEGRAM_PULL_BLOCK` n'est pas une livraison et ne doit jamais être compté comme telle.
+- **Commandes de diagnostic** : `/statut` et `/audit` restent sur le chemin rapide; `/diag` est traité par `traiter`, uniquement en chat privé, avec expéditeur = chat = propriétaire. Il interroge en lecture la même route MTF que le bot pour BTC et GOLD, affiche l'UT active et le nombre d'UT fraîches, puis lit `RUNNER_TEMP/align_diag.json` pour les compteurs STALE. Aucune écriture, aucun payload ni secret n'est exposé.
+- **Composants à ne pas confondre avec un second bot** : `server.js` expose des routes serveur/bridge mais ne contient pas d'appel direct à l'API Bot Telegram; `agent-bus.js` est un bus interne d'agents; l'extension `tradingview-analyzer` transmet des données au serveur mais n'appelle pas directement l'API Bot Telegram.
+- Les contrôles `getMe` / `getWebhookInfo` des workflows sont des précontrôles d'identité et de réception; ils ne remplacent pas le chemin applicatif du bot ni un test de livraison.
+
 ## 3. Règles d'unité de temps (confusion connue)
 
 - Le **plan** (Entry / SL / TP1 / TP2) est calculé sur **M15 clôturé**.
