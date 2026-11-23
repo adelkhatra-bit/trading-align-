@@ -392,3 +392,33 @@ Une PR documentaire unique **#780** a été ouverte depuis `docs/align-source-tr
 - **D7 : toujours à Adel** — garder ou supprimer la logique d'annulation/retrait automatique du worker actif. Le rollover actuellement configuré a arrêté #1038 gracieusement; aucune modification du workflow `align-bot-rollover.yml` n'a été faite.
 - Runs queued depuis le 22/11 : **NON VÉRIFIÉ** (endpoint list workflow runs non accessible; page publique affiche seulement les runs récents).
 - Aucune annulation, relance, merge, écriture live-data, suppression, trading ou message Telegram réel n'a été effectué dans cette reprise.
+
+
+## Addendum — IA gratuites / G1–G3 (23/11/2026, lecture GitHub 01:13 CET)
+
+### Référence et clone isolé
+- `main` vérifié : `006280ef214f5c82ea010f5647e9d444b93b5417` (merge #780). Lecture API branche `main` à 01:13 CET.
+- Clone propre séparé, créé à partir de ce SHA et vérifié propre : `ALIGN_CANONICAL/trading-align-/g1-clean-006280ef`. L'ancien workspace n'a pas été réutilisé.
+- Le clone a été conservé propre après suppression des scripts de patch temporaires : `git status --short --branch` = `## main...origin/main`, `git diff --stat` vide. SHA local vérifié : `006280ef214f5c82ea010f5647e9d444b93b5417`.
+
+### G1 — résultat de l'intervention
+- Référence code lue : `align-bot/align_bot.py` blob `76d3059ec9c3666a52e595b80617aad4aba66bec`.
+- Références tests lues : `test_align_mtf.py` blob `68c59190f819624d60d72872b1c68b8690e74ab7`; `test_ia_provider_config.py` blob `9ef8b515a4330220222a2a3f33ad0b87489d62d4`.
+- Compte avant : 1142 méthodes `test_*` dans 70 fichiers `align-bot/test_*.py` (calcul AST sur clone propre).
+- Patch de retrait Gemini tenté sur script temporaire; échec de syntaxe/regex avant toute écriture des fichiers source. Scripts temporaires supprimés et clone re-vérifié propre. Aucun code source modifié.
+- Compte après : NON EXÉCUTÉ, car G1 n'a pas été appliqué. Aucun compte ne doit être annoncé après sur un patch absent.
+- PR G1 : non créée. Tests complets : NON EXÉCUTÉS. Aucun merge.
+
+### Production — preuve réelle IA
+- Dernier run `align-bot.yml` terminé sur `main` au moment de la lecture : #1038, ID `45067670356`, conclusion `cancelled`. Job `signaux` terminé `success`. Run #1039 (`45085640139`) reste `in_progress` au moment de la vérification.
+- Run #1038, logs relus : `AI_PROVIDER_STATUS Groq=CONNECTED model=openai/gpt-oss-120b` à `2026-11-22T20:40:23.6873035Z (`21:40:23 CET`). Préflight confirmé connecté.
+- Ligne de réponse réelle : `2026-11-22T23:00:25.2325989Z AI_PROVIDER_USED=Groq model=openai/gpt-oss-120b` (23/11 00:00:25 CET). Groq a donc réellement répondu au bot dans ce run.
+- Dernier succès externe dans les logs : `2026-11-22T23:50:47.3592493Z AI_PROVIDER_USED=Pollinations model=openai` (23/11 00:50:47 CET). Après cela, les dernières lignes montrent `AI_PROVIDER_USED=INTERNAL_FALLBACK` et `AI_ALL_PROVIDERS_FAILED`, dernière paire à `2026-11-22T23:53:23.7066822Z / `23:53:23.7067491Z` (23/11 00:53:23 CET). Les appels ne sont donc pas restés opérationnels jusqu'à la cancellation.
+- Lien du run : https://github.com/adelkhatra-bit/trading-align-/actions/runs/45067670356
+- Run #1039 et logs actifs : status API `in_progress`; téléchargement des logs échoue `404 BlobNotFound`. Aucun fournisseur final de ce run ne peut être confirmé.
+
+### Plan séquencé demandé par Adel
+- G1 : retrait Gemini et tests de remplacement, sans baisse du nombre de tests. En attente d'un patch fiable et d'une suite complète verte.
+- G2 Cerebras : après G1 verte seulement. Vérifier endpoint/model exclusivement dans la documentation officielle Cerebras; fournisseur après Groq; clé `CEREBRAS_API_KEY` et plafond journalier; clé créée par Adel.
+- G3 OpenRouter :free : optionnel, après G2 verte; modèle épinglé depuis `openrouter.ai/models`, clé `OPENROUTER_API_KEY`.
+- Aucun fournisseur ajouté/réinstallé, aucun secret créé/affiché, aucun merge, aucune annulation ou relance, aucun changement rollover, aucun message Telegram réel, aucune écriture `live-data`.
