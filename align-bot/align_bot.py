@@ -3424,6 +3424,20 @@ def _telegram_sortant_autorise(methode, params):
     if cid and prive and cid == contexte:
         return True
     etat = DERNIER_ETAT or {}
+    # Un chrono existant n'est éditable qu'avec son autorisation opt-in persistante
+    # et uniquement pour le message/market exact, jamais comme autorisation générale.
+    chrono_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "chrono_chat_id", "") or "")
+    chrono_market = str(getattr(TELEGRAM_PULL_CONTEXT, "chrono_market", "") or "").upper()
+    chrono_mid = str(getattr(TELEGRAM_PULL_CONTEXT, "chrono_message_id", "") or "")
+    chrono_state = getattr(TELEGRAM_PULL_CONTEXT, "chrono_state", None)
+    if (methode == "editMessageText" and cid and cid == chrono_chat and chrono_market in MARCHES
+            and isinstance(chrono_state, dict)):
+        chrono = ((chrono_state.get("chrono") or {}).get(chrono_market) or {}).get(cid)
+        message_id = str(params.get("message_id") or "")
+        if (isinstance(chrono, dict) and chrono_mid and message_id == chrono_mid
+                and str(chrono.get("mid") or "") == chrono_mid
+                and _chrono_suivi_actif(chrono_state, chrono_market, cid)):
+            return True
     actifs = {str(x) for x in etat.get("recherche_positions_active", [])}
     texte = str(params.get("text") or params.get("caption") or "")
     # Pré-alerte privée : autorisation temporaire accordée par le routeur des abonnés coach.
@@ -5256,8 +5270,60 @@ def chrono_txt(m, r, cle, t0):
     ]
     return "\n".join(l)
 
-def _editer_chrono_ou_recreer(cid, chrono, texte):
-    """Répare un chronomètre dont le message Telegram a été supprimé ou n'est plus éditable."""
+def _chrono_suivi_actif(etat, marche, cid):
+    """Le chrono vit uniquement pendant le coach opt-in ou le suivi d'une position de CE marché."""
+    cid, marche = str(cid), str(marche).upper()
+    if marche not in MARCHES:
+        return False
+    if coach_actif(etat, cid, marche) and marche_autorise(etat, cid, marche):
+        return True
+    trade = (etat.get(marche) or {}).get("trade") or {}
+    suivi = (trade.get("qui") or {}).get(cid)
+    return isinstance(suivi, dict) and not suivi.get("fini")
+
+
+def _editer_chrono_ou_recreer(cid, chrono, texte, etat=None, marche=None):
+    """Édite le chrono exact d'un abonné actif ; en Pull, ne recrée jamais un push orphelin."""
+    cid = str(cid)
+    if TELEGRAM_PULL_MODE:
+        marche = str(marche or "").upper()
+        if not isinstance(etat, dict) or marche not in MARCHES or not _chrono_suivi_actif(etat, marche, cid):
+            return False
+        mid = str(chrono.get("mid") or "")
+        courant = ((etat.get("chrono") or {}).get(marche) or {}).get(cid)
+        if not mid or courant is not chrono or str((courant or {}).get("mid") or "") != mid:
+            return False
+        saved = (
+            getattr(TELEGRAM_PULL_CONTEXT, "chrono_chat_id", None),
+            getattr(TELEGRAM_PULL_CONTEXT, "chrono_market", None),
+            getattr(TELEGRAM_PULL_CONTEXT, "chrono_message_id", None),
+            getattr(TELEGRAM_PULL_CONTEXT, "chrono_state", None),
+        )
+        TELEGRAM_PULL_CONTEXT.chrono_chat_id = cid
+        TELEGRAM_PULL_CONTEXT.chrono_market = marche
+        TELEGRAM_PULL_CONTEXT.chrono_message_id = mid
+        TELEGRAM_PULL_CONTEXT.chrono_state = etat
+        try:
+            try:
+                resultat = telegram("editMessageText", chat_id=cid, message_id=mid, text=texte)
+            except Exception as ex:
+                erreur = str(ex).lower()
+                if "message is not modified" in erreur or "message not modified" in erreur:
+                    return True
+                if any(x in erreur for x in ("message to edit not found", "message can't be edited",
+                                             "message_id_invalid", "message identifier is not specified",
+                                             "bot was blocked", "chat not found", "user is deactivated")):
+                    return False
+                raise
+            return isinstance(resultat, dict) and resultat.get("ok") is True and not resultat.get("blocked_by_pull_mode")
+        finally:
+            (
+                TELEGRAM_PULL_CONTEXT.chrono_chat_id,
+                TELEGRAM_PULL_CONTEXT.chrono_market,
+                TELEGRAM_PULL_CONTEXT.chrono_message_id,
+                TELEGRAM_PULL_CONTEXT.chrono_state,
+            ) = saved
+
     try:
         telegram("editMessageText", chat_id=cid, message_id=chrono["mid"], text=texte)
         return True
@@ -5283,29 +5349,34 @@ def _editer_chrono_ou_recreer(cid, chrono, texte):
 
 
 def _maj_chronos_verrouille(etat, m, r):
-    """Actualise le compte à rebours et recrée son message si Telegram l'a rendu invalide."""
+    """Actualise le compte à rebours seulement pour un opt-in toujours actif."""
     ch = etat.setdefault("chrono", {}).setdefault(m, {})
     cle = etat.get(m, {})
     for cid, c in list(ch.items()):
         now = time.time()
         try:
+            if TELEGRAM_PULL_MODE and not _chrono_suivi_actif(etat, m, cid):
+                ch.pop(cid, None)
+                continue
             if cle.get("trade") and c.get("fini") is None:
                 c["fini"] = True
-                _editer_chrono_ou_recreer(cid, c, chrono_txt(m, r, cle, c["t0"]))
+                _editer_chrono_ou_recreer(cid, c, chrono_txt(m, r, cle, c["t0"]), etat=etat, marche=m)
                 ch.pop(cid, None)
                 continue
             if now - c["t0"] > CHRONO_MAX:
-                ch.pop(cid, None)
-                suivis_auto = etat.setdefault("auto", {})
-                suivis_auto[m] = [x for x in suivis_auto.get(m, []) if str(x) != str(cid)]
                 texte = (f"⌛ {ICONE.get(m, '')} {m} : 4 h sans entrée\n"
                          "😎 La position n'est pas venue : pas de mauvaise entrée\n"
                          "🎯 Réappuie sur le bouton pour la prochaine")
-                _editer_chrono_ou_recreer(cid, c, texte)
+                _editer_chrono_ou_recreer(cid, c, texte, etat=etat, marche=m)
+                ch.pop(cid, None)
+                suivis_auto = etat.setdefault("auto", {})
+                suivis_auto[m] = [x for x in suivis_auto.get(m, []) if str(x) != str(cid)]
                 continue
             if now - c.get("maj", 0) >= CHRONO_REFRESH_SEC:
                 c["maj"] = now
-                if not _editer_chrono_ou_recreer(cid, c, chrono_txt(m, r, cle, c["t0"])):
+                if not _editer_chrono_ou_recreer(
+                    cid, c, chrono_txt(m, r, cle, c["t0"]), etat=etat, marche=m
+                ):
                     ch.pop(cid, None)
         except Exception as ex:
             print("chrono", cid, ex)
