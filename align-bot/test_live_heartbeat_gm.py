@@ -17,7 +17,7 @@ class HeartbeatGmTests(unittest.TestCase):
         self.assertNotIn("// @grant        none", self.js)
 
     def test_heartbeat_et_evenements_passent_par_envoyerecran(self):
-        self.assertIn("function envoyerEcran(corps)", self.js)
+        self.assertIn("function envoyerEcran(corps, ok, ko)", self.js)
         self.assertIn("GM_xmlhttpRequest({ method: 'POST'", self.js)
         self.assertIn("envoyerEcran('PING|LIVE_SCREEN|' + Date.now())", self.js)
         self.assertIn("envoyerEcran(['EVT', mk, typ, d, minutes", self.js)
@@ -33,6 +33,11 @@ class HeartbeatGmTests(unittest.TestCase):
         self.assertIn("return PAGE.TradingViewApi.activeChart();", self.js)
         self.assertNotIn("return window.TradingViewApi.activeChart();", self.js)
 
+    def test_heartbeat_verifie_statut_http_et_retentatives(self):
+        self.assertIn("r.status >= 200 && r.status < 300", self.js)
+        self.assertIn("timeout: 8000", self.js)
+        self.assertIn("delais = [5000, 10000, 20000]", self.js)
+        self.assertIn("clearTimeout(ecranRetryTimer)", self.js)
     def test_chaines_historiques_conservees(self):
         self.assertIn("PING|LIVE_SCREEN|", self.js)
         self.assertIn("setInterval(pingEcran, 25000)", self.js)
