@@ -8821,24 +8821,9 @@ def texte_statut(etat, derniers, now=None):
 
 
 def texte_diag(cid=None):
-    """Diagnostic bridge lecture seule : compteurs du run courant, aucun payload ni secret."""
-    runner_temp = os.environ.get("RUNNER_TEMP") or tempfile.gettempdir()
-    path = os.path.join(runner_temp, "align_diag.json")
-    try:
-        with open(path, encoding="utf-8") as stream:
-            diagnostic = json.load(stream)
-    except FileNotFoundError:
-        return ("📊 DIAGNOSTIC ALIGN — lecture seule\n"
-                "Aucun rejet STALE n'a encore été enregistré, ou le bridge ne s'est pas démarré sur ce run.")
-    except Exception as exc:
-        print(f"ALIGN_DIAG_READ_FAILED error={type(exc).__name__}", flush=True)
-        return "📊 DIAGNOSTIC ALIGN\nFichier diagnostic présent mais illisible."
-
-    if (not isinstance(diagnostic, dict) or diagnostic.get("version") != 1
-            or not isinstance(diagnostic.get("triggerStale"), dict)):
-        return "📊 DIAGNOSTIC ALIGN\nFichier diagnostic présent mais format invalide."
-
+    """Diagnostic bridge live et compteurs STALE en lecture seule ; aucun payload ni secret."""
     anglais = str(cid or "") in LANG_EN
+    requis = ("M5", "M15", "H1", "H4", "D1", "W1")
 
     def entier(value):
         if isinstance(value, bool) or value is None:
@@ -8848,46 +8833,126 @@ def texte_diag(cid=None):
         except (TypeError, ValueError, OverflowError):
             return None
 
-    def heure_locale(value):
-        timestamp = entier(value)
-        if timestamp is None or timestamp <= 0:
-            return None
+    def libelle(value, francais, english):
+        return english if anglais else francais
+
+    lignes = [
+        libelle("📡 ALIGN BRIDGE DIAGNOSTICS — read-only",
+                "📡 DIAGNOSTIC BRIDGE ALIGN — lecture seule")
+    ]
+
+    # Interroge exactement la même route MTF que l'analyse du bot.
+    # Deux lectures indépendantes : une pour BTC, une pour GOLD.
+    for pair, label in (("XBTUSD", "BTC"), ("XAUUSD", "GOLD")):
         try:
-            return datetime.datetime.fromtimestamp(timestamp / 1000, PARIS).strftime("%H:%M:%S")
-        except (OSError, OverflowError, ValueError):
-            return None
+            bridge = fetch_tv_mtf(pair)
+        except Exception as exc:
+            print(f"ALIGN_DIAG_BRIDGE_READ_FAILED market={label} error={type(exc).__name__}", flush=True)
+            bridge = {"available": False, "reason": "bridge inaccessible", "snapshots": {}}
 
-    lignes = ["📊 ALIGN DIAGNOSTICS — read-only" if anglais else "📊 DIAGNOSTIC ALIGN — lecture seule"]
-    demarre = heure_locale(diagnostic.get("startedAtMs"))
-    if demarre:
-        lignes.append(("Bridge started: " if anglais else "Bridge démarré : ") + demarre)
-
-    labels = (("BTCUSD", "BTC"), ("XAUUSD", "GOLD"))
-    for symbol, label in labels:
-        item = diagnostic["triggerStale"].get(symbol)
-        if not isinstance(item, dict):
-            item = {}
-        count = entier(item.get("count"))
-        count = max(0, count if count is not None else 0)
-        if count == 0:
-            lignes.append(f"{label} : 0 " + ("TRIGGER_STALE rejection(s)" if anglais else "rejet TRIGGER_STALE"))
+        if not isinstance(bridge, dict) or bridge.get("available") is not True:
+            reason = bridge.get("reason") if isinstance(bridge, dict) else None
+            if reason == "bridge TradingView non configuré":
+                state = libelle("BRIDGE NON CONFIGURÉ", "BRIDGE NOT CONFIGURED")
+            elif reason == "réponse bridge invalide":
+                state = libelle("BRIDGE INVALIDE", "INVALID BRIDGE RESPONSE")
+            else:
+                state = libelle("BRIDGE INDISPONIBLE", "BRIDGE UNAVAILABLE")
+            lignes.append(f"{label} : {state}")
             continue
-        age_ms = entier(item.get("lastAgeMs"))
-        threshold_ms = entier(item.get("lastThresholdMs"))
-        last_at = heure_locale(item.get("lastAtMs"))
-        details = []
-        if age_ms is not None:
-            details.append(("last age " if anglais else "dernier âge ") + f"{int(age_ms / 1000)} s")
-        if threshold_ms is not None:
-            details.append(("limit " if anglais else "seuil ") + f"{int(threshold_ms / 1000)} s")
-        if last_at:
-            details.append(("last " if anglais else "dernier ") + last_at)
-        suffix = " • " + " / ".join(details) if details else ""
-        lignes.append(f"{label} : {count} " +
-                      ("TRIGGER_STALE rejection(s)" if anglais else "rejet(s) TRIGGER_STALE") + suffix)
 
-    lignes.append("Counters reset at bridge restart." if anglais
-                  else "Compteurs remis à zéro à chaque redémarrage du bridge.")
+        snapshots = bridge.get("snapshots")
+        snapshots = snapshots if isinstance(snapshots, dict) else {}
+        fresh = [
+            tf for tf in requis
+            if isinstance(snapshots.get(tf), dict) and snapshots[tf].get("fresh") is True
+        ]
+        active = str(bridge.get("activeTimeframe") or "—").upper()
+        age_ms = entier(bridge.get("activeTimeframeAgeMs"))
+        age_text = (
+            f" • {libelle('âge', 'age')} {max(0, age_ms) // 1000}s"
+            if age_ms is not None else ""
+        )
+        state = (
+            libelle("BRIDGE CONNECTÉ", "BRIDGE CONNECTED")
+            if len(fresh) == len(requis) and active != "—"
+            else libelle("BRIDGE PARTIEL", "BRIDGE PARTIAL")
+        )
+        lignes.append(
+            f"{label} : {state} • UT active {active} • MTF {len(fresh)}/{len(requis)}"
+            + age_text
+        )
+
+    # Les compteurs STALE sont complémentaires : l'absence du fichier
+    # ne signifie pas que le bridge est arrêté, seulement qu'aucun rejet
+    # n'a encore été écrit pendant ce run.
+    runner_temp = os.environ.get("RUNNER_TEMP") or tempfile.gettempdir()
+    path = os.path.join(runner_temp, "align_diag.json")
+    diagnostic = None
+    try:
+        with open(path, encoding="utf-8") as stream:
+            diagnostic = json.load(stream)
+    except FileNotFoundError:
+        lignes.append(libelle(
+            "Aucun rejet STALE enregistré pendant ce run.",
+            "No STALE rejection recorded during this run."
+        ))
+    except Exception as exc:
+        print(f"ALIGN_DIAG_READ_FAILED error={type(exc).__name__}", flush=True)
+        lignes.append(libelle(
+            "Fichier de compteurs STALE présent mais illisible.",
+            "STALE counter file exists but is unreadable."
+        ))
+
+    if diagnostic is not None:
+        if (not isinstance(diagnostic, dict) or diagnostic.get("version") != 1
+                or not isinstance(diagnostic.get("triggerStale"), dict)):
+            lignes.append(libelle(
+                "Format du fichier de compteurs STALE invalide.",
+                "Invalid STALE counter file format."
+            ))
+        else:
+            started = entier(diagnostic.get("startedAtMs"))
+            if started is not None and started > 0:
+                try:
+                    time_text = datetime.datetime.fromtimestamp(
+                        started / 1000, PARIS
+                    ).strftime("%H:%M:%S")
+                    lignes.append(
+                        libelle("Compteurs bridge démarrés : ", "Bridge counters started: ")
+                        + time_text
+                    )
+                except (OSError, OverflowError, ValueError):
+                    pass
+
+            for symbol, label in (("BTCUSD", "BTC"), ("XAUUSD", "GOLD")):
+                item = diagnostic["triggerStale"].get(symbol)
+                if not isinstance(item, dict):
+                    item = {}
+                count = entier(item.get("count"))
+                count = max(0, count if count is not None else 0)
+                detail = []
+                age = entier(item.get("lastAgeMs"))
+                threshold = entier(item.get("lastThresholdMs"))
+                if age is not None:
+                    detail.append(
+                        libelle("dernier âge ", "last age ") + f"{age // 1000}s"
+                    )
+                if threshold is not None:
+                    detail.append(
+                        libelle("seuil ", "limit ") + f"{threshold // 1000}s"
+                    )
+                suffix = " • " + " / ".join(detail) if detail else ""
+                lignes.append(
+                    f"{label} : {count} "
+                    + libelle("rejet(s) TRIGGER_STALE", "TRIGGER_STALE rejection(s)")
+                    + suffix
+                )
+
+    lignes.append(libelle(
+        "Les compteurs STALE sont remis à zéro à chaque redémarrage du bridge.",
+        "STALE counters reset at each bridge restart."
+    ))
     return "\n".join(lignes)
 
 
