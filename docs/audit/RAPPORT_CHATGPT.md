@@ -544,3 +544,9 @@ Une PR documentaire unique **#780** a été ouverte depuis `docs/align-source-tr
 - Boutons : test dispatch OK + mutation test FAIL attendue; fonctionnement réel Telegram non vérifié.
 - Baseline : 1140 tests, 1 skip, aggregate exit 0.
 - Aucun merge, aucun workflow relancé/annulé, aucun fichier de production modifié, aucune modification de `align-bot-rollover.yml`, aucun message Telegram réel, aucun ordre, aucun changement TradingView; G1/G2 suspendus.
+
+
+### Note de transparence — nettoyage du clone temporaire
+- Une commande de nettoyage a supprimé par erreur des fichiers suivis **dans le clone local temporaire uniquement**. Aucun commit/push GitHub n'a eu lieu.
+- Restauration immédiate : `git reset --hard origin/main`, nettoyage des artefacts temporaires, puis récupération du test d'audit depuis `origin/audit/chatgpt-pilotage`.
+- Vérification après restauration : clone local `HEAD=006280ef214f5c82ea010f5647e9d444b93b5417`; `git status` ne montre que `align-bot/test_bugs_telegram_news.py` comme modification d'audit; `git diff -- align-bot/align_bot.py` vide. Aucun fichier de production ou workflow n'est modifié dans le clone; main GitHub reste inchangé.
