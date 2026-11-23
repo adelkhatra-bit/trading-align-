@@ -23,6 +23,7 @@ TELEGRAM_UPDATES = queue.Queue()
 TELEGRAM_POLL_STOP = threading.Event()
 SHUTDOWN_REQUESTED = threading.Event()
 CALLBACKS_ACKNOWLEDGED = set()
+CALLBACKS_ACK_FAILED = set()
 # Mode Telegram « pull » : seuls les messages déclenchés par l'utilisateur ou une entrée demandée sont autorisés.
 TELEGRAM_PULL_CONTEXT = threading.local()
 TELEGRAM_LIVRES = [0]   # messages réellement acceptés par Telegram (compteur du journal)
@@ -7223,6 +7224,18 @@ def traiter(etat, chats, updates):
                     pass
                 continue
             choix, _, mk = cb.get("data", "").partition(":")
+            callback_id = str(cb.get("id") or "")
+            if callback_id and callback_id in CALLBACKS_ACK_FAILED:
+                CALLBACKS_ACK_FAILED.discard(callback_id)
+                try:
+                    retry_ack = telegram("answerCallbackQuery", callback_query_id=callback_id)
+                    if isinstance(retry_ack, dict) and retry_ack.get("ok") is True:
+                        _telegram_audit("callback_ack_ok", cb.get("data"))
+                        CALLBACKS_ACKNOWLEDGED.add(callback_id)
+                    else:
+                        _telegram_audit("callback_ack_failed", cb.get("data"))
+                except Exception:
+                    _telegram_audit("callback_ack_failed", cb.get("data"))
             u["_align_callback_dispatched"] = True
             TELEGRAM_PULL_CONTEXT.callback_action = choix
             _telegram_audit("callback_dispatched", cb.get("data"))
@@ -7974,8 +7987,9 @@ def traiter(etat, chats, updates):
             _telegram_audit("callback_completed", cb_done.get("data"))
         callback_id = str(cb_done.get("id") or "")
         if callback_id:
-            # Libère les ACK rapides des boutons qui n'appellent pas eux-mêmes answerCallbackQuery.
+            # Libère les ACK rapides/retentés même si le bouton n'appelle pas lui-même answerCallbackQuery.
             CALLBACKS_ACKNOWLEDGED.discard(callback_id)
+            CALLBACKS_ACK_FAILED.discard(callback_id)
     TELEGRAM_PULL_CONTEXT.chat_id = None
     TELEGRAM_PULL_CONTEXT.private = False
     TELEGRAM_PULL_CONTEXT.callback_action = None
@@ -11934,12 +11948,15 @@ def _ack_callback_rapide(cb, text):
         success = isinstance(result, dict) and result.get("ok") is True
         print(f"TELEGRAM_CALLBACK_ACK callback_id={cb.get('id', '')} data={data!r} result={'ok' if success else 'failed'}", flush=True)
         if success:
+            CALLBACKS_ACK_FAILED.discard(str(cb["id"]))
             _telegram_audit("callback_ack_ok", data)
             CALLBACKS_ACKNOWLEDGED.add(str(cb["id"]))
         else:
-            # Un ACK refusé ne doit pas être mémorisé comme réussi : le handler principal retentera.
+            # Le poller transmet l'échec au thread principal pour un nouvel essai avant l'action.
+            CALLBACKS_ACK_FAILED.add(str(cb["id"]))
             _telegram_audit("callback_ack_failed", data)
     except Exception as ex:
+        CALLBACKS_ACK_FAILED.add(str(cb.get("id") or ""))
         _telegram_audit("callback_ack_failed", data)
         print(f"TELEGRAM_CALLBACK_ACK callback_id={cb.get('id', '')} data={data!r} result=failed", flush=True)
         print("callback ack", ex)
