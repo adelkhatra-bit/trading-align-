@@ -9138,6 +9138,11 @@ def texte_audit_telegram(etat, derniers, now=None):
             lines.append(f"{market} : bougies M1 {market_age}s")
         else:
             lines.append(f"{market} : aucune bougie M1 dans le dernier calcul")
+        # /audit lit le bridge attaché au dernier calcul ; à la fermeture CME,
+        # l'absence d'un snapshot GOLD n'est pas une panne du bridge.
+        if market == "GOLD" and not cme_ouvert(int(now)):
+            lines.append("  Bridge TradingView : marché CME fermé (normal) • snapshot non requis")
+            continue
         bridge = market_state.get("tv_indicator_mtf") or {}
         if bridge:
             active = str(bridge.get("activeTimeframe") or "aucune")
