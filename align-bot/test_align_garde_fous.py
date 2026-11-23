@@ -132,7 +132,7 @@ class GardeFousBridge(unittest.TestCase):
         self.assertLessEqual(bridge.ACTIVE_MAX_AGE_MS, 90_000, "fraîcheur du prix relâchée")
         self.assertEqual(bridge.MTF_BAR_GRACE_MS, 90_000, "MTF grace must match documented webhook delivery delay")
         self.assertEqual(bridge.ENTRY_BAR_GRACE_MS, 30_000, "entry trigger freshness must remain strict")
-        self.assertEqual(set(bridge.REQUIRED_TIMEFRAMES), {"M5", "M15", "H1", "H4", "D1", "W1"})
+        self.assertEqual(set(bridge.REQUIRED_TIMEFRAMES), {"M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1"})
 
 
 if __name__ == "__main__":
