@@ -16,7 +16,9 @@ class ProductionMarketCoverageTest(unittest.TestCase):
     def test_telegram_preflight_accepts_only_the_canonical_align_bot(self):
         self.assertIn('BOT_USERNAME_ATTENDU = "align_mtf_adel_bot"', self.workflow)
         self.assertIn('if username != BOT_USERNAME_ATTENDU:', self.workflow)
+        self.assertIn('if (payload.get("result") or {}).get("is_bot") is not True:', self.workflow)
         self.assertIn('ÉCHEC: le secret TELEGRAM_TOKEN ne correspond pas au bot ALIGN attendu', self.workflow)
+        self.assertIn('is_bot") is not True', self.workflow)
         self.assertIn('TELEGRAM_API_OK bot=@' + username, self.workflow)
 
     def test_worker_operational_scope_is_btc_and_gold_only(self):
