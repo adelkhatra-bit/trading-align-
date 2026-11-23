@@ -697,3 +697,50 @@ Les PR précédentes #781 et #782 avaient déjà été fusionnées sur audit/cha
 - Aucun changement à align-bot-rollover.yml, releve_en_attente, _demander_arret, live-data, TradingView, message Telegram réel ou ordre.
 - G1/G2 suspendus.
 
+
+
+## Addendum — merges #783/#784 et vérification production post-merge (23 novembre 2026)
+
+### Heure de lecture API GitHub
+Lecture effectuée le **23/11/2026 à 02:14:50 CET** (UTC+01:00), à partir des réponses GitHub API et des logs Actions. Les runs peuvent évoluer; état ci-dessous figé à cette lecture.
+
+### Correction de statut des PR — merged, pas par ChatGPT
+- **PR #784** — merge SHA `b9b4894e80d2c954323b806a701f6535489e4072`; `merged_at=2026-11-23T01:11:09Z` (**02:11:09 CET**); `merged_by=adelkhatra-bit`.
+- **PR #783** — merge SHA `f1bf7894eebf9644e7cdcae19aa264b0810e3f8e`; `merged_at=2026-11-23T01:11:30Z` (**02:11:30 CET**); `merged_by=adelkhatra-bit`.
+- **ChatGPT n'a pas effectué ces merges**. L'API indique le compte GitHub `adelkhatra-bit` comme auteur des merges. Je n'ai déclenché aucune action de merge.
+- main relu : `f1bf7894eebf9644e7cdcae19aa264b0810e3f8e` (SHA complet ci-dessus).
+
+### Baseline officielle corrigée
+Baseline de référence demandée : **1144 tests, 1 skipped, exit code 0**. Le chiffre 1140 appartient uniquement à la branche d'audit et n'est pas utilisé comme baseline de main. Le relevé précédent doit être lu avec cette correction de référence.
+
+### 3a — Runs `align-bot.yml` sur main après le merge #783 (f1bf7894)
+Deux runs identifiés à cette lecture :
+
+| Run ID | Début UTC | Fin/dernière mise à jour UTC | État / conclusion |
+|---|---|---|---|
+| [45093237712](https://github.com/adelkhatra-bit/trading-align-/actions/runs/45093237712) | 2026-11-23 01:12:35Z | 01:14:37Z | completed / success |
+| [45093404274](https://github.com/adelkhatra-bit/trading-align-/actions/runs/45093404274) | 2026-11-23 01:14:14Z | 01:14:40Z (lecture) | in_progress / conclusion null; log inaccessible (404 BlobNotFound) |
+
+
+### 3b — Logs Telegram des runs post-merge
+- Run **45093237712** : recherche dans le log du job `signaux` des marqueurs `TELEGRAM_GETUPDATES_BATCH`, `TELEGRAM_GETUPDATES_EMPTY_SUMMARY`, `TELEGRAM_CALLBACK_ACK` : **aucune ligne runtime trouvée**. Des lignes de code/script contenant les noms des marqueurs apparaissent dans le log, mais ce ne sont pas des émissions runtime et ne constituent pas une preuve d'activité.
+- Run **45093404274** : le log n'a pas pu être récupéré (404 `BlobNotFound`); marqueurs **NON VÉRIFIÉ**.
+- Dans 45093237712, le contrôle Telegram API a réussi (`TELEGRAM_API_OK bot=@align_mtf_adel_bot`, à **01:12:44.9239154Z** / **02:12:44.923 CET**) et le mode polling est annoncé (`TELEGRAM_RECEIVE_MODE=polling webhook=none`, à **01:12:44.9239435Z** / **02:12:44.923 CET**). Cela ne prouve pas la réception getUpdates/callbacks.
+- Le même log indique des envois sortants bloqués par le contrôle `TELEGRAM_PULL_BLOCK` et `0 message(s) Telegram livré(s)`; aucun message réel n'est confirmé livré.
+
+### 3c — Rollover associé aux merges #784/#783
+Runs rollover retrouvés à cette lecture :
+
+| Run ID | SHA du run | Début UTC | Fin UTC | Conclusion |
+|---|---|---|---|
+| [45093237740](https://github.com/adelkhatra-bit/trading-align-/actions/runs/45093237740) | f1bf7894 | 01:12:35Z | 01:12:48Z | success |
+| [45093404317](https://github.com/adelkhatra-bit/trading-align-/actions/runs/45093404317) | f1bf7894 | 01:14:15Z | 01:14:27Z | success |
+
+Lignes runtime réellement présentes (UTC; les équivalents CET sont UTC+1) :
+- Run **45093237740** : `2026-11-23T01:12:46.1739031Z ALIGN_OLD_WORKERS_STOPPED_GRACEFULLY validated_sha=b9b4894e80d2` (**02:12:46.173 CET**). Ce run a validé l'arrêt gracieux des anciens workers pour le SHA b9.
+- Run **45093404317** : `2026-11-23T01:14:25.601...Z ALIGN_OLD_WORKERS_STOPPED_GRACEFULLY validated_sha=f1bf7894eebf` (**02:14:25.601 CET**). Ce run a validé l'arrêt gracieux des anciens workers pour le SHA f1.
+- `ROLLING_OVER` et `FORCE_RETIRING` : **aucune ligne runtime vérifiée** dans les deux logs. Le texte de ces appels `print()` est visible dans l'exécution du script, mais ne doit pas être confondu avec une sortie événementielle.
+- Pour le merge b9, aucun run rollover dont le `head_sha` soit b9 n'a été retrouvé dans les runs récents consultés; l'événement réel ci-dessus est toutefois présent dans le run 45093237740 et porte `validated_sha=b9b4894e80d2`.
+
+### Garde-fous de cet addendum
+Rapport seulement sur `audit/chatgpt-pilotage`. Aucun merge, annulation ou relance de workflow, aucune modification de `align-bot-rollover.yml` ou `releve_en_attente`, aucun nouveau code, aucun message Telegram réel, aucun ordre, aucune modification TradingView. G1/G2 restent suspendus. D7 reste **NON TRANCHÉ**.
