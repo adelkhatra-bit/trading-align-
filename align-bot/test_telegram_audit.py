@@ -31,6 +31,7 @@ class TelegramAuditTests(unittest.TestCase):
         ab.TELEGRAM_PULL_MODE = self.old_pull_mode
         ab.TOKEN = self.old_token
         ab.CALLBACKS_ACKNOWLEDGED.clear()
+        ab.CALLBACKS_ACK_FAILED.clear()
 
     def test_failed_fast_ack_is_not_cached_and_handler_can_retry(self):
         cb = {"id": "callback-failed", "data": "markets:BTC"}
