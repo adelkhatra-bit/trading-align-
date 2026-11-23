@@ -11677,11 +11677,30 @@ def toast_callback(data, anglais=False):
     return en if anglais else fr
 
 
+def _log_callback_ack(cb, result):
+    """Log l'identifiant, le data du callback et le résultat de l'ACK Telegram."""
+    success = isinstance(result, dict) and result.get("ok") is True
+    data = str(cb.get("data", "")).replace(chr(10), " ").replace(chr(13), " ")[:200]
+    print(f"TELEGRAM_CALLBACK_ACK callback_id={cb.get('id', '')} data={data!r} result={'ok' if success else 'failed'}", flush=True)
+
+
+def _log_releve_trigger(runs, mon_id):
+    """Log l'identifiant du run récent qui déclenche le shutdown par rollover."""
+    actifs = {"queued", "in_progress", "waiting", "pending", "requested"}
+    declencheurs = [r for r in runs or [] if int(r.get("id") or 0) > mon_id and r.get("status") in actifs]
+    declencheur = max(declencheurs, key=lambda r: int(r.get("id") or 0), default={})
+    ligne = f"ALIGN_RELEVE_DETECTEE newer_run_id={declencheur.get('id', 'unknown')} status={declencheur.get('status', 'unknown')} : arrêt propre + sauvegarde de la mémoire"
+    print(ligne, flush=True)
+    return ligne
+
+
 def _ack_callback_rapide(cb, text):
     try:
-        telegram("answerCallbackQuery", callback_query_id=cb["id"], text=text)
+        result = telegram("answerCallbackQuery", callback_query_id=cb["id"], text=text)
+        _log_callback_ack(cb, result)
         CALLBACKS_ACKNOWLEDGED.add(str(cb["id"]))
     except Exception as ex:
+        _log_callback_ack(cb, {"ok": False})
         print("callback ack", ex)
 
 
@@ -13012,12 +13031,19 @@ def _traiter_paiement_rapide(etat, update):
         TELEGRAM_PULL_CONTEXT.private = ancien_prive
 
 
+def _log_telegram_batch(updates):
+    """Log observabilité : compte les updates et callback_query sans modifier leur traitement."""
+    callbacks = sum(1 for update in updates or [] if update.get("callback_query"))
+    print(f"TELEGRAM_GETUPDATES_BATCH updates={len(updates or [])} callbacks={callbacks}", flush=True)
+
+
 def boucle_polling_telegram(etat, chats):
     """Poll Telegram indépendamment des analyses longues; les actions d'écriture restent dans le thread principal."""
     offset = int(etat.get("offset", 0) or 0)
     while TOKEN and not TELEGRAM_POLL_STOP.is_set():
         try:
             updates = telegram("getUpdates", offset=offset, timeout=1).get("result", [])
+            _log_telegram_batch(updates)
         except Exception as ex:
             if not TELEGRAM_POLL_STOP.is_set():
                 print("poller Telegram", ex)
@@ -13149,7 +13175,7 @@ def surveiller_releve():
             with urllib.request.urlopen(req, timeout=15) as rep_:
                 runs = json.loads(rep_.read().decode("utf-8")).get("workflow_runs", [])
             if releve_en_attente(runs, mon_id):
-                print("ALIGN_RELEVE_DETECTEE : arrêt propre + sauvegarde de la mémoire", flush=True)
+                _log_releve_trigger(runs, mon_id)
                 _demander_arret(0, None)
                 return
         except Exception as ex:
