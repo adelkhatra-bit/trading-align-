@@ -39,6 +39,8 @@ TELEGRAM_AUDIT = {
     "last_callback": None, "last_callback_latency_ms": None,
     "last_error": None, "last_block": None,
 }
+# Les blocages Pull sont agrégés par méthode/action pour éviter les logs répétitifs.
+TELEGRAM_PULL_BLOCK_LOGGED = set()
 # Préfixes routés par traiter() ou live_callback(). Les compteurs indiquent ceux réellement cliqués.
 TELEGRAM_CALLBACK_HANDLER_PREFIXES = (
     "analysechoice", "auto", "autoadm", "botmenu", "botoff", "boton",
@@ -3480,7 +3482,16 @@ def _telegram_sortant_autorise(methode, params):
     chaines.discard("")
     if cid and cid in chaines and methode in ("sendMessage", "sendPhoto", "editMessageText") and _telegram_position_attendue(texte):
         return True
-    print(f"TELEGRAM_PULL_BLOCK method={methode} chat={cid or '-'}", flush=True)
+    action = str(getattr(TELEGRAM_PULL_CONTEXT, "callback_action", "") or "").split(":", 1)[0][:40] or "outside_callback"
+    log_key = (str(methode)[:40], action)
+    should_log = False
+    with TELEGRAM_AUDIT_LOCK:
+        if log_key not in TELEGRAM_PULL_BLOCK_LOGGED:
+            TELEGRAM_PULL_BLOCK_LOGGED.add(log_key)
+            should_log = True
+    if should_log:
+        # Pas d'identifiant de chat dans les logs ; /audit conserve les compteurs détaillés.
+        print(f"TELEGRAM_PULL_BLOCK method={methode} action={action} (first occurrence)", flush=True)
     return False
 
 
