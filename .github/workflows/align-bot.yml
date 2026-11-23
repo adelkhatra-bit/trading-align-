@@ -373,6 +373,7 @@ jobs:
 
       - name: Analyse BTC + Gold et envoi Telegram
         env:
+          ALIGN_WORKER_RUN_ID: ${{ github.run_id }}
           ALIGN_AI_HEALTHY_PROVIDER: ${{ steps.ia_preflight.outputs.provider }}
           ALIGN_REQUIRE_TV_BRIDGE: "1"
           ALIGN_TV_BRIDGE_PRET: ${{ steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == '1' && '1' || '0' }}
