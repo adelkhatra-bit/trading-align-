@@ -526,6 +526,16 @@ class BridgeStoreTests(unittest.TestCase):
                     diagnostic["triggerStale"]["BTCUSD"]["lastThresholdMs"],
                     2 * TIMEFRAME_MS["M5"] + ENTRY_BAR_GRACE_MS,
                 )
+
+                # Un snapshot frais suivant ne réinitialise pas les compteurs du run.
+                fresh_btc = valid_payload()
+                status, result = self.store.ingest(fresh_btc, INGEST, BASE_MS + 2_000)
+                self.assertEqual(status, 200, result)
+                with open(diagnostic_path, encoding="utf-8") as stream:
+                    after_fresh = json.load(stream)
+                self.assertEqual(after_fresh["triggerStale"]["BTCUSD"]["count"], 1)
+                self.assertEqual(after_fresh["triggerStale"]["XAUUSD"]["count"], 1)
+
                 rendered = json.dumps(diagnostic)
                 self.assertNotIn(INGEST, rendered)
                 self.assertNotIn(READ, rendered)
