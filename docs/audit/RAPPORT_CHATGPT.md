@@ -659,3 +659,41 @@ Une PR documentaire unique **#780** a été ouverte depuis `docs/align-source-tr
 ### État des PR à la relecture
 - PR #781 : ouverte, non fusionnée, head SHA 20672801887fa5da83112a012044da59d3f7e8c9. Relecture automatique Codex n'a pas pu se terminer (limite d'usage); revue humaine requise.
 - PR #782 : ouverte, non fusionnée, head SHA d19d616a98582e665428fe6ee8080b3fa4c511a8. Relecture automatique Codex non terminée (limite d'usage); revue humaine requise.
+
+## Addendum — Correctifs des PR #781/#782, rebase main (23/11/2026)
+
+**Lecture GitHub : 2026-11-23 02:09:39 CET.** Base main confirmée par l'API à SHA 006280ef214f5c82ea010f5647e9d444b93b5417.
+
+Les PR précédentes #781 et #782 avaient déjà été fusionnées sur audit/chatgpt-pilotage, pas sur main; elles ne pouvaient pas être réécrites. Deux PR de remplacement sont créées à partir de main:
+
+### PR #784 — T1 observabilité Telegram
+- URL: https://github.com/adelkhatra-bit/trading-align-/pull/784
+- Branche: fix/telegram-observabilite-main-clean-20261123
+- Head SHA: a481c05097d1f8f9ca579b3dd8ff91292d57aabe
+- Mergeable API: true (02:09:39 CET)
+- Compare main...head: 1 commit, 2 fichiers seulement: align-bot/align_bot.py (+22/-1) et align-bot/test_telegram_observabilite.py (+70). Aucun rapport d'audit, document vérité, ou test_bugs_telegram_news.py.
+- Logs: lot non vide (updates/callbacks), lot vide silencieux et résumé au plus une fois toutes les 5 minutes; callback (ID/data/ACK ok ou failed).
+- releve_en_attente, _demander_arret, rollover workflow, TradingView, messages Telegram réels et ordres non touchés.
+- Test ciblé: python -m unittest align-bot.test_telegram_observabilite — 5 tests, OK, code 0.
+- Suite complète, une seule commande depuis la racine: python -m unittest discover -s align-bot -p "test_*.py" — Ran 1144 tests in 77.758s; OK (skipped=1), code 0.
+
+### PR #783 — T3 commentaire worker
+- URL: https://github.com/adelkhatra-bit/trading-align-/pull/783
+- Branche: docs/worker-comment-clean2-20261123
+- Head SHA: 2cd8821468502530dd054a06dfc59319a8d4d941
+- Mergeable API: true (02:09:39 CET)
+- Compare main...head: 1 fichier, align-bot/align_bot.py, exactement 1 ligne modifiée (+1/-1), commentaire uniquement.
+- git diff --check réussi.
+- Suite complète depuis racine: python -m unittest discover -s align-bot -p "test_*.py" — Ran 1139 tests in 78.429s; OK (skipped=1), code 0.
+- **Attendu utilisateur: 1140; résultat observé sur main: 1139 — écart de 1, non résolu.** Aucun test d'audit n'a été ajouté à la PR pour maquiller ce décalage.
+
+### T2 — correction de terminologie
+- Le 90,9340 % est désormais décrit comme **couverture théorique des intervalles de workflows** (65,4725 h sur 72 h).
+- Ce chiffre **n'est pas la disponibilité Telegram, ni la disponibilité du lecteur**. Disponibilité réelle: **NON VÉRIFIÉ**.
+
+### Garde-fous
+- Les deux PR de remplacement sont ouvertes, mergeable=true, non fusionnées.
+- Aucun run GitHub Actions relancé ou annulé.
+- Aucun changement à align-bot-rollover.yml, releve_en_attente, _demander_arret, live-data, TradingView, message Telegram réel ou ordre.
+- G1/G2 suspendus.
+
