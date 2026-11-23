@@ -4136,8 +4136,13 @@ def ia(etat, consigne, donnees, cle_cache=None, duree=600, premium=False, recher
             print("ia", nom, modele, detail, flush=True)
     if not txt:
         etat["ia_dernier_fournisseur"] = "INTERNAL_FALLBACK"
-        etat["ia_dernier_statut"] = "ALL_EXTERNAL_PROVIDERS_FAILED"
-        print("AI_PROVIDER_USED=INTERNAL_FALLBACK", flush=True)
+        etat["ia_dernier_statut"] = (
+            "DAILY_LIMIT_FREE_FALLBACK_UNAVAILABLE"
+            if plafond_global_atteint
+            else "ALL_EXTERNAL_PROVIDERS_FAILED"
+        )
+        reason = etat["ia_dernier_statut"]
+        print(f"AI_PROVIDER_USED=INTERNAL_FALLBACK reason={reason}", flush=True)
         etat["ia_err"] = " | ".join(erreurs)
         # Panne IA : uniquement dans les journaux techniques, jamais dans Telegram (rien à voir avec le trading).
         print("AI_ALL_PROVIDERS_FAILED", etat["ia_err"][:250], flush=True)
