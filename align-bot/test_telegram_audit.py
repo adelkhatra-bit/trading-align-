@@ -81,7 +81,7 @@ class TelegramAuditTests(unittest.TestCase):
         self.assertEqual(ab.TELEGRAM_AUDIT["callback_ack_ok"], 1)
 
     def test_owner_can_request_audit_on_fast_path(self):
-        update = {"message": {"chat": {"id": "owner-1", "type": "private"}, "text": "/audit"}}
+        update = {"message": {"chat": {"id": "owner-1", "type": "private"}, "from": {"id": "owner-1"}, "text": "/audit"}}
         with patch.object(ab, "proprio", return_value=["owner-1"]), \
              patch.object(ab, "texte_audit_telegram", return_value="AUDIT TEST") as report, \
              patch.object(ab, "_envoi_sur") as send:
@@ -91,8 +91,30 @@ class TelegramAuditTests(unittest.TestCase):
         report.assert_called_once()
         send.assert_called_once_with("owner-1", text="AUDIT TEST")
 
+    def test_owner_audit_requires_sender_identity(self):
+        update = {"message": {"chat": {"id": "owner-1", "type": "private"},
+                              "from": {"id": "guest-2"}, "text": "/audit"}}
+        with patch.object(ab, "proprio", return_value=["owner-1"]), \
+             patch.object(ab, "texte_audit_telegram") as report, \
+             patch.object(ab, "_envoi_sur") as send:
+            handled = ab._traiter_lecture_rapide({}, set(), update)
+        self.assertFalse(handled)
+        report.assert_not_called()
+        send.assert_not_called()
+
+    def test_diag_alias_is_not_audit_command(self):
+        update = {"message": {"chat": {"id": "owner-1", "type": "private"},
+                              "from": {"id": "owner-1"}, "text": "/diag"}}
+        with patch.object(ab, "proprio", return_value=["owner-1"]), \
+             patch.object(ab, "texte_audit_telegram") as report, \
+             patch.object(ab, "_envoi_sur") as send:
+            handled = ab._traiter_lecture_rapide({}, set(), update)
+        self.assertFalse(handled)
+        report.assert_not_called()
+        send.assert_not_called()
+
     def test_non_owner_cannot_request_owner_audit(self):
-        update = {"message": {"chat": {"id": "guest-1", "type": "private"}, "text": "/audit"}}
+        update = {"message": {"chat": {"id": "guest-1", "type": "private"}, "from": {"id": "guest-1"}, "text": "/audit"}}
         with patch.object(ab, "proprio", return_value=[]), \
              patch.object(ab, "texte_audit_telegram") as report, \
              patch.object(ab, "_envoi_sur") as send:
