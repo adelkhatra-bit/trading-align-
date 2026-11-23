@@ -56,8 +56,16 @@ def _telegram_audit(event, action=None, detail=None):
     """Compteurs runtime sans identifiants de chat, contenu des messages ni secrets."""
     now = time.time()
     with TELEGRAM_AUDIT_LOCK:
-        if event in TELEGRAM_AUDIT and isinstance(TELEGRAM_AUDIT[event], int):
-            TELEGRAM_AUDIT[event] += 1
+        # Les événements callback sont au singulier ; les compteurs publics au pluriel.
+        counter_key = {
+            "callback_received": "callbacks_received",
+            "callback_dispatched": "callbacks_dispatched",
+            "callback_completed": "callbacks_completed",
+            "callback_unknown": "callbacks_unknown",
+            "callback_rejected": "callbacks_rejected",
+        }.get(event, event)
+        if counter_key in TELEGRAM_AUDIT and isinstance(TELEGRAM_AUDIT[counter_key], int):
+            TELEGRAM_AUDIT[counter_key] += 1
         if event in ("callback_received", "callback_dispatched", "callback_completed",
                      "callback_unknown", "callback_rejected", "callback_ack_ok", "callback_ack_failed"):
             prefix = str(action or "unknown").split(":", 1)[0][:40] or "unknown"
