@@ -90,6 +90,13 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertIn('f_align_v25_json_num(bridgePlanValid ? zHaut : na)', export_block)
         self.assertIn('f_align_v25_json_num(bridgePlanValid ? (zBas + zHaut) / 2 : na)', export_block)
 
+    def test_higher_chart_uses_last_closed_lower_timeframe_intrabar_for_entry_trigger(self):
+        export_block = self.source.split(EXPORT_MARKER, 1)[1]
+        self.assertIn("timeframe.in_seconds(bridgeEntryTf) < timeframe.in_seconds()", export_block)
+        self.assertIn("request.security_lower_tf(syminfo.tickerid, bridgeEntryTf", export_block)
+        self.assertIn("array.get(bridgeEntryTimeArray, bridgeEntryLast)", export_block)
+        self.assertIn('bridgeEntryTimeSafe = bridgeEntryTf == "" ? na : bridgeEntryTime', export_block)
+
     def test_no_secret_is_embedded_in_pine(self):
         self.assertNotIn("ALIGN_TV_INGEST_TOKEN", self.source)
         self.assertNotIn("ingest_token", self.source)
