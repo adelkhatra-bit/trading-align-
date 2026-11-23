@@ -13,6 +13,12 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.sniper_replay = (Path(__file__).parent / "replay_sniper.py").read_text(encoding="utf-8")
         self.bot = (Path(__file__).parent / "align_bot.py").read_text(encoding="utf-8")
 
+    def test_telegram_preflight_accepts_only_the_canonical_align_bot(self):
+        self.assertIn('BOT_USERNAME_ATTENDU = "align_mtf_adel_bot"', self.workflow)
+        self.assertIn('if username != BOT_USERNAME_ATTENDU:', self.workflow)
+        self.assertIn('ÉCHEC: le secret TELEGRAM_TOKEN ne correspond pas au bot ALIGN attendu', self.workflow)
+        self.assertIn('TELEGRAM_API_OK bot=@' + username, self.workflow)
+
     def test_worker_operational_scope_is_btc_and_gold_only(self):
         self.assertIn("required_symbols = align_bot.symboles_bridge_obligatoires(time.time())", self.workflow)
         self.assertIn("for symbol in required_symbols:", self.workflow)
