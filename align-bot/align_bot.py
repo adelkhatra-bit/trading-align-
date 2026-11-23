@@ -7945,7 +7945,7 @@ def traiter(etat, chats, updates):
         if txt.startswith("/statut") and str(cid) in {str(x) for x in proprio(etat)}:
             _envoi_sur(cid, text=texte_statut(etat, DERNIERS))
             continue
-        if cmd in ("/audit", "/diag") and str(cid) in {str(x) for x in proprio(etat)}:
+        if cmd == "/audit" and str(cid) in {str(x) for x in proprio(etat)} and str((msg.get("from") or {}).get("id", "")) in {str(x) for x in proprio(etat)}:
             _envoi_sur(cid, text=texte_audit_telegram(etat, DERNIERS))
             continue
         if "me concentrer" in txt or "where to focus" in txt or txt.startswith("/focus") or txt.strip() == "focus":
@@ -11900,7 +11900,7 @@ def _traiter_lecture_rapide(etat, chats, update):
         _envoi_sur(cid, text=texte_statut(etat, DERNIERS))
         update["_align_fast_handled"] = True
         return True
-    if cmd in ("/audit", "/diag") and cid in {str(x) for x in proprio(etat)}:
+    if cmd == "/audit" and cid in {str(x) for x in proprio(etat)} and str((msg.get("from") or {}).get("id", "")) in {str(x) for x in proprio(etat)}:
         _envoi_sur(cid, text=texte_audit_telegram(etat, DERNIERS))
         update["_align_fast_handled"] = True
         return True
