@@ -153,6 +153,110 @@ class TelegramCoachPrealertPullGate(unittest.TestCase):
             "sendMessage", {"chat_id": "43", "text": "📊 BTC : configuration proche"}
         ))
 
+    def test_429_retry_preserves_opted_in_coach_prealert_scope(self):
+        import time
+        old_current = ab._ETAT_COURANT.get("etat")
+        old_chats = ab._ETAT_COURANT.get("chats")
+        old_retry = dict(ab.TELEGRAM_RETRY_UNTIL)
+        old_news_chat = getattr(ab.TELEGRAM_PULL_CONTEXT, "news_chat_id", None)
+        self.state["telegram_outbox"] = []
+        ab._ETAT_COURANT["etat"] = self.state
+        ab._ETAT_COURANT["chats"] = set()
+        ab.TELEGRAM_RETRY_UNTIL.clear()
+        try:
+            with patch.object(ab, "coach_actif", return_value=True), \
+                 patch.object(ab, "marches_choisis", return_value={"BTC"}), \
+                 patch.object(ab, "http_json", side_effect=RuntimeError("HTTP Error 429: retry after 30")):
+                ab._telegram_envoyer_coach_prealerte(
+                    self.state, "42", "📊 BTC : alignement en progression, configuration proche.", {"BTC"}
+                )
+
+            self.assertEqual(len(self.state["telegram_outbox"]), 1)
+            item = self.state["telegram_outbox"][0]
+            self.assertFalse(item["prive"])
+            self.assertEqual(item.get("coach_prealert_markets"), ["BTC"])
+
+            ab.TELEGRAM_RETRY_UNTIL.clear()
+            item["next_t"] = 0
+            sent = []
+
+            def fake_http(url, data=None, **kwargs):
+                sent.append((url, urllib.parse.parse_qs(data.decode("utf-8"))))
+                return {"ok": True, "result": {"message_id": 56, "chat": {"id": 42}}}
+
+            with patch.object(ab, "coach_actif", return_value=True), \
+                 patch.object(ab, "marches_choisis", return_value={"BTC"}), \
+                 patch.object(ab, "http_json", side_effect=fake_http):
+                delivered = ab.traiter_file_telegram(self.state, maintenant=time.time() + 60)
+
+            self.assertEqual(delivered, 1)
+            self.assertEqual(len(sent), 1)
+            self.assertTrue(sent[0][0].endswith("/sendMessage"))
+            self.assertEqual(sent[0][1]["chat_id"], ["42"])
+            self.assertEqual(self.state["telegram_outbox"], [])
+            self.assertIsNone(ab.TELEGRAM_PULL_CONTEXT.coach_prealert_chat_id)
+            self.assertEqual(ab.TELEGRAM_PULL_CONTEXT.coach_prealert_markets, frozenset())
+        finally:
+            ab.TELEGRAM_RETRY_UNTIL.clear()
+            ab.TELEGRAM_RETRY_UNTIL.update(old_retry)
+            ab.TELEGRAM_PULL_CONTEXT.news_chat_id = old_news_chat
+            if old_current is None:
+                ab._ETAT_COURANT.pop("etat", None)
+            else:
+                ab._ETAT_COURANT["etat"] = old_current
+            if old_chats is None:
+                ab._ETAT_COURANT.pop("chats", None)
+            else:
+                ab._ETAT_COURANT["chats"] = old_chats
+
+
+    def test_429_retry_rechecks_coach_opt_in_before_delivery(self):
+        import time
+        old_current = ab._ETAT_COURANT.get("etat")
+        old_chats = ab._ETAT_COURANT.get("chats")
+        old_retry = dict(ab.TELEGRAM_RETRY_UNTIL)
+        self.state["telegram_outbox"] = []
+        ab._ETAT_COURANT["etat"] = self.state
+        ab._ETAT_COURANT["chats"] = set()
+        ab.TELEGRAM_RETRY_UNTIL.clear()
+        try:
+            with patch.object(ab, "coach_actif", return_value=True), \
+                 patch.object(ab, "marches_choisis", return_value={"BTC"}), \
+                 patch.object(ab, "http_json", side_effect=RuntimeError("HTTP Error 429: retry after 30")):
+                ab._telegram_envoyer_coach_prealerte(
+                    self.state, "42", "📊 BTC : alignement en progression, configuration proche.", {"BTC"}
+                )
+
+            self.assertEqual(len(self.state["telegram_outbox"]), 1)
+            self.assertEqual(self.state["telegram_outbox"][0].get("coach_prealert_markets"), ["BTC"])
+            ab.TELEGRAM_RETRY_UNTIL.clear()
+            self.state["telegram_outbox"][0]["next_t"] = 0
+            sent = []
+
+            def fake_http(url, data=None, **kwargs):
+                sent.append(url)
+                return {"ok": True, "result": {"message_id": 57, "chat": {"id": 42}}}
+
+            with patch.object(ab, "coach_actif", return_value=False), \
+                 patch.object(ab, "marches_choisis", return_value={"BTC"}), \
+                 patch.object(ab, "http_json", side_effect=fake_http):
+                delivered = ab.traiter_file_telegram(self.state, maintenant=time.time() + 60)
+
+            self.assertEqual(delivered, 0)
+            self.assertEqual(sent, [])
+            self.assertEqual(self.state["telegram_outbox"], [])
+        finally:
+            ab.TELEGRAM_RETRY_UNTIL.clear()
+            ab.TELEGRAM_RETRY_UNTIL.update(old_retry)
+            if old_current is None:
+                ab._ETAT_COURANT.pop("etat", None)
+            else:
+                ab._ETAT_COURANT["etat"] = old_current
+            if old_chats is None:
+                ab._ETAT_COURANT.pop("chats", None)
+            else:
+                ab._ETAT_COURANT["chats"] = old_chats
+
 
 if __name__ == "__main__":
     unittest.main()
