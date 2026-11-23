@@ -1,6 +1,8 @@
 # ALIGN — source de vérité unique (à lire AVANT toute action)
 
 Ce fichier définit la source de vérité du projet pour les mainteneurs humains et les outils explicitement autorisés.
+System map (flows, component roles, folders and reliability checks): `docs/ALIGN_SYSTEM_MAP.md`.
+
 Si une information ci-dessous contredit ce que tu crois savoir : **ce fichier gagne**.
 Si l'**identité du projet** est ambiguë (autre dépôt, autre branche de production, autre indicateur, autre projet) : **arrête-toi et demande**. Une tâche de maintenance ALIGN normale (test, workflow, bot) se traite normalement.
 
