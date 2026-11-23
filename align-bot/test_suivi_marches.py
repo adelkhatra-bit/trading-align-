@@ -446,14 +446,40 @@ class CourseDesTP(unittest.TestCase):
 
 
 class ReleveDuWorker(unittest.TestCase):
-    """Un nouveau worker en file = l'ancien s'arrête lui-même et sauve sa mémoire (plus de doublons après redémarrage)."""
-    def test_detecte_le_nouveau_worker(self):
-        self.assertTrue(ab.releve_en_attente([{"id": 10, "status": "in_progress"}, {"id": 12, "status": "pending"}], 10))
-        self.assertTrue(ab.releve_en_attente([{"id": 12, "status": "queued"}], 10))
+    """Un nouveau run du workflow ALIGN BOT seul déclenche l'arrêt propre de l'ancien worker."""
+    PATH_BOT = ".github/workflows/align-bot.yml"
+
+    def test_detecte_le_nouveau_worker_du_meme_workflow(self):
+        runs = [
+            {"id": 10, "path": self.PATH_BOT, "status": "in_progress"},
+            {"id": 12, "path": self.PATH_BOT, "status": "pending"},
+        ]
+        self.assertTrue(ab.releve_en_attente(runs, 10))
+        self.assertTrue(ab.releve_en_attente([
+            {"id": 12, "path": self.PATH_BOT, "status": "queued"}
+        ], 10))
 
     def test_ignore_les_anciens_et_les_termines(self):
-        self.assertFalse(ab.releve_en_attente([{"id": 9, "status": "in_progress"}, {"id": 11, "status": "completed"}], 10))
+        runs = [
+            {"id": 9, "path": self.PATH_BOT, "status": "in_progress"},
+            {"id": 11, "path": self.PATH_BOT, "status": "completed"},
+        ]
+        self.assertFalse(ab.releve_en_attente(runs, 10))
         self.assertFalse(ab.releve_en_attente([], 10))
+
+    def test_ignore_un_run_plus_recent_du_watchdog_ou_du_coordinateur(self):
+        runs = [
+            {"id": 12, "path": ".github/workflows/align-workflow-watchdog.yml",
+             "name": "ALIGN Workflow Watchdog", "status": "in_progress"},
+            {"id": 13, "path": ".github/workflows/align-auto-repair.yml",
+             "name": "ALIGN Coordinateur de réparation automatique", "status": "queued"},
+        ]
+        self.assertFalse(ab.releve_en_attente(runs, 10))
+
+    def test_ignore_un_run_plus_recent_sans_identite_de_workflow(self):
+        self.assertFalse(ab.releve_en_attente(
+            [{"id": 12, "status": "in_progress"}], 10
+        ))
 
 
 class EtalonTradingView(unittest.TestCase):
