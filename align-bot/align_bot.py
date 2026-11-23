@@ -3307,7 +3307,7 @@ def _telegram_sortant_autorise(methode, params):
     if (cid and cid == news_chat and methode == "sendMessage"
             and texte.startswith("🚨 NEWS DE DERNIÈRE MINUTE")):
         return True
-    if cid and cid in actifs and methode in ("sendMessage", "sendPhoto") and _telegram_position_attendue(texte):
+    if cid and cid in actifs and methode in ("sendMessage", "sendPhoto", "editMessageText") and _telegram_position_attendue(texte):
         marches_signal = marches_message(texte)
         silencieux = {str(x) for x in (etat.get("quiet") or [])}
         if (bot_on(etat, cid) and cid not in silencieux
@@ -3315,7 +3315,7 @@ def _telegram_sortant_autorise(methode, params):
             return True
     # Les abonnements « Alertes BTC/GOLD » sont un opt-in explicite séparé de la recherche live.
     # Ils autorisent uniquement une entrée confirmée sur le marché coché, jamais un statut ou une autre UT.
-    if cid and methode in ("sendMessage", "sendPhoto") and _telegram_position_attendue(texte):
+    if cid and methode in ("sendMessage", "sendPhoto", "editMessageText") and _telegram_position_attendue(texte):
         marches_message_ = marches_message(params.get("text") or params.get("caption") or "")
         for marche in MARCHES:
             abonnes = {str(x) for x in (etat.get("auto", {}).get(marche) or [])}
@@ -3327,7 +3327,7 @@ def _telegram_sortant_autorise(methode, params):
     chaines = {str(etat.get("canal") or ""), str(etat.get("canal_preuves") or "")}
     chaines |= {str(v) for v in (etat.get("canaux_marche") or {}).values()}
     chaines.discard("")
-    if cid and cid in chaines and methode in ("sendMessage", "sendPhoto") and _telegram_position_attendue(texte):
+    if cid and cid in chaines and methode in ("sendMessage", "sendPhoto", "editMessageText") and _telegram_position_attendue(texte):
         return True
     print(f"TELEGRAM_PULL_BLOCK method={methode} chat={cid or '-'}", flush=True)
     return False
