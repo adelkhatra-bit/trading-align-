@@ -302,6 +302,13 @@ class BridgeStore:
             # Le Pine envoie l'heure d'OUVERTURE de la dernière bougie CLÔTURÉE (time[1]) :
             # son âge va donc jusqu'à 2 UT (18/11 : SWING H1 refusé à 1 h 35 alors que valide).
             if entry_bar_age < -MAX_FUTURE_SKEW_MS or entry_bar_age > 2 * entry_tf_ms + ENTRY_BAR_GRACE_MS:
+                threshold_ms = 2 * entry_tf_ms + ENTRY_BAR_GRACE_MS
+                print(
+                    f"BTC_TRIGGER_STALE entry_tf_ms={entry_tf_ms} "
+                    f"entry_bar_time_ms={entry_bar_time} now_ms={now_ms} "
+                    f"age_ms={entry_bar_age} threshold_ms={threshold_ms} received_ms=absent",
+                    flush=True,
+                )
                 return 400, {"ok": False, "error": "stale_or_future_entry_trigger_candle"}
             if not (entry_bar_low <= min(entry_bar_open, entry_bar_close) <= max(entry_bar_open, entry_bar_close) <= entry_bar_high):
                 return 400, {"ok": False, "error": "invalid_entry_trigger_ohlc"}
