@@ -569,7 +569,7 @@ Une PR documentaire unique **#780** a été ouverte depuis `docs/align-source-tr
 - Lecture API locale à **2026-11-23 01:49:18 CET** / `2026-11-23T00:49:18Z`.
 - Endpoint : `GET /repos/adelkhatra-bit/trading-align-/actions/workflows/align-bot.yml/runs?branch=main&per_page=100`.
 - Réponse : total repository `1037`, 100 runs reçus sur la page, **68 runs main dans la fenêtre de 72 h** (du 20 nov. 00:49:18 UTC au 23 nov. 00:49:18 UTC).
-- Méthode disponibilité : union des intervalles run_started_at→updated_at de ces runs; durée couverte **235 701 s = 65,4725 h**, **90,9340 %** de la fenêtre 72 h. Ceci est une **borne supérieure au niveau workflow**, pas une mesure exacte du poller. Les heures de démarrage/fin du job signaux et du thread getUpdates ne sont pas retournées dans cette lecture; le temps réel de lecteur est **NON VÉRIFIÉ**. Runs qui se chevauchent sont comptés une seule fois dans l'union.
+- Calcul de **couverture théorique des intervalles de workflows** : union des intervalles `run_started_at`→`updated_at` de ces runs; **235 701 s = 65,4725 h**, **90,9340 %** de la fenêtre de 72 h. Ce pourcentage est une couverture théorique de la durée des workflows, **pas une disponibilité Telegram ni du lecteur**. Les horaires du job signaux et du thread `getUpdates` ne sont pas disponibles dans cette extraction; disponibilité Telegram réelle : **NON VÉRIFIÉ**. Les chevauchements sont comptés une seule fois.
 - Liste des runs (heures UTC; toutes les lignes sont completed au moment de la lecture) :
 
 | Run | ID | Début UTC | Fin UTC | Conclusion |
