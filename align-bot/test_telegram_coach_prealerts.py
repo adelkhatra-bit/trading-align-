@@ -98,7 +98,7 @@ class TelegramCoachPrealertPullGate(unittest.TestCase):
                     self.state, "42", "📊 BTC : configuration à surveiller", {"BTC"}
                 )
         self.assertIsNone(ab.TELEGRAM_PULL_CONTEXT.coach_prealert_chat_id)
-        self.assertIsNone(ab.TELEGRAM_PULL_CONTEXT.coach_prealert_markets)
+        self.assertEqual(ab.TELEGRAM_PULL_CONTEXT.coach_prealert_markets, frozenset())
 
     def test_market_scope_denies_gold_only_subscriber_from_btc_prealert(self):
         self.state["auto"] = {"BTC": [], "GOLD": ["42"]}
