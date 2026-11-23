@@ -476,7 +476,15 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertFalse(data["snapshots"]["M1"]["robotV12"]["entryTriggered"])
 
     def test_stale_trigger_counters_are_written_per_market_to_runner_temp(self):
-        previous_counts = dict(getattr(bridge, "DIAG_TRIGGER_COUNT", {}))
+        self.assertTrue(
+            hasattr(bridge, "DIAG_TRIGGER_COUNT"),
+            "bridge must expose per-market stale trigger counters",
+        )
+        self.assertTrue(
+            hasattr(bridge, "DIAG_TRIGGER_LAST"),
+            "bridge must expose per-market last stale trigger details",
+        )
+        previous_counts = dict(bridge.DIAG_TRIGGER_COUNT)
         previous_last = dict(getattr(bridge, "DIAG_TRIGGER_LAST", {}))
         previous_started = getattr(bridge, "DIAG_STARTED_AT_MS", None)
         old_runner_temp = os.environ.get("RUNNER_TEMP")
