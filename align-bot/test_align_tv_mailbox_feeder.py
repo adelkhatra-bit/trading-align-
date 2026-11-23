@@ -32,6 +32,59 @@ class MailboxFeederTests(unittest.TestCase):
         self.assertTrue(res["BTCUSD"].startswith("rejected:"))
         self.assertFalse(self.store.read("BTCUSD", now_ms=BASE_MS)[1]["ok"])
 
+    def test_mailbox_network_error_retries_then_recovers_without_fake_payload(self):
+        calls = []
+        sleeps = []
+        box = {"ok": True, "payload": valid_payload(BASE_MS, "BTCUSD"), "_http_status": 200}
+
+        def fetch(symbol):
+            calls.append(symbol)
+            if len(calls) == 1:
+                raise OSError("temporary network failure")
+            return box
+
+        result = feeder.fetch_mailbox_with_retry(fetch, "BTCUSD", attempts=3, delay=0.25, sleeper=sleeps.append)
+        self.assertIs(result, box)
+        self.assertEqual(calls, ["BTCUSD", "BTCUSD"])
+        self.assertEqual(sleeps, [0.25])
+
+    def test_mailbox_5xx_retries_but_auth_4xx_does_not(self):
+        calls = []
+        sleeps = []
+        responses = [
+            {"ok": False, "_http_status": 503},
+            {"ok": True, "payload": valid_payload(BASE_MS, "BTCUSD"), "_http_status": 200},
+        ]
+
+        def fetch(symbol):
+            calls.append(symbol)
+            return responses.pop(0)
+
+        result = feeder.fetch_mailbox_with_retry(fetch, "BTCUSD", attempts=3, delay=0.1, sleeper=sleeps.append)
+        self.assertEqual(result["_http_status"], 200)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(sleeps, [0.1])
+
+        auth_calls = []
+        auth = {"ok": False, "_http_status": 401}
+        def auth_fetch(symbol):
+            auth_calls.append(symbol)
+            return auth
+        result = feeder.fetch_mailbox_with_retry(auth_fetch, "BTCUSD", attempts=3, delay=0.1, sleeper=sleeps.append)
+        self.assertIs(result, auth)
+        self.assertEqual(auth_calls, ["BTCUSD"])
+
+    def test_mailbox_retry_exhaustion_reports_transport_error(self):
+        calls = []
+        sleeps = []
+        def fetch(symbol):
+            calls.append(symbol)
+            raise OSError("persistent network failure")
+        with self.assertRaises(OSError):
+            feeder.fetch_mailbox_with_retry(fetch, "BTCUSD", attempts=3, delay=0.1, sleeper=sleeps.append)
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(sleeps, [0.1, 0.1])
+
     def test_mailbox_network_error_never_fabricates_data(self):
         def boom(_):
             raise OSError("down")
