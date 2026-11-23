@@ -19,7 +19,8 @@ class HeartbeatGmTests(unittest.TestCase):
     def test_heartbeat_et_evenements_passent_par_envoyerecran(self):
         self.assertIn("function envoyerEcran(corps, ok, ko)", self.js)
         self.assertIn("GM_xmlhttpRequest({ method: 'POST'", self.js)
-        self.assertIn("envoyerEcran('PING|LIVE_SCREEN|' + Date.now())", self.js)
+        self.assertIn("const message = 'PING|LIVE_SCREEN|' + Date.now();", self.js)
+        self.assertIn("envoyerEcran(message,", self.js)
         self.assertIn("envoyerEcran(['EVT', mk, typ, d, minutes", self.js)
 
     def test_repli_fetch_si_pas_de_gm(self):
