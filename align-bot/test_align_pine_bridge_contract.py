@@ -7,7 +7,7 @@ BASELINE_GIT_BLOB_SHA = "578c0a1f58c03e658c42c91aeeca37e865e31e7c"  # v25 : anci
 SETTINGS_BLOCK = """// ═════════ BRIDGE ALIGN (optionnel, sans modification visuelle) ═════════
 grpBridge = "Bridge ALIGN (optionnel)"
 bridgeEnabled = input.bool(true, "Envoyer les snapshots au ROBOT V12", group=grpBridge)
-// Le marché est routé automatiquement depuis le ticker du graphique.
+// Le marché du bridge est détecté depuis le ticker réel du graphique, jamais choisi manuellement.
 
 """
 EXPORT_MARKER = "// ═════════ BRIDGE ALIGN — export structuré du Pine v25 (sans toucher aux signaux/visuels) ═════════"
