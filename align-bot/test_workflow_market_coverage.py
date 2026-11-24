@@ -71,6 +71,16 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("--marche et --pair doivent correspondre", result.stderr)
+    def test_worker_rollover_serializes_memory_saves(self):
+        script = self.rollover[self.rollover.index("          # Traiter les anciens workers un par un"):]
+        self.assertIn("while True:", script)
+        self.assertIn("pending = sorted(", script)
+        self.assertIn("item for item in older_active_runs()", script)
+        self.assertIn("if int(item.get(\"id\", 0)) == run_id", script)
+        self.assertIn("ALIGN_OLD_WORKER_STOPPED_GRACEFULLY", script)
+        self.assertIn("FORCE_RETIRING old_run=", script)
+        self.assertNotIn("for run in old_runs:", script)
+
     def test_worker_rollover_recognizes_both_legacy_and_renamed_worker(self):
         self.assertIn("if run.get(\"name\") in {", self.rollover)
         self.assertIn("ALIGN MTF BOT (signaux BTC + Gold Telegram)", self.rollover)
