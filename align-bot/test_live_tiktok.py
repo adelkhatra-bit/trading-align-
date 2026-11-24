@@ -546,14 +546,16 @@ class LiveOutbox(unittest.TestCase):
 
     def test_search_position_starts_persistent_coach_for_selected_markets(self):
         state = {"marches_par_chat": {"user-42": ["BTC", "GOLD"]}, "bot_off": ["user-42"]}
-        with mock.patch.object(ab, "DERNIERS", {
-            "BTC": {"b15": [{"t": 100}, {"t": 200}]},
-            "GOLD": {"b15": [{"t": 300}, {"t": 400}]}
-        }), mock.patch.object(ab.time, "time", return_value=500):
+        def activer_auto(etat, cid, marche, notifier=False):
+            etat["bot_off"] = [x for x in etat.get("bot_off", []) if str(x) != str(cid)]
+            etat.setdefault("auto", {}).setdefault(marche, []).append(str(cid))
+        with mock.patch.object(ab, "inscrire_auto", side_effect=activer_auto):
             selected = ab.demarrer_recherche_positions(state, "user-42")
         self.assertEqual(selected, ("BTC", "GOLD"))
-        self.assertEqual(state["coach_live"]["BTC"]["user-42"], {"dernier_t": 100, "started_t": 500})
-        self.assertEqual(state["coach_live"]["GOLD"]["user-42"], {"dernier_t": 300, "started_t": 500})
+        self.assertEqual(state["auto"]["BTC"], ["user-42"])
+        self.assertEqual(state["auto"]["GOLD"], ["user-42"])
+        self.assertNotIn("coach_live", state)
+        self.assertIn("user-42", state["recherche_positions_active"])
         self.assertNotIn("user-42", state["bot_off"])
 
 
