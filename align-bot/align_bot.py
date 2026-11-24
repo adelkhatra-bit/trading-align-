@@ -9723,21 +9723,54 @@ LIVE_BRANCHE, LIVE_FICHIER = "live-data", "live.json"
 LIVE_INTERVALLE, LIVE_RAFRAICHIR = 120, 300      # tentative toutes les 2 min ; republication forcée au plus toutes les 5 min
 
 def construire_live(etat, derniers, now=None):
-    """Contenu public : marché, biais probable, UT alignées x/11, profil, état, heure. Rien d'autre."""
+    """Contenu public sans niveaux : en mode bridge obligatoire, biais/UT/profil viennent uniquement de Pine v25."""
     now = now or time.time()
     marches = []
+    tf_requis = tuple(tf for tf, _ in TELEGRAM_TF_VIEWS)
     for m in MARCHES:
         r = derniers.get(m)
         if not r:
             continue
         cle = etat.get(m, {})
         statut, _ = etat_marche_hb(m, r, now)
-        e = hb_etat_surveille(r)
-        etat_l = ("ferme" if statut == "ferme" else "perime" if statut == "perime" else "entree" if cle.get("trade") else
-                  "preparation" if (cle.get("ordre") or cle.get("prep") or e["strat"]) else "calme")
-        marches.append({"m": m, "etat": etat_l, "biais": {1: "haussier", -1: "baissier", 0: "indecis"}[e["sens"]],
-                        "ut": int(e["n"]), "seuil": MIN_ALIGN,
-                        "profil": {"SWING": "SWING", "DAY": "INTRADAY", "SCALPING": "SCALP"}.get(e["strat"], "aucun")})
+        if r.get("require_tv_bridge"):
+            bridge = r.get("tv_indicator_mtf") or {}
+            snapshots = bridge.get("snapshots") if isinstance(bridge.get("snapshots"), dict) else {}
+            complet = bridge.get("available") is True and all(
+                isinstance(snapshots.get(tf), dict) and snapshots[tf].get("fresh") is True
+                for tf in tf_requis
+            )
+            if not complet:
+                # Ne jamais publier un biais/compteur issu du flux local lorsque Pine est obligatoire.
+                sens, nb_ut, profil = 0, 0, "aucun"
+                etat_l = "ferme" if statut == "ferme" else "perime"
+            else:
+                directions = [snapshots[tf].get("direction") for tf in tf_requis]
+                haussieres = sum(1 for direction in directions if direction == 1)
+                baissieres = sum(1 for direction in directions if direction == -1)
+                if haussieres >= MIN_ALIGN and haussieres > baissieres:
+                    sens, nb_ut = 1, haussieres
+                elif baissieres >= MIN_ALIGN and baissieres > haussieres:
+                    sens, nb_ut = -1, baissieres
+                else:
+                    sens, nb_ut = 0, max(haussieres, baissieres)
+                active_tf = str(bridge.get("activeTimeframe") or "").upper()
+                active = snapshots.get(active_tf) or {}
+                robot = active.get("robotV12") or {}
+                plan = plan_indicateur(r)
+                strategie = str((plan or {}).get("strategy") or robot.get("strategy") or "").upper()
+                profil = {"SWING": "SWING", "DAY": "INTRADAY", "SCALPING": "SCALP"}.get(strategie, "aucun")
+                etat_l = ("ferme" if statut == "ferme" else "entree" if cle.get("trade") else
+                          "preparation" if plan and plan.get("available") else "calme")
+        else:
+            # Compatibilité des environnements historiques sans obligation TradingView.
+            e = hb_etat_surveille(r)
+            sens, nb_ut = e["sens"], int(e["n"])
+            profil = {"SWING": "SWING", "DAY": "INTRADAY", "SCALPING": "SCALP"}.get(e["strat"], "aucun")
+            etat_l = ("ferme" if statut == "ferme" else "perime" if statut == "perime" else "entree" if cle.get("trade") else
+                      "preparation" if (cle.get("ordre") or cle.get("prep") or e["strat"]) else "calme")
+        marches.append({"m": m, "etat": etat_l, "biais": {1: "haussier", -1: "baissier", 0: "indecis"}[sens],
+                        "ut": int(nb_ut), "seuil": MIN_ALIGN, "profil": profil})
     return {"v": 1, "maj": int(now), "bot": "@" + str(etat.get("bot") or "align_mtf_adel_bot"), "marches": marches}
 
 def _api_github(chemin, methode="GET", corps=None):
