@@ -198,7 +198,7 @@ class PageLive(unittest.TestCase):
         self.assertIn("ALIGN_TV_BRIDGE_PRET: ${{ steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == '1' && '1' || '0' }}", wf)
         self.assertNotIn("env.ALIGN_TV_BRIDGE_PRET", wf)
         final = wf.split("Bridge TradingView obligatoire — échec signalé", 1)[1]
-        self.assertIn("if: ${{ always() && steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET != '1' }}", final)
+        self.assertIn("if: ${{ always() && (steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET != '1' || steps.bridge_final.outcome != 'success') }}", final)
         self.assertIn("exit 1", final)
         self.assertIn('os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "1") == "1" and m in MARCHES', bot)
         self.assertIn('os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "1") == "1" and nom_marche in MARCHES', bot)
