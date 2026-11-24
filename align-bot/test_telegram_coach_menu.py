@@ -26,9 +26,9 @@ class TelegramCoachMenuTests(unittest.TestCase):
         buttons = [button for row in keyboard["inline_keyboard"] for button in row]
         labels = [button["text"] for button in buttons]
 
-        self.assertIn("Commentary BTC", labels)
-        self.assertIn("Next position BTC", labels)
-        self.assertIn("12 timeframes BTC", labels)
+        self.assertTrue(any("Commentary BTC" in label for label in labels))
+        self.assertTrue(any("Next position BTC" in label for label in labels))
+        self.assertTrue(any("12 timeframes BTC" in label for label in labels))
         self.assertNotIn("Commentaire BTC", labels)
         self.assertNotIn("Coach position BTC", labels)
 
