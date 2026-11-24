@@ -1170,6 +1170,7 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         self.assertIn("alignLiveScreenOwner", bande)
         self.assertIn("alignLiveScreenTabId", bande)
         self.assertIn("document.visibilityState !== 'visible'", bande)
+        self.assertIn("!prendreLeaseHeartbeat()", bande)
         self.assertIn("setTimeout(ecouter, 30000)", bande)
         self.assertIn("retry-after:", bande)
         self.assertIn("'Content-Type': 'text/plain; charset=utf-8'", bande)
