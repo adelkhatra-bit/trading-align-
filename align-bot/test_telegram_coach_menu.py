@@ -71,11 +71,19 @@ class TelegramCoachMenuTests(unittest.TestCase):
         activate.assert_any_call(etat, "101", "GOLD", notifier=False)
         commentary.assert_not_called()
         self.assertIn("101", etat["recherche_positions_active"])
+        self.assertEqual(etat["telegram_outbox"][0]["coach_prealert_markets"], ["GOLD"])
+        self.assertEqual(len(etat["telegram_outbox"]), 2)
+        self.assertEqual(etat["telegram_outbox"][1]["chat_id"], "202")
 
     def test_autostop_callback_removes_only_selected_market_and_its_chrono(self):
         etat = {
             "auto": {"BTC": ["101", "202"], "GOLD": ["101"]},
             "recherche_positions_active": ["101"],
+            "telegram_outbox": [
+                {"chat_id": "101", "coach_prealert_markets": ["BTC", "GOLD"], "text": "prealert both"},
+                {"chat_id": "101", "coach_prealert_markets": ["BTC"], "text": "prealert btc"},
+                {"chat_id": "202", "coach_prealert_markets": ["BTC"], "text": "other chat"},
+            ],
             "veille_cloture": {"BTC": {"101": {"multi": True}}, "GOLD": {"101": {"multi": True}}},
             "chrono": {"BTC": {"101": {"mid": 777}}, "GOLD": {"101": {"mid": 888}}},
             "BTC": {"trade": {"qui": {"101": {"fini": False}}}},
