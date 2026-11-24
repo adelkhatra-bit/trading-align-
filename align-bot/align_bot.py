@@ -4479,7 +4479,7 @@ def donnees_ia(m, r, cle):
         "unite_bloquante": tf,
         "heure_locale": datetime.datetime.fromtimestamp(close_ts, PARIS).strftime("%Y-%m-%d %H:%M:%S %Z"),
         "secondes_restantes": max(0, int(close_ts - time.time())),
-        "signification": "prochaine vérification à la clôture estimée, jamais une prévision d'entrée"
+        "signification": "prochaine vérification à la clôture estimée, pas une prévision d'entrée"
     }
     lp = lecons_pour(m)
     if lp:
