@@ -901,6 +901,8 @@
   let es;
   // v12.2.11 : le heartbeat passe par GM_xmlhttpRequest (hors de la page TradingView, sans CORS ni blocage réseau de la page).
   // Repli sur fetch si le gestionnaire de scripts ne fournit pas GM_xmlhttpRequest.
+  // v12.2.16 : état du script initialisé avant le premier heartbeat (évite la zone morte temporelle).
+  let vivant = true;
   let ecranRetryTimer = null;
   let ecranInFlight = false;
   let ecranRetryAttempt = 0;
@@ -1282,7 +1284,7 @@
     montrer(txt, false, 1, coul, true); coeurs(1, [emo]); lueur(0);   // pastille : en haut si le marché baisse, en bas s'il monte
     return true;
   }
-  let posDown = null, survolT = null, vivant = true;   // v7.7 : une ancienne bande arrêtée ne réagit plus aux clics (plus de pastilles en double)
+  let posDown = null, survolT = null;   // v7.7 : une ancienne bande arrêtée ne réagit plus aux clics (plus de pastilles en double)
   document.addEventListener('pointerdown', e => { posDown = { x: e.clientX, y: e.clientY, t: Date.now() }; }, { passive: true, capture: true });
   document.addEventListener('pointerup', e => { try { if (!vivant) return;
     if (!posDown || Math.hypot(e.clientX - posDown.x, e.clientY - posDown.y) > 8 || Date.now() - posDown.t > 700) return;   // un glisser n'est pas un clic
