@@ -12,14 +12,14 @@ class AlignFastHealthcheckWorkflowTests(unittest.TestCase):
     def setUpClass(cls):
         cls.source = WORKFLOW.read_text(encoding="utf-8")
         bridge_step = cls.source.split(
-            "      - name: Vérifier BTC + GOLD avec le contrat MTF canonique (12 UT)\\n",
+            "      - name: Vérifier BTC + GOLD avec le contrat MTF canonique (12 UT)\n",
             1,
         )[1]
         lines = bridge_step.splitlines()
         marker = "          python3 - <<'PY'"
         start = lines.index(marker) + 1
         end = lines.index("          PY", start)
-        cls.verifier = textwrap.dedent("\\n".join(lines[start:end]))
+        cls.verifier = textwrap.dedent("\n".join(lines[start:end]))
 
     def test_embedded_bridge_verifier_is_valid_python(self):
         compile(self.verifier, str(WORKFLOW) + ":bridge-verifier", "exec")
