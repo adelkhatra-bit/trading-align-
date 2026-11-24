@@ -102,6 +102,19 @@ class TelegramCoachMenuTests(unittest.TestCase):
         commentary.assert_not_called()
         self.assertIn("101", etat["recherche_positions_active"])
 
+    def test_search_positions_repairs_empty_market_preference(self):
+        etat = {"marches_par_chat": {"101": []}, "recherche_positions_active": []}
+        activated = []
+        with patch.object(ab, "inscrire_auto", side_effect=lambda state, cid, market, notifier=False: activated.append((cid, market))), \
+             patch.object(ab, "selectionner_marches_suivi", wraps=ab.selectionner_marches_suivi) as select:
+            marches = ab.demarrer_recherche_positions(etat, "101")
+
+        self.assertEqual(marches, ("BTC", "GOLD"))
+        self.assertEqual(set(activated), {("101", "BTC"), ("101", "GOLD")})
+        self.assertEqual(set(etat["marches_par_chat"]["101"]), {"BTC", "GOLD"})
+        select.assert_called_once_with(etat, "101", ("BTC", "GOLD"))
+        self.assertIn("101", etat["recherche_positions_active"])
+
     def test_autostop_callback_removes_only_selected_market_and_its_chrono(self):
         etat = {
             "auto": {"BTC": ["101", "202"], "GOLD": ["101"]},
