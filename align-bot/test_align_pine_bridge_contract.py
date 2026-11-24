@@ -7,7 +7,7 @@ BASELINE_GIT_BLOB_SHA = "578c0a1f58c03e658c42c91aeeca37e865e31e7c"  # v25 : anci
 SETTINGS_BLOCK = """// ═════════ BRIDGE ALIGN (optionnel, sans modification visuelle) ═════════
 grpBridge = "Bridge ALIGN (optionnel)"
 bridgeEnabled = input.bool(true, "Envoyer les snapshots au ROBOT V12", group=grpBridge)
-bridgeMarket = input.string("BTCUSD", "Marché ALIGN", options=["BTCUSD", "XAUUSD"], group=grpBridge)
+// Le marché du bridge est détecté depuis le ticker réel du graphique, jamais choisi manuellement.
 
 """
 EXPORT_MARKER = "// ═════════ BRIDGE ALIGN — export structuré du Pine v25 (sans toucher aux signaux/visuels) ═════════"
@@ -36,7 +36,10 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertEqual(git_blob, BASELINE_GIT_BLOB_SHA)
 
     def test_only_btc_and_gold_are_supported_for_signals_and_bridge(self):
-        self.assertIn('options=["BTCUSD", "XAUUSD"]', self.source)
+        self.assertNotIn('input.string("BTCUSD", "Marché ALIGN"', self.source)
+        self.assertIn('bridgeMarket = isBtc ? "BTCUSD" : isGold ? "XAUUSD" : "UNSUPPORTED"', self.source)
+        export_block = self.source.split(EXPORT_MARKER, 1)[1]
+        self.assertIn('bridgeMarket +', export_block)
         self.assertNotIn("NAS100", self.source)
         self.assertIn("isBtc = str.contains(tickerUpper, \"BTC\") or str.contains(tickerUpper, \"XBT\")", self.source)
         self.assertIn("isGold = str.contains(tickerUpper, \"XAU\") or str.contains(tickerUpper, \"GOLD\")", self.source)

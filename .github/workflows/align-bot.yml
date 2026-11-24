@@ -300,7 +300,7 @@ jobs:
               if not isinstance(payload, dict):
                   raise RuntimeError("ÉCHEC: réponse bridge JSON non-objet pour " + symbol)
               snapshots = payload.get("snapshots") if isinstance(payload.get("snapshots"), dict) else {}
-              required = ("M5", "M15", "H1", "H4", "D1", "W1")
+              required = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1")
               def get_tf(tf):
                   return snapshots.get(tf) or snapshots.get(tf.lower()) or {}
               stale = [tf for tf in required if get_tf(tf).get("fresh") is not True]

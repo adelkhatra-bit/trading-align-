@@ -144,7 +144,7 @@ def detail_bridge_invalide(payload):
     if not isinstance(payload, dict):
         return "réponse illisible"
     snaps = payload.get("snapshots") if isinstance(payload.get("snapshots"), dict) else {}
-    requis = ("M5", "M15", "H1", "H4", "D1", "W1")
+    requis = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1")
     morceaux = []
     if not snaps:
         morceaux.append("aucun snapshot reçu")

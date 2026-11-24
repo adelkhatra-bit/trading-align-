@@ -122,7 +122,8 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn('"planTimeframe":"M15"', payload)
 
     def test_market_scope_remains_btc_and_gold_only_in_indicator(self):
-        self.assertIn('options=["BTCUSD", "XAUUSD"]', self.pine)
+        self.assertIn('bridgeMarket = isBtc ? "BTCUSD" : isGold ? "XAUUSD" : "UNSUPPORTED"', self.pine)
+        self.assertNotIn('input.string("BTCUSD", "Marché ALIGN"', self.pine)
         self.assertNotIn("NAS100", self.pine)
 
 
