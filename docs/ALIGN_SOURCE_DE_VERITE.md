@@ -19,18 +19,26 @@ Si l'**identité du projet** est ambiguë (autre dépôt, autre branche de produ
 | Marchés actifs | BTC, GOLD (`BTCUSD`, `XAUUSD`) uniquement | NASDAQ retiré de l'analyse, des entrées, de la surveillance et du suivi des positions ; toute ancienne mémoire NASDAQ est archivée pour audit et jamais rejouée |
 | Bot Telegram | `@align_mtf_adel_bot` | — |
 | Bande live | `docs/live/align-bande-live.user.js` (Tampermonkey) | Copies locales anciennes (12.2.3, 12.2.4…) |
-| Bridge TradingView | `align-bot/align_tv_bridge.py`, port **4100** | Ports 3000 / 4000 / 5001 et l'ancien tunnel `server.js` |
+| Chaîne TradingView → ROBOT V12 | Worker `align-tv-mailbox` → `align_tv_mailbox_feeder.py` → un seul `align_tv_bridge.py` sur `127.0.0.1:4100` dans le runner GitHub Actions | Ne pas confondre Worker (boîte aux lettres), relais (transfert inchangé) et bridge (validation MTF unique) ; ports 3000 / 4000 / 5001 et ancien tunnel `server.js` exclus |
 
 ## 2. Chaîne de données (une seule)
 
 ```
-TradingView (indicateur v25, alerte « Any alert() function call »)
-  → bridge ROBOT V12 (align_tv_bridge.py, HTTPS dédié → 127.0.0.1:4100)
-  → align-bot.yml (lit /bridge/robot-v12/mtf avec ALIGN_TV_READ_TOKEN)
-  → align_bot.py (filtres news / R:R / risque)
-  → Telegram (@align_mtf_adel_bot) + live-data/live.json
+TradingView (Pine v25, alert « Any alert() function call »)
+  → Cloudflare Worker align-tv-mailbox (POST /ingest/tradingview)
+  → Durable Object : dernier snapshot par symbole (boîte aux lettres, sans validation MTF)
+  → align_tv_mailbox_feeder.py dans GitHub Actions (lecture de la boîte, transfert JSON inchangé)
+  → align_tv_bridge.py sur 127.0.0.1:4100 dans le même runner (validation MTF unique)
+  → align-bot.yml / align_bot.py (filtres news / R:R / risque)
+  → Telegram (@align_mtf_adel_bot) + publication live-data/live.json
   → bande live (texte, animations, voix)
 ```
+
+**Mode par défaut du workflow :** lorsque le secret `ALIGN_TV_API_URL` est absent et que `CLOUDFLARE_API_TOKEN` est configuré, TradingView envoie au Worker, puis le feeder du runner transfère les snapshots vers l'unique bridge local du même run. Le bridge `127.0.0.1:4100` est donc éphémère dans GitHub Actions ; aucun bridge permanent sur le poste ni tunnel public vers ce port n'est requis pour ce mode.
+
+**Mode externe alternatif :** si `ALIGN_TV_API_URL` et `ALIGN_TV_READ_TOKEN` sont fournis, le workflow utilise ce bridge HTTPS externe et ne démarre pas le couple Worker-feeder + bridge local. Ce mode remplace le chemin par défaut ; il ne s'y ajoute pas. Ne jamais faire passer un même snapshot dans deux bridges concurrents.
+
+Rôles distincts : le Worker stocke le dernier payload par marché sans valider les UT ; le feeder le transfère sans le réécrire ; seul `align_tv_bridge.py` applique le contrat MTF ROBOT V12. Ne pas utiliser le serveur historique du port 4000, les ports 3000 / 5001, ni l'ancien tunnel `server.js`.
 
 Règle : quand `ALIGN_REQUIRE_TV_BRIDGE=1`, **aucun repli** sur des niveaux calculés ailleurs.
 
