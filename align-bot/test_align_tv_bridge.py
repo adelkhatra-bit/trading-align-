@@ -89,7 +89,8 @@ def valid_payload(now_ms=BASE_MS, symbol="BTCUSD", timeframe="M1"):
 
 class BridgeStoreTests(unittest.TestCase):
     def setUp(self):
-        self.store = BridgeStore(INGEST, READ)
+        # Les tests historiques couvrent M1 ; la production utilise M15 par défaut.
+        self.store = BridgeStore(INGEST, READ, canonical_active_timeframe="M1")
 
     def test_pine_bridge_uses_latest_intrabar_clock_for_bar_timestamps(self):
         pine_path = Path(__file__).resolve().parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
@@ -277,12 +278,42 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertEqual(result["error"], "unsupported_active_timeframe")
 
-    def test_accepts_new_indicator_timeframes_m3_m10_m45(self):
+    def test_accepts_new_indicator_timeframes_m3_m10_m45_when_configured(self):
         for tf in ("M3", "M10", "M45"):
             with self.subTest(timeframe=tf):
-                status, result = self.store.ingest(valid_payload(timeframe=tf), INGEST, BASE_MS)
+                store = BridgeStore(INGEST, READ, canonical_active_timeframe=tf)
+                status, result = store.ingest(valid_payload(timeframe=tf), INGEST, BASE_MS)
                 self.assertEqual(status, 200, result)
                 self.assertTrue(result["accepted"])
+
+    def test_default_canonical_active_timeframe_is_m15_and_ignores_other_alerts(self):
+        store = BridgeStore(INGEST, READ)
+        self.assertEqual(store.canonical_active_timeframe, "M15")
+        status, accepted = store.ingest(valid_payload(timeframe="M15"), INGEST, BASE_MS)
+        self.assertEqual(status, 200, accepted)
+        self.assertTrue(accepted["accepted"])
+        status, ignored = store.ingest(
+            valid_payload(now_ms=BASE_MS + 1_000, timeframe="H1"),
+            INGEST,
+            BASE_MS + 1_000,
+        )
+        self.assertEqual(status, 202, ignored)
+        self.assertFalse(ignored["accepted"])
+        self.assertTrue(ignored["ignored"])
+        self.assertEqual(ignored["reason"], "noncanonical_active_timeframe")
+        self.assertEqual(ignored["canonicalActiveTimeframe"], "M15")
+        self.assertEqual(ignored["receivedActiveTimeframe"], "H1")
+        _, data = store.read("BTCUSD", BASE_MS + 2_000)
+        self.assertEqual(data["activeTimeframe"], "M15")
+        self.assertEqual(data["canonicalActiveTimeframe"], "M15")
+        self.assertEqual(data["snapshots"]["M15"]["price"], 100.0)
+
+    def test_canonical_active_timeframe_can_be_overridden_explicitly(self):
+        store = BridgeStore(INGEST, READ, canonical_active_timeframe="H1")
+        status, result = store.ingest(valid_payload(timeframe="H1"), INGEST, BASE_MS)
+        self.assertEqual(status, 200, result)
+        self.assertTrue(result["accepted"])
+        self.assertEqual(store.read("BTCUSD", BASE_MS)[1]["activeTimeframe"], "H1")
 
     def test_rejects_missing_required_timeframe_instead_of_fabricating_it(self):
         payload = valid_payload()
@@ -362,10 +393,10 @@ class BridgeStoreTests(unittest.TestCase):
 
     def test_active_snapshot_stays_fresh_between_two_tradingview_alerts(self):
         # Cas réel du 19/11 : TradingView n'alerte qu'une fois par minute, le relais relit toutes les 10 s.
-        # UT active M5 comme en production (alertes posées sur le graphique 5 min).
-        status, body = self.store.ingest(valid_payload(timeframe="M5"), INGEST, BASE_MS + 70_000)
+        store = BridgeStore(INGEST, READ, canonical_active_timeframe="M5")
+        status, body = store.ingest(valid_payload(timeframe="M5"), INGEST, BASE_MS + 70_000)
         self.assertEqual(status, 200, body)  # même message relayé 70 s après l'alerte : accepté
-        _, data = self.store.read("BTCUSD", BASE_MS + 70_000)
+        _, data = store.read("BTCUSD", BASE_MS + 70_000)
         self.assertTrue(data["activeTimeframeFresh"])
 
     def test_active_snapshot_expires_after_ninety_seconds(self):
@@ -629,7 +660,7 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertNotIn(READ, rendered)
 
     def test_http_ingest_and_authenticated_read_endpoints(self):
-        store = BridgeStore(INGEST, READ)
+        store = BridgeStore(INGEST, READ, canonical_active_timeframe="M1")
         server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(store))
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -658,7 +689,7 @@ class BridgeStoreTests(unittest.TestCase):
             thread.join(timeout=2)
 
     def test_http_ignores_existing_plain_text_pine_alerts(self):
-        store = BridgeStore(INGEST, READ)
+        store = BridgeStore(INGEST, READ, canonical_active_timeframe="M1")
         server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(store))
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
