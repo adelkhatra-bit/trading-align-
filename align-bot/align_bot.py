@@ -9748,16 +9748,19 @@ def construire_live(etat, derniers, now=None):
                 directions = [snapshots[tf].get("direction") for tf in tf_requis]
                 haussieres = sum(1 for direction in directions if direction == 1)
                 baissieres = sum(1 for direction in directions if direction == -1)
-                if haussieres >= MIN_ALIGN and haussieres > baissieres:
+                active_tf = str(bridge.get("activeTimeframe") or "").upper()
+                active = snapshots.get(active_tf) or {}
+                robot = active.get("robotV12") or {}
+                plan = plan_indicateur(r)
+                if plan and plan.get("available"):
+                    sens = int(plan["direction"])
+                    nb_ut = haussieres if sens == 1 else baissieres
+                elif haussieres >= MIN_ALIGN and haussieres > baissieres:
                     sens, nb_ut = 1, haussieres
                 elif baissieres >= MIN_ALIGN and baissieres > haussieres:
                     sens, nb_ut = -1, baissieres
                 else:
                     sens, nb_ut = 0, max(haussieres, baissieres)
-                active_tf = str(bridge.get("activeTimeframe") or "").upper()
-                active = snapshots.get(active_tf) or {}
-                robot = active.get("robotV12") or {}
-                plan = plan_indicateur(r)
                 strategie = str((plan or {}).get("strategy") or robot.get("strategy") or "").upper()
                 profil = {"SWING": "SWING", "DAY": "INTRADAY", "SCALPING": "SCALP"}.get(strategie, "aucun")
                 etat_l = ("ferme" if statut == "ferme" else "entree" if cle.get("trade") else
