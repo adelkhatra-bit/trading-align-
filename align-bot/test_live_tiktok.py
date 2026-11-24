@@ -1159,13 +1159,16 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
 
     def test_bande_version_12_2_14_voice_recovery_and_sync(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
-        self.assertIn("// @version      12.2.19", bande)
-        self.assertIn("const VERSION = '12.2.19';", bande)
+        self.assertIn("// @version      12.2.20", bande)
+        self.assertIn("const VERSION = '12.2.20';", bande)
         self.assertIn('let voixUtterance = null', bande)
         self.assertIn('voixUtterance = utterance;', bande)
         self.assertIn("setInterval(pingEcran, 25000)", bande)
         self.assertIn("__ALIGN_LIVE_SCREEN_OWNER_V1__", bande)
         self.assertIn("ECRAN_OWNER_TTL_MS = 45000", bande)
+        self.assertIn("data-align-live-screen-heartbeat", bande)
+        self.assertIn("data-align-live-screen-owner", bande)
+        self.assertIn("data-align-live-screen-tab-id", bande)
         self.assertIn("voiceschanged", bande)
         self.assertIn("voixEnAttente = item", bande)
         self.assertIn("bulle ? 'marche' : 'live'", bande)
