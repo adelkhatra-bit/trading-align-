@@ -36,7 +36,7 @@ class TradingViewBridgeGateTests(unittest.TestCase):
 
     def test_postrun_bridge_gate_rechecks_all_twelve_snapshots_and_compiles(self):
         section = WORKFLOW_SOURCE.split("name: Vérifier le bridge TradingView après le worker", 1)[1]
-        start = section.index("run: |\n") + len("run: |\\n")
+        start = section.index("run: |\n") + len("run: |\n")
         end = section.index("\n          PY", start)
         source = textwrap.dedent(section[start:end])
         compile(source, "<align-tv-bridge-postrun>", "exec")
