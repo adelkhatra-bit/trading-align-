@@ -32,6 +32,14 @@ class MailboxFeederTests(unittest.TestCase):
         self.assertTrue(res["BTCUSD"].startswith("rejected:"))
         self.assertFalse(self.store.read("BTCUSD", now_ms=BASE_MS)[1]["ok"])
 
+    def test_missing_mtf_timeframe_rejection_reports_tf_without_payload(self):
+        payload = valid_payload(BASE_MS, "BTCUSD")
+        payload["mtf"].pop("M5")
+        res = feeder.relay_once(lambda s: {"ok": True, "payload": payload},
+                                self._ingest, symbols=("BTCUSD",))
+        self.assertEqual(res["BTCUSD"], "rejected:missing_mtf_timeframe:tf=M5")
+        self.assertNotIn("payload", res["BTCUSD"])
+
     def test_mailbox_network_error_retries_then_recovers_without_fake_payload(self):
         calls = []
         sleeps = []
