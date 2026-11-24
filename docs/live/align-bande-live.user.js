@@ -962,16 +962,16 @@
   }
   function delaiRetryNtfy(entetes) {
     const h = String(entetes || '');
-    let m = h.match(/^retry-after:\\s*(\\d+)/im);
+    let m = h.match(/^retry-after:\s*(\d+)/im);
     if (m) return Math.min(Number(m[1]) * 1000, 86400000);
-    m = h.match(/^ratelimit:\\s*.*?;\\s*t=(\\d+)/im);
+    m = h.match(/^ratelimit:\s*.*?;\s*t=(\d+)/im);
     if (m) return Math.min(Number(m[1]) * 1000, 86400000);
     return 0;
   }
   function quotaNtfy(entetes) {
     const h = String(entetes || '');
-    const p = h.match(/^ratelimit-policy:\\s*.*?q=(\\d+)/im);
-    const r = h.match(/^ratelimit:\\s*.*?r=(\\d+)/im);
+    const p = h.match(/^ratelimit-policy:\s*.*?q=(\d+)/im);
+    const r = h.match(/^ratelimit:\s*.*?r=(\d+)/im);
     return p && r ? (r[1] + '/' + p[1]) : '';
   }
   function envoyerEcran(corps, ok, ko) {
