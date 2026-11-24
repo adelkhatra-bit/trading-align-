@@ -616,8 +616,10 @@ jobs:
           PY
 
       - name: Archiver le journal du relais TradingView (diagnostic sans payload)
-        # N'archive que la copie sanitisee, jamais align_bridge.log ni les URLs de token.
-        if: always()
+        # Le job peut déjà être terminé quand GitHub évalue toujours() pendant le post-job.
+        # L'upload d'artefact dans cette phase retourne alors 403 job completed ; le log reste
+        # disponible dans la sortie du job et l'absence d'archive ne doit pas polluer le worker.
+        if: ${{ always() && !cancelled() && job.status != 'completed' }}
         uses: actions/upload-artifact@v4
         with:
           name: align-tv-relay-log-${{ github.run_id }}
