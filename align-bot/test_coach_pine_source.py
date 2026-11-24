@@ -113,5 +113,85 @@ class CoachPineSourceTests(unittest.TestCase):
         self.assertIn("spot TradingView", data["estimation_approche_entree"]["raison"])
 
 
+    def test_live_countdown_uses_pine_plan_and_refuses_local_order_when_plan_missing(self):
+        r = self.base_market()
+        r["require_tv_bridge"] = True
+        cle = {"ordre": {"e": 999.0, "za": 998.0, "zb": 1000.0}}
+        with patch.object(ab, "plan_indicateur", return_value={"available": False, "reason": "plan Pine absent"}), \
+             patch.object(ab.time, "time", return_value=1000.0), \
+             patch.object(ab, "prochaine_cloture_bougie", return_value=1300.0):
+            text = ab.chrono_txt("BTC", r, cle, 900.0)
+
+        self.assertIn("aucun plan Pine v25 frais", text)
+        self.assertIn("aucune zone Entry/SL/TP", text)
+        self.assertNotIn("998", text)
+        self.assertNotIn("999", text)
+        self.assertIn("prochaine réévaluation", text)
+
+    def test_live_countdown_uses_pine_entry_timeframe_and_zone_guard(self):
+        r = self.base_market()
+        r["require_tv_bridge"] = True
+        plan = {
+            "available": True, "price": 107.0, "entry": 105.0, "sl": 95.0,
+            "tp1": 115.0, "tp2": 120.0, "zone_low": 104.0, "zone_high": 106.0,
+            "strategy": "DAY", "direction": 1, "entry_timeframe": "M5",
+            "triggered": True, "price_in_zone": False,
+        }
+        seen = []
+        def next_close(_r, tf, _now):
+            seen.append(tf)
+            return 1300.0
+        with patch.object(ab, "plan_indicateur", return_value=plan), \
+             patch.object(ab.time, "time", return_value=1000.0), \
+             patch.object(ab, "prochaine_cloture_bougie", side_effect=next_close):
+            text = ab.chrono_txt("BTC", r, {}, 900.0)
+
+        self.assertIn("prix hors zone", text)
+        self.assertIn("104", text)
+        self.assertIn("106", text)
+        self.assertIn("Entry", text)
+        self.assertEqual(seen, ["5m"])
+
+    def test_auto_coach_activation_never_displays_local_levels_in_bridge_mode(self):
+        r = self.base_market()
+        r["require_tv_bridge"] = True
+        state = {"BTC": {"ordre": {"e": 999.0, "za": 998.0, "zb": 1000.0, "sl": 900.0, "tp1": 1100.0, "tp2": 1200.0}}}
+        with patch.dict(ab.DERNIERS, {"BTC": r}, clear=True), \
+             patch.object(ab, "plan_indicateur", return_value={"available": False, "reason": "plan Pine absent"}), \
+             patch.object(ab, "_envoi_sur") as send, \
+             patch.object(ab, "armer_clotures_multi"), \
+             patch.object(ab, "lancer_chrono"):
+            ab.inscrire_auto(state, "chat-test", "BTC")
+
+        message = send.call_args.kwargs["text"]
+        self.assertIn("aucun sens Pine v25 frais", message)
+        self.assertIn("aucune zone Entry/SL/TP", message)
+        self.assertNotIn("999", message)
+        self.assertNotIn("998", message)
+        self.assertIn("12 unités", message)
+
+    def test_auto_coach_activation_displays_only_pine_entry_levels(self):
+        r = self.base_market()
+        r["require_tv_bridge"] = True
+        state = {"BTC": {"ordre": {"e": 999.0, "za": 998.0, "zb": 1000.0, "sl": 900.0, "tp1": 1100.0, "tp2": 1200.0}}}
+        plan = {
+            "available": True, "price": 101.0, "entry": 105.0, "sl": 95.0,
+            "tp1": 115.0, "tp2": 120.0, "zone_low": 104.0, "zone_high": 106.0,
+            "strategy": "DAY", "direction": 1, "triggered": False, "price_in_zone": False,
+        }
+        with patch.dict(ab.DERNIERS, {"BTC": r}, clear=True), \
+             patch.object(ab, "plan_indicateur", return_value=plan), \
+             patch.object(ab, "_envoi_sur") as send, \
+             patch.object(ab, "armer_clotures_multi"), \
+             patch.object(ab, "lancer_chrono"):
+            ab.inscrire_auto(state, "chat-test", "BTC")
+
+        message = send.call_args.kwargs["text"]
+        self.assertIn("Direction Pine v25 : LONG", message)
+        self.assertIn("Entry", message)
+        self.assertNotIn("999", message)
+        self.assertNotIn("900", message)
+
+
 if __name__ == "__main__":
     unittest.main()
