@@ -4651,7 +4651,7 @@ def texte_timeframes(m, r, anglais=False):
         snap = snapshots.get(tf)
         if not isinstance(snap, dict) or not snap:
             status = "snapshot missing" if anglais else "snapshot absent"
-            lignes.append(f"⏳ {label}: {status}")
+            lignes.append(f"⏳ {label}: {status}" if anglais else f"⏳ {label} : {status}")
             continue
         if snap.get("fresh") is not True:
             status = "stale — wait for a new snapshot" if anglais else "périmé — attendre un nouveau snapshot"
