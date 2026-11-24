@@ -63,50 +63,170 @@ jobs:
           ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
         run: python3 ai_healthcheck.py
 
-      - name: Test bridge TradingView ROBOT V12 BTC + GOLD
+      - name: Démarrer le bridge canonique + relais mailbox (même routage que le BOT)
+        # Si un bridge externe est réellement configuré pour le BOT, on réutilise cette URL.
+        # Sinon, on démarre le même bridge Python éphémère sur 4100 et le même relais Cloudflare
+        # que align-bot.yml. Le serveur Node historique / port 4000 n'est jamais appelé ici.
         env:
-          ALIGN_TV_API_URL: ${{ secrets.ALIGN_TV_API_URL }}
-          ALIGN_TV_READ_TOKEN: ${{ secrets.ALIGN_TV_READ_TOKEN }}
+          ALIGN_TV_API_URL_SECRET: ${{ secrets.ALIGN_TV_API_URL }}
+          ALIGN_TV_READ_TOKEN_SECRET: ${{ secrets.ALIGN_TV_READ_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -n "$ALIGN_TV_API_URL_SECRET" ]; then
+            if [ -z "$ALIGN_TV_READ_TOKEN_SECRET" ]; then
+              echo "::error::ALIGN_TV_READ_TOKEN absent alors qu'un bridge externe est configuré."
+              exit 1
+            fi
+            echo "::add-mask::$ALIGN_TV_READ_TOKEN_SECRET"
+            {
+              echo "ALIGN_TV_API_URL=$ALIGN_TV_API_URL_SECRET"
+              echo "ALIGN_TV_READ_TOKEN=$ALIGN_TV_READ_TOKEN_SECRET"
+              echo "ALIGN_FAST_BRIDGE_MODE=external"
+            } >> "$GITHUB_ENV"
+            echo "BRIDGE_MODE=external-configured (URL/jeton masqués)"
+            exit 0
+          fi
+
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Aucun bridge externe et CLOUDFLARE_API_TOKEN absent; chemin canonique impossible."
+            exit 1
+          fi
+
+          ING=$(python3 -c "import secrets; print(secrets.token_urlsafe(48))")
+          LEC=$(python3 -c "import secrets; print(secrets.token_urlsafe(48))")
+          echo "::add-mask::$ING"
+          echo "::add-mask::$LEC"
+          {
+            echo "ALIGN_TV_API_URL=http://127.0.0.1:4100"
+            echo "ALIGN_TV_READ_TOKEN=$LEC"
+            echo "ALIGN_FAST_BRIDGE_MODE=runner-mailbox"
+          } >> "$GITHUB_ENV"
+
+          ALIGN_TV_INGEST_TOKEN="$ING" ALIGN_TV_READ_TOKEN="$LEC" nohup python3 align_tv_bridge.py > "$RUNNER_TEMP/align_bridge.log" 2>&1 &
+          for _ in $(seq 1 20); do
+            grep -q ALIGN_TV_BRIDGE_READY "$RUNNER_TEMP/align_bridge.log" && break
+            sleep 0.5
+          done
+          if ! grep -q ALIGN_TV_BRIDGE_READY "$RUNNER_TEMP/align_bridge.log"; then
+            echo "::error::Bridge Python canonique non démarré."
+            cat "$RUNNER_TEMP/align_bridge.log"
+            exit 1
+          fi
+
+          ALIGN_TV_INGEST_TOKEN="$ING" nohup python3 align_tv_mailbox_feeder.py > "$RUNNER_TEMP/align_relais.log" 2>&1 &
+          sleep 12
+          echo "BRIDGE_MODE=runner-mailbox (127.0.0.1:4100)"
+          tail -n 1 "$RUNNER_TEMP/align_relais.log" || true
+
+      - name: Vérifier BTC + GOLD avec le contrat MTF canonique (12 UT)
+        env:
+          ALIGN_TV_API_URL: ${{ env.ALIGN_TV_API_URL }}
+          ALIGN_TV_READ_TOKEN: ${{ env.ALIGN_TV_READ_TOKEN }}
+          ALIGN_FAST_BRIDGE_MODE: ${{ env.ALIGN_FAST_BRIDGE_MODE }}
         run: |
           python3 - <<'PY'
-          import json, math, os, time, urllib.parse, urllib.request
+          import json, math, os, time, urllib.error, urllib.parse, urllib.request
+          import align_bot
+          from align_tv_bridge import REQUIRED_TIMEFRAMES
+
           base = os.environ.get("ALIGN_TV_API_URL", "").strip().rstrip("/")
           token = os.environ.get("ALIGN_TV_READ_TOKEN", "").strip()
           if not base or not token:
-              raise SystemExit("FAIL: secrets bridge absents")
-          required = ("M5","M15","H1","H4","D1","W1")
-          allowed = {"M1","M5","M15","M30","H1","H2","H4","D1","W1"}
-          for symbol, label in (("BTCUSD","BTC"),("XAUUSD","GOLD")):
+              raise SystemExit("FAIL: endpoint bridge canonique non configuré")
+
+          # Le bridge transporte 12 UT. Le timeframe actif du graphique reste limité
+          # aux 9 unités acceptées par le BOT; M3/M10/M45 sont néanmoins obligatoires dans mtf.
+          allowed_active = {"M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"}
+          symbols = align_bot.symboles_bridge_obligatoires(time.time())
+          if not symbols:
+              raise SystemExit("FAIL: aucun marché obligatoire retourné par le BOT")
+
+          def verifier_symbol(symbol):
               url = base + "/bridge/robot-v12/mtf?symbol=" + urllib.parse.quote(symbol)
-              req = urllib.request.Request(url, headers={"Authorization":"Bearer "+token,"User-Agent":"ALIGN-fast-healthcheck"})
+              req = urllib.request.Request(
+                  url,
+                  headers={
+                      "Authorization": "Bearer " + token,
+                      "User-Agent": "ALIGN-fast-healthcheck",
+                  },
+              )
               with urllib.request.urlopen(req, timeout=12) as response:
-                  p = json.loads(response.read().decode())
-              snaps = p.get("snapshots") if isinstance(p.get("snapshots"),dict) else {}
-              stale = [tf for tf in required if (snaps.get(tf) or snaps.get(tf.lower()) or {}).get("fresh") is not True]
-              active = str(p.get("activeTimeframe") or "").upper()
-              snap = snaps.get(active) or snaps.get(active.lower()) or {}
-              robot = snap.get("robotV12") or {}
-              timestamp = snap.get("updatedAt")
+                  payload = json.loads(response.read().decode("utf-8"))
+              if not isinstance(payload, dict):
+                  raise RuntimeError("réponse bridge non-objet")
+
+              snapshots = payload.get("snapshots") if isinstance(payload.get("snapshots"), dict) else {}
+              active = str(payload.get("activeTimeframe") or "").upper()
+              missing_or_stale = [
+                  tf for tf in REQUIRED_TIMEFRAMES
+                  if not isinstance(snapshots.get(tf), dict)
+                  or snapshots[tf].get("fresh") is not True
+              ]
+              rejection = payload.get("lastRejection") if isinstance(payload.get("lastRejection"), dict) else {}
+              rejection_name = str(rejection.get("error") or "none")
+
+              if payload.get("ok") is not True or missing_or_stale:
+                  raise RuntimeError(
+                      "bridge invalide; missing_or_stale="
+                      + (",".join(missing_or_stale) or "none")
+                      + "; last_rejection=" + rejection_name
+                      + "; received=" + ",".join(str(x) for x in payload.get("receivedTimeframes", []))
+                  )
+              if payload.get("activeTimeframeFresh") is not True or active not in allowed_active:
+                  raise RuntimeError("aucun timeframe actif BOT autorisé et frais: " + (active or "none"))
+
+              snap = snapshots.get(active) or {}
               price = snap.get("price")
+              updated_at = snap.get("updatedAt")
               try:
-                  ts = float(timestamp)
-                  if ts < 100000000000: ts *= 1000
-                  age = time.time()*1000-ts
-                  price_ok = math.isfinite(float(price)) and float(price)>0 and 0<=age<=90000
-              except (TypeError,ValueError):
-                  price_ok = False
-                  age = -1
-              ok = (p.get("ok") is True and p.get("activeTimeframeFresh") is True
-                    and active in allowed and snap.get("fresh") is True
-                    and isinstance(robot,dict) and bool(robot)
-                    and any(robot.get(k) not in (None,"") for k in ("lecture_1m","lecture_5m","lecture_15m","lecture_60m"))
-                    and not stale and price_ok)
-              print(f"BRIDGE {label} ok={ok} active_tf={active or 'NONE'} age_ms={int(age) if age>=0 else 'INVALID'} stale_tf={','.join(stale) or 'none'}")
-              if not ok:
-                  raise SystemExit("FAIL: bridge MTF incomplet/périmé pour "+label)
+                  price = float(price)
+                  updated_ms = float(updated_at)
+                  if updated_ms < 100000000000:
+                      updated_ms *= 1000
+                  age_ms = time.time() * 1000 - updated_ms
+              except (TypeError, ValueError, OverflowError):
+                  raise RuntimeError("prix ou horodatage TradingView absent/invalide")
+              if not math.isfinite(price) or price <= 0 or not math.isfinite(age_ms) or not 0 <= age_ms <= 90000:
+                  raise RuntimeError("prix TradingView absent, invalide ou périmé")
+
+              robot = snap.get("robotV12") or {}
+              if snap.get("fresh") is not True or not isinstance(robot, dict) or not robot:
+                  raise RuntimeError("snapshot actif frais ou données ROBOT V12 absents")
+              directions = [robot.get(k) for k in ("lecture_1m", "lecture_5m", "lecture_15m", "lecture_60m")]
+              if not any(value not in (None, "") for value in directions):
+                  raise RuntimeError("lectures ROBOT V12 absentes")
+
+              print(
+                  "BRIDGE_CONFIRMED"
+                  + " symbol=" + symbol
+                  + " active=" + active
+                  + " age_ms=" + str(int(age_ms))
+                  + " received=" + ",".join(str(x) for x in payload.get("receivedTimeframes", []))
+                  + " required_fresh=" + ",".join(REQUIRED_TIMEFRAMES)
+                  + " fresh_snapshot=true robot_v12=true"
+              )
+
+          deadline = time.monotonic() + 120
+          for symbol in symbols:
+              while True:
+                  try:
+                      verifier_symbol(symbol)
+                      break
+                  except urllib.error.HTTPError as exc:
+                      if exc.code in (401, 403, 404):
+                          raise SystemExit("FAIL: accès bridge refusé (HTTP " + str(exc.code) + ")")
+                      reason = "HTTP " + str(exc.code)
+                  except Exception as exc:
+                      reason = str(exc).replace("\n", " ")[:400] or type(exc).__name__
+                  remaining = deadline - time.monotonic()
+                  if remaining <= 0:
+                      raise SystemExit("FAIL: bridge canonique non prêt pour " + symbol + "; " + reason)
+                  print("BRIDGE_WAIT symbol=" + symbol + " remaining_sec=" + str(int(remaining)) + " reason=" + reason, flush=True)
+                  time.sleep(min(10.0, remaining))
           PY
 
       - name: Résumé santé
         if: always()
         run: |
-          echo "Ce check ne démarre pas le poller Telegram, ne modifie pas state.json et n'envoie aucun message." >> "$GITHUB_STEP_SUMMARY"
+          echo "Ce check utilise le même bridge que le BOT (route externe canonique si configurée, sinon mailbox Cloudflare + bridge runner 4100)." >> "$GITHUB_STEP_SUMMARY"
+          echo "Il lit les snapshots uniquement, ne démarre pas le poller Telegram, ne modifie pas state.json et n'envoie aucun message." >> "$GITHUB_STEP_SUMMARY"
