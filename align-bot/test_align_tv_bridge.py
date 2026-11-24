@@ -216,6 +216,36 @@ class BridgeStoreTests(unittest.TestCase):
                       "entryZoneHigh", "entryDecision", "entryBarTime"):
             self.assertIsNone(robot[field], field)
 
+    def test_missing_entry_trigger_candle_downgrades_to_wait_and_keeps_fresh_mtf(self):
+        fields = ("entryBarTime", "entryBarOpen", "entryBarHigh", "entryBarLow", "entryBarClose")
+        for missing_field in fields:
+            with self.subTest(missing_field=missing_field):
+                payload = valid_payload()
+                payload[missing_field] = None
+                status, result = self.store.ingest(payload, INGEST, BASE_MS)
+                self.assertEqual(status, 200, result)
+                self.assertTrue(result["accepted"])
+                self.assertEqual(
+                    result["diagnosticRejection"]["error"],
+                    "missing_entry_trigger_candle",
+                )
+
+                status, data = self.store.read("BTCUSD", BASE_MS + 1_000)
+                self.assertEqual(status, 200)
+                self.assertTrue(data["ok"])
+                self.assertTrue(data["activeTimeframeFresh"])
+                self.assertEqual(
+                    data["lastRejection"]["error"],
+                    "missing_entry_trigger_candle",
+                )
+                robot = data["snapshots"]["M1"]["robotV12"]
+                self.assertEqual(robot["signal"], "WAIT")
+                self.assertFalse(robot["confirmed"])
+                self.assertFalse(robot["entryTriggered"])
+                for field in ("entry", "sl", "tp", "tp1", "tp2", "entryZoneLow",
+                              "entryZoneHigh", "entryDecision", "entryBarTime"):
+                    self.assertIsNone(robot[field], field)
+
     def test_stale_entry_trigger_rejection_emits_diagnostic_line(self):
         payload = valid_payload()
         payload["entryBarTime"] = BASE_MS - 2 * TIMEFRAME_MS["M5"] - ENTRY_BAR_GRACE_MS - 1
