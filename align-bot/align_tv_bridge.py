@@ -242,9 +242,16 @@ def _safe_robot(payload, price, received_at_ms):
 class BridgeStore:
     """Thread-safe in-memory snapshots; restarts intentionally clear stale state."""
 
-    def __init__(self, ingest_token: str, read_token: str):
+    def __init__(self, ingest_token: str, read_token: str, canonical_active_timeframe: str | None = None):
         self.ingest_token = ingest_token
         self.read_token = read_token
+        canonical_tf = _text(
+            canonical_active_timeframe or os.getenv("ALIGN_TV_CANONICAL_ACTIVE_TF") or "M15",
+            8,
+        ).upper()
+        if canonical_tf not in ACTIVE_TIMEFRAMES:
+            raise ValueError("unsupported_canonical_active_timeframe")
+        self.canonical_active_timeframe = canonical_tf
         self._lock = threading.RLock()
         self._symbols = {}
         self._rejections = {}
@@ -282,6 +289,15 @@ class BridgeStore:
             return 400, {"ok": False, "error": "unsupported_active_timeframe"}
         if not tickerid_matches_symbol(symbol, payload.get("tickerid")):
             return 400, {"ok": False, "error": "symbol_tickerid_mismatch", "symbol": symbol}
+        if timeframe != self.canonical_active_timeframe:
+            return 202, {
+                "ok": True,
+                "accepted": False,
+                "ignored": True,
+                "reason": "noncanonical_active_timeframe",
+                "canonicalActiveTimeframe": self.canonical_active_timeframe,
+                "receivedActiveTimeframe": timeframe,
+            }
 
         price = _finite_number(payload.get("price"))
         source_timestamp = _epoch_ms(payload.get("timestamp"))
@@ -483,6 +499,7 @@ class BridgeStore:
             "accepted": True,
             "symbol": symbol,
             "activeTimeframe": timeframe,
+            "canonicalActiveTimeframe": self.canonical_active_timeframe,
             "receivedTimeframes": list(snapshots.keys()),
         }
         if entry_trigger_rejection is not None:
@@ -505,6 +522,7 @@ class BridgeStore:
                     "lastRejection": last_rejection,
                     "symbol": symbol,
                     "activeTimeframe": None,
+                    "canonicalActiveTimeframe": self.canonical_active_timeframe,
                     "activeTimeframeFresh": False,
                     "activeTimeframeAgeMs": None,
                     "receivedTimeframes": [],
@@ -529,6 +547,7 @@ class BridgeStore:
             "lastRejection": last_rejection,
             "symbol": symbol,
             "activeTimeframe": active_tf,
+            "canonicalActiveTimeframe": self.canonical_active_timeframe,
             "activeTimeframeFresh": active_fresh,
             "activeTimeframeAgeMs": max(0, active_age),
             "receivedTimeframes": list(snapshots.keys()),
