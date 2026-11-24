@@ -6717,6 +6717,10 @@ def demarrer_recherche_positions(etat, cid):
     """Démarre le vrai coach de position Pine sur les marchés choisis, jusqu'à arrêt manuel."""
     cid = str(cid)
     marches = tuple(sorted(marches_choisis(etat, cid)))
+    # Un nouvel abonné reste en attente tant que sa sélection n'a pas été validée.
+    # Ne jamais convertir son absence d'opt-in en abonnement automatique BTC + GOLD.
+    if cid in {str(x) for x in etat.get("coach_pending", [])}:
+        return ()
     # Une préférence vide est un état invalide (la sélection normale impose au moins un marché).
     # Réparer les anciennes mémoires en réactivant BTC + GOLD plutôt que d'enregistrer
     # une recherche « active » qui ne suit en réalité aucun marché.
@@ -7791,15 +7795,19 @@ def traiter(etat, chats, updates):
                     pass
                 continue
             if choix == "searchpos" and mk == "BOTH":
+                marches_recherche = demarrer_recherche_positions(etat, qui)
+                if not marches_recherche:
+                    try:
+                        telegram("answerCallbackQuery", callback_query_id=cb["id"], text="Choisis tes marchés et valide-les d'abord")
+                    except Exception:
+                        pass
+                    _envoi_sur(qui, text="📡 Choisis d'abord les marchés à surveiller et valide ta sélection avant de lancer la recherche.")
+                    menu_marches(etat, qui)
+                    continue
                 try:
                     telegram("answerCallbackQuery", callback_query_id=cb["id"], text="🎯 Recherche activée")
                 except Exception:
                     pass
-                marches_recherche = demarrer_recherche_positions(etat, qui)
-                if not marches_recherche:
-                    _envoi_sur(qui, text="📡 Choisis d'abord les marchés à surveiller pour chercher une position.")
-                    menu_marches(etat, qui)
-                    continue
                 noms = " + ".join(marches_recherche)
                 deja_ouverts = [m for m in marches_recherche if (etat.get(m) or {}).get("trade")]
                 precision_retard = (f"\n⚠️ Position déjà en cours sur {', '.join(deja_ouverts)} : je ne te ferai pas entrer en retard. Je cherche la prochaine entrée."
