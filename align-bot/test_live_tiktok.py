@@ -134,7 +134,7 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("animationsActives = valeur === 'on'", bande)
         self.assertIn("localStorage.setItem('alignAnimationsEnabled'", bande)
         self.assertIn("appliquerAnimations()", bande)
-        self.assertIn("const voixBtn", bande)
+        self.assertIn("const voixLangueBtn", bande)
         self.assertIn("const animationsBtn", bande)
 
     def test_reinjection_arrete_tous_les_animateurs_periodiques(self):
