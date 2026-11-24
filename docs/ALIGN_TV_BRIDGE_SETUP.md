@@ -1,83 +1,88 @@
-# ALIGN canonical Pine v25 → ROBOT V12 bridge
+# ALIGN v25 → ROBOT V12 — canonical bridge routing
 
-## Scope
+## Purpose and protected scope
 
-This bridge connects the **canonical production indicator** `align-bot/pine/ALIGN_MTF_PRO_v25.pine` (`ALIGN MTF PRO v25 (Inside)`) to the existing ALIGN MTF BOT preflight contract.
+The production Pine source is `align-bot/pine/ALIGN_MTF_PRO_v25.pine` (`ALIGN MTF PRO v25 (Inside)`). Its bridge export sends one JSON snapshot containing the active chart timeframe, price, current plan and independent MTF readings. It does not place or authorize broker orders.
 
-The only Pine changes are two isolated bridge blocks:
-- a settings group with snapshot export enabled by default;
-- a structured JSON export appended after the existing script.
+The Pine title, calculations, Entry/SL/TP1/TP2 plan, animation setting, chart drawings, table and existing human-readable alerts are preserved. The bridge is a data-ingestion path only; it never sends broker orders.
 
-The export only sends snapshots when the user creates an active TradingView alert using **Any alert() function call** and the dedicated bridge webhook. It does not place or authorize broker orders.
+This guide distinguishes the **default Cloudflare mailbox path** from the **optional external bridge path**. They are alternatives. Do not configure both as competing webhook routes for the same market.
 
-The canonical indicator's existing source is protected by a regression test: after removing those two bridge blocks, its Git blob SHA must remain exactly `823635f039ff3b59c39867a7b59dfa3ed6fafaf1`. The title, short title, signal calculations, Entry/SL/TP1/TP2 logic, animation setting, chart drawings, table and existing human-readable alerts remain unchanged. No second indicator is introduced.
+## Canonical production path — Cloudflare mailbox → runner bridge
 
-This service is isolated from the legacy `server.js`/port 4000 and from the `tradingview-analyzer` extension. Do not reuse the old project, its ports, or its Cloudflare tunnel.
+This is the path used by the standard `.github/workflows/align-bot.yml` run when the GitHub Actions secret `ALIGN_TV_API_URL` is not set and `CLOUDFLARE_API_TOKEN` is available.
 
-## Data flow
+1. **TradingView alert → Cloudflare Worker.** Create one alert for BTC and one for GOLD. Each alert posts to:
 
-1. Two TradingView charts/alerts are configured: BTC and GOLD only. NASDAQ is not an accepted ALIGN market.
-2. In the canonical v25 indicator settings, verify **Envoyer les snapshots au ROBOT V12** is enabled (it is enabled by default) and select exactly one supported market: `BTCUSD` or `XAUUSD`.
-3. Create or recreate an alert with condition **Any alert() function call**. While the chart is receiving real-time updates, the bridge export sends a JSON snapshot every 20 seconds. Existing human-readable Pine alerts remain unchanged; the bridge ignores non-JSON alert messages.
-4. The payload contains the active chart timeframe, actual TradingView price, the indicator's current Entry/SL/TP1/TP2 plan, confirmation state, and independent MTF direction/RSI/bar-time data for M1, M5, M15, M30, H1, H2, H4, D1 and W1.
-5. The dedicated bridge validates the source, symbol, active timeframe, source timestamp, each timeframe's own candle timestamp, the fixed M15 plan, the green entry zone and its decision line, plus the strategy-specific closed trigger candle. It never places orders.
-6. The trigger timeframe is independent of the chart timeframe: SCALPING = M1, DAY = M5, SWING = H1. The plan levels remain anchored to the last closed M15 calculation.
-7. The bridge accepts an entry trigger only when the strategy candle is recent and closed, its range retests the green zone, and its close is beyond the decision line in the plan direction while remaining on the safe side of the stop. Repeated 20-second webhook payloads for the same trigger candle retain the same `entryBarTime` and cannot authorize duplicate entries.
-8. When `ALIGN_REQUIRE_TV_BRIDGE=1` (the default for production markets), ROBOT V12 does not fall back to the local Python-generated entry levels. It uses the Pine M15 Entry/SL/TP1/TP2 only after the validated trigger. Existing open-trade follow-up remains unchanged; no broker order is sent by the bridge.
-9. The bot's existing news pause, Daily/Weekly extreme, risk/reward and risk-memory filters remain mandatory vetoes. These checks can block a Pine signal but do not rewrite its price levels.
-10. GitHub Actions reads `GET /bridge/robot-v12/mtf?symbol=...` using `ALIGN_TV_READ_TOKEN`. It blocks the bot if the active price or required M5/M15/H1/H4/D1/W1 snapshots are missing or stale.
-11. The existing bot displays the indicator plan in Telegram separately from its own safety verdict. Once the existing bot run completes successfully, its publisher updates `live-data/live.json`; the ALIGN live band continues to read that file. The live band/userscript keeps its established animations and design; market labels and prompts expose BTC and GOLD only.
+   `https://align-tv-mailbox.adel-khatra.workers.dev/ingest/tradingview`
 
-## Local service
+   The Worker accepts this route from TradingView's allow-listed source IPs. No ingress token is appended to this URL in the standard mailbox mode.
 
-- Default listener: `127.0.0.1:4100`.
-- Do not use ports 3000, 4000 or 5001; do not stop or repurpose their existing services.
-- Python standard library only.
-- Snapshots are held in memory. A restart clears the cache; the bot stays blocked until fresh TradingView alerts repopulate it.
-- `/health` is a non-secret health check.
-- `POST /ingest/<ALIGN_TV_INGEST_TOKEN>` accepts TradingView payloads. The token is checked in constant time and request paths are never logged.
-- `GET /bridge/robot-v12/mtf?symbol=...` requires `Authorization: Bearer <ALIGN_TV_READ_TOKEN>`.
+2. **Worker mailbox.** `cloud/align-tv-mailbox/worker.js` checks the ALIGN source marker and the symbol/ticker match, then stores the latest payload in its Durable Object mailbox for that symbol. It is a mailbox, not the authoritative MTF validator.
 
-Generate two independent random tokens (32–128 URL-safe characters). They must be different. Never place either token in this repository, Pine source, logs or chat. The ingress token belongs only in the dedicated TradingView webhook URL and the bridge process environment. The read token belongs in the bridge process environment and the GitHub Actions secret `ALIGN_TV_READ_TOKEN`. Treat the full webhook URL as secret.
+3. **GitHub Actions runner.** The workflow creates per-run ingress/read tokens, starts exactly one `align_tv_bridge.py` listener on `127.0.0.1:4100`, then starts `align_tv_mailbox_feeder.py`. The feeder reads BTCUSD and XAUUSD from the Worker mailbox every 10 seconds and forwards the payload unchanged to that runner-local bridge.
 
-Start the service in a PowerShell session after setting the two environment variables in that session:
+4. **Single authoritative bridge validation.** `align_tv_bridge.py` validates the payload and maintains the in-memory snapshots for that workflow run. Its read endpoint is `GET /bridge/robot-v12/mtf?symbol=...`, protected by `ALIGN_TV_READ_TOKEN`. The listener is temporary on the GitHub Actions runner; it is not a permanent desktop service and does not need a public tunnel in this mode.
 
-```powershell
-$env:ALIGN_TV_INGEST_TOKEN = '<private ingress token>'
-$env:ALIGN_TV_READ_TOKEN = '<different private read token>'
-python .\align-bot\align_tv_bridge.py
-```
+5. **ROBOT V12 and Telegram.** `align_bot.py` reads the runner-local bridge endpoint. Missing, incomplete or stale TradingView data keeps entries fail-closed: the bot must not substitute local/fabricated prices or plans. Telegram connectivity does not override this signal gate.
 
-Expose the service only through a **dedicated HTTPS tunnel/hostname** forwarding to `http://127.0.0.1:4100`. Do not expose port 4100 directly to the internet and do not reuse an existing tunnel configuration. Tunnel creation, DNS and credentials are intentionally not performed by this code change.
+The feeder does not transform or repair snapshots, and the Worker does not replace the bridge validator. There is one validation point: `align_tv_bridge.py` in the runner.
 
-## TradingView configuration
+### Required GitHub Actions configuration for the default path
 
-For each supported market (BTC and GOLD):
+- `CLOUDFLARE_API_TOKEN`: required by the workflow to derive the mailbox read token and start the feeder.
+- `ALIGN_TV_API_URL`: leave unset to select this default Worker → runner path.
+- `ALIGN_TV_READ_TOKEN`: not required as a persistent repository secret for the default path; the workflow creates a per-run read token for its runner-local bridge.
+- The Worker must have its mailbox Durable Object binding and the expected Worker secrets configured. Never print or copy secrets into Pine, the repository, alert messages or chat.
 
-1. Add the canonical **ALIGN MTF PRO v25 (Inside)** indicator.
-2. Open its settings and expand **Bridge ALIGN (optionnel)**.
-3. Enable **Envoyer les snapshots au ROBOT V12**.
-4. Set **Marché ALIGN** to the matching symbol: `BTCUSD` or `XAUUSD`.
-5. Use an active chart timeframe supported by the bridge: M1, M5, M15, M30, H1, H2, H4, D1 or W1. The Pine retains its internal calculations for the other timeframes.
-6. Create one alert per market with condition **Any alert() function call** and webhook URL:
-   `https://<dedicated-https-host>/ingest/<ALIGN_TV_INGEST_TOKEN>`
+Do not install another permanent bridge on the desktop for this workflow. Do not point TradingView at `127.0.0.1`, a local port, the legacy port 4000, or an unrelated service.
 
-The MTF readings are included in the same payload; separate alerts for each timeframe are not required.
+## Optional alternative — a dedicated external bridge
 
-**Important — TradingView alert snapshots:** TradingView keeps a server-side copy of the script, its input values and chart context when an alert is created. After updating the Pine script or changing the bridge checkbox/market, delete the old alert and create a new one for that market. An old alert does not inherit the new Pine code or settings.
+Use this mode only when an independently operated HTTPS bridge already exists and is intentionally selected for production.
 
-## GitHub Actions secrets
+- Set GitHub Actions secrets `ALIGN_TV_API_URL` (the external bridge base URL) and `ALIGN_TV_READ_TOKEN` (the read token accepted by that bridge).
+- The workflow then skips starting the default Worker mailbox feeder and runner-local bridge, and reads the external service through `GET /bridge/robot-v12/mtf?symbol=...`.
+- TradingView must post to that external bridge's dedicated HTTPS ingress route, for example `https://<dedicated-host>/ingest/<private-ingress-token>`, using a separate ingress token. The external service must implement the same snapshot and read contracts as the canonical ALIGN bridge.
+- Keep the ingress token and read token separate. Never expose the read token in the TradingView webhook URL.
+- The external host/tunnel must be dedicated to this bridge. Do not reuse or repurpose another server or tunnel.
 
-Only after the dedicated HTTPS endpoint is running, set these repository Actions secrets:
+Choose one mode for the production bot. Setting `ALIGN_TV_API_URL` changes the workflow path; it is not an extra forwarding hop to be added on top of the default mailbox path.
 
-- `ALIGN_TV_API_URL`: base HTTPS hostname, without `/bridge/robot-v12/mtf` and without the ingress token.
-- `ALIGN_TV_READ_TOKEN`: the same read token configured in the bridge process.
+## TradingView configuration — BTC and GOLD only
 
-The existing workflow already checks these secrets and validates BTCUSD and XAUUSD, active price freshness (30 seconds), ROBOT V12 readings and required MTF freshness. No fallback to unrelated data sources is introduced.
+For each market, use the canonical **ALIGN MTF PRO v25 (Inside)** instance:
+
+1. Use a BTCUSD chart for BTC, or an XAUUSD chart for GOLD. The actual chart ticker and the indicator's **Marché ALIGN** input must represent the same market. Never set `XAUUSD` on a BTCUSD chart or `BTCUSD` on an XAUUSD chart.
+2. Enable **Envoyer les snapshots au ROBOT V12**.
+3. Set **Marché ALIGN** to `BTCUSD` or `XAUUSD`, matching that chart.
+4. Use a supported active chart timeframe: `M1`, `M3`, `M5`, `M10`, `M15`, `M30`, `M45`, `H1`, `H2`, `H4`, `D1` or `W1`.
+5. Create one alert per market with condition **Any alert() function call**. In the default mailbox mode, use the Worker URL shown in the canonical production path above. Do not create one webhook alert per timeframe.
+
+The payload contains independent readings and candle timestamps for all 12 timeframes: M1, M3, M5, M10, M15, M30, M45, H1, H2, H4, D1 and W1. Separate alerts for each timeframe are not required.
+
+Attach the bridge alert to the **v25** indicator instance. The legacy `ALIGN MTF PRO (Inside)` / `ALIGN MTF` indicator is not a second bridge and must not be confused with the canonical v25 snapshot exporter.
+
+**TradingView alert snapshots:** TradingView retains the script version, inputs and chart context captured when an alert is created. After changing the Pine script, the bridge checkbox, market input, chart symbol or webhook route, delete and recreate only the corresponding ALIGN BTC or GOLD alert. An existing alert does not automatically inherit later Pine changes.
+
+## Bridge isolation and ports
+
+- The default workflow bridge listens on `127.0.0.1:4100` **inside the GitHub Actions runner**.
+- Its snapshots are held in memory for that run. A new run starts with an empty cache and must wait for fresh TradingView payloads.
+- Ports `3000`, `4000` and `5001` are forbidden for this bridge. In particular, do not touch, stop, reuse or redirect the legacy server on port `4000`.
+- The Cloudflare Worker is only the mailbox layer in the default path. Do not add a second bridge between the mailbox feeder and the runner bridge.
+- Do not reuse the `tradingview-analyzer` extension, historical project copies, or unrelated server instances as an ALIGN bridge.
+
+## ROBOT V12 validation and safety
+
+The bridge validates source, supported market, active timeframe, source timestamp, the active price and the independent MTF readings/bar times. It also validates the plan and the strategy-specific closed trigger candle. Production requires fresh M5, M15, H1, H4, D1 and W1 snapshots, a fresh supported active timeframe, a valid price and usable ROBOT V12 readings; the bridge also enforces its complete MTF contract.
+
+When `ALIGN_REQUIRE_TV_BRIDGE=1`, ROBOT V12 does not fall back to locally generated entry levels. It uses the Pine M15 Entry/SL/TP1/TP2 only after the validated trigger. Existing news, Daily/Weekly extreme, risk/reward and risk-memory filters remain mandatory vetoes. No broker order is sent.
 
 ## Validation and limits
 
-- `test_align_tv_bridge.py` covers authentication, source/symbol/timeframe validation, MTF completeness, candle freshness, plan geometry, TP1/TP2 and HTTP response shape.
-- `test_align_pine_bridge_contract.py` verifies the canonical Pine identity and animation default, existing human alerts, opt-in export, all MTF timestamps and byte-identical original Pine outside the bridge blocks.
-- CI does not compile Pine in TradingView and cannot prove live webhook delivery. The final end-to-end test remains pending until the dedicated HTTPS tunnel, two TradingView alerts and GitHub secrets are configured.
-- No broker order endpoint exists in this service. No real order is sent.
+- `align-bot/test_align_tv_bridge.py` covers authentication, source/symbol/timeframe validation, MTF completeness, candle freshness, plan geometry, TP1/TP2 and HTTP response shape.
+- `align-bot/test_align_pine_bridge_contract.py` verifies the canonical Pine identity and animation default, existing human alerts, bridge export and MTF timestamps.
+- CI does not compile Pine in TradingView and cannot prove that the two active server-side TradingView alerts are current or delivering.
+- End-to-end production validation requires fresh BTCUSD and XAUUSD snapshots from the intended alert route, bridge confirmation for both symbols, a successful ROBOT V12 run and a fresh `live-data/live.json` publication.
+- No real broker orders are placed by this bridge.
