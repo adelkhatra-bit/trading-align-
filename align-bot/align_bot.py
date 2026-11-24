@@ -13929,12 +13929,13 @@ def live_callback(etat, chats, cb, choix, mk, qui):
                 pass
             return True
         animations_on = not bool(etat.get("live_animations", True))
-        etat["live_animations"] = animations_on
         commande = "on" if animations_on else "off"
         publie = live_publier(f"CMD:animations:{commande}:ALIGN")
+        if publie:
+            etat["live_animations"] = animations_on
         _envoi_sur(qui, text=(
             ("✨ Animations activées sur l'écran TradingView." if animations_on else "⏸ Animations coupées sur l'écran TradingView.")
-            if publie else "⚠️ La commande n'a pas pu être envoyée à l'écran TradingView."
+            if publie else "⚠️ La commande n'a pas pu être envoyée à l'écran TradingView ; l'état précédent est conservé."
         ))
         try:
             telegram("answerCallbackQuery", callback_query_id=cb["id"])
