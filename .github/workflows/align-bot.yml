@@ -129,6 +129,13 @@ jobs:
                       report["gold_open_trade"] = bool((state.get("GOLD") or {}).get("trade"))
                       report["btc_auto_follow_count"] = len((state.get("auto") or {}).get("BTC", []))
                       report["gold_auto_follow_count"] = len((state.get("auto") or {}).get("GOLD", []))
+                      coach_live = state.get("coach_live") or {}
+                      coach_btc = coach_live.get("BTC") or {}
+                      coach_gold = coach_live.get("GOLD") or {}
+                      report["coach_live_btc_count"] = len(coach_btc) if isinstance(coach_btc, dict) else 0
+                      report["coach_live_gold_count"] = len(coach_gold) if isinstance(coach_gold, dict) else 0
+                      report["coach_live_total_unique_count"] = len({str(cid) for group in (coach_btc, coach_gold) if isinstance(group, dict) for cid in group})
+                      report["position_search_active_count"] = len(state.get("recherche_positions_active") or [])
                       report["active_markets"] = state.get("marches_actifs", [])
                       report["nasdaq_active_root_key"] = "NASDAQ" in state
                       archives = state.get("archives_marches_retirees") or {}
