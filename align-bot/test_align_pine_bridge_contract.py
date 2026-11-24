@@ -28,7 +28,7 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertIn(SETTINGS_BLOCK, self.source)
         self.assertIn(EXPORT_MARKER, self.source)
         tp_start = self.source.index("// TP1 touché :")
-        tp_end = self.source.index("// ═════════ LIGNES BLANCHES D'EXPLICATION", tp_start)
+        tp_end = self.source.index("// Les deux objectifs restent visibles dès qu'un plan existe.", tp_start)
         baseline_tp_state = """// TP1 touché : on garde TP1 affiché et on montre TP2 (remis à zéro seulement si le sens change = position annulée)
 var bool tp1Ok = false
 var float tp1M = na
