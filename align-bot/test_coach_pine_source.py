@@ -48,9 +48,9 @@ class CoachPineSourceTests(unittest.TestCase):
         self.assertIsNone(data["zone d'entrée"])
         self.assertEqual(data["profil_strategie"]["mode"], "ATTENTE")
         self.assertIn("plan Pine v25 indisponible", data["verdict du bot"])
-        self.assertFalse(data["distance_plan_entree"].get("available", True))
+        self.assertIs(data["distance_plan_entree"]["disponible"], False)
         self.assertNotIn("entree_visee", data["distance_plan_entree"])
-        self.assertFalse(data["estimation_approche_entree"].get("available", True))
+        self.assertIs(data["estimation_approche_entree"]["disponible"], False)
 
     def test_bridge_required_uses_pine_price_entry_and_zone_not_local_values(self):
         r = self.base_market()
@@ -81,7 +81,7 @@ class CoachPineSourceTests(unittest.TestCase):
         }
         data = self.run_data("GOLD", r, {}, plan)
 
-        self.assertFalse(data["estimation_approche_entree"].get("available", True))
+        self.assertIs(data["estimation_approche_entree"]["disponible"], False)
         self.assertNotIn("minutes_indicatives", data["estimation_approche_entree"])
         self.assertIn("spot TradingView", data["estimation_approche_entree"]["raison"])
 
