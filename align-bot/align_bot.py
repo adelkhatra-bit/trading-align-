@@ -10606,9 +10606,14 @@ def coach_fvg(r, d, prix, attente=True, tr=None):
         except (KeyError, TypeError, ValueError):
             return []
         if za <= tv_price <= zb:
+            pine_strategy = str(tr.get("strategie") or tr.get("strat") or "").upper()
+            local_strategy = str(tr.get("strat_filtre") or "").upper()
+            detail = f"Stratégie Pine {pine_strategy} ({ut})"
+            if local_strategy and local_strategy != pine_strategy:
+                detail += f" • filtre local {local_strategy}"
             return [
                 f"📍 Prix TradingView dans la zone Pine M15 : {px(za)} → {px(zb)}",
-                f"🕯 Retest + clôture {ut} confirmés par Pine v25",
+                f"🕯 Retest + clôture validés • {detail}",
             ]
         return [
             f"⏳ Prix TradingView hors zone Pine M15 : {px(tv_price)} • zone {px(za)} → {px(zb)}",
@@ -11709,20 +11714,6 @@ def agent(m, r, cle, ferme):
             out.append(f"⏳ {ICONE.get(m, '')} {m} : sens Pine M15 différent de la lecture locale ; aucune entrée.")
             return out
         cle.pop("tv_bridge_wait_reason", None)
-        strategie_locale = (strategie_trade(r, d) or {}).get("strat")
-        if strategie_locale != plan_tv["strategy"]:
-            cle["prep"] = False
-            cle.pop("ordre", None)
-            raison_strategie = f"{strategie_locale or 'non confirmée'}|{plan_tv['strategy']}"
-            if cle.get("tv_strategy_wait") != raison_strategie:
-                cle["tv_strategy_wait"] = raison_strategie
-                out.append(
-                    f"⏳ {ICONE.get(m, '')} {m} : stratégie locale ALIGN "
-                    f"{strategie_locale or 'non confirmée'} différente de Pine {plan_tv['strategy']} ; aucune entrée."
-                )
-            return out
-        cle.pop("tv_strategy_wait", None)
-
         # Les niveaux sont ceux du Pine, jamais recalculés ni ajustés par l'apprentissage SL.
         entry = float(plan_tv["entry"])
         stop = float(plan_tv["sl"])
@@ -11800,6 +11791,10 @@ def agent(m, r, cle, ferme):
             strategie=plan_tv["strategy"],
         )
         tr.update(strategie_trade(r, d))
+        # La stratégie et l'UT d'exécution du trade suivent le plan Pine v25.
+        # La lecture locale reste conservée à part pour expliquer un éventuel écart MTF.
+        tr["strat_filtre"] = tr.get("strat")
+        tr["strat"] = plan_tv["strategy"]
         tr["retour"] = retournement_confirme(cle, d, r)
         # Ne pas appliquer appliquer_marge_sl() : le SL est celui du plan Pine canonique.
         non, n_, w_ = memoire_refuse(tr["profil"])
