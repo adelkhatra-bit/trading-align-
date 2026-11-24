@@ -1173,6 +1173,7 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         self.assertIn("!prendreLeaseHeartbeat()", bande)
         self.assertIn("setTimeout(ecouter, 30000)", bande)
         self.assertIn("setTimeout(ecouter, 15000)", bande)
+        self.assertIn("Math.min(Number(retryAfterMs) || 0, 60000)", bande)
         self.assertIn("retry-after:", bande)
         self.assertIn("'Content-Type': 'text/plain; charset=utf-8'", bande)
         self.assertIn("voiceschanged", bande)
