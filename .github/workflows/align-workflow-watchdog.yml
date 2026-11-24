@@ -15,8 +15,6 @@ on:
       - "ALIGN Topstep vérification"
       - "pages build and deployment"
     types: [completed]
-  schedule:
-    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
