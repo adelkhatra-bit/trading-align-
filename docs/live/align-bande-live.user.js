@@ -749,6 +749,13 @@
   const PAGE = (typeof unsafeWindow !== 'undefined' && unsafeWindow) ? unsafeWindow : window;
   function chart() { try { return PAGE.TradingViewApi.activeChart(); } catch (e) { return null; } }
   function commande(sorte, valeur, prenom) {
+    if (sorte === 'animations') {
+      if (valeur !== 'on' && valeur !== 'off') return;
+      animationsActives = valeur === 'on';
+      try { localStorage.setItem('alignAnimationsEnabled', animationsActives ? '1' : '0'); } catch (e) {}
+      appliquerAnimations();
+      return;
+    }
     const c = chart(); if (!c) return;
     if (!retour) retour = { tf: c.resolution(), sym: c.symbol() };
     const nom = prenom ? prenom + ' a demandé ' : 'Vue ';
