@@ -24,15 +24,32 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertIn("clignote = animer and tick % 2 == 0", self.source)
         self.assertIn('voirPlan = input.bool(true, "Afficher le plan (TP / SL)"', self.source)
 
-    def test_original_pine_is_byte_identical_outside_the_two_bridge_blocks(self):
+    def test_original_pine_is_byte_identical_outside_bridge_and_tp_state_blocks(self):
         self.assertIn(SETTINGS_BLOCK, self.source)
         self.assertIn(EXPORT_MARKER, self.source)
-        without_settings = self.source.replace(SETTINGS_BLOCK, "", 1)
+        tp_start = self.source.index("// TP1 touché :")
+        tp_end = self.source.index("// ═════════ LIGNES BLANCHES D'EXPLICATION", tp_start)
+        baseline_tp_state = """// TP1 touché : on garde TP1 affiché et on montre TP2 (remis à zéro seulement si le sens change = position annulée)
+var bool tp1Ok = false
+var float tp1M = na
+var float tp2M = na
+if dirPlan != nz(dirPlan[1]) or na(tp1M)
+    tp1Ok := false
+    tp1M := tp1
+    tp2M := tp2
+if not tp1Ok and dirPlan != 0 and ((dirPlan == 1 and high >= tp1M) or (dirPlan == -1 and low <= tp1M))
+    tp1Ok := true
+if not tp1Ok
+    tp1M := tp1
+    tp2M := tp2
+"""
+        without_tp_change = self.source[:tp_start] + baseline_tp_state + self.source[tp_end:]
+        without_settings = without_tp_change.replace(SETTINGS_BLOCK, "", 1)
         without_export = without_settings.split(EXPORT_MARKER, 1)[0]
-        if without_export.endswith("\n\n"):
+        if without_export.endswith("\\n\\n"):
             without_export = without_export[:-1]
         raw = without_export.encode("utf-8")
-        git_blob = hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
+        git_blob = hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\\0" + raw).hexdigest()
         self.assertEqual(git_blob, BASELINE_GIT_BLOB_SHA)
 
     def test_only_btc_and_gold_are_supported_for_signals_and_bridge(self):
