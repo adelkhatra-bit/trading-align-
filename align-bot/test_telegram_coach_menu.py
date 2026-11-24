@@ -16,6 +16,8 @@ class TelegramCoachMenuTests(unittest.TestCase):
         self.assertIn("auto:BTC", callbacks)
         self.assertIn("timeframes:BTC", callbacks)
         self.assertIn("autostop:BTC", callbacks)
+        self.assertIn("animlive:toggle", callbacks)
+        self.assertIn("Animations ON", callbacks["animlive:toggle"])
         self.assertIn("Commentaire BTC", callbacks["coachlive:BTC"])
         self.assertIn("Coach position BTC", callbacks["auto:BTC"])
         self.assertIn("12 UT BTC", callbacks["timeframes:BTC"])
@@ -32,8 +34,27 @@ class TelegramCoachMenuTests(unittest.TestCase):
         self.assertTrue(any("Next position BTC" in label for label in labels))
         self.assertTrue(any("12 timeframes BTC" in label for label in labels))
         self.assertTrue(any("Stop coach BTC" in label for label in labels))
+        self.assertTrue(any("Animations ON" in label for label in labels))
         self.assertNotIn("Commentaire BTC", labels)
         self.assertNotIn("Coach position BTC", labels)
+
+    def test_animation_remote_callback_is_owner_only_and_publishes_state(self):
+        etat = {"proprio": ["101"], "live_animations": True}
+        cb = {"id": "animlive-test"}
+        published = []
+        with patch.object(ab, "live_publier", side_effect=lambda msg: published.append(msg) or True), \
+             patch.object(ab, "_envoi_sur") as send, \
+             patch.object(ab, "telegram", return_value={"ok": True}):
+            ab.live_callback(etat, set(), cb, "animlive", "toggle", "101")
+        self.assertFalse(etat["live_animations"])
+        self.assertEqual(published, ["CMD:animations:off:ALIGN"])
+        self.assertIn("coupées", send.call_args.kwargs["text"])
+
+        # A non-owner cannot publish a remote visual command.
+        with patch.object(ab, "live_publier") as publish, patch.object(ab, "telegram", return_value={"ok": True}):
+            ab.live_callback(etat, set(), {"id": "animlive-denied"}, "animlive", "toggle", "202")
+        publish.assert_not_called()
+        self.assertFalse(etat["live_animations"])
 
     def test_next_position_button_dispatches_to_real_auto_coach_activation(self):
         etat = {}
