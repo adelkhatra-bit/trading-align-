@@ -32,7 +32,7 @@ REAL_TV_PAYLOAD_BTC_SWING_20261118 = r'''{"source":"ALIGN_MTF_PRO_V25","symbol":
 
 
 def valid_payload(now_ms=BASE_MS, symbol="BTCUSD", timeframe="M1"):
-    frames = ("M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1")
+    frames = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1")
     mtf = {
         tf: {"direction": 1, "rsi": 58.5, "bar_time": now_ms - 60_000}
         for tf in frames
@@ -96,9 +96,12 @@ class BridgeStoreTests(unittest.TestCase):
         pine = pine_path.read_text(encoding="utf-8")
         expected = {
             "bridgeTimeM1": 'request.security(syminfo.tickerid, "1", time, lookahead=barmerge.lookahead_off)',
+            "bridgeTimeM3": 'request.security(syminfo.tickerid, "3", time, lookahead=barmerge.lookahead_off)',
             "bridgeTimeM5": 'request.security(syminfo.tickerid, "5", time, lookahead=barmerge.lookahead_off)',
+            "bridgeTimeM10": 'request.security(syminfo.tickerid, "10", time, lookahead=barmerge.lookahead_off)',
             "bridgeTimeM15": 'request.security(syminfo.tickerid, "15", time, lookahead=barmerge.lookahead_off)',
             "bridgeTimeM30": 'request.security(syminfo.tickerid, "30", time, lookahead=barmerge.lookahead_off)',
+            "bridgeTimeM45": 'request.security(syminfo.tickerid, "45", time, lookahead=barmerge.lookahead_off)',
             "bridgeTimeH1": 'request.security(syminfo.tickerid, "60", time, lookahead=barmerge.lookahead_off)',
             "bridgeTimeH2": 'request.security(syminfo.tickerid, "120", time, lookahead=barmerge.lookahead_off)',
             "bridgeTimeH4": 'request.security(syminfo.tickerid, "240", time, lookahead=barmerge.lookahead_off)',
@@ -164,15 +167,15 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertFalse(bridge.tickerid_matches_symbol("BTCUSD", ""))
         self.assertFalse(bridge.tickerid_matches_symbol("XAUUSD", "BINANCE:BTCUSDT"))
 
-    def test_real_tradingview_swing_payload_18_11_accepted(self):
-        # Payload RÉEL du journal TradingView (BTC SWING, 18/11) refusé à tort deux fois :
-        # bord de zone arrondi à 25 % du risque, bougie H1 clôturée âgée de 1 h 35.
+    def test_legacy_real_tradingview_swing_payload_missing_new_mtf_is_rejected(self):
+        # Payload réel du 18/11 : il précède M3/M10/M45 et ne doit pas être accepté
+        # comme snapshot complet après l'extension du contrat MTF.
         p = json.loads(REAL_TV_PAYLOAD_BTC_SWING_20261118)
         status, result = self.store.ingest(p, INGEST, p["timestamp"] + 5000)
-        self.assertEqual((status, result.get("ok")), (200, True), result)
-        lu = self.store.read("BTCUSD", p["timestamp"] + 8000)[1]
-        self.assertTrue(lu["ok"])
-        self.assertEqual(lu["snapshots"]["M15"]["robotV12"]["signal"], "SHORT")
+        self.assertEqual(status, 400, result)
+        self.assertEqual(result["error"], "missing_mtf_timeframe")
+        self.assertEqual(result["timeframe"], "M3")
+        self.assertEqual(self.store.read("BTCUSD", p["timestamp"] + 8000)[1]["snapshots"], {})
 
     def test_wait_without_plan_keeps_real_mtf_reading(self):
         payload = valid_payload()
@@ -270,9 +273,16 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertEqual(result["error"], "unsupported_symbol")
 
     def test_rejects_unsupported_active_timeframe(self):
-        status, result = self.store.ingest(valid_payload(timeframe="M3"), INGEST, BASE_MS)
+        status, result = self.store.ingest(valid_payload(timeframe="M2"), INGEST, BASE_MS)
         self.assertEqual(status, 400)
         self.assertEqual(result["error"], "unsupported_active_timeframe")
+
+    def test_accepts_new_indicator_timeframes_m3_m10_m45(self):
+        for tf in ("M3", "M10", "M45"):
+            with self.subTest(timeframe=tf):
+                status, result = self.store.ingest(valid_payload(timeframe=tf), INGEST, BASE_MS)
+                self.assertEqual(status, 200, result)
+                self.assertTrue(result["accepted"])
 
     def test_rejects_missing_required_timeframe_instead_of_fabricating_it(self):
         payload = valid_payload()

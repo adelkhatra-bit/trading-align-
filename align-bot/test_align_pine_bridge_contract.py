@@ -54,11 +54,20 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
     def test_active_plan_and_all_required_mtf_timeframes_are_exported(self):
         for key in ('"entry"', '"sl"', '"tp1"', '"tp2"', '"lecture_1m"', '"lecture_5m"', '"lecture_15m"', '"lecture_60m"'):
             self.assertIn(key, self.source)
-        for tf in ("M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"):
+        for tf in ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1"):
             self.assertIn('"' + tf + '"', self.source)
         self.assertIn(">= 20000", self.source)
         self.assertLessEqual(self.source.count("request.security("), 40)
+        for variable, tf in (("bridgeTimeM3", "3"), ("bridgeTimeM10", "10"), ("bridgeTimeM45", "45")):
+            self.assertIn(f'{variable} = request.security(syminfo.tickerid, "{tf}", time, lookahead=barmerge.lookahead_off)', self.source)
+        self.assertIn('bridgeTfSeconds == 180 ? "M3"', self.source)
+        self.assertIn('bridgeTfSeconds == 600 ? "M10"', self.source)
+        self.assertIn('bridgeTfSeconds == 2700 ? "M45"', self.source)
         export_block = self.source.split(EXPORT_MARKER, 1)[1]
+        expected_m3 = '''"M3":{"direction":' + f_align_v25_json_int(d2) + ',"rsi":' + f_align_v25_json_num(r2)'''
+        wrong_m3 = '''"M3":{"direction":' + f_align_v25_json_int(d3) + ',"rsi":' + f_align_v25_json_num(r3)'''
+        self.assertIn(expected_m3, export_block)
+        self.assertNotIn(wrong_m3, export_block)
         for missing_value_fallback in ("f_align_v25_json_num(nz(r1, 50))", "f_align_v25_json_num(nz(r5, 50))", "f_align_v25_json_num(nz(r15, 50))", "f_align_v25_json_num(nz(r60, 50))", "str.tostring(nz(d1))"):
             self.assertNotIn(missing_value_fallback, export_block)
         self.assertIn('na(v) ? "null" : str.tostring(v)', export_block)

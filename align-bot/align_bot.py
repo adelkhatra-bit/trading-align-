@@ -39,6 +39,8 @@ TELEGRAM_AUDIT = {
     "last_callback": None, "last_callback_latency_ms": None,
     "last_error": None, "last_block": None,
 }
+# Les blocages Pull sont agrégés par méthode/action pour éviter les logs répétitifs.
+TELEGRAM_PULL_BLOCK_LOGGED = set()
 # Préfixes routés par traiter() ou live_callback(). Les compteurs indiquent ceux réellement cliqués.
 TELEGRAM_CALLBACK_HANDLER_PREFIXES = (
     "analysechoice", "auto", "autoadm", "botmenu", "botoff", "boton",
@@ -3480,7 +3482,16 @@ def _telegram_sortant_autorise(methode, params):
     chaines.discard("")
     if cid and cid in chaines and methode in ("sendMessage", "sendPhoto", "editMessageText") and _telegram_position_attendue(texte):
         return True
-    print(f"TELEGRAM_PULL_BLOCK method={methode} chat={cid or '-'}", flush=True)
+    action = str(getattr(TELEGRAM_PULL_CONTEXT, "callback_action", "") or "").split(":", 1)[0][:40] or "outside_callback"
+    log_key = (str(methode)[:40], action)
+    should_log = False
+    with TELEGRAM_AUDIT_LOCK:
+        if log_key not in TELEGRAM_PULL_BLOCK_LOGGED:
+            TELEGRAM_PULL_BLOCK_LOGGED.add(log_key)
+            should_log = True
+    if should_log:
+        # Pas d'identifiant de chat dans les logs ; /audit conserve les compteurs détaillés.
+        print(f"TELEGRAM_PULL_BLOCK method={methode} action={action} (first occurrence)", flush=True)
     return False
 
 
@@ -8875,15 +8886,18 @@ def controles_statut(etat, derniers, now=None):
     now = time.time() if now is None else now
     out = [("ok", "📡 Telegram : connecté (je te réponds)")]
     for m in MARCHES:
-        r = (derniers or {}).get(m)
         ic = ICONE.get(m, "")
+        # CME closed is normal even before the worker has produced its first Gold snapshot.
+        if m != "BTC" and not cme_ouvert(int(now)):
+            reouverture = prochaine_ouverture_cme(now)
+            detail_reouverture = f", réouverture {quand_txt(reouverture)}" if reouverture else ""
+            out.append(("veille", f"{ic} {m} : marché fermé (normal){detail_reouverture}"))
+            continue
+        r = (derniers or {}).get(m)
         if not r or not r.get("m1"):
             out.append(("attention", f"{ic} {m} : pas encore d'analyse (premier tour en cours ou données indisponibles)"))
             continue
         age = now - float(r["m1"][-1]["t"])
-        if m != "BTC" and not cme_ouvert(int(now)):
-            out.append(("veille", f"{ic} {m} : marché fermé (normal)"))
-            continue
         if age > 600:
             out.append(("attention", f"{ic} {m} : données en retard de {int(age // 60)} min"))
             continue
@@ -8949,7 +8963,19 @@ def texte_diag(cid=None):
 
     # Interroge exactement la même route MTF que l'analyse du bot.
     # Deux lectures indépendantes : une pour BTC, une pour GOLD.
+    now = time.time()
     for pair, label in (("XBTUSD", "BTC"), ("XAUUSD", "GOLD")):
+        # Pendant la pause/week-end CME, aucun snapshot XAUUSD n'est requis.
+        # Le silence normal de la session ne doit pas apparaître comme une panne bridge.
+        if label == "GOLD" and not cme_ouvert(int(now)):
+            reouverture = prochaine_ouverture_cme(now)
+            suffixe = f" • réouverture {quand_txt(reouverture)}" if reouverture else ""
+            lignes.append(
+                libelle("GOLD : MARCHÉ CME FERMÉ (normal) — snapshot non requis",
+                        "GOLD: CME SESSION CLOSED (normal) — snapshot not required")
+                + suffixe
+            )
+            continue
         try:
             bridge = fetch_tv_mtf(pair)
         except Exception as exc:
@@ -9123,6 +9149,11 @@ def texte_audit_telegram(etat, derniers, now=None):
             lines.append(f"{market} : bougies M1 {market_age}s")
         else:
             lines.append(f"{market} : aucune bougie M1 dans le dernier calcul")
+        # /audit lit le bridge attaché au dernier calcul ; à la fermeture CME,
+        # l'absence d'un snapshot GOLD n'est pas une panne du bridge.
+        if market == "GOLD" and not cme_ouvert(int(now)):
+            lines.append("  Bridge TradingView : marché CME fermé (normal) • snapshot non requis")
+            continue
         bridge = market_state.get("tv_indicator_mtf") or {}
         if bridge:
             active = str(bridge.get("activeTimeframe") or "aucune")
@@ -13716,7 +13747,7 @@ def releve_en_attente(runs, mon_id):
     """Vrai si un run plus récent du worker ALIGN est en file / en cours : l'ancien doit s'arrêter LUI-MÊME pour sauver sa mémoire.
     Cause réelle constatée (13/11) : annulation douce jamais reçue → annulation forcée → mémoire non sauvée → doublons au redémarrage."""
     actifs = {"queued", "in_progress", "waiting", "pending", "requested"}
-    return any(int(r.get("id") or 0) > mon_id and r.get("status") in actifs for r in runs or [])
+    return any(int(r.get("id") or 0) > mon_id and r.get("status") in actifs and r.get("worker_job_status") not in {"skipped", "completed", "cancelled"} for r in runs or [])
 
 def surveiller_releve():
     """Thread : demande l'arrêt propre (sauvegarde puis sortie) dès qu'un nouveau worker est lancé."""
@@ -13735,6 +13766,17 @@ def surveiller_releve():
                                                        "User-Agent": "ALIGN-worker"})
             with urllib.request.urlopen(req, timeout=15) as rep_:
                 runs = json.loads(rep_.read().decode("utf-8")).get("workflow_runs", [])
+            # A workflow_run can be skipped (e.g. validation from a PR merge). Do not stop
+            # the current worker unless the replacement's actual signaux job is queued/running.
+            jobs_actifs = {"queued", "in_progress", "waiting", "pending"}
+            for run in runs or []:
+                if int(run.get("id") or 0) <= mon_id or run.get("status") not in jobs_actifs:
+                    continue
+                jobs_url = f"https://api.github.com/repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100"
+                jobs_req = urllib.request.Request(jobs_url, headers={"Authorization": "Bearer " + jeton, "Accept": "application/vnd.github+json", "User-Agent": "ALIGN-worker"})
+                with urllib.request.urlopen(jobs_req, timeout=15) as jobs_rep:
+                    jobs = json.loads(jobs_rep.read().decode("utf-8")).get("jobs", [])
+                run["worker_job_status"] = next((j.get("status") for j in jobs if j.get("name") == "signaux" and j.get("status") in jobs_actifs), "skipped")
             if releve_en_attente(runs, mon_id):
                 print("ALIGN_RELEVE_DETECTEE : arrêt propre + sauvegarde de la mémoire", flush=True)
                 _demander_arret(0, None)

@@ -83,7 +83,14 @@ def relay_once(fetch_mailbox, ingest, symbols=SYMBOLS):
         except Exception as exc:  # bridge local momentanément indisponible : on réessaiera au cycle suivant
             results[symbol] = "ingest_error:" + type(exc).__name__
             continue
-        results[symbol] = "ok" if status == 200 else "rejected:" + str(body.get("error", status))
+        if status == 200:
+            results[symbol] = "ok"
+        else:
+            error = str(body.get("error", status))
+            # Expose only the rejected timeframe (never the payload) for MTF diagnosis.
+            missing_tf = str(body.get("timeframe") or "").strip().upper()
+            detail = f":tf={missing_tf}" if error == "missing_mtf_timeframe" and missing_tf.isalnum() and len(missing_tf) <= 8 else ""
+            results[symbol] = "rejected:" + error + detail
     return results
 
 
