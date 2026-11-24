@@ -39,7 +39,7 @@ class HeartbeatGmTests(unittest.TestCase):
         self.assertIn("timeout: 8000", self.js)
         self.assertIn("delais = [15000, 30000, 45000, 60000]", self.js)
         self.assertIn("let ecranInFlight = false;", self.js)
-        self.assertIn("if (!vivant || ecranInFlight || ecranRetryTimer) return;", self.js)
+        self.assertIn("if (!vivant || ecranInFlight || ecranRetryTimer || !prendreLeaseHeartbeat()) return;", self.js)
         self.assertIn("ecranRetryAttempt = 0;", self.js)
         self.assertIn("const delay = delais[ecranRetryAttempt++];", self.js)
         self.assertIn("clearTimeout(ecranRetryTimer)", self.js)
