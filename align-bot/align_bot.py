@@ -4470,13 +4470,16 @@ def donnees_ia(m, r, cle):
         ]
     data["structure_bougies_recentes"] = structure
     data["ATR_15m"] = round(float(r.get("atr") or 0), 5) or None
-    tf = timeframe_attendu(r, cle or {})
+    if bridge_required:
+        tf = {"SCALPING": "1m", "DAY": "5m", "SWING": "1h"}.get(plan.get("strategy"), "15m")
+    else:
+        tf = timeframe_attendu(r, cle or {})
     close_ts = prochaine_cloture_bougie(r, tf, time.time())
     data["prochaine_reevaluation"] = {
         "unite_bloquante": tf,
         "heure_locale": datetime.datetime.fromtimestamp(close_ts, PARIS).strftime("%Y-%m-%d %H:%M:%S %Z"),
         "secondes_restantes": max(0, int(close_ts - time.time())),
-        "signification": "réévaluation à la clôture, pas une prévision d'entrée"
+        "signification": "prochaine vérification à la clôture estimée, jamais une prévision d'entrée"
     }
     lp = lecons_pour(m)
     if lp:
