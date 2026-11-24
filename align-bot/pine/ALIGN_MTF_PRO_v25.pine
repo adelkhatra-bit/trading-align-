@@ -559,14 +559,15 @@ if not na(plX)
 plotshape(voirEss and divHx, "Essoufflement en haut", shape.diamond, location.abovebar, color.new(color.orange, 0), offset=-5, size=size.tiny)
 plotshape(voirEss and divBx, "Essoufflement en bas", shape.diamond, location.belowbar, color.new(color.aqua, 0), offset=-5, size=size.tiny)
 plotchar(voirExpl and comp >= minSqz and nz(comp[1]) < minSqz, "Explosion à venir", "⚡", location.top, color.new(color.yellow, 0), size=size.tiny)
-// TP1 touché : on garde TP1 affiché et on montre TP2 (remis à zéro seulement si le sens change = position annulée)
+// TP1 touché : on garde TP1 affiché et on montre TP2 (état rattaché au plan actif)
 var bool tp1Ok = false
 var float tp1M = na
 var float tp2M = na
-// Réinitialiser l'état de suivi si le plan validé change (direction, TP1 ou TP2).
-// Le rendu visuel reste strictement identique ; seul le rattachement aux niveaux actifs est corrigé.
-planTpChange = dirPlan != nz(dirPlan[1]) or na(tp1M) or na(tp2M) or
-     (not na(tp1) and tp1 != tp1M) or (not na(tp2) and tp2 != tp2M)
+// Un plan change si la direction, TP1 ou TP2 change : le suivi repart sur les niveaux actifs.
+planTpChange = dirPlan != nz(dirPlan[1]) or
+     (not na(tp1) and tp1 != tp1M) or
+     (not na(tp2) and tp2 != tp2M) or
+     (na(tp1) != na(tp1M)) or (na(tp2) != na(tp2M))
 if planTpChange
     tp1Ok := false
     tp1M := tp1
