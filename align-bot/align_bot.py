@@ -4412,7 +4412,9 @@ def donnees_ia(m, r, cle):
         )
         if plan.get("available"):
             sens_pine = "LONG" if plan["direction"] == 1 else "SHORT"
-            etat_plan = "déclencheur confirmé" if plan.get("triggered") else "déclencheur en attente"
+            etat_plan = ("déclencheur confirmé et prix dans la zone" if plan.get("price_in_zone") else
+                         "déclencheur confirmé mais prix hors zone : attendre le retour" if plan.get("triggered") else
+                         "déclencheur en attente")
             data["verdict du bot"] = f"Plan Pine v25 {sens_pine} : {etat_plan}; l'entrée reste soumise au garde-fou ROBOT V12."
         else:
             data["verdict du bot"] = "Aucune entrée autorisée : plan Pine v25 indisponible — " + str(plan.get("reason") or "données incomplètes")
