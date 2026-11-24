@@ -5422,19 +5422,81 @@ def raison_attente(r, cle):
 
 
 def chrono_txt(m, r, cle, t0):
-    """Chronomètre calé sur les bougies reçues et sur l'unité de temps qui bloque réellement."""
+    """Chronomètre du coach ; en mode bridge, prix, plan et biais viennent exclusivement de Pine v25."""
     now = time.time()
-    p = r["m1"][-1]["c"] if r.get("m1") else r.get("prix", 0)
+    bridge_required = bool(r.get("require_tv_bridge"))
+    plan = plan_indicateur(r) if bridge_required else None
+    if bridge_required:
+        bridge = r.get("tv_indicator_mtf") or {}
+        active_tf = str(bridge.get("activeTimeframe") or "").upper()
+        active_snap = (bridge.get("snapshots") or {}).get(active_tf) or {}
+        try:
+            p = float(plan["price"]) if plan and plan.get("available") else float(active_snap["price"])
+            if not math.isfinite(p) or p <= 0 or active_snap.get("fresh") is not True:
+                p = None
+        except (KeyError, TypeError, ValueError):
+            p = None
+    else:
+        p = r["m1"][-1]["c"] if r.get("m1") else r.get("prix", 0)
     tr = cle.get("trade")
+    prix_affiche = px(p) if p is not None else "indisponible"
     if tr:
-        return "\n".join([
-            f"⏱ SUIVI EN DIRECT — {ICONE.get(m, '')} {m}  {px(p)}",
+        lignes = [
+            f"⏱ SUIVI EN DIRECT — {ICONE.get(m, '')} {m}  {prix_affiche}",
             f"🎯 Suivi en cours depuis {duree_humaine(now - t0)}",
             f"🟢 POSITION OUVERTE — {SENS[tr['d']]}",
             f"🟨 Entrée {px(tr['e'])} • 🛑 SL {px(tr['sl'])} • 🎯 TP1 {px(tr['tp1'])}",
-            statut_position(tr, p),
-            "🧑‍🏫 Le coach surveille le SL, le passage à BE et les TP."
-        ])
+        ]
+        if p is not None:
+            lignes.append(statut_position(tr, p))
+        elif bridge_required:
+            lignes.append("⚠️ Prix TradingView indisponible : aucun prix local ne le remplace.")
+        lignes.append("🧑‍🏫 Le coach surveille le SL, le passage à BE et les TP.")
+        return "\n".join(lignes)
+
+    if bridge_required:
+        tf_map = {"M1": "5m", "M3": "5m", "M5": "5m", "M10": "5m",
+                  "M15": "15m", "M30": "15m", "M45": "15m",
+                  "H1": "1h", "H2": "1h", "H4": "4h", "D1": "D", "W1": "W"}
+        tf = tf_map.get(str((plan or {}).get("entry_timeframe") or "").upper(), "15m")
+        if plan and plan.get("available"):
+            sens = "LONG" if plan["direction"] == 1 else "SHORT"
+            if plan.get("triggered") and not plan.get("price_in_zone"):
+                direction = f"Pine v25 {sens} — déclencheur confirmé, prix hors zone : attendre le retour"
+                raison = "Le prix TradingView a quitté la zone Pine M15. Aucune entrée au marché ; attendre le retour dans la zone."
+            elif plan.get("triggered"):
+                direction = f"Pine v25 {sens} — déclencheur confirmé, garde-fou ROBOT V12 en cours"
+                raison = "Le déclencheur Pine est confirmé et le prix est dans la zone ; l'entrée reste soumise au contrôle final ROBOT V12."
+            else:
+                direction = f"Pine v25 {sens} — déclencheur en attente"
+                raison = "Le plan Pine existe, mais la bougie de déclenchement n'est pas encore confirmée. Aucune entrée avant clôture."
+        else:
+            direction = "ATTENTE — aucun plan Pine v25 frais exploitable"
+            raison = "Plan Pine indisponible : les lectures locales ne remplacent pas le bridge. Aucun niveau d'entrée n'est affiché."
+        cible = prochaine_cloture_bougie(r, tf, now)
+        restant = max(0, cible - now)
+        lignes = [
+            f"⏱ SUIVI EN DIRECT — {ICONE.get(m, '')} {m}  {prix_affiche}",
+            f"🎯 Suivi en cours depuis {duree_humaine(now - t0)}",
+            f"🧭 DIRECTION : {direction}",
+            f"⏳ POURQUOI J'ATTENDS : {raison}",
+        ]
+        if plan and plan.get("available"):
+            lignes += [
+                f"📍 ZONE PINE M15 : {px(plan['zone_low'])} à {px(plan['zone_high'])}",
+                f"🎯 Entry Pine : {px(plan['entry'])} • 🛑 SL : {px(plan['sl'])} • TP1 : {px(plan['tp1'])}"
+                + (f" • TP2 : {px(plan['tp2'])}" if plan.get("tp2") is not None else ""),
+            ]
+        lignes += [
+            f"⏳ PROCHAINE RÉÉVALUATION {tf}",
+            f"⏱ Temps restant : {duree_cloture(restant)}",
+            f"🕒 Heure prévue : {datetime.datetime.fromtimestamp(cible, PARIS).strftime('%H:%M')} (heure de Paris)",
+            "ℹ️ Ce compte à rebours indique la prochaine vérification, pas l'heure garantie d'une entrée.",
+            f"⌛ Fin du suivi si aucun setup avant {heure(t0 + CHRONO_MAX)} — aucune entrée forcée",
+            f"🔄 Actualisé à {datetime.datetime.fromtimestamp(now, PARIS).strftime('%H:%M:%S')}",
+        ]
+        return "\n".join(lignes)
+
     tf = timeframe_attendu(r, cle)
     cible = prochaine_cloture_bougie(r, tf, now)
     restant = max(0, cible - now)
@@ -5451,7 +5513,7 @@ def chrono_txt(m, r, cle, t0):
     else:
         direction = f"4 h {('LONG' if d4h == 1 else 'SHORT')} — validation complète en attente"
     l = [
-        f"⏱ SUIVI EN DIRECT — {ICONE.get(m, '')} {m}  {px(p)}",
+        f"⏱ SUIVI EN DIRECT — {ICONE.get(m, '')} {m}  {prix_affiche}",
         f"🎯 Suivi en cours depuis {duree_humaine(now - t0)}",
         f"🧭 DIRECTION : {direction}",
         f"⏳ POURQUOI J'ATTENDS : {raison_attente(r, cle)}",
