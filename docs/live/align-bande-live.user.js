@@ -1,20 +1,23 @@
 // ==UserScript==
 // @name         ALIGN Bande Live
 // @namespace    align-live
-// @version      12.2.15
+// @version      12.2.23
 // @description  Bande du live ALIGN sur TradingView : messages Telegram, bulles, télécommande 15 s, infobulles roses
 // @match        https://*.tradingview.com/chart/*
 // @updateURL    https://raw.githubusercontent.com/adelkhatra-bit/trading-align-/main/docs/live/align-bande-live.user.js
 // @downloadURL  https://raw.githubusercontent.com/adelkhatra-bit/trading-align-/main/docs/live/align-bande-live.user.js
 // @run-at       document-idle
 // @grant        GM_xmlhttpRequest
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_registerMenuCommand
 // @grant        unsafeWindow
 // @connect      ntfy.sh
 // ==/UserScript==
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '12.2.15';  // v12.2.14 : relecture vocale du dernier commentaire IA visible, en français puis en anglais.  // v12.2.13 : synchronisation bouche ALIGN LIVE avec le coach vocal. v12.2.12 : voix naturelle retentée quand les voix navigateur arrivent, ON réinitialisé après rechargement et listener nettoyé. v12.2.11 : heartbeat écran via GM_xmlhttpRequest (hors page, sans blocage CORS/réseau). v12.2.10 : la voix garde sa phrase en mémoire jusqu'à la fin (plus de coupure après 2-3 mots). v12.2.9 : libellé « COACH VOCAL OFF » (plus « ACTIVER LE COMMENTATEUR »). v12.2.8 : une seule voix (naturelle), off = silence total, plus de phrase d'accueil. v12.2.7 : la voix parle en français PUIS en anglais (chaque info), voix naturelle si disponible, jamais « risque »  // v12.2.6 : la voix ne lit ni disclaimer ni appel « lien en bio », ni phrase coupée  // v12.2.5 : la voix suit uniquement le commentaire IA visible ; commandes déplacées en bas à gauche  // v12.0 : les commentaires IA du live déclenchent immédiatement bulle, ping prix et lueur neutre  // v11.8 : narration marché calée à 55 s, au plus près du cooldown d'affichage de 52 s  // v11.7 : narration technique factuelle toutes les ~75 s, horloges séparées et activation vocale explicite  // v10.8 : commentaires IA ancrés sur les données réelles du marché affiché  // v10.7 : « ÇA PLONGE 🌊 » quand ça coule (en plus de la fusée) ; v10.6 : NEWS DE DERNIÈRE MINUTE prioritaire (coupe la bande) ; v10.5 : fusée 🚀 + sourire quand le bot entre / quand ça accélère ; v10.4 : bot en position = blagues taquines (je suis dedans avec vous, qui est rentré ? tapote, partage) ; v10.3 : blagues quand le marché dort (petit film, café, ouvertures, tapote MDR) ; v10.2 : « prépare-toi ≠ vas-y 😝 » ; v10.1 : l'animateur remet gentiment les petits malins à leur place (feu vert, discipline 😝) ; v10.0 : après un TP → « une rose ou un like » + « crée ton compte démo » ; v9.9 : fenêtre « 💰 ALIGN EN DIRECT » (gain réel en cours, après la moitié du chemin vers le TP1) ; v9.8 : « active ton coach en temps réel » + « un clic sur Mon bot pour arrêter » ; v9.7 : texte de la ligne du bas plus gros (taille des %) ; v9.6 : ligne du bas qui clignote vert ▲ LONG ? / rouge ▼ SHORT ? (plus vite quand une entrée approche) ; v9.5 : ligne du bas du tableau rouge ↔ vert en boucle + « LONG OU SHORT ? » (le sens ne se voit plus) ; v9.4 : « crée ton compte démo, teste gratuitement » + codes prop firms (lien en bio) ; v9.3 : titres de bulle drôles liés au marché (fin de « LE GRAPH BALANCE ») ; v9.2 : plus de spectacle quand le marché hésite (l'animateur parle toutes les ~40 s, discussion avis → merci → lien en bio), bulle « 🤫 PSST… LE GRAPH BALANCE » ; v9.1 : plus aucune flèche ni sens (monter / baisser) sur la bande ; v9.0 : « tu préfères BTC, Gold ou NASDAQ ? une autre unité de temps ? lien en bio » ; v8.9 : « ALIGN est dedans depuis le début… trop tard pour rentrer, on ne court jamais après le prix » ; v8.8  // v8.8 : l'animateur parle toutes les ~90 s (humour, nouveaux arrivants, commentaires), feu d'artifice « objectif de likes atteint » ; v8.7  // v8.7 : « je t'avais prévenu » après le chrono de grosse distribution / accumulation ; v8.6  // v8.6 : marché calme → l'animateur (vrai trader) parle aux spectateurs : questions rebond / cassure, pression pour taper et commenter ; v8.5  // v8.5 : phrases IA gratuites toujours nouvelles (FR/EN), chrono « une position arrive » + agenda (discours, annonces, ouvertures) venant du bot, chrono posé AU-DESSUS des colonnes 1 min / 3 min / 5 min ; v8.4   // v8.4 : ligne du bas du tableau revenue à sa couleur d'origine (v8.2), texte 13 px ; v8.3  // v8.3 : (étiquettes posées par-dessus désactivées, à faire dans le Pine), ligne du bas du tableau en couleur neutre, plus grosse, « tu peux rentrer ? 👍 » ; v8.2  // v8.2 : prix cachés dans la ligne du bas du tableau (❓ + lien en bio) ; v8.1  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
+  const VERSION = '12.2.23';  // v12.2.14 : relecture vocale du dernier commentaire IA visible, en français puis en anglais.  // v12.2.13 : synchronisation bouche ALIGN LIVE avec le coach vocal. v12.2.12 : voix naturelle retentée quand les voix navigateur arrivent, ON réinitialisé après rechargement et listener nettoyé. v12.2.11 : heartbeat écran via GM_xmlhttpRequest (hors page, sans blocage CORS/réseau). v12.2.10 : la voix garde sa phrase en mémoire jusqu'à la fin (plus de coupure après 2-3 mots). v12.2.9 : libellé « COACH VOCAL OFF » (plus « ACTIVER LE COMMENTATEUR »). v12.2.8 : une seule voix (naturelle), off = silence total, plus de phrase d'accueil. v12.2.7 : la voix parle en français PUIS en anglais (chaque info), voix naturelle si disponible, jamais « risque »  // v12.2.6 : la voix ne lit ni disclaimer ni appel « lien en bio », ni phrase coupée  // v12.2.5 : la voix suit uniquement le commentaire IA visible ; commandes déplacées en bas à gauche  // v12.0 : les commentaires IA du live déclenchent immédiatement bulle, ping prix et lueur neutre  // v11.8 : narration marché calée à 55 s, au plus près du cooldown d'affichage de 52 s  // v11.7 : narration technique factuelle toutes les ~75 s, horloges séparées et activation vocale explicite  // v10.8 : commentaires IA ancrés sur les données réelles du marché affiché  // v10.7 : « ÇA PLONGE 🌊 » quand ça coule (en plus de la fusée) ; v10.6 : NEWS DE DERNIÈRE MINUTE prioritaire (coupe la bande) ; v10.5 : fusée 🚀 + sourire quand le bot entre / quand ça accélère ; v10.4 : bot en position = blagues taquines (je suis dedans avec vous, qui est rentré ? tapote, partage) ; v10.3 : blagues quand le marché dort (petit film, café, ouvertures, tapote MDR) ; v10.2 : « prépare-toi ≠ vas-y 😝 » ; v10.1 : l'animateur remet gentiment les petits malins à leur place (feu vert, discipline 😝) ; v10.0 : après un TP → « une rose ou un like » + « crée ton compte démo » ; v9.9 : fenêtre « 💰 ALIGN EN DIRECT » (gain réel en cours, après la moitié du chemin vers le TP1) ; v9.8 : « active ton coach en temps réel » + « un clic sur Mon bot pour arrêter » ; v9.7 : texte de la ligne du bas plus gros (taille des %) ; v9.6 : ligne du bas qui clignote vert ▲ LONG ? / rouge ▼ SHORT ? (plus vite quand une entrée approche) ; v9.5 : ligne du bas du tableau rouge ↔ vert en boucle + « LONG OU SHORT ? » (le sens ne se voit plus) ; v9.4 : « crée ton compte démo, teste gratuitement » + codes prop firms (lien en bio) ; v9.3 : titres de bulle drôles liés au marché (fin de « LE GRAPH BALANCE ») ; v9.2 : plus de spectacle quand le marché hésite (l'animateur parle toutes les ~40 s, discussion avis → merci → lien en bio), bulle « 🤫 PSST… LE GRAPH BALANCE » ; v9.1 : plus aucune flèche ni sens (monter / baisser) sur la bande ; v9.0 : « tu préfères BTC, Gold ou NASDAQ ? une autre unité de temps ? lien en bio » ; v8.9 : « ALIGN est dedans depuis le début… trop tard pour rentrer, on ne court jamais après le prix » ; v8.8  // v8.8 : l'animateur parle toutes les ~90 s (humour, nouveaux arrivants, commentaires), feu d'artifice « objectif de likes atteint » ; v8.7  // v8.7 : « je t'avais prévenu » après le chrono de grosse distribution / accumulation ; v8.6  // v8.6 : marché calme → l'animateur (vrai trader) parle aux spectateurs : questions rebond / cassure, pression pour taper et commenter ; v8.5  // v8.5 : phrases IA gratuites toujours nouvelles (FR/EN), chrono « une position arrive » + agenda (discours, annonces, ouvertures) venant du bot, chrono posé AU-DESSUS des colonnes 1 min / 3 min / 5 min ; v8.4   // v8.4 : ligne du bas du tableau revenue à sa couleur d'origine (v8.2), texte 13 px ; v8.3  // v8.3 : (étiquettes posées par-dessus désactivées, à faire dans le Pine), ligne du bas du tableau en couleur neutre, plus grosse, « tu peux rentrer ? 👍 » ; v8.2  // v8.2 : prix cachés dans la ligne du bas du tableau (❓ + lien en bio) ; v8.1  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
   // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
   const SUJET = 'align-live-2a4bccafd9548d93';
   const BASE = [
@@ -908,27 +911,111 @@
   let es;
   // v12.2.11 : le heartbeat passe par GM_xmlhttpRequest (hors de la page TradingView, sans CORS ni blocage réseau de la page).
   // Repli sur fetch si le gestionnaire de scripts ne fournit pas GM_xmlhttpRequest.
+  // v12.2.16 : état du script initialisé avant le premier heartbeat (évite la zone morte temporelle). v12.2.23 : jeton ntfy local, quota visible et Retry-After complet.
+  let vivant = true;
   let ecranRetryTimer = null;
   let ecranInFlight = false;
   let ecranRetryAttempt = 0;
+  const ECRAN_OWNER_KEY = '__ALIGN_LIVE_SCREEN_OWNER_V1__';
+  const ECRAN_OWNER_TTL_MS = 90000;
+  const ecranTabId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+  try { document.documentElement.dataset.alignLiveScreenTabId = ecranTabId; } catch (e) {}
+  function prendreLeaseHeartbeat() {
+    if (document.visibilityState !== 'visible') {
+      try { document.documentElement.dataset.alignLiveScreenOwner = 'hidden'; } catch (e) {}
+      libererLeaseHeartbeat();
+      return false;
+    }
+    try {
+      const stockage = unsafeWindow.localStorage;
+      const now = Date.now();
+      let owner = null;
+      try { owner = JSON.parse(stockage.getItem(ECRAN_OWNER_KEY) || 'null'); } catch (e) {}
+      if (owner && owner.id !== ecranTabId && Number(owner.expireAt) > now) { try { document.documentElement.dataset.alignLiveScreenOwner = '0'; } catch (e) {} return false; }
+      stockage.setItem(ECRAN_OWNER_KEY, JSON.stringify({ id: ecranTabId, expireAt: now + ECRAN_OWNER_TTL_MS }));
+      try { document.documentElement.dataset.alignLiveScreenOwner = '1'; } catch (e) {}
+      return true;
+    } catch (e) {
+      try { document.documentElement.dataset.alignLiveScreenOwner = 'fallback'; } catch (e) {}
+      return document.visibilityState === 'visible';
+    }
+  }
+  function libererLeaseHeartbeat() {
+    try {
+      const stockage = unsafeWindow.localStorage;
+      const owner = JSON.parse(stockage.getItem(ECRAN_OWNER_KEY) || 'null');
+      if (owner && owner.id === ecranTabId) stockage.removeItem(ECRAN_OWNER_KEY);
+    } catch (e) {}
+  }
+  window.addEventListener('pagehide', libererLeaseHeartbeat, { once: true });
+  function marquerHeartbeat(etat) {
+    try { document.documentElement.dataset.alignLiveScreenHeartbeat = String(etat) + '|' + Date.now(); } catch (e) {}
+  }
+  function jetonNtfy() {
+    try { return String(typeof GM_getValue === 'function' ? (GM_getValue('ALIGN_NTFY_TOKEN', '') || '') : '').trim(); }
+    catch (e) { return ''; }
+  }
+  if (typeof GM_registerMenuCommand === 'function') {
+    GM_registerMenuCommand('ALIGN — configurer le jeton ntfy', () => {
+      const courant = jetonNtfy();
+      const nouveau = prompt('Jeton ntfy du compte avec quota adapté (saisie locale Tampermonkey, ne pas le partager).', courant);
+      if (nouveau === null) return;
+      try { GM_setValue('ALIGN_NTFY_TOKEN', nouveau.trim()); } catch (e) {}
+      ecranRetryAttempt = 0;
+      if (ecranRetryTimer) { clearTimeout(ecranRetryTimer); ecranRetryTimer = null; }
+      marquerHeartbeat(nouveau.trim() ? 'jeton_configure' : 'jeton_absent');
+      pingEcran();
+    });
+  }
+  function delaiRetryNtfy(entetes) {
+    const h = String(entetes || '');
+    let m = h.match(/^retry-after:\s*(\d+)/im);
+    if (m) return Math.min(Number(m[1]) * 1000, 86400000);
+    m = h.match(/"?messages"?;r=\d+;t=(\d+)/im);
+    if (m) return Math.min(Number(m[1]) * 1000, 86400000);
+    return 0;
+  }
+  function quotaNtfy(entetes) {
+    const h = String(entetes || '');
+    const p = h.match(/"?messages"?;q=(\d+);w=\d+/im);
+    const r = h.match(/"?messages"?;r=(\d+);t=\d+/im);
+    return p && r ? (r[1] + '/' + p[1]) : '';
+  }
   function envoyerEcran(corps, ok, ko) {
     const url = 'https://ntfy.sh/' + SUJET + '-ecran';
     let settled = false;
-    const success = () => { if (settled) return; settled = true; if (ok) ok(); };
-    const failure = err => { if (settled) return; settled = true; if (ko) ko(err || new Error('network error')); };
+    const success = () => { if (settled) return; settled = true; marquerHeartbeat('ok'); if (ok) ok(); };
+    const failure = (err, retryAfterMs) => { if (settled) return; settled = true; marquerHeartbeat('error: ' + String(err && err.message || err || 'network error')); if (ko) ko(err || new Error('network error'), retryAfterMs || 0); };
     try {
+      const headers = { 'Content-Type': 'text/plain; charset=utf-8' };
+      const token = jetonNtfy();
+      if (token) headers.Authorization = 'Bearer ' + token;
       if (typeof GM_xmlhttpRequest === 'function') {
-        GM_xmlhttpRequest({ method: 'POST', url: url, data: corps, timeout: 8000,
-          onload: r => { if (r && r.status >= 200 && r.status < 300) success(); else failure(new Error('HTTP ' + (r && r.status))); },
+        GM_xmlhttpRequest({ method: 'POST', url: url, data: corps, headers: headers, timeout: 8000,
+          onload: r => {
+            const h = String(r && r.responseHeaders || '');
+            const quota = quotaNtfy(h);
+            if (r && r.status >= 200 && r.status < 300) {
+              success();
+              if (quota) marquerHeartbeat('ok;quota=' + quota);
+            } else {
+              const wait = delaiRetryNtfy(h);
+              const info = quota ? '; quota=' + quota : '';
+              failure(new Error('HTTP ' + (r && r.status) + info), wait);
+            }
+          },
           onerror: err => failure(err || new Error('network error')),
           ontimeout: () => failure(new Error('timeout')) });
       } else {
-        fetch(url, { method: 'POST', body: corps, keepalive: true }).then(r => { if (r.ok) success(); else failure(new Error('HTTP ' + r.status)); }).catch(err => failure(err));
+        fetch(url, { method: 'POST', body: corps, headers: headers, keepalive: true }).then(r => {
+          if (r.ok) success();
+          else failure(new Error('HTTP ' + r.status));
+        }).catch(err => failure(err));
       }
     } catch (err) { failure(err); }
   }
   function pingEcran() {
-    if (!vivant || ecranInFlight || ecranRetryTimer) return;
+    if (!vivant || ecranInFlight || ecranRetryTimer || !prendreLeaseHeartbeat()) return;
     ecranInFlight = true;
     const message = 'PING|LIVE_SCREEN|' + Date.now();
     envoyerEcran(message, () => {
@@ -936,24 +1023,40 @@
       ecranRetryAttempt = 0;
       if (ecranRetryTimer) clearTimeout(ecranRetryTimer);
       ecranRetryTimer = null;
-    }, () => {
+    }, (_err, retryAfterMs) => {
       ecranInFlight = false;
-      if (ecranRetryAttempt >= 3 || !vivant || ecranRetryTimer) return;
-      const delais = [5000, 10000, 20000];
-      const delay = delais[ecranRetryAttempt++];
+      if (!vivant || ecranRetryTimer) return;
+      const delais = [15000, 30000, 60000, 120000, 300000, 900000];
+      const index = Math.min(ecranRetryAttempt, delais.length - 1);
+      const delay = Math.max(delais[index], Math.min(Number(retryAfterMs) || 0, 86400000));
+      ecranRetryAttempt = Math.min(ecranRetryAttempt + 1, delais.length - 1);
       ecranRetryTimer = setTimeout(() => { ecranRetryTimer = null; pingEcran(); }, delay);
     });
   }
   function ecouter() {
     try { es && es.close(); } catch (e) {}
-    es = new EventSource('https://ntfy.sh/' + SUJET + '/sse');
-    es.onopen = pingEcran;
-    es.onmessage = e => { try { const d = JSON.parse(e.data); if (d.event === 'message') recu(d.message); } catch (er) {} };
-    es.onerror = () => { try { es.close(); } catch (e) {} setTimeout(ecouter, 5000); };
+    es = null;
+    if (!prendreLeaseHeartbeat()) { setTimeout(ecouter, 15000); return; }
+    try {
+      es = new EventSource('https://ntfy.sh/' + SUJET + '/sse');
+      es.onopen = pingEcran;
+      es.onmessage = e => { try { const d = JSON.parse(e.data); if (d.event === 'message') recu(d.message); } catch (er) {} };
+      es.onerror = () => { try { es && es.close(); } catch (e) {} es = null; setTimeout(ecouter, 30000); };
+    } catch (e) { es = null; setTimeout(ecouter, 30000); }
   }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      try { es && es.close(); } catch (e) {}
+      es = null;
+      libererLeaseHeartbeat();
+    } else if (!es) {
+      ecouter();
+      pingEcran();
+    }
+  });
   ecouter();
   pingEcran();
-  const heartbeatT = setInterval(pingEcran, 25000);
+  const heartbeatT = setInterval(pingEcran, 45000); // 45 s; quota ntfy Supporter 2 500/jour avec marge.
 
   // ───── infobulles : baissier → en haut, haussier → en bas, collées à gauche ─────
   // v6.2 (demande d'Adel) : plus de petite fenêtre au survol : l'explication de la ligne (ENTRÉE, SL, TP, ZONE…)
@@ -1289,7 +1392,7 @@
     montrer(txt, false, 1, coul, true); coeurs(1, [emo]); lueur(0);   // pastille : en haut si le marché baisse, en bas s'il monte
     return true;
   }
-  let posDown = null, survolT = null, vivant = true;   // v7.7 : une ancienne bande arrêtée ne réagit plus aux clics (plus de pastilles en double)
+  let posDown = null, survolT = null;   // v7.7 : une ancienne bande arrêtée ne réagit plus aux clics (plus de pastilles en double)
   document.addEventListener('pointerdown', e => { posDown = { x: e.clientX, y: e.clientY, t: Date.now() }; }, { passive: true, capture: true });
   document.addEventListener('pointerup', e => { try { if (!vivant) return;
     if (!posDown || Math.hypot(e.clientX - posDown.x, e.clientY - posDown.y) > 8 || Date.now() - posDown.t > 700) return;   // un glisser n'est pas un clic

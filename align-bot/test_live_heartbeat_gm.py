@@ -37,15 +37,35 @@ class HeartbeatGmTests(unittest.TestCase):
     def test_heartbeat_verifie_statut_http_et_retentatives(self):
         self.assertIn("r.status >= 200 && r.status < 300", self.js)
         self.assertIn("timeout: 8000", self.js)
-        self.assertIn("delais = [5000, 10000, 20000]", self.js)
+        self.assertIn("delais = [15000, 30000, 60000, 120000, 300000, 900000]", self.js)
         self.assertIn("let ecranInFlight = false;", self.js)
-        self.assertIn("if (!vivant || ecranInFlight || ecranRetryTimer) return;", self.js)
+        self.assertIn("if (!vivant || ecranInFlight || ecranRetryTimer || !prendreLeaseHeartbeat()) return;", self.js)
         self.assertIn("ecranRetryAttempt = 0;", self.js)
-        self.assertIn("const delay = delais[ecranRetryAttempt++];", self.js)
+        self.assertIn("const delay = Math.max(delais[index], Math.min(Number(retryAfterMs) || 0, 86400000));", self.js)
         self.assertIn("clearTimeout(ecranRetryTimer)", self.js)
+    def test_jeton_ntfy_authentifie_le_compte_sans_exposer_le_secret(self):
+        self.assertIn("// @grant        GM_getValue", self.js)
+        self.assertIn("// @grant        GM_setValue", self.js)
+        self.assertIn("// @grant        GM_registerMenuCommand", self.js)
+        self.assertIn("Authorization = 'Bearer ' + token", self.js)
+        self.assertIn("GM_registerMenuCommand('ALIGN — configurer le jeton ntfy'", self.js)
+        self.assertNotIn("console.log(token)", self.js)
+
+    def test_retry_after_daily_ntfy_est_respecte_jusqua_24h(self):
+        self.assertIn("function delaiRetryNtfy(entetes)", self.js)
+        self.assertIn("86400000", self.js)
+        self.assertIn(r"^retry-after:\s*(\d+)", self.js)
+        self.assertIn('"?messages"?;q=(\\d+);w=\\d+', self.js)
+        self.assertIn('"?messages"?;r=(\\d+);t=\\d+', self.js)
+        self.assertNotIn("Math.min(Number(retryAfterMs) || 0, 60000)", self.js)
+
+    def test_heartbeat_intervale_pour_tier_ntfy_supporter(self):
+        self.assertIn("setInterval(pingEcran, 45000)", self.js)
+        self.assertIn("const ECRAN_OWNER_TTL_MS = 90000", self.js)
+
     def test_chaines_historiques_conservees(self):
         self.assertIn("PING|LIVE_SCREEN|", self.js)
-        self.assertIn("setInterval(pingEcran, 25000)", self.js)
+        self.assertIn("setInterval(pingEcran, 45000)", self.js)
 
 
 
