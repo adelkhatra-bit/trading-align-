@@ -35,11 +35,12 @@ class MemoireDuBot(unittest.TestCase):
         bloc = self.t[self.t.index("Attendre la fin de l'ancien worker"):self.t.index("Récupérer la mémoire du robot")]
         # L'incertitude sur l'ancien worker ne doit jamais autoriser une mémoire potentiellement périmée.
         self.assertNotIn("continue-on-error: true", bloc)
-        self.assertIn("< 240", bloc)                                                    # attente plafonnée à 4 minutes
+        self.assertIn("< 900", bloc)                                                    # attente plafonnée à 4 minutes
         self.assertIn('x["id"] < me', bloc)                                           # n'attend que les workers plus anciens
         self.assertIn("except Exception as ex:", bloc)
         self.assertIn("raise SystemExit", bloc)                                      # erreur API = arrêt
-        self.assertIn("délai de 240 s atteint", bloc)                                # expiration = arrêt
+        self.assertIn("time.time() - debut < 900", bloc)
+        self.assertIn("délai de 900 s atteint", bloc)                                # expiration = arrêt
 
     def test_worker_checkout_exactement_le_commit_valide(self):
         checkout = self.t[self.t.index("uses: actions/checkout@v4"):self.t.index("name: Attendre la fin de l'ancien worker")]
