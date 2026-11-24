@@ -315,7 +315,7 @@ class LiveTikTok(unittest.TestCase):
         source = Path(path).read_text(encoding="utf-8")
         self.assertIn("speechSynthesis.speak(utterance)", source)
         self.assertIn("PING|LIVE_SCREEN|", source)
-        self.assertIn("setInterval(pingEcran, 25000)", source)
+        self.assertIn("setInterval(pingEcran, 60000)", source)
         self.assertIn("clearInterval(heartbeatT)", source)
         self.assertIn("🔇 COACH VOCAL OFF", source)
         self.assertIn("🔊 COACH VOCAL ON", source)
