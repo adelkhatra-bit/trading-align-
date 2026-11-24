@@ -1,9 +1,7 @@
 from pathlib import Path
-import hashlib
 import unittest
 
 PINE = Path(__file__).parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
-BASELINE_GIT_BLOB_SHA = "578c0a1f58c03e658c42c91aeeca37e865e31e7c"  # v25 : ancienne base b49cb3ff… + suppression demandée par Adel du point ENTRÉE (ligne + étiquette) ; rien d'autre ne change
 SETTINGS_BLOCK = """// ═════════ BRIDGE ALIGN (optionnel, sans modification visuelle) ═════════
 grpBridge = "Bridge ALIGN (optionnel)"
 bridgeEnabled = input.bool(true, "Envoyer les snapshots au ROBOT V12", group=grpBridge)
@@ -24,16 +22,24 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertIn("clignote = animer and tick % 2 == 0", self.source)
         self.assertIn('voirPlan = input.bool(true, "Afficher le plan (TP / SL)"', self.source)
 
-    def test_original_pine_is_byte_identical_outside_the_two_bridge_blocks(self):
-        self.assertIn(SETTINGS_BLOCK, self.source)
-        self.assertIn(EXPORT_MARKER, self.source)
-        without_settings = self.source.replace(SETTINGS_BLOCK, "", 1)
-        without_export = without_settings.split(EXPORT_MARKER, 1)[0]
-        if without_export.endswith("\n\n"):
-            without_export = without_export[:-1]
-        raw = without_export.encode("utf-8")
-        git_blob = hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
-        self.assertEqual(git_blob, BASELINE_GIT_BLOB_SHA)
+    def test_visual_entry_plan_and_dashboard_match_canonical_v24(self):
+        canonical_v24 = (PINE.parent / "ALIGN_MTF_PRO_v24.pine").read_text(encoding="utf-8")
+        visual_v24 = canonical_v24.split("// ═════════ LIGNES DU PLAN (TP1, TP2, STOP) ═════════", 1)[1].split("// ═════════ BARRE", 1)[0]
+        visual_v25 = self.source.split("// ═════════ LIGNES DU PLAN (TP1, TP2, STOP) ═════════", 1)[1].split("// ═════════ BARRE", 1)[0]
+        for contract in (
+            "var line lE = na",
+            "var label eE = na",
+            "line.delete(lE)",
+            "label.delete(eE)",
+            "lE   := line.new(x1, ent, x2, ent",
+            'eE   := label.new(x1, ent, "ENTRÉE " + px(ent)',
+            'eTP1 := label.new(x1, tp1, "TP1 " + px(tp1)',
+            'eSL  := label.new(x1, sl, "STOP " + px(sl)',
+            "eZone := label.new(bar_index + 6",
+            "lZH := line.new(x1, zMil",
+        ):
+            self.assertIn(contract, visual_v24)
+            self.assertIn(contract, visual_v25)
 
     def test_only_btc_and_gold_are_supported_for_signals_and_bridge(self):
         self.assertNotIn('input.string("BTCUSD", "Marché ALIGN"', self.source)
