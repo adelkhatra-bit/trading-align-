@@ -55,7 +55,8 @@ class HeartbeatGmTests(unittest.TestCase):
         self.assertIn("function delaiRetryNtfy(entetes)", self.js)
         self.assertIn("86400000", self.js)
         self.assertIn(r"^retry-after:\s*(\d+)", self.js)
-        self.assertIn("ratelimit-policy", self.js)
+        self.assertIn('"?messages"?;q=(\\d+);w=\\d+', self.js)
+        self.assertIn('"?messages"?;r=(\\d+);t=\\d+', self.js)
         self.assertNotIn("Math.min(Number(retryAfterMs) || 0, 60000)", self.js)
 
     def test_heartbeat_intervale_pour_tier_ntfy_supporter(self):
