@@ -128,6 +128,15 @@ class LiveTikTok(unittest.TestCase):
         for mot in ("GOLD", "SHORT", "LONG", "ZONE", "position"):
             self.assertNotIn(mot, self.publie[0])
 
+    def test_tradingview_userscript_accepts_remote_animation_toggle_without_touching_voice(self):
+        bande = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")).read_text(encoding="utf-8")
+        self.assertIn("if (sorte === 'animations')", bande)
+        self.assertIn("animationsActives = valeur === 'on'", bande)
+        self.assertIn("localStorage.setItem('alignAnimationsEnabled'", bande)
+        self.assertIn("appliquerAnimations()", bande)
+        self.assertIn("const voixBtn", bande)
+        self.assertIn("const animationsBtn", bande)
+
     def test_reinjection_arrete_tous_les_animateurs_periodiques(self):
         bande = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")).read_text(encoding="utf-8")
         stop = bande[bande.index("stop() { vivant = false;"):]
