@@ -23,7 +23,7 @@ class TelegramCoachMenuTests(unittest.TestCase):
         self.assertNotEqual(callbacks["coachlive:BTC"], callbacks["auto:BTC"])
 
     def test_english_live_menu_keeps_labels_in_english(self):
-        etat = {"live_on": True, "proprio": ["101"]}
+        etat = {"live_on": True, "proprio": ["101"], "auto": {"BTC": ["101"]}}
         keyboard = json.loads(ab.clavier_live(etat, "101", anglais=True))
         buttons = [button for row in keyboard["inline_keyboard"] for button in row]
         labels = [button["text"] for button in buttons]
