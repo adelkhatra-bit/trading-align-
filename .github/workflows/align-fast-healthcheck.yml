@@ -119,10 +119,6 @@ jobs:
           tail -n 1 "$RUNNER_TEMP/align_relais.log" || true
 
       - name: Vérifier BTC + GOLD avec le contrat MTF canonique (12 UT)
-        env:
-          ALIGN_TV_API_URL: ${{ env.ALIGN_TV_API_URL }}
-          ALIGN_TV_READ_TOKEN: ${{ env.ALIGN_TV_READ_TOKEN }}
-          ALIGN_FAST_BRIDGE_MODE: ${{ env.ALIGN_FAST_BRIDGE_MODE }}
         run: |
           python3 - <<'PY'
           import json, math, os, time, urllib.error, urllib.parse, urllib.request
