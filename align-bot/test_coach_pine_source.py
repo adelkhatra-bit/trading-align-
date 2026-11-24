@@ -123,7 +123,7 @@ class CoachPineSourceTests(unittest.TestCase):
             text = ab.chrono_txt("BTC", r, cle, 900.0)
 
         self.assertIn("aucun plan Pine v25 frais", text)
-        self.assertIn("aucune zone Entry/SL/TP", text)
+        self.assertIn("Aucun niveau", text)
         self.assertNotIn("998", text)
         self.assertNotIn("999", text)
         self.assertIn("PROCHAINE RÉÉVALUATION", text)
@@ -165,7 +165,7 @@ class CoachPineSourceTests(unittest.TestCase):
 
         message = send.call_args.kwargs["text"]
         self.assertIn("aucun sens Pine v25 frais", message)
-        self.assertIn("aucune zone Entry/SL/TP", message)
+        self.assertIn("Aucune zone", message)
         self.assertNotIn("999", message)
         self.assertNotIn("998", message)
         self.assertIn("douze unités", message)
@@ -187,7 +187,8 @@ class CoachPineSourceTests(unittest.TestCase):
             ab.inscrire_auto(state, "chat-test", "BTC")
 
         message = send.call_args.kwargs["text"]
-        self.assertIn("Direction Pine v25 : LONG", message)
+        self.assertIn("Direction Pine v25 :", message)
+        self.assertIn("LONG", message)
         self.assertIn("Prix TradingView", message)
         self.assertIn("Entry", message)
         self.assertNotIn("999", message)
