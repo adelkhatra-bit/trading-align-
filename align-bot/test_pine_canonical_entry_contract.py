@@ -2,6 +2,8 @@
 from pathlib import Path
 import unittest
 
+import align_bot as ab
+
 BOT = Path(__file__).resolve().parent / "align_bot.py"
 BRIDGE = Path(__file__).resolve().parent / "align_tv_bridge.py"
 PINE = Path(__file__).resolve().parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
@@ -76,6 +78,30 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertLess(coach.index('startswith("Pine v25")'), coach.index("pe = pine_entree(r, d)"))
         self.assertIn('tv_price = float(tr["tv_price"])', coach)
         self.assertIn('float(tr["za"]), float(tr["zb"])', coach)
+
+    def test_prix_tradingview_dans_zone_uses_closed_zone_boundaries_and_rejects_invalid_data(self):
+        self.assertTrue(ab.prix_tradingview_dans_zone(100, 99, 101))
+        self.assertTrue(ab.prix_tradingview_dans_zone(99, 99, 101))
+        self.assertTrue(ab.prix_tradingview_dans_zone(101, 99, 101))
+        self.assertFalse(ab.prix_tradingview_dans_zone(101.01, 99, 101))
+        self.assertFalse(ab.prix_tradingview_dans_zone(98.99, 99, 101))
+        self.assertFalse(ab.prix_tradingview_dans_zone(None, 99, 101))
+        self.assertFalse(ab.prix_tradingview_dans_zone(float("nan"), 99, 101))
+
+    def test_pine_v25_coach_reads_only_the_trade_snapshot_zone_and_price(self):
+        lines = ab.coach_fvg(
+            {}, 1, 999, attente=False,
+            tr={
+                "src": "Pine v25 M15 / M5", "za": 99, "zb": 101,
+                "tv_price": 100, "entry_timeframe": "M5",
+                "strategie": "DAY", "strat_filtre": "SWING",
+            },
+        )
+        self.assertEqual(len(lines), 2)
+        self.assertIn("99", lines[0])
+        self.assertIn("101", lines[0])
+        self.assertIn("Pine DAY (M5)", lines[1])
+        self.assertIn("filtre local SWING", lines[1])
 
     def test_live_sniper_notification_requires_confirmed_pine_levels(self):
         start = self.bot.index("def evenements_pine(etat, m, r, cle, now):")
