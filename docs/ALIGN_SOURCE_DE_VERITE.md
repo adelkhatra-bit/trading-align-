@@ -107,4 +107,4 @@ Ne jamais publier dans ce dépôt, les issues, les commentaires ou les logs publ
 | `audit/chatgpt-pilotage` | Rapports de vérification, audit, notes | Mainteneurs humains | Documentation audit seulement; aucun runtime |
 | `fix/ci-triggers` | Correctif E1 désormais intégré (historique) | — | — |
 
-**Précision:** Les lecteurs externes de `live-data` et la source/dossier GitHub Pages ne sont pas exhaustivement identifiés; Cloudflare Worker `align-tv-mailbox` reste NON VÉRIFIÉ. Cette matrice décrit les flux confirmés, pas un inventaire exhaustif.
+**Précision:** Les lecteurs externes de `live-data` et la source/dossier GitHub Pages ne sont pas exhaustivement identifiés; le endpoint `/health` de `align-tv-mailbox` a répondu le 24/11/2026, mais la réception d'une alerte TradingView fraîche et l'écriture/lecture Durable Object restent NON VÉRIFIÉES de bout en bout. Cette matrice décrit les flux confirmés, pas un inventaire exhaustif.
