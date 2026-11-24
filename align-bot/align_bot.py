@@ -5789,6 +5789,10 @@ def desinscrire_auto(etat, cid, m):
     abonnes = trade.get("qui")
     if isinstance(abonnes, dict):
         abonnes.pop(cid, None)
+    auto_reste = any(cid in {str(x) for x in (etat.get("auto", {}).get(k) or [])} for k in MARCHES)
+    live_reste = any(cid in {str(x) for x in (abonnes or {})} for abonnes in (etat.get("coach_live") or {}).values())
+    if not auto_reste and not live_reste:
+        etat["recherche_positions_active"] = [x for x in etat.get("recherche_positions_active", []) if str(x) != cid]
     return True
 
 
