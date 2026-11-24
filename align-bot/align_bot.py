@@ -44,7 +44,7 @@ TELEGRAM_PULL_BLOCK_LOGGED = set()
 # Préfixes routés par traiter() ou live_callback(). Les compteurs indiquent ceux réellement cliqués.
 TELEGRAM_CALLBACK_HANDLER_PREFIXES = (
     "analysechoice", "auto", "autoadm", "botmenu", "botoff", "boton",
-    "choixcanal", "coach", "coachlive", "coachstop", "details", "financeplus",
+    "choixcanal", "coach", "coachlive", "coachstop", "autostop", "details", "financeplus",
     "followmarket", "history", "in", "jno", "jok", "levels", "likeobj",
     "likeok", "liveboost", "livemain", "liveoff", "liveon", "livemenu",
     "livemkt", "markets", "marketsmenu", "menulive", "next", "niveau",
@@ -4362,16 +4362,72 @@ def donnees_ia(m, r, cle):
         data["position_ouverte"] = {"sens": "LONG" if trx["d"] == 1 else "SHORT", "entrée": round(trx["e"], 2),
                                     "SL": round(trx["sl"], 2), "TP1": round(trx["tp1"], 2),
                                     "TP2": round(trx["tp2"], 2) if trx.get("tp2") else None, "statut": trx.get("statut")}
-    # Distance réelle au plan d'entrée et rythme observé : aide à décider si l'attente vaut la peine.
-    prix_actuel = float(r["m1"][-1]["c"])
+    # En mode bridge obligatoire, le coach ne mélange jamais le prix/plan Pine avec un ordre local de secours.
+    bridge_required = r.get("require_tv_bridge") is True
     plan = plan_indicateur(r)
+    bridge = r.get("tv_indicator_mtf") or {}
+    snapshots = bridge.get("snapshots") or {}
+    active_tf = str(bridge.get("activeTimeframe") or "").upper()
+    active_snap = snapshots.get(active_tf) or {}
+    try:
+        prix_tv = float(plan["price"]) if plan.get("available") else float(active_snap["price"])
+        if not math.isfinite(prix_tv) or prix_tv <= 0 or active_snap.get("fresh") is not True:
+            prix_tv = None
+    except (KeyError, TypeError, ValueError):
+        prix_tv = None
+    if bridge_required:
+        data["prix"] = round(prix_tv, 2) if prix_tv is not None else None
+        data["zone d'entrée"] = (
+            [round(plan["zone_low"], 2), round(plan["zone_high"], 2)]
+            if plan.get("available") else None
+        )
+        def lecture_pine(tf, champ):
+            snap = snapshots.get(tf) or {}
+            if snap.get("fresh") is not True:
+                return None
+            valeur = snap.get(champ)
+            if champ == "direction":
+                return _direction_tv(valeur)
+            try:
+                nombre = float(valeur)
+                return round(nombre) if math.isfinite(nombre) else None
+            except (TypeError, ValueError):
+                return None
+
+        data["sens 1m/5m/15m/1h/4h/Daily"] = [
+            lecture_pine(tf, "direction") for tf in ("M1", "M5", "M15", "H1", "H4", "D1")
+        ]
+        data["RSI 5m/15m/1h/4h"] = [
+            lecture_pine(tf, "rsi") for tf in ("M5", "M15", "H1", "H4")
+        ]
+        data["lecture_multi_unites"] = {
+            tf: lecture_pine(tf, "direction") for tf in ("M5", "M15", "H1", "H4")
+        }
+        data["niveau de cassure 5 min"] = None
+        data["profil_strategie"] = (
+            {"mode": plan["strategy"], "direction": plan["direction"],
+             "horizon": {"SCALPING": "court terme", "DAY": "séance", "SWING": "plusieurs séances"}.get(plan["strategy"], "à réévaluer")}
+            if plan.get("available") else
+            {"mode": "ATTENTE", "direction": 0, "horizon": "aucun plan Pine frais exploitable"}
+        )
+        if plan.get("available"):
+            sens_pine = "LONG" if plan["direction"] == 1 else "SHORT"
+            etat_plan = ("déclencheur confirmé et prix dans la zone" if plan.get("price_in_zone") else
+                         "déclencheur confirmé mais prix hors zone : attendre le retour" if plan.get("triggered") else
+                         "déclencheur en attente")
+            data["verdict du bot"] = f"Plan Pine v25 {sens_pine} : {etat_plan}; l'entrée reste soumise au garde-fou ROBOT V12."
+        else:
+            data["verdict du bot"] = "Aucune entrée autorisée : plan Pine v25 indisponible — " + str(plan.get("reason") or "données incomplètes")
+    # Distance réelle au plan : même prix TradingView que le snapshot du plan.
+    # Hors mode bridge, le comportement historique reste inchangé.
+    prix_actuel = prix_tv if bridge_required else float(r["m1"][-1]["c"])
     cible_entree = None
     origine_plan = None
     if plan.get("available"):
         cible_entree, origine_plan = float(plan["entry"]), "TradingView ROBOT V12 frais"
-    elif o.get("e") is not None:
+    elif not bridge_required and o.get("e") is not None:
         cible_entree, origine_plan = float(o["e"]), "ordre ALIGN actif"
-    if cible_entree is not None:
+    if cible_entree is not None and prix_actuel is not None:
         distance = abs(cible_entree - prix_actuel)
         data["distance_plan_entree"] = {
             "prix_actuel": round(prix_actuel, 5), "entree_visee": round(cible_entree, 5),
@@ -4380,18 +4436,28 @@ def donnees_ia(m, r, cle):
             "distance_en_ATR_15m": round(distance / max(float(r.get("atr") or 0), 1e-9), 2) if r.get("atr") else None
         }
     else:
-        data["distance_plan_entree"] = {"disponible": False, "raison": "aucun ordre ALIGN ni plan TradingView frais avec prix d'entrée exploitable"}
-    # Rythme des dernières bougies 5m : estimation indicative, jamais un compte à rebours garanti.
+        data["distance_plan_entree"] = {
+            "disponible": False,
+            "raison": "aucun plan Pine frais avec prix TradingView exploitable" if bridge_required
+                      else "aucun ordre ALIGN ni plan TradingView frais avec prix d'entrée exploitable"
+        }
+    # Le rythme 5m est un proxy local, pas le flux Pine : ne pas en déduire une ETA GOLD.
     b5 = r.get("b5") or []
     ranges = [max(float(b.get("h", 0)) - float(b.get("l", 0)), abs(float(b.get("h", 0)) - float(b.get("c", 0))), abs(float(b.get("l", 0)) - float(b.get("c", 0)))) for b in b5[-12:] if b.get("h") is not None and b.get("l") is not None and b.get("c") is not None]
     moyenne_5m = sum(ranges) / len(ranges) if ranges else 0
-    if cible_entree is not None and moyenne_5m > 0:
+    if bridge_required and m == "GOLD":
+        data["estimation_approche_entree"] = {
+            "disponible": False,
+            "raison": "historique 5m du flux spot TradingView non disponible; utiliser uniquement la prochaine clôture comme heure de réévaluation"
+        }
+    elif cible_entree is not None and prix_actuel is not None and moyenne_5m > 0:
         bougies = distance / moyenne_5m
         data["estimation_approche_entree"] = {
             "mouvement_moyen_5m": round(moyenne_5m, 5),
             "bougies_5m_indicatives": round(bougies, 1),
             "minutes_indicatives": round(bougies * 5),
-            "avertissement": "projection mécanique fondée sur les 12 dernières bougies, non prédictive et à ne pas traiter comme heure d'entrée"
+            "source_mouvement": "bougies 5m locales du bot (proxy, distinct du snapshot TradingView)" if bridge_required else "bougies 5m locales",
+            "avertissement": "projection mécanique non prédictive; jamais une heure d'entrée garantie"
         }
     else:
         data["estimation_approche_entree"] = {"disponible": False, "raison": "pas de plan d'entrée exploitable ou historique 5m insuffisant"}
@@ -4406,13 +4472,16 @@ def donnees_ia(m, r, cle):
         ]
     data["structure_bougies_recentes"] = structure
     data["ATR_15m"] = round(float(r.get("atr") or 0), 5) or None
-    tf = timeframe_attendu(r, cle or {})
+    if bridge_required:
+        tf = {"SCALPING": "1m", "DAY": "5m", "SWING": "1h"}.get(plan.get("strategy"), "15m")
+    else:
+        tf = timeframe_attendu(r, cle or {})
     close_ts = prochaine_cloture_bougie(r, tf, time.time())
     data["prochaine_reevaluation"] = {
         "unite_bloquante": tf,
         "heure_locale": datetime.datetime.fromtimestamp(close_ts, PARIS).strftime("%Y-%m-%d %H:%M:%S %Z"),
         "secondes_restantes": max(0, int(close_ts - time.time())),
-        "signification": "réévaluation à la clôture, pas une prévision d'entrée"
+        "signification": "prochaine vérification à la clôture estimée, pas une prévision d'entrée"
     }
     lp = lecons_pour(m)
     if lp:
@@ -5353,19 +5422,81 @@ def raison_attente(r, cle):
 
 
 def chrono_txt(m, r, cle, t0):
-    """Chronomètre calé sur les bougies reçues et sur l'unité de temps qui bloque réellement."""
+    """Chronomètre du coach ; en mode bridge, prix, plan et biais viennent exclusivement de Pine v25."""
     now = time.time()
-    p = r["m1"][-1]["c"] if r.get("m1") else r.get("prix", 0)
+    bridge_required = bool(r.get("require_tv_bridge"))
+    plan = plan_indicateur(r) if bridge_required else None
+    if bridge_required:
+        bridge = r.get("tv_indicator_mtf") or {}
+        active_tf = str(bridge.get("activeTimeframe") or "").upper()
+        active_snap = (bridge.get("snapshots") or {}).get(active_tf) or {}
+        try:
+            p = float(plan["price"]) if plan and plan.get("available") else float(active_snap["price"])
+            if not math.isfinite(p) or p <= 0 or active_snap.get("fresh") is not True:
+                p = None
+        except (KeyError, TypeError, ValueError):
+            p = None
+    else:
+        p = r["m1"][-1]["c"] if r.get("m1") else r.get("prix", 0)
     tr = cle.get("trade")
+    prix_affiche = px(p) if p is not None else "indisponible"
     if tr:
-        return "\n".join([
-            f"⏱ SUIVI EN DIRECT — {ICONE.get(m, '')} {m}  {px(p)}",
+        lignes = [
+            f"⏱ SUIVI EN DIRECT — {ICONE.get(m, '')} {m}  {prix_affiche}",
             f"🎯 Suivi en cours depuis {duree_humaine(now - t0)}",
             f"🟢 POSITION OUVERTE — {SENS[tr['d']]}",
             f"🟨 Entrée {px(tr['e'])} • 🛑 SL {px(tr['sl'])} • 🎯 TP1 {px(tr['tp1'])}",
-            statut_position(tr, p),
-            "🧑‍🏫 Le coach surveille le SL, le passage à BE et les TP."
-        ])
+        ]
+        if p is not None:
+            lignes.append(statut_position(tr, p))
+        elif bridge_required:
+            lignes.append("⚠️ Prix TradingView indisponible : aucun prix local ne le remplace.")
+        lignes.append("🧑‍🏫 Le coach surveille le SL, le passage à BE et les TP.")
+        return "\n".join(lignes)
+
+    if bridge_required:
+        tf_map = {"M1": "5m", "M3": "5m", "M5": "5m", "M10": "5m",
+                  "M15": "15m", "M30": "15m", "M45": "15m",
+                  "H1": "1h", "H2": "1h", "H4": "4h", "D1": "D", "W1": "W"}
+        tf = tf_map.get(str((plan or {}).get("entry_timeframe") or "").upper(), "15m")
+        if plan and plan.get("available"):
+            sens = "LONG" if plan["direction"] == 1 else "SHORT"
+            if plan.get("triggered") and not plan.get("price_in_zone"):
+                direction = f"Pine v25 {sens} — déclencheur confirmé, prix hors zone : attendre le retour"
+                raison = "Le prix TradingView a quitté la zone Pine M15. Aucune entrée au marché ; attendre le retour dans la zone."
+            elif plan.get("triggered"):
+                direction = f"Pine v25 {sens} — déclencheur confirmé, garde-fou ROBOT V12 en cours"
+                raison = "Le déclencheur Pine est confirmé et le prix est dans la zone ; l'entrée reste soumise au contrôle final ROBOT V12."
+            else:
+                direction = f"Pine v25 {sens} — déclencheur en attente"
+                raison = "Le plan Pine existe, mais la bougie de déclenchement n'est pas encore confirmée. Aucune entrée avant clôture."
+        else:
+            direction = "ATTENTE — aucun plan Pine v25 frais exploitable"
+            raison = "Plan Pine indisponible : les lectures locales ne remplacent pas le bridge. Aucun niveau d'entrée n'est affiché."
+        cible = prochaine_cloture_bougie(r, tf, now)
+        restant = max(0, cible - now)
+        lignes = [
+            f"⏱ SUIVI EN DIRECT — {ICONE.get(m, '')} {m}  {prix_affiche}",
+            f"🎯 Suivi en cours depuis {duree_humaine(now - t0)}",
+            f"🧭 DIRECTION : {direction}",
+            f"⏳ POURQUOI J'ATTENDS : {raison}",
+        ]
+        if plan and plan.get("available"):
+            lignes += [
+                f"📍 ZONE PINE M15 : {px(plan['zone_low'])} à {px(plan['zone_high'])}",
+                f"🎯 Entry Pine : {px(plan['entry'])} • 🛑 SL : {px(plan['sl'])} • TP1 : {px(plan['tp1'])}"
+                + (f" • TP2 : {px(plan['tp2'])}" if plan.get("tp2") is not None else ""),
+            ]
+        lignes += [
+            f"⏳ PROCHAINE RÉÉVALUATION {tf}",
+            f"⏱ Temps restant : {duree_cloture(restant)}",
+            f"🕒 Heure prévue : {datetime.datetime.fromtimestamp(cible, PARIS).strftime('%H:%M')} (heure de Paris)",
+            "ℹ️ Ce compte à rebours indique la prochaine vérification, pas l'heure garantie d'une entrée.",
+            f"⌛ Fin du suivi si aucun setup avant {heure(t0 + CHRONO_MAX)} — aucune entrée forcée",
+            f"🔄 Actualisé à {datetime.datetime.fromtimestamp(now, PARIS).strftime('%H:%M:%S')}",
+        ]
+        return "\n".join(lignes)
+
     tf = timeframe_attendu(r, cle)
     cible = prochaine_cloture_bougie(r, tf, now)
     restant = max(0, cible - now)
@@ -5382,7 +5513,7 @@ def chrono_txt(m, r, cle, t0):
     else:
         direction = f"4 h {('LONG' if d4h == 1 else 'SHORT')} — validation complète en attente"
     l = [
-        f"⏱ SUIVI EN DIRECT — {ICONE.get(m, '')} {m}  {px(p)}",
+        f"⏱ SUIVI EN DIRECT — {ICONE.get(m, '')} {m}  {prix_affiche}",
         f"🎯 Suivi en cours depuis {duree_humaine(now - t0)}",
         f"🧭 DIRECTION : {direction}",
         f"⏳ POURQUOI J'ATTENDS : {raison_attente(r, cle)}",
@@ -5564,9 +5695,8 @@ def boucle_chronos(etat):
 
 
 def inscrire_auto(etat, cid, m, notifier=True):
-    """Active explicitement le coach pour le prochain setup, sans envoyer d'ordre broker."""
+    """Active le coach pour le prochain setup ; en mode bridge, seuls les niveaux Pine sont présentés."""
     cid = str(cid)
-    # Une inscription explicite réactive le suivi après un refus « Pas aujourd'hui ».
     etat["quiet"] = [x for x in (etat.get("quiet") or []) if str(x) != cid]
     etat["bot_off"] = [x for x in etat.get("bot_off", []) if str(x) != cid]
     liste = etat.setdefault("auto", {}).setdefault(m, [])
@@ -5574,40 +5704,108 @@ def inscrire_auto(etat, cid, m, notifier=True):
         liste.append(cid)
     r = (DERNIERS or {}).get(m)
     cle = etat.get(m, {})
-    o = cle.get("ordre")
-    d = (o or {}).get("d") or cle.get("aligne") or (r or {}).get("confirme") or 0
-    decision = raison_attente(r, cle) if r else "J'attends les premières bougies complètes pour établir le contexte."
-    direction = SENS[d] if d in SENS else "⚪ NEUTRE — aucun sens confirmé"
-    lignes = [
-        f"🎯 SUIVI ACTIVÉ — {ICONE.get(m, '')} {m}",
-        f"🧭 Direction actuelle : {direction}",
-        f"⏳ Décision actuelle : {decision}"
-    ]
-    if o:
-        bas, haut = sorted((o.get("za", o["e"]), o.get("zb", o["e"])))
-        lignes += [
-            f"📍 Zone d'entrée surveillée : {px(bas)} à {px(haut)}",
-            f"🛑 Stop calculé : {px(o['sl'])} — {meche_sl(o)}",
-            f"🎯 Objectifs : TP1 {px(o['tp1'])} • TP2 {px(o['tp2'])}",
-            "⚠️ Cette zone est un repère, pas un ordre à placer maintenant."
-        ]
+    bridge_required = bool(r and r.get("require_tv_bridge"))
+    plan = plan_indicateur(r) if bridge_required else None
+    if bridge_required:
+        if plan and plan.get("available"):
+            d = plan["direction"]
+            sens = SENS[d]
+            if plan.get("triggered") and not plan.get("price_in_zone"):
+                decision = "Déclencheur Pine confirmé, mais le prix TradingView est hors zone : attendre le retour. Aucune entrée au marché."
+            elif plan.get("triggered"):
+                decision = "Déclencheur Pine confirmé et prix dans la zone ; contrôle final ROBOT V12 en attente."
+            else:
+                decision = "Plan Pine v25 disponible ; attendre la clôture du déclencheur avant toute entrée."
+            lignes = [
+                f"🎯 SUIVI ACTIVÉ — {ICONE.get(m, '')} {m}",
+                f"🧭 Direction Pine v25 : {sens}",
+                f"⏳ Décision actuelle : {decision}",
+                f"💹 Prix TradingView : {px(plan['price'])}",
+                f"📍 Zone Pine M15 : {px(plan['zone_low'])} à {px(plan['zone_high'])}",
+                f"🎯 Entry {px(plan['entry'])} • 🛑 SL {px(plan['sl'])} • TP1 {px(plan['tp1'])}"
+                + (f" • TP2 {px(plan['tp2'])}" if plan.get("tp2") is not None else ""),
+                "⚠️ Plan indicatif : aucune entrée n'est autorisée avant validation du garde-fou ROBOT V12.",
+            ]
+        else:
+            raison = str((plan or {}).get("reason") or "snapshots TradingView incomplets ou périmés")
+            lignes = [
+                f"🎯 SUIVI ACTIVÉ — {ICONE.get(m, '')} {m}",
+                "🧭 Direction : ATTENTE — aucun sens Pine v25 frais exploitable",
+                f"⏳ Décision actuelle : {raison}",
+                "📍 Aucune zone Entry/SL/TP affichée : le coach refuse tout remplacement par un ordre local.",
+            ]
     else:
-        lignes += [
-            "📍 Aucune zone d'entrée validée pour le moment.",
-            "🙅 Ne place pas d'ordre sur une zone qui n'a pas encore été calculée."
+        o = cle.get("ordre")
+        d = (o or {}).get("d") or cle.get("aligne") or (r or {}).get("confirme") or 0
+        decision = raison_attente(r, cle) if r else "J'attends les premières bougies complètes pour établir le contexte."
+        direction = SENS[d] if d in SENS else "⚪ NEUTRE — aucun sens confirmé"
+        lignes = [
+            f"🎯 SUIVI ACTIVÉ — {ICONE.get(m, '')} {m}",
+            f"🧭 Direction actuelle : {direction}",
+            f"⏳ Décision actuelle : {decision}"
         ]
+        if o:
+            bas, haut = sorted((o.get("za", o["e"]), o.get("zb", o["e"])))
+            lignes += [
+                f"📍 Zone d'entrée surveillée : {px(bas)} à {px(haut)}",
+                f"🛑 Stop calculé : {px(o['sl'])} — {meche_sl(o)}",
+                f"🎯 Objectifs : TP1 {px(o['tp1'])} • TP2 {px(o['tp2'])}",
+                "⚠️ Cette zone est un repère, pas un ordre à placer maintenant."
+            ]
+        else:
+            lignes += [
+                "📍 Aucune zone d'entrée validée pour le moment.",
+                "🙅 Ne place pas d'ordre sur une zone qui n'a pas encore été calculée."
+            ]
     lignes += [
-        "🔔 Je t'alerterai à la prochaine clôture utile pour débloquer la décision. Toutes les unités restent consultables avec le bouton « Toutes les unités ».",
-        "🤖 Si ALIGN déclenche une position, ton suivi interne sera activé automatiquement.",
+        "🔔 Je t'alerterai à la prochaine clôture utile pour débloquer la décision. Les douze unités restent consultables dans Telegram.",
+        "🤖 Si ALIGN valide une position, ton suivi interne sera activé automatiquement.",
         "ℹ️ Aucun ordre n'est envoyé à ta plateforme : tu gardes la main sur l'exécution.",
         "🎯 Le coach suit ensuite le SL, le passage à BE et les TP.",
-        "⏱ Le chronomètre réel est affiché dans le message juste en dessous."
+        "⏱ Le chronomètre indique la prochaine réévaluation, jamais une heure d'entrée garantie."
     ]
     if notifier:
         _envoi_sur(cid, reply_markup=CLAVIER, text="\n".join(lignes))
     if r:
         armer_clotures_multi(etat, cid, m, r)
     lancer_chrono(etat, cid, m, r)
+
+
+
+def desinscrire_auto(etat, cid, m):
+    """Arrête le suivi de la prochaine position pour un seul marché et un seul chat."""
+    cid = str(cid)
+    auto = etat.setdefault("auto", {}).setdefault(m, [])
+    etat["auto"][m] = [x for x in auto if str(x) != cid]
+    veille = etat.setdefault("veille_cloture", {}).setdefault(m, {})
+    veille.pop(cid, None)
+    chrono = etat.setdefault("chrono", {}).setdefault(m, {}).pop(cid, None)
+    if chrono and chrono.get("mid"):
+        try:
+            telegram("deleteMessage", chat_id=cid, message_id=chrono["mid"])
+        except Exception as ex:
+            print("suppression chrono coach", m, ex)
+    trade = (etat.get(m) or {}).get("trade") or {}
+    abonnes = trade.get("qui")
+    if isinstance(abonnes, dict):
+        abonnes.pop(cid, None)
+    # Retirer uniquement les pré-alertes en attente pour ce marché ; conserver celles de l'autre marché.
+    file_outbox = etat.get("telegram_outbox") or []
+    file_conservee = []
+    for item in file_outbox:
+        if str(item.get("chat_id", "")) == cid and m in (item.get("coach_prealert_markets") or []):
+            marches_restantes = [x for x in item.get("coach_prealert_markets") or [] if x != m]
+            if not marches_restantes:
+                continue
+            item["coach_prealert_markets"] = marches_restantes
+        file_conservee.append(item)
+    etat["telegram_outbox"] = file_conservee
+    auto_reste = any(cid in {str(x) for x in (etat.get("auto", {}).get(k) or [])} for k in MARCHES)
+    live_reste = any(cid in {str(x) for x in (abonnes or {})} for abonnes in (etat.get("coach_live") or {}).values())
+    if not auto_reste and not live_reste:
+        etat["recherche_positions_active"] = [x for x in etat.get("recherche_positions_active", []) if str(x) != cid]
+    return True
+
 
 def bot_on(etat, cid):
     return str(cid) not in {str(x) for x in etat.get("bot_off", [])}
@@ -6516,10 +6714,14 @@ def activer_coach_live(etat, cid, m, actif=True):
             etat["recherche_positions_active"] = [x for x in etat.get("recherche_positions_active", []) if str(x) != str(cid)]
 
 def demarrer_recherche_positions(etat, cid):
-    """Démarre la veille persistante sur les marchés choisis, jusqu'à arrêt manuel."""
+    """Démarre le vrai coach de position Pine sur les marchés choisis, jusqu'à arrêt manuel."""
+    cid = str(cid)
     marches = tuple(sorted(marches_choisis(etat, cid)))
     for m in marches:
-        activer_coach_live(etat, cid, m, True)
+        inscrire_auto(etat, cid, m, notifier=False)
+    actifs = etat.setdefault("recherche_positions_active", [])
+    if cid not in {str(x) for x in actifs}:
+        actifs.append(cid)
     return marches
 
 
@@ -7596,13 +7798,13 @@ def traiter(etat, chats, updates):
                 deja_ouverts = [m for m in marches_recherche if (etat.get(m) or {}).get("trade")]
                 precision_retard = (f"\n⚠️ Position déjà en cours sur {', '.join(deja_ouverts)} : je ne te ferai pas entrer en retard. Je cherche la prochaine entrée."
                                     if deja_ouverts else "")
-                boutons_stop = [[{"text": f"⏹ Arrêter {m}", "callback_data": f"coachstop:{m}"} for m in marches_recherche]]
+                boutons_stop = [[{"text": f"⏹ Arrêter {m}", "callback_data": f"autostop:{m}"} for m in marches_recherche]]
                 _envoi_sur(qui, text=(f"🎯 RECHERCHE DE POSITION ACTIVE — {noms}\n"
-                                      "🔎 ALIGN surveille les configurations confirmées en continu.\n"
-                                      "🔕 Aucun commentaire intermédiaire : je t'écris uniquement lorsqu'une position est confirmée.\n"
-                                      "📍 Dès qu'une position est détectée, tu reçois ses niveaux et son suivi.\n"
-                                      "🔕 Pas d'alerte automatique sur les autres marchés.\n"
-                                      "⏹ La recherche reste active jusqu'à ton arrêt." + precision_retard), 
+                                      "🔎 Le coach suit le plan Pine v25, les snapshots TradingView et le déclencheur de la prochaine position.\n"
+                                      "⏳ Un compte à rebours indique la prochaine réévaluation ; seules les clôtures utiles déclenchent une mise à jour.\n"
+                                      "📍 Entry/SL/TP ne sont transmis qu'après confirmation Pine et validation du prix dans la zone.\n"
+                                      "🛑 Aucun ordre broker n'est envoyé ; tu gardes la main sur l'exécution.\n"
+                                      "⏹ Chaque marché peut être arrêté séparément." + precision_retard), 
                            reply_markup=json.dumps({"inline_keyboard": boutons_stop}))
                 continue
             if choix == "analysechoice" and marche_retiree_demande(mk):
@@ -7946,6 +8148,14 @@ def traiter(etat, chats, updates):
                     pass
                 _envoi_sur(qui, text=f"🎙 COMMENTATEUR {ICONE.get(mk, '')} {mk}\n✅ Tu es déjà dans la chaîne\n👀 Il commente là-bas\n🙅 Pas de doublon ici")
                 continue
+            if choix == "autostop" and mk in MARCHES:
+                desinscrire_auto(etat, qui, mk)
+                try:
+                    telegram("answerCallbackQuery", callback_query_id=cb["id"], text="⏹ Suivi coach arrêté pour " + mk)
+                except Exception:
+                    pass
+                _envoi_sur(qui, text=f"⏹ SUIVI COACH ARRÊTÉ — {ICONE.get(mk, '')} {mk}\nLe suivi de l'autre marché reste inchangé.")
+                continue
             if choix in ("coachlive", "coachstop") and mk in MARCHES:
                 activer_coach_live(etat, qui, mk, choix == "coachlive")
                 r_now = DERNIERS.get(mk)
@@ -7956,7 +8166,7 @@ def traiter(etat, chats, updates):
                 if choix == "coachlive":
                     intro = (f"🎙 COACH COMMENTATEUR ACTIVÉ — {ICONE.get(mk, '')} {mk}\n"
                              "🔎 Surveillance continue : je cherche une configuration d'entrée confirmée, sans inventer de signal.\n"
-                             "🔕 Aucun message de marché intermédiaire : uniquement une position confirmée.\n"
+                             "🕯 Commentaire aux clôtures 15 min utiles ; aucune Entry/SL/TP sans confirmation Pine.\n"
                              "📍 Dès qu'une position est ouverte par ALIGN, je poursuis son suivi.\n"
                              "⏹ Pour arrêter : le bouton sous mes messages.")
                     contenu = intro
@@ -13572,7 +13782,16 @@ def clavier_live(etat, cid, anglais=False):
         lignes.append([{"text": "🚀 Boost the live" if anglais else "🚀 Booster le live", "callback_data": "liveboost:x"}])
         lignes.append([{"text": LIVE_CHOIX[k][2], "callback_data": f"livemain:{k}"} for k in ("BTC", "GOLD")])
         lignes.append([{"text": LIVE_CHOIX[k][2], "callback_data": f"livemain:{k}"} for k in ("1", "5", "15", "60")])
-        lignes.append([{"text": f"🎙 Coach {k}", "callback_data": f"coachlive:{k}"} for k in ("BTC", "GOLD")])
+        lignes.append([{"text": (f"🎙 Commentary {k}" if anglais else f"🎙 Commentaire {k}"),
+                         "callback_data": f"coachlive:{k}"} for k in ("BTC", "GOLD")])
+        lignes.append([{"text": (f"🧑‍🏫 Next position {k}" if anglais else f"🧑‍🏫 Coach position {k}"),
+                         "callback_data": f"auto:{k}"} for k in ("BTC", "GOLD")])
+        lignes.append([{"text": (f"📊 12 timeframes {k}" if anglais else f"📊 12 UT {k}"),
+                         "callback_data": f"timeframes:{k}"} for k in ("BTC", "GOLD")])
+        suivis_actifs = [k for k in ("BTC", "GOLD") if str(cid) in {str(x) for x in etat.get("auto", {}).get(k, [])}]
+        if suivis_actifs:
+            lignes.append([{"text": (f"⏹ Stop coach {k}" if anglais else f"⏹ Arrêter coach {k}"),
+                             "callback_data": f"autostop:{k}"} for k in suivis_actifs])
         lignes.append([{"text": "🔎 Faire une analyse" if not anglais else "🔎 Research markets",
                         "callback_data": "analysechoice:BOTH"}])
         lignes.append([{"text": "🎯 Chercher une position" if not anglais else "🎯 Find a position",
