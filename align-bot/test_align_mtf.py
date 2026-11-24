@@ -3646,6 +3646,7 @@ class PineOnlyEntryGateTests(unittest.TestCase):
                 "snapshots": {
                     "M5": {
                         "fresh": True,
+                        "price": 100.0,
                         "confirmed": True,
                         "robotV12": {
                             "signal": "LONG", "entry": 100.0, "sl": 95.0,
