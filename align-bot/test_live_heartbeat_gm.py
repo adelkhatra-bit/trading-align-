@@ -54,7 +54,7 @@ class HeartbeatGmTests(unittest.TestCase):
     def test_retry_after_daily_ntfy_est_respecte_jusqua_24h(self):
         self.assertIn("function delaiRetryNtfy(entetes)", self.js)
         self.assertIn("86400000", self.js)
-        self.assertIn(r"^retry-after:\\s*(\\d+)", self.js)
+        self.assertIn(r"^retry-after:\s*(\d+)", self.js)
         self.assertIn("ratelimit-policy", self.js)
         self.assertNotIn("Math.min(Number(retryAfterMs) || 0, 60000)", self.js)
 
