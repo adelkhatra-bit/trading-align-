@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -71,6 +72,16 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("--marche et --pair doivent correspondre", result.stderr)
+    def test_worker_rollover_script_compiles_and_has_time_budget(self):
+        marker = "python3 - <<'PY'\\n"
+        start = self.rollover.index(marker) + len(marker)
+        end = self.rollover.index("\\n          PY", start)
+        script = textwrap.dedent(self.rollover[start:end])
+        compile(script, "<align-worker-rollover>", "exec")
+        self.assertIn("timeout-minutes: 18", self.rollover)
+        self.assertIn("grace_deadline = time.time() + 300", self.rollover)
+        self.assertIn("deadline = time.time() + 120", self.rollover)
+
     def test_worker_rollover_serializes_memory_saves(self):
         script = self.rollover[self.rollover.index("          # Traiter les anciens workers un par un"):]
         self.assertIn("while True:", script)
