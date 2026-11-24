@@ -87,6 +87,18 @@ class CoachPineSourceTests(unittest.TestCase):
         self.assertEqual(data["estimation_approche_entree"]["source_mouvement"],
                          "bougies 5m locales du bot (proxy, distinct du snapshot TradingView)")
 
+    def test_confirmed_pine_trigger_outside_zone_is_never_presented_as_entry_ready(self):
+        r = self.base_market()
+        plan = {
+            "available": True, "price": 107.0, "entry": 105.0, "sl": 95.0,
+            "tp1": 115.0, "tp2": None, "zone_low": 104.0, "zone_high": 106.0,
+            "strategy": "DAY", "direction": 1, "triggered": True, "price_in_zone": False,
+        }
+        data = self.run_data("BTC", r, {}, plan)
+
+        self.assertIn("déclencheur confirmé mais prix hors zone", data["verdict du bot"])
+        self.assertIn("attendre le retour", data["verdict du bot"])
+
     def test_gold_does_not_publish_eta_from_non_tradingview_proxy_candles(self):
         r = self.base_market("GOLD")
         plan = {
