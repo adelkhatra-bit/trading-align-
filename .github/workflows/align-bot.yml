@@ -83,7 +83,7 @@ jobs:
               with urllib.request.urlopen(req, timeout=20) as r:
                   return [x["id"] for x in json.loads(r.read().decode()).get("workflow_runs", []) if x["id"] < me]
           debut = time.time()
-          while time.time() - debut < 240:
+          while time.time() - debut < 900:
               try:
                   vieux = autres()
               except Exception as ex:
@@ -92,7 +92,7 @@ jobs:
                   print(f"WORKER_WAIT ancien worker terminé après {int(time.time() - debut)} s"); break
               print(f"WORKER_WAIT en attente de {vieux} ({int(time.time() - debut)} s)"); time.sleep(5)
           else:
-              raise SystemExit("WORKER_WAIT délai de 240 s atteint : arrêt préventif, mémoire non garantie")
+              raise SystemExit("WORKER_WAIT délai de 900 s atteint : arrêt préventif, mémoire non garantie")
           PY
 
       - name: Récupérer la mémoire du robot
