@@ -5695,9 +5695,8 @@ def boucle_chronos(etat):
 
 
 def inscrire_auto(etat, cid, m, notifier=True):
-    """Active explicitement le coach pour le prochain setup, sans envoyer d'ordre broker."""
+    """Active le coach pour le prochain setup ; en mode bridge, seuls les niveaux Pine sont présentés."""
     cid = str(cid)
-    # Une inscription explicite réactive le suivi après un refus « Pas aujourd'hui ».
     etat["quiet"] = [x for x in (etat.get("quiet") or []) if str(x) != cid]
     etat["bot_off"] = [x for x in etat.get("bot_off", []) if str(x) != cid]
     liste = etat.setdefault("auto", {}).setdefault(m, [])
@@ -5705,40 +5704,71 @@ def inscrire_auto(etat, cid, m, notifier=True):
         liste.append(cid)
     r = (DERNIERS or {}).get(m)
     cle = etat.get(m, {})
-    o = cle.get("ordre")
-    d = (o or {}).get("d") or cle.get("aligne") or (r or {}).get("confirme") or 0
-    decision = raison_attente(r, cle) if r else "J'attends les premières bougies complètes pour établir le contexte."
-    direction = SENS[d] if d in SENS else "⚪ NEUTRE — aucun sens confirmé"
-    lignes = [
-        f"🎯 SUIVI ACTIVÉ — {ICONE.get(m, '')} {m}",
-        f"🧭 Direction actuelle : {direction}",
-        f"⏳ Décision actuelle : {decision}"
-    ]
-    if o:
-        bas, haut = sorted((o.get("za", o["e"]), o.get("zb", o["e"])))
-        lignes += [
-            f"📍 Zone d'entrée surveillée : {px(bas)} à {px(haut)}",
-            f"🛑 Stop calculé : {px(o['sl'])} — {meche_sl(o)}",
-            f"🎯 Objectifs : TP1 {px(o['tp1'])} • TP2 {px(o['tp2'])}",
-            "⚠️ Cette zone est un repère, pas un ordre à placer maintenant."
-        ]
+    bridge_required = bool(r and r.get("require_tv_bridge"))
+    plan = plan_indicateur(r) if bridge_required else None
+    if bridge_required:
+        if plan and plan.get("available"):
+            d = plan["direction"]
+            sens = SENS[d]
+            if plan.get("triggered") and not plan.get("price_in_zone"):
+                decision = "Déclencheur Pine confirmé, mais le prix TradingView est hors zone : attendre le retour. Aucune entrée au marché."
+            elif plan.get("triggered"):
+                decision = "Déclencheur Pine confirmé et prix dans la zone ; contrôle final ROBOT V12 en attente."
+            else:
+                decision = "Plan Pine v25 disponible ; attendre la clôture du déclencheur avant toute entrée."
+            lignes = [
+                f"🎯 SUIVI ACTIVÉ — {ICONE.get(m, '')} {m}",
+                f"🧭 Direction Pine v25 : {sens}",
+                f"⏳ Décision actuelle : {decision}",
+                f"📍 Zone Pine M15 : {px(plan['zone_low'])} à {px(plan['zone_high'])}",
+                f"🎯 Entry {px(plan['entry'])} • 🛑 SL {px(plan['sl'])} • TP1 {px(plan['tp1'])}"
+                + (f" • TP2 {px(plan['tp2'])}" if plan.get("tp2") is not None else ""),
+                "⚠️ Plan indicatif : aucune entrée n'est autorisée avant validation du garde-fou ROBOT V12.",
+            ]
+        else:
+            raison = str((plan or {}).get("reason") or "snapshots TradingView incomplets ou périmés")
+            lignes = [
+                f"🎯 SUIVI ACTIVÉ — {ICONE.get(m, '')} {m}",
+                "🧭 Direction : ATTENTE — aucun sens Pine v25 frais exploitable",
+                f"⏳ Décision actuelle : {raison}",
+                "📍 Aucune zone Entry/SL/TP affichée : le coach refuse tout remplacement par un ordre local.",
+            ]
     else:
-        lignes += [
-            "📍 Aucune zone d'entrée validée pour le moment.",
-            "🙅 Ne place pas d'ordre sur une zone qui n'a pas encore été calculée."
+        o = cle.get("ordre")
+        d = (o or {}).get("d") or cle.get("aligne") or (r or {}).get("confirme") or 0
+        decision = raison_attente(r, cle) if r else "J'attends les premières bougies complètes pour établir le contexte."
+        direction = SENS[d] if d in SENS else "⚪ NEUTRE — aucun sens confirmé"
+        lignes = [
+            f"🎯 SUIVI ACTIVÉ — {ICONE.get(m, '')} {m}",
+            f"🧭 Direction actuelle : {direction}",
+            f"⏳ Décision actuelle : {decision}"
         ]
+        if o:
+            bas, haut = sorted((o.get("za", o["e"]), o.get("zb", o["e"])))
+            lignes += [
+                f"📍 Zone d'entrée surveillée : {px(bas)} à {px(haut)}",
+                f"🛑 Stop calculé : {px(o['sl'])} — {meche_sl(o)}",
+                f"🎯 Objectifs : TP1 {px(o['tp1'])} • TP2 {px(o['tp2'])}",
+                "⚠️ Cette zone est un repère, pas un ordre à placer maintenant."
+            ]
+        else:
+            lignes += [
+                "📍 Aucune zone d'entrée validée pour le moment.",
+                "🙅 Ne place pas d'ordre sur une zone qui n'a pas encore été calculée."
+            ]
     lignes += [
-        "🔔 Je t'alerterai à la prochaine clôture utile pour débloquer la décision. Toutes les unités restent consultables avec le bouton « Toutes les unités ».",
-        "🤖 Si ALIGN déclenche une position, ton suivi interne sera activé automatiquement.",
+        "🔔 Je t'alerterai à la prochaine clôture utile pour débloquer la décision. Les douze unités restent consultables dans Telegram.",
+        "🤖 Si ALIGN valide une position, ton suivi interne sera activé automatiquement.",
         "ℹ️ Aucun ordre n'est envoyé à ta plateforme : tu gardes la main sur l'exécution.",
         "🎯 Le coach suit ensuite le SL, le passage à BE et les TP.",
-        "⏱ Le chronomètre réel est affiché dans le message juste en dessous."
+        "⏱ Le chronomètre indique la prochaine réévaluation, jamais une heure d'entrée garantie."
     ]
     if notifier:
         _envoi_sur(cid, reply_markup=CLAVIER, text="\n".join(lignes))
     if r:
         armer_clotures_multi(etat, cid, m, r)
     lancer_chrono(etat, cid, m, r)
+
 
 def bot_on(etat, cid):
     return str(cid) not in {str(x) for x in etat.get("bot_off", [])}
