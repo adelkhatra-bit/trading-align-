@@ -21,7 +21,7 @@ class CauseSansSignalTests(unittest.TestCase):
                    "activeTimeframeAgeMs": 41_000, "snapshots": snaps, "lastRejection": None}
         detail = ab.detail_bridge_invalide(payload)
         self.assertIn("UT active M5 périmée (41 s)", detail)
-        self.assertRegex(detail, r"UT absentes [^;]*\\bW1\\b")
+        self.assertRegex(detail, r"UT absentes [^;]*\bW1\b")
         self.assertIn("UT périmées H1", detail)
         self.assertNotIn("refusé", detail)
 
