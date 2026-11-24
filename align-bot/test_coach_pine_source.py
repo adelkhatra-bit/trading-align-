@@ -32,6 +32,12 @@ class CoachPineSourceTests(unittest.TestCase):
         }
 
     def run_data(self, market, r, cle, plan):
+        self.next_review_tf = None
+
+        def next_close(_r, tf, _now):
+            self.next_review_tf = tf
+            return 1_795_536_600
+
         with (
             patch.object(ab, "verdict", return_value=("ATTENTE", "test local")),
             patch.object(ab, "profil_strategie", return_value={"mode": "LOCAL"}),
@@ -39,7 +45,7 @@ class CoachPineSourceTests(unittest.TestCase):
             patch.object(ab, "niveau_cassure", return_value=None),
             patch.object(ab, "resume_volume", return_value={}),
             patch.object(ab, "timeframe_attendu", return_value="5m"),
-            patch.object(ab, "prochaine_cloture_bougie", return_value=1_795_536_600),
+            patch.object(ab, "prochaine_cloture_bougie", side_effect=next_close),
             patch.object(ab, "lecons_pour", return_value=[]),
         ):
             return ab.donnees_ia(market, r, cle)
@@ -77,6 +83,7 @@ class CoachPineSourceTests(unittest.TestCase):
         self.assertEqual(data["distance_plan_entree"]["prix_actuel"], 101.0)
         self.assertEqual(data["distance_plan_entree"]["entree_visee"], 105.0)
         self.assertEqual(data["distance_plan_entree"]["origine"], "TradingView ROBOT V12 frais")
+        self.assertEqual(self.next_review_tf, "5m")
         self.assertEqual(data["estimation_approche_entree"]["source_mouvement"],
                          "bougies 5m locales du bot (proxy, distinct du snapshot TradingView)")
 
