@@ -56,6 +56,15 @@ class TelegramCoachMenuTests(unittest.TestCase):
         publish.assert_not_called()
         self.assertFalse(etat["live_animations"])
 
+        # A failed ntfy publish must not claim that the remote screen changed.
+        etat_echec = {"proprio": ["101"], "live_animations": True}
+        with patch.object(ab, "live_publier", return_value=False), \
+             patch.object(ab, "_envoi_sur") as send_fail, \
+             patch.object(ab, "telegram", return_value={"ok": True}):
+            ab.live_callback(etat_echec, set(), {"id": "animlive-fail"}, "animlive", "toggle", "101")
+        self.assertTrue(etat_echec["live_animations"])
+        self.assertIn("état précédent", send_fail.call_args.kwargs["text"])
+
     def test_next_position_button_dispatches_to_real_auto_coach_activation(self):
         etat = {}
         update = {
