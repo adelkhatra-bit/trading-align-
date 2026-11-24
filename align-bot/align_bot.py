@@ -6717,6 +6717,12 @@ def demarrer_recherche_positions(etat, cid):
     """Démarre le vrai coach de position Pine sur les marchés choisis, jusqu'à arrêt manuel."""
     cid = str(cid)
     marches = tuple(sorted(marches_choisis(etat, cid)))
+    # Une préférence vide est un état invalide (la sélection normale impose au moins un marché).
+    # Réparer les anciennes mémoires en réactivant BTC + GOLD plutôt que d'enregistrer
+    # une recherche « active » qui ne suit en réalité aucun marché.
+    if not marches:
+        marches = tuple(sorted(MARCHES))
+        selectionner_marches_suivi(etat, cid, marches)
     for m in marches:
         inscrire_auto(etat, cid, m, notifier=False)
     actifs = etat.setdefault("recherche_positions_active", [])
