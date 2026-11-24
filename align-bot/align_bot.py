@@ -50,7 +50,7 @@ TELEGRAM_CALLBACK_HANDLER_PREFIXES = (
     "livemkt", "markets", "marketsmenu", "menulive", "next", "niveau",
     "offrir", "out", "plateforme", "position", "previous", "pub", "quiet",
     "rawdetails", "refus", "resume", "retirer", "results", "searchpos",
-    "son", "timeframes", "trade", "tvoffre", "tvok", "vuegratuit", "why",
+    "son", "tfview", "timeframes", "trade", "tvoffre", "tvok", "vuegratuit", "why",
 )
 
 
@@ -103,6 +103,12 @@ LIEN_RESULTATS = "https://t.me/+RajFd_hMgl1kNmQ0"     # groupe ALIGN Résultats 
 RISQUE_MAX = 1.5      # SL jamais plus loin que 1,5 ATR 15 min : pas de gros SL, on attend mieux
 UT = ["1", "3", "5", "10", "15", "30", "45", "1h", "2h", "4h", "D"]   # 3 min comme l'indicateur TradingView (unité standard)
 POIDS = [1, 1, 1, 1, 2, 2, 2, 3, 3, 4, 5]
+
+TELEGRAM_TF_VIEWS = (
+    ("M1", "1 min"), ("M3", "3 min"), ("M5", "5 min"), ("M10", "10 min"),
+    ("M15", "15 min"), ("M30", "30 min"), ("M45", "45 min"), ("H1", "1 h"),
+    ("H2", "2 h"), ("H4", "4 h"), ("D1", "1 jour"), ("W1", "1 semaine"),
+)
 
 # ───────── Données ─────────
 HTTP_MARCHE_TIMEOUT_SEC = 12
@@ -4627,30 +4633,114 @@ def texte_vision(m, r, cle, anglais=False):
                   else "🔔 Pas encore d'entrée confirmée : je te préviens à la clôture de confirmation")
     return "\n".join(lignes)
 
-def texte_timeframes(m, r):
-    """Lecture pédagogique de toutes les unités réellement calculées par ALIGN."""
-    noms = ["1 min", "3 min", "5 min", "10 min", "15 min", "30 min", "45 min",
-            "1 heure", "2 heures", "4 heures", "Daily"]
-    directions = ["🟩 HAUSSIER ⬆️" if d == 1 else "🟥 BAISSIER ⬇️" if d == -1 else "⬜ NEUTRE ➖"
-                  for d in r["dirs"]]
+def texte_timeframes(m, r, anglais=False):
+    """Résumé des unités calculées, avec langue séparée et source d'analyse explicite."""
+    noms = (["1 min", "3 min", "5 min", "10 min", "15 min", "30 min", "45 min",
+             "1 hour", "2 hours", "4 hours", "Daily"] if anglais else
+            ["1 min", "3 min", "5 min", "10 min", "15 min", "30 min", "45 min",
+             "1 heure", "2 heures", "4 heures", "Daily"])
+    directions = [(("🟩 BULLISH ⬆️" if d == 1 else "🟥 BEARISH ⬇️" if d == -1 else "⬜ NEUTRAL ➖")
+                  if anglais else ("🟩 HAUSSIER ⬆️" if d == 1 else "🟥 BAISSIER ⬇️" if d == -1 else "⬜ NEUTRE ➖"))
+                  for d in (r.get("dirs") or [0] * 11)]
+    rsis = r.get("rsis") or []
     prof = profil_strategie(r) if len(r.get("dirs") or []) >= 11 else {}
-    lignes = [f"⏱ TOUTES LES UNITÉS — {ICONE.get(m, '')} {m}"]
+    lignes = [f"⏱ ALL TIMEFRAMES — {ICONE.get(m, '')} {m}" if anglais
+              else f"⏱ TOUTES LES UNITÉS — {ICONE.get(m, '')} {m}"]
     if prof.get("mode"):
-        lignes.append(f"🏷 Profil : {prof['mode']}")
+        lignes.append(f"🏷 Profile: {prof['mode']}" if anglais else f"🏷 Profil : {prof['mode']}")
     lignes.append("")
-    for nom, direction, valeur in zip(noms, directions, r["rsis"]):
-        lignes.append(f"{nom} : {direction} — RSI {valeur:.0f}")
-    lignes += [
-        "",
-        "🏔 4 h : tendance principale",
-        "🔁 1 h : confirme ou contredit la 4 h",
-        "👀 15 min : préparation et cassure",
-        "🎯 5 min : timing de l'entrée (clôture obligatoire)",
-        "⚖️ SCALP : 1h + 15m + 5m + 1m — DAY : 4h + 1h + 15m + 5m — SWING : D/W + 4h + 1h",
-        "⚠️ Une unité seule n'autorise jamais une entrée.",
-    ]
+    for nom, direction, valeur in zip(noms, directions, rsis):
+        try:
+            rsi_txt = f"{float(valeur):.0f}"
+        except (TypeError, ValueError):
+            rsi_txt = "—"
+        lignes.append(f"{nom}: {direction} — RSI {rsi_txt}" if anglais else f"{nom} : {direction} — RSI {rsi_txt}")
+    if anglais:
+        lignes += ["", "🏔 4 h: main trend", "🔁 1 h: confirms or contradicts 4 h",
+                   "👀 15 min: preparation and breakout", "🎯 5 min: entry timing (candle close required)",
+                   "⚖️ SCALP: 1h + 15m + 5m + 1m — DAY: 4h + 1h + 15m + 5m — SWING: D/W + 4h + 1h",
+                   "⚠️ One timeframe alone never authorizes an entry."]
+    else:
+        lignes += ["", "🏔 4 h : tendance principale", "🔁 1 h : confirme ou contredit la 4 h",
+                   "👀 15 min : préparation et cassure", "🎯 5 min : timing de l'entrée (clôture obligatoire)",
+                   "⚖️ SCALP : 1h + 15m + 5m + 1m — DAY : 4h + 1h + 15m + 5m — SWING : D/W + 4h + 1h",
+                   "⚠️ Une unité seule n'autorise jamais une entrée."]
     return "\n".join(lignes)
 
+
+def clavier_timeframes(m, anglais=False):
+    """Sélecteur de lecture seule des 12 snapshots MTF TradingView."""
+    labels = dict(TELEGRAM_TF_VIEWS)
+    if anglais:
+        labels.update({"D1": "1 day", "W1": "1 week"})
+    boutons = [{"text": labels[tf], "callback_data": f"tfview:{m}:{tf}"}
+               for tf, _ in TELEGRAM_TF_VIEWS]
+    lignes = [boutons[i:i + 3] for i in range(0, len(boutons), 3)]
+    lignes.append([{"text": "↩️ Back to analysis" if anglais else "↩️ Retour à l'analyse", "callback_data": f"resume:{m}"}])
+    return json.dumps({"inline_keyboard": lignes}, ensure_ascii=False)
+
+
+def texte_unite_timeframe(m, tf, r, anglais=False):
+    """Affiche exclusivement le snapshot Pine v25 frais de l'UT choisie."""
+    labels = dict(TELEGRAM_TF_VIEWS)
+    if anglais:
+        labels.update({"D1": "1 day", "W1": "1 week"})
+    label = labels.get(tf)
+    if not label:
+        return "⚠️ Unknown timeframe. Choose one from the menu." if anglais else "⚠️ Unité de temps inconnue. Choisis une unité dans le menu."
+    bridge = (r or {}).get("tv_indicator_mtf") or {}
+    if bridge.get("available") is not True:
+        if anglais:
+            return f"📡 {m} · {label}\nTradingView bridge unavailable.\nNo indicator data available for this timeframe."
+        return (f"📡 {m} · {label}\nBridge TradingView indisponible.\n"
+                "Aucune donnée d'indicateur exploitable pour cette unité.")
+    snap = (bridge.get("snapshots") or {}).get(tf) or {}
+    if not snap:
+        if anglais:
+            return f"⏳ {m} · {label}\nTradingView snapshot missing.\nI will not replace it with a local estimate."
+        return (f"⏳ {m} · {label}\nSnapshot TradingView absent.\n"
+                "Je ne remplace pas cette donnée par une estimation locale.")
+    if snap.get("fresh") is not True:
+        if anglais:
+            return f"⏳ {m} · {label}\nTradingView snapshot is stale.\nWait for a new confirmed candle close."
+        return (f"⏳ {m} · {label}\nSnapshot TradingView périmé.\n"
+                "Attendre une nouvelle clôture confirmée.")
+    direction = _direction_tv(snap.get("direction"))
+    sens = (("BULLISH ⬆️" if direction == 1 else "BEARISH ⬇️" if direction == -1 else "NEUTRAL ➖" if direction == 0 else "UNAVAILABLE")
+            if anglais else ("HAUSSIER ⬆️" if direction == 1 else "BAISSIER ⬇️" if direction == -1 else "NEUTRE ➖" if direction == 0 else "INDISPONIBLE"))
+    try:
+        rsi = float(snap.get("rsi"))
+        rsi_txt = f"{rsi:.1f}" if math.isfinite(rsi) else "—"
+    except (TypeError, ValueError):
+        rsi_txt = "—"
+    try:
+        price = float(snap.get("price"))
+        price_txt = px(price) if math.isfinite(price) and price > 0 else "—"
+    except (TypeError, ValueError):
+        price_txt = "—"
+    try:
+        bar_time = int(snap.get("bar_time"))
+        close_txt = datetime.datetime.fromtimestamp(bar_time / 1000, tz=PARIS).strftime("%d/%m %H:%M")
+    except (TypeError, ValueError, OverflowError, OSError):
+        close_txt = "—"
+    if anglais:
+        return "\n".join([
+            f"📊 {m} — {label}", "📡 Source: TradingView · Pine v25",
+            f"🧭 Direction: {sens}", f"📈 RSI: {rsi_txt}",
+            f"💵 Last price: {price_txt}", f"🕯 Reference candle: {close_txt}",
+            "━━━━━━━━━━━━━━━━━━━━",
+            "ℹ️ Read-only view: Entry / SL / TP remain on the Pine M15 plan.",
+        ])
+    return "\n".join([
+        f"📊 {m} — {label}",
+        "📡 Source : TradingView · Pine v25",
+        f"🧭 Direction : {sens}",
+        f"📈 RSI : {rsi_txt}",
+        f"💵 Dernier prix : {price_txt}",
+        f"🕯 Bougie de référence : {close_txt}",
+        "━━━━━━━━━━━━━━━━━━━━",
+        "ℹ️ Lecture seule : le plan Entry / SL / TP reste celui de Pine M15.",
+    ])
 
 def texte_pourquoi(m, r, cle):
     """Explication courte de la décision, sans transformer le biais en signal d'entrée."""
@@ -7369,6 +7459,9 @@ def traiter(etat, chats, updates):
                     pass
                 continue
             choix, _, mk = cb.get("data", "").partition(":")
+            tf_view = ""
+            if choix == "tfview":
+                mk, _, tf_view = mk.partition(":")
             callback_id = str(cb.get("id") or "")
             if callback_id and callback_id in CALLBACKS_ACK_FAILED:
                 CALLBACKS_ACK_FAILED.discard(callback_id)
@@ -7697,7 +7790,7 @@ def traiter(etat, chats, updates):
                     else:
                         _envoi_sur(qui, text=f"⚠️ L'analyse {mk} n'est pas encore disponible. Appuie sur Analyse {mk}.")
                 continue
-            if choix in ("why", "details", "rawdetails", "levels", "timeframes", "position") and mk in MARCHES:
+            if choix in ("why", "details", "rawdetails", "levels", "timeframes", "position", "tfview") and mk in MARCHES:
                 if not autorise(etat, qui, cb.get("from", {}).get("id")):
                     try:
                         telegram("answerCallbackQuery", callback_query_id=cb["id"], text="🔒 Détails réservés aux VIP")
@@ -7731,9 +7824,13 @@ def traiter(etat, chats, updates):
                     _envoi_sur(qui, text=texte_etat(mk, r_detail, cle_detail, vip=True),
                                reply_markup=json.dumps({"inline_keyboard": [[{"text": "↩️ Retour à l'analyse", "callback_data": f"resume:{mk}"}]]}))
                 elif choix == "timeframes":
-                    _envoi_sur(qui, text=texte_timeframes(mk, r_detail),
-                               reply_markup=json.dumps({"inline_keyboard": [[{"text": "❓ Pourquoi cette décision ?", "callback_data": f"why:{mk}"},
-                                                                             {"text": "↩️ Retour à l'analyse", "callback_data": f"resume:{mk}"}]]}))
+                    anglais = str(qui) in LANG_EN
+                    _envoi_sur(qui, text=texte_timeframes(mk, r_detail, anglais=anglais),
+                               reply_markup=clavier_timeframes(mk, anglais=anglais))
+                elif choix == "tfview":
+                    anglais = str(qui) in LANG_EN
+                    _envoi_sur(qui, text=texte_unite_timeframe(mk, tf_view, r_detail, anglais=anglais),
+                               reply_markup=clavier_timeframes(mk, anglais=anglais))
                 elif choix == "details":
                     rapport = avis_ia(etat, mk, r_detail, cle_detail, anglais=str(qui) in LANG_EN)
                     _envoi_sur(qui, text=rapport,
