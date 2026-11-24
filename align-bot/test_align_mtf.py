@@ -3800,9 +3800,11 @@ class PineOnlyEntryGateTests(unittest.TestCase):
              patch.object(align_bot, "profil_trade", return_value={"mode": "DAY"}), \
              patch.object(align_bot, "memoire_refuse", return_value=(False, 0, 0)), \
              patch.object(align_bot, "carte_coach", return_value="PINE_SIGNAL"), \
-             patch.object(align_bot, "strategie_trade", return_value={}):
+             patch.object(align_bot, "strategie_trade", return_value={"strat": "SWING"}):
             out = align_bot.agent("BTC", r, state, "")
             self.assertTrue(state.get("trade"))
+            self.assertEqual(state["trade"]["strat"], "DAY")
+            self.assertEqual(state["trade"]["strat_filtre"], "SWING")
             self.assertEqual(
                 (state["trade"]["e"], state["trade"]["sl"], state["trade"]["tp1"], state["trade"]["tp2"]),
                 (100.0, 95.0, 110.0, 120.0),
@@ -3812,6 +3814,26 @@ class PineOnlyEntryGateTests(unittest.TestCase):
             second = align_bot.agent("BTC", r, state, "")
         self.assertEqual(second, [])
         self.assertEqual(state["trade"]["e"], 100.0)
+
+    def test_required_bridge_does_not_send_entry_after_tradingview_price_left_zone(self):
+        from unittest.mock import patch
+        r = self._market()
+        r["require_tv_bridge"] = True
+        r["tv_indicator_mtf"]["snapshots"]["M5"]["price"] = 102.0
+        r["tv_indicator_mtf"]["snapshots"]["M5"]["robotV12"]["entryTriggered"] = True
+        state = {"t1m": 0}
+        with patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), \\
+             patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")), \\
+             patch.object(align_bot, "pause_entree_marche", return_value=None), \\
+             patch.object(align_bot, "bloque_dw", return_value=False), \\
+             patch.object(align_bot, "profil_trade", return_value={"mode": "DAY"}), \\
+             patch.object(align_bot, "memoire_refuse", return_value=(False, 0, 0)), \\
+             patch.object(align_bot, "strategie_trade", return_value={"strat": "DAY"}):
+            out = align_bot.agent("BTC", r, state, "")
+        self.assertFalse(state.get("trade"))
+        self.assertEqual(state.get("ordre", {}).get("e"), 100.0)
+        self.assertTrue(any("hors zone M15" in str(x) for x in out))
+        self.assertFalse(state.get("pine_entry_bar_done"))
 
 
 class TelegramTp1Tp2BridgeTests(unittest.TestCase):
