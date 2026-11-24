@@ -72,19 +72,9 @@ jobs:
           ALIGN_TV_READ_TOKEN_SECRET: ${{ secrets.ALIGN_TV_READ_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          if [ -n "$ALIGN_TV_API_URL_SECRET" ]; then
-            if [ -z "$ALIGN_TV_READ_TOKEN_SECRET" ]; then
-              echo "::error::ALIGN_TV_READ_TOKEN absent alors qu'un bridge externe est configuré."
-              exit 1
-            fi
-            echo "::add-mask::$ALIGN_TV_READ_TOKEN_SECRET"
-            {
-              echo "ALIGN_TV_API_URL=$ALIGN_TV_API_URL_SECRET"
-              echo "ALIGN_TV_READ_TOKEN=$ALIGN_TV_READ_TOKEN_SECRET"
-              echo "ALIGN_FAST_BRIDGE_MODE=external"
-            } >> "$GITHUB_ENV"
-            echo "BRIDGE_MODE=external-configured (URL/jeton masqués)"
-            exit 0
+          if [ -n "$ALIGN_TV_API_URL_SECRET" ] || [ -n "$ALIGN_TV_READ_TOKEN_SECRET" ]; then
+            echo "::error::Override bridge externe détecté. Le healthcheck refuse de contacter une URL non vérifiée; aucun serveur externe n'est appelé."
+            exit 1
           fi
 
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
@@ -224,5 +214,5 @@ jobs:
       - name: Résumé santé
         if: always()
         run: |
-          echo "Ce check utilise le même bridge que le BOT (route externe canonique si configurée, sinon mailbox Cloudflare + bridge runner 4100)." >> "$GITHUB_STEP_SUMMARY"
+          echo "Ce check utilise la voie canonique mailbox Cloudflare + bridge runner 4100. Tout override URL externe est refusé pour éviter toute confusion avec le serveur historique." >> "$GITHUB_STEP_SUMMARY"
           echo "Il lit les snapshots uniquement, ne démarre pas le poller Telegram, ne modifie pas state.json et n'envoie aucun message." >> "$GITHUB_STEP_SUMMARY"
