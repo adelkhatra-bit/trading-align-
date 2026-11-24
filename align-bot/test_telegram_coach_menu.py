@@ -58,9 +58,24 @@ class TelegramCoachMenuTests(unittest.TestCase):
         activate_coach.assert_called_once_with(etat, "101", "BTC", notifier=False)
 
 
+    def test_search_positions_activates_auto_coach_not_commentator(self):
+        etat = {"recherche_positions_active": []}
+        with patch.object(ab, "marches_choisis", return_value=("BTC", "GOLD")), \
+             patch.object(ab, "inscrire_auto") as activate, \
+             patch.object(ab, "activer_coach_live") as commentary:
+            marches = ab.demarrer_recherche_positions(etat, "101")
+
+        self.assertEqual(marches, ("BTC", "GOLD"))
+        self.assertEqual(activate.call_count, 2)
+        activate.assert_any_call(etat, "101", "BTC", notifier=False)
+        activate.assert_any_call(etat, "101", "GOLD", notifier=False)
+        commentary.assert_not_called()
+        self.assertIn("101", etat["recherche_positions_active"])
+
     def test_autostop_callback_removes_only_selected_market_and_its_chrono(self):
         etat = {
             "auto": {"BTC": ["101", "202"], "GOLD": ["101"]},
+            "recherche_positions_active": ["101"],
             "veille_cloture": {"BTC": {"101": {"multi": True}}, "GOLD": {"101": {"multi": True}}},
             "chrono": {"BTC": {"101": {"mid": 777}}, "GOLD": {"101": {"mid": 888}}},
             "BTC": {"trade": {"qui": {"101": {"fini": False}}}},
@@ -87,6 +102,9 @@ class TelegramCoachMenuTests(unittest.TestCase):
         self.assertIn("101", etat["chrono"]["GOLD"])
         self.assertNotIn("101", etat["BTC"]["trade"]["qui"])
         self.assertIn("101", etat["GOLD"]["trade"]["qui"])
+        self.assertIn("101", etat["recherche_positions_active"])
+        ab.desinscrire_auto(etat, "101", "GOLD")
+        self.assertNotIn("101", etat["recherche_positions_active"])
         self.assertTrue(any(call.args[0] == "deleteMessage" and call.kwargs.get("message_id") == 777
                             for call in telegram.call_args_list))
 
