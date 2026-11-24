@@ -559,19 +559,22 @@ if not na(plX)
 plotshape(voirEss and divHx, "Essoufflement en haut", shape.diamond, location.abovebar, color.new(color.orange, 0), offset=-5, size=size.tiny)
 plotshape(voirEss and divBx, "Essoufflement en bas", shape.diamond, location.belowbar, color.new(color.aqua, 0), offset=-5, size=size.tiny)
 plotchar(voirExpl and comp >= minSqz and nz(comp[1]) < minSqz, "Explosion à venir", "⚡", location.top, color.new(color.yellow, 0), size=size.tiny)
-// TP1 touché : on garde TP1 affiché et on montre TP2 (remis à zéro seulement si le sens change = position annulée)
+// TP1 touché : l'état reste lié aux niveaux du plan actif, pas seulement à sa direction.
 var bool tp1Ok = false
 var float tp1M = na
 var float tp2M = na
-if dirPlan != nz(dirPlan[1]) or na(tp1M)
+// Un plan change si la direction, TP1 ou TP2 change : le suivi repart sur les niveaux actifs.
+planTpChange = dirPlan != nz(dirPlan[1]) or
+     (not na(tp1) and tp1 != tp1M) or
+     (not na(tp2) and tp2 != tp2M) or
+     (na(tp1) != na(tp1M)) or (na(tp2) != na(tp2M))
+if planTpChange
     tp1Ok := false
     tp1M := tp1
     tp2M := tp2
-if not tp1Ok and dirPlan != 0 and ((dirPlan == 1 and high >= tp1M) or (dirPlan == -1 and low <= tp1M))
+if not tp1Ok and dirPlan != 0 and not na(tp1M) and
+     ((dirPlan == 1 and high >= tp1M) or (dirPlan == -1 and low <= tp1M))
     tp1Ok := true
-if not tp1Ok
-    tp1M := tp1
-    tp2M := tp2
 // Les deux objectifs restent visibles dès qu'un plan existe. Après TP1, l'option accentue TP2 sans recréer de lignes superposées.
 if barstate.islast and voirTP2 and tp1Ok and voirPlan and dirPlan != 0
     if not na(lTP1)
