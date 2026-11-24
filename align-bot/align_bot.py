@@ -259,6 +259,15 @@ def fusionne_lectures_tradingview(r):
     return r
 
 
+def prix_tradingview_dans_zone(prix, zone_low, zone_high):
+    """True uniquement si le dernier prix du snapshot Pine reste dans la zone du plan."""
+    try:
+        p, low, high = float(prix), float(zone_low), float(zone_high)
+    except (TypeError, ValueError):
+        return False
+    return all(math.isfinite(x) for x in (p, low, high)) and low <= p <= high
+
+
 def plan_indicateur(r):
     """Plan Pine canonique M15 + bougie clôturée de déclenchement stratégie."""
     bridge = r.get("tv_indicator_mtf") or {}
@@ -341,7 +350,7 @@ def plan_indicateur(r):
         "strategy": strategy, "available": True, "direction": direction,
         "entry": entry, "sl": sl, "tp": tp1, "tp1": tp1, "tp2": tp2,
         "zone_low": zone_low, "zone_high": zone_high, "decision": decision,
-        "price": current_price, "price_in_zone": zone_low <= current_price <= zone_high,
+        "price": current_price, "price_in_zone": prix_tradingview_dans_zone(current_price, zone_low, zone_high),
         "entry_bar_time": entry_bar_time, "entry_bar_open": entry_bar_open,
         "entry_bar_high": entry_bar_high, "entry_bar_low": entry_bar_low,
         "entry_bar_close": entry_bar_close, "triggered": triggered,
