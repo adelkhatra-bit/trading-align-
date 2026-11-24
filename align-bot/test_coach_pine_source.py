@@ -10,7 +10,7 @@ class CoachPineSourceTests(unittest.TestCase):
             "market": market,
             "require_tv_bridge": True,
             "m1": [{"c": 999.0}],
-            "dirs": [1] * 11,
+            "dirs": [0] * 11,
             "dirs_cloturees": [1] * 11,
             "rsis": [60] * 11,
             "posD": 0.5,
@@ -21,7 +21,12 @@ class CoachPineSourceTests(unittest.TestCase):
                 "available": True,
                 "activeTimeframe": "M15",
                 "snapshots": {
-                    "M15": {"fresh": True, "price": 101.0, "direction": "BULLISH", "rsi": 61.0}
+                    "M1": {"fresh": True, "direction": "BEARISH", "rsi": 48.0},
+                    "M5": {"fresh": True, "direction": "BULLISH", "rsi": 62.0},
+                    "M15": {"fresh": True, "price": 101.0, "direction": "BULLISH", "rsi": 61.0},
+                    "H1": {"fresh": True, "direction": "BULLISH", "rsi": 64.0},
+                    "H4": {"fresh": True, "direction": "BEARISH", "rsi": 38.0},
+                    "D1": {"fresh": True, "direction": "NEUTRAL", "rsi": 51.0},
                 },
             },
         }
@@ -45,6 +50,9 @@ class CoachPineSourceTests(unittest.TestCase):
         data = self.run_data("BTC", r, cle, {"available": False, "reason": "plan Pine incomplet"})
 
         self.assertEqual(data["prix"], 101.0)
+        self.assertEqual(data["sens 1m/5m/15m/1h/4h/Daily"], [-1, 1, 1, 1, -1, 0])
+        self.assertEqual(data["RSI 5m/15m/1h/4h"], [62, 61, 64, 38])
+        self.assertEqual(data["lecture_multi_unites"], {"M5": 1, "M15": 1, "H1": 1, "H4": -1})
         self.assertIsNone(data["zone d'entrée"])
         self.assertEqual(data["profil_strategie"]["mode"], "ATTENTE")
         self.assertIn("plan Pine v25 indisponible", data["verdict du bot"])
