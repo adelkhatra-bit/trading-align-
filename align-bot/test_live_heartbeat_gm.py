@@ -43,9 +43,27 @@ class HeartbeatGmTests(unittest.TestCase):
         self.assertIn("ecranRetryAttempt = 0;", self.js)
         self.assertIn("const delay = Math.max(delais[ecranRetryAttempt++], Math.min(Number(retryAfterMs) || 0, 60000));", self.js)
         self.assertIn("clearTimeout(ecranRetryTimer)", self.js)
+    def test_jeton_ntfy_authentifie_le_compte_sans_exposer_le_secret(self):
+        self.assertIn("// @grant        GM_getValue", self.js)
+        self.assertIn("// @grant        GM_setValue", self.js)
+        self.assertIn("// @grant        GM_registerMenuCommand", self.js)
+        self.assertIn("Authorization = 'Bearer ' + token", self.js)
+        self.assertIn("GM_registerMenuCommand('ALIGN — configurer le jeton ntfy'", self.js)
+        self.assertNotIn("console.log(token)", self.js)
+
+    def test_retry_after_daily_ntfy_est_respecte_jusqua_24h(self):
+        self.assertIn("function delaiRetryNtfy(entetes)", self.js)
+        self.assertIn("86400000", self.js)
+        self.assertIn("ratelimit-policy", self.js)
+        self.assertNotIn("Math.min(Number(retryAfterMs) || 0, 60000)", self.js)
+
+    def test_heartbeat_intervale_pour_tier_ntfy_supporter(self):
+        self.assertIn("setInterval(pingEcran, 45000)", self.js)
+        self.assertIn("const ECRAN_OWNER_TTL_MS = 90000", self.js)
+
     def test_chaines_historiques_conservees(self):
         self.assertIn("PING|LIVE_SCREEN|", self.js)
-        self.assertIn("setInterval(pingEcran, 60000)", self.js)
+        self.assertIn("setInterval(pingEcran, 45000)", self.js)
 
 
 
