@@ -6699,10 +6699,14 @@ def activer_coach_live(etat, cid, m, actif=True):
             etat["recherche_positions_active"] = [x for x in etat.get("recherche_positions_active", []) if str(x) != str(cid)]
 
 def demarrer_recherche_positions(etat, cid):
-    """Démarre la veille persistante sur les marchés choisis, jusqu'à arrêt manuel."""
+    """Démarre le vrai coach de position Pine sur les marchés choisis, jusqu'à arrêt manuel."""
+    cid = str(cid)
     marches = tuple(sorted(marches_choisis(etat, cid)))
     for m in marches:
-        activer_coach_live(etat, cid, m, True)
+        inscrire_auto(etat, cid, m, notifier=False)
+    actifs = etat.setdefault("recherche_positions_active", [])
+    if cid not in {str(x) for x in actifs}:
+        actifs.append(cid)
     return marches
 
 
@@ -7781,11 +7785,11 @@ def traiter(etat, chats, updates):
                                     if deja_ouverts else "")
                 boutons_stop = [[{"text": f"⏹ Arrêter {m}", "callback_data": f"autostop:{m}"} for m in marches_recherche]]
                 _envoi_sur(qui, text=(f"🎯 RECHERCHE DE POSITION ACTIVE — {noms}\n"
-                                      "🔎 ALIGN surveille les configurations confirmées en continu.\n"
-                                      "🔕 Aucun commentaire intermédiaire : je t'écris uniquement lorsqu'une position est confirmée.\n"
-                                      "📍 Dès qu'une position est détectée, tu reçois ses niveaux et son suivi.\n"
-                                      "🔕 Pas d'alerte automatique sur les autres marchés.\n"
-                                      "⏹ La recherche reste active jusqu'à ton arrêt." + precision_retard), 
+                                      "🔎 Le coach suit le plan Pine v25, les snapshots TradingView et le déclencheur de la prochaine position.\n"
+                                      "⏳ Un compte à rebours indique la prochaine réévaluation ; seules les clôtures utiles déclenchent une mise à jour.\n"
+                                      "📍 Entry/SL/TP ne sont transmis qu'après confirmation Pine et validation du prix dans la zone.\n"
+                                      "🛑 Aucun ordre broker n'est envoyé ; tu gardes la main sur l'exécution.\n"
+                                      "⏹ Chaque marché peut être arrêté séparément." + precision_retard), 
                            reply_markup=json.dumps({"inline_keyboard": boutons_stop}))
                 continue
             if choix == "analysechoice" and marche_retiree_demande(mk):
@@ -8147,7 +8151,7 @@ def traiter(etat, chats, updates):
                 if choix == "coachlive":
                     intro = (f"🎙 COACH COMMENTATEUR ACTIVÉ — {ICONE.get(mk, '')} {mk}\n"
                              "🔎 Surveillance continue : je cherche une configuration d'entrée confirmée, sans inventer de signal.\n"
-                             "🔕 Aucun message de marché intermédiaire : uniquement une position confirmée.\n"
+                             "🕯 Commentaire aux clôtures 15 min utiles ; aucune Entry/SL/TP sans confirmation Pine.\n"
                              "📍 Dès qu'une position est ouverte par ALIGN, je poursuis son suivi.\n"
                              "⏹ Pour arrêter : le bouton sous mes messages.")
                     contenu = intro
