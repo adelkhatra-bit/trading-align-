@@ -188,6 +188,7 @@ class CoachPineSourceTests(unittest.TestCase):
 
         message = send.call_args.kwargs["text"]
         self.assertIn("Direction Pine v25 : LONG", message)
+        self.assertIn("Prix TradingView", message)
         self.assertIn("Entry", message)
         self.assertNotIn("999", message)
         self.assertNotIn("900", message)
