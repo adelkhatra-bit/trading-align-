@@ -73,9 +73,9 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("--marche et --pair doivent correspondre", result.stderr)
     def test_worker_rollover_script_compiles_and_has_time_budget(self):
-        marker = "python3 - <<'PY'\\n"
+        marker = "python3 - <<'PY'\n"
         start = self.rollover.index(marker) + len(marker)
-        end = self.rollover.index("\\n          PY", start)
+        end = self.rollover.index("\n          PY", start)
         script = textwrap.dedent(self.rollover[start:end])
         compile(script, "<align-worker-rollover>", "exec")
         self.assertIn("timeout-minutes: 18", self.rollover)
