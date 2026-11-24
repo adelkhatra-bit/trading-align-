@@ -594,3 +594,26 @@ jobs:
           echo "ÉCHEC: bridge TradingView ROBOT V12 indisponible (secrets ALIGN_TV_* absents ou données invalides). Aucun signal n'a été émis."
           exit 1
 
+      - name: Sanitiser le journal du relais TradingView
+        if: always()
+        env:
+          RELAY_LOG: ${{ runner.temp }}/align_relais.log
+          SAFE_RELAY_LOG: ${{ runner.temp }}/align_relais.safe.log
+        run: |
+          python3 - <<'PY'
+          import os, re
+          source = os.environ["RELAY_LOG"]
+          target = os.environ["SAFE_RELAY_LOG"]
+          if os.path.isfile(source):
+              text = open(source, encoding="utf-8", errors="replace").read()
+          else:
+              text = "Journal relais absent pour ce run."
+          text = re.sub(r"(/ingest/)[A-Za-z0-9_-]{32,128}", r"\1[REDACTED]", text)
+          text = re.sub(r"(Bearer\s+)[A-Za-z0-9._-]{32,}", r"\1[REDACTED]", text, flags=re.I)
+          text = re.sub(r"(token[=: ]+)[A-Za-z0-9._-]{32,}", r"\1[REDACTED]", text, flags=re.I)
+          with open(target, "w", encoding="utf-8") as f:
+              f.write(text)
+          PY
+
+      # Le journal du relais reste dans la sortie du job. On ne crée pas un second
+      # artefact post-job : GitHub peut refuser sa finalisation après la clôture du job.
