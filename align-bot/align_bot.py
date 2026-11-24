@@ -50,7 +50,7 @@ TELEGRAM_CALLBACK_HANDLER_PREFIXES = (
     "livemkt", "markets", "marketsmenu", "menulive", "next", "niveau",
     "offrir", "out", "plateforme", "position", "previous", "pub", "quiet",
     "rawdetails", "refus", "resume", "retirer", "results", "searchpos",
-    "son", "tfview", "timeframes", "trade", "tvoffre", "tvok", "vuegratuit", "why",
+    "son", "tfview", "timeframes", "trade", "tvoffre", "tvok", "vuegratuit", "why", "animlive",
 )
 
 
@@ -9723,21 +9723,57 @@ LIVE_BRANCHE, LIVE_FICHIER = "live-data", "live.json"
 LIVE_INTERVALLE, LIVE_RAFRAICHIR = 120, 300      # tentative toutes les 2 min ; republication forcée au plus toutes les 5 min
 
 def construire_live(etat, derniers, now=None):
-    """Contenu public : marché, biais probable, UT alignées x/11, profil, état, heure. Rien d'autre."""
+    """Contenu public sans niveaux : en mode bridge obligatoire, biais/UT/profil viennent uniquement de Pine v25."""
     now = now or time.time()
     marches = []
+    tf_requis = tuple(tf for tf, _ in TELEGRAM_TF_VIEWS)
     for m in MARCHES:
         r = derniers.get(m)
         if not r:
             continue
         cle = etat.get(m, {})
         statut, _ = etat_marche_hb(m, r, now)
-        e = hb_etat_surveille(r)
-        etat_l = ("ferme" if statut == "ferme" else "perime" if statut == "perime" else "entree" if cle.get("trade") else
-                  "preparation" if (cle.get("ordre") or cle.get("prep") or e["strat"]) else "calme")
-        marches.append({"m": m, "etat": etat_l, "biais": {1: "haussier", -1: "baissier", 0: "indecis"}[e["sens"]],
-                        "ut": int(e["n"]), "seuil": MIN_ALIGN,
-                        "profil": {"SWING": "SWING", "DAY": "INTRADAY", "SCALPING": "SCALP"}.get(e["strat"], "aucun")})
+        if r.get("require_tv_bridge"):
+            bridge = r.get("tv_indicator_mtf") or {}
+            snapshots = bridge.get("snapshots") if isinstance(bridge.get("snapshots"), dict) else {}
+            complet = bridge.get("available") is True and all(
+                isinstance(snapshots.get(tf), dict) and snapshots[tf].get("fresh") is True
+                for tf in tf_requis
+            )
+            if not complet:
+                # Ne jamais publier un biais/compteur issu du flux local lorsque Pine est obligatoire.
+                sens, nb_ut, profil = 0, 0, "aucun"
+                etat_l = "ferme" if statut == "ferme" else "perime"
+            else:
+                directions = [snapshots[tf].get("direction") for tf in tf_requis]
+                haussieres = sum(1 for direction in directions if direction == 1)
+                baissieres = sum(1 for direction in directions if direction == -1)
+                active_tf = str(bridge.get("activeTimeframe") or "").upper()
+                active = snapshots.get(active_tf) or {}
+                robot = active.get("robotV12") or {}
+                plan = plan_indicateur(r)
+                if plan and plan.get("available"):
+                    sens = int(plan["direction"])
+                    nb_ut = haussieres if sens == 1 else baissieres
+                elif haussieres >= MIN_ALIGN and haussieres > baissieres:
+                    sens, nb_ut = 1, haussieres
+                elif baissieres >= MIN_ALIGN and baissieres > haussieres:
+                    sens, nb_ut = -1, baissieres
+                else:
+                    sens, nb_ut = 0, max(haussieres, baissieres)
+                strategie = str((plan or {}).get("strategy") or robot.get("strategy") or "").upper()
+                profil = {"SWING": "SWING", "DAY": "INTRADAY", "SCALPING": "SCALP"}.get(strategie, "aucun")
+                etat_l = ("ferme" if statut == "ferme" else "entree" if cle.get("trade") else
+                          "preparation" if plan and plan.get("available") else "calme")
+        else:
+            # Compatibilité des environnements historiques sans obligation TradingView.
+            e = hb_etat_surveille(r)
+            sens, nb_ut = e["sens"], int(e["n"])
+            profil = {"SWING": "SWING", "DAY": "INTRADAY", "SCALPING": "SCALP"}.get(e["strat"], "aucun")
+            etat_l = ("ferme" if statut == "ferme" else "perime" if statut == "perime" else "entree" if cle.get("trade") else
+                      "preparation" if (cle.get("ordre") or cle.get("prep") or e["strat"]) else "calme")
+        marches.append({"m": m, "etat": etat_l, "biais": {1: "haussier", -1: "baissier", 0: "indecis"}[sens],
+                        "ut": int(nb_ut), "seuil": MIN_ALIGN, "profil": profil})
     return {"v": 1, "maj": int(now), "bot": "@" + str(etat.get("bot") or "align_mtf_adel_bot"), "marches": marches}
 
 def _api_github(chemin, methode="GET", corps=None):
@@ -13804,6 +13840,10 @@ def clavier_live(etat, cid, anglais=False):
         lignes.append([{"text": "🎆 Objectif de likes atteint !", "callback_data": "likeok:x"}])
         lignes.append([{"text": "⏹ Live terminé" if live_actif(etat) else "🔴 Je lance le live",
                         "callback_data": "liveoff:x" if live_actif(etat) else "liveon:x"}])
+        animations_on = bool(etat.get("live_animations", True))
+        lignes.append([{"text": ("✨ Animations ON" if animations_on else "⏸ Animations OFF")
+                        if not anglais else ("✨ Animations ON" if animations_on else "⏸ Animations OFF"),
+                        "callback_data": "animlive:toggle"}])
     return json.dumps({"inline_keyboard": lignes}) if lignes else None
 
 def texte_choix_coach(m, anglais=False):
@@ -13862,7 +13902,7 @@ def live_annoncer_debut(etat, chats):
 
 def live_callback(etat, chats, cb, choix, mk, qui):
     """Boutons du live. Renvoie True si le bouton appartenait au live."""
-    if choix not in ("liveon", "liveoff", "liveboost", "livemain", "menulive", "likeobj", "likeok"):
+    if choix not in ("liveon", "liveoff", "liveboost", "livemain", "menulive", "likeobj", "likeok", "animlive"):
         return False
     anglais = qui in LANG_EN
     if choix in ("likeobj", "likeok"):          # v8.8 : réservé au propriétaire
@@ -13876,6 +13916,27 @@ def live_callback(etat, chats, cb, choix, mk, qui):
             obj = etat.pop("like_obj", "")
             live_publier(f"🎆 FÉLICITATIONS LA TEAM ! OBJECTIF {obj + ' ' if obj else ''}LIKES ATTEINT 🎉 • comme promis, la prochaine info arrive : viens dans la bio 👉")
             _envoi_sur(qui, text="🎆 Feu d'artifice envoyé sur le live !")
+        try:
+            telegram("answerCallbackQuery", callback_query_id=cb["id"])
+        except Exception:
+            pass
+        return True
+    if choix == "animlive":
+        if qui not in {str(x) for x in proprio(etat)}:
+            try:
+                telegram("answerCallbackQuery", callback_query_id=cb["id"], text="Commande réservée à l'administrateur")
+            except Exception:
+                pass
+            return True
+        animations_on = not bool(etat.get("live_animations", True))
+        commande = "on" if animations_on else "off"
+        publie = live_publier(f"CMD:animations:{commande}:ALIGN")
+        if publie:
+            etat["live_animations"] = animations_on
+        _envoi_sur(qui, text=(
+            ("✨ Animations activées sur l'écran TradingView." if animations_on else "⏸ Animations coupées sur l'écran TradingView.")
+            if publie else "⚠️ La commande n'a pas pu être envoyée à l'écran TradingView ; l'état précédent est conservé."
+        ))
         try:
             telegram("answerCallbackQuery", callback_query_id=cb["id"])
         except Exception:
