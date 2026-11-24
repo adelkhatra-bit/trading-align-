@@ -71,9 +71,6 @@ class TelegramCoachMenuTests(unittest.TestCase):
         activate.assert_any_call(etat, "101", "GOLD", notifier=False)
         commentary.assert_not_called()
         self.assertIn("101", etat["recherche_positions_active"])
-        self.assertEqual(etat["telegram_outbox"][0]["coach_prealert_markets"], ["GOLD"])
-        self.assertEqual(len(etat["telegram_outbox"]), 2)
-        self.assertEqual(etat["telegram_outbox"][1]["chat_id"], "202")
 
     def test_autostop_callback_removes_only_selected_market_and_its_chrono(self):
         etat = {
@@ -111,6 +108,9 @@ class TelegramCoachMenuTests(unittest.TestCase):
         self.assertNotIn("101", etat["BTC"]["trade"]["qui"])
         self.assertIn("101", etat["GOLD"]["trade"]["qui"])
         self.assertIn("101", etat["recherche_positions_active"])
+        self.assertEqual(etat["telegram_outbox"][0]["coach_prealert_markets"], ["GOLD"])
+        self.assertEqual(len(etat["telegram_outbox"]), 2)
+        self.assertEqual(etat["telegram_outbox"][1]["chat_id"], "202")
         ab.desinscrire_auto(etat, "101", "GOLD")
         self.assertNotIn("101", etat["recherche_positions_active"])
         self.assertTrue(any(call.args[0] == "deleteMessage" and call.kwargs.get("message_id") == 777
