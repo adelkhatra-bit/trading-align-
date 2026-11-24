@@ -45,7 +45,7 @@ class HeartbeatGmTests(unittest.TestCase):
         self.assertIn("clearTimeout(ecranRetryTimer)", self.js)
     def test_chaines_historiques_conservees(self):
         self.assertIn("PING|LIVE_SCREEN|", self.js)
-        self.assertIn("setInterval(pingEcran, 60000)", self.js)
+        self.assertIn("setInterval(pingEcran, 25000)", self.js)
 
 
 
