@@ -109,7 +109,7 @@ class AlignMtfRulesTest(unittest.TestCase):
         for active_tf in ("M1", "M5", "M15", "H4"):
             with self.subTest(active_timeframe=active_tf):
                 r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": active_tf, "snapshots": {
-                    active_tf: {"fresh": True, "confirmed": True, "robotV12": dict(robot)}
+                    active_tf: {"fresh": True, "price": 101.0, "confirmed": True, "robotV12": dict(robot)}
                 }}}
                 plan = align_bot.plan_indicateur(r)
                 self.assertTrue(plan["available"], plan.get("reason"))
@@ -133,7 +133,7 @@ class AlignMtfRulesTest(unittest.TestCase):
                     "confirmed": True,
                 }
                 r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "H4", "snapshots": {
-                    "H4": {"fresh": True, "confirmed": True, "robotV12": robot}
+                    "H4": {"fresh": True, "price": 110.0, "confirmed": True, "robotV12": robot}
                 }}}
                 self.assertTrue(align_bot.plan_indicateur(r)["available"])
 
@@ -151,20 +151,20 @@ class AlignMtfRulesTest(unittest.TestCase):
                 robot = dict(valid_robot)
                 robot[key] = value
                 r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "M15", "snapshots": {
-                    "M15": {"fresh": True, "robotV12": robot}
+                    "M15": {"fresh": True, "price": 101.0, "robotV12": robot}
                 }}}
                 self.assertFalse(align_bot.plan_indicateur(r)["available"])
 
     def test_indicator_plan_changes_when_active_timeframe_changes(self):
         r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "H4", "snapshots": {
-            "M15": {"fresh": True, "robotV12": {
+            "M15": {"fresh": True, "price": 101.0, "robotV12": {
                 "signal": "LONG", "entry": 101, "sl": 99, "tp": 105,
                 "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
                 "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
                 "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
                 "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
             }},
-            "H4": {"fresh": True, "confirmed": True, "robotV12": {
+            "H4": {"fresh": True, "price": 110.0, "confirmed": True, "robotV12": {
                 "signal": "SHORT", "entry": 110, "sl": 112, "tp": 106,
                 "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
                 "entryZoneLow": 109.5, "entryZoneHigh": 110.5, "entryDecision": 110,
@@ -190,7 +190,7 @@ class AlignMtfRulesTest(unittest.TestCase):
 
     def test_indicator_plan_rejects_incoherent_levels(self):
         r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "M5", "snapshots": {
-            "M5": {"fresh": True, "robotV12": {"signal": "LONG", "entry": 100, "sl": 102, "tp": 104}}
+            "M5": {"fresh": True, "price": 100.0, "robotV12": {"signal": "LONG", "entry": 100, "sl": 102, "tp": 104}}
         }}}
         self.assertFalse(align_bot.plan_indicateur(r)["available"])
 
@@ -3838,7 +3838,7 @@ class TelegramTp1Tp2BridgeTests(unittest.TestCase):
         return {"tv_indicator_mtf": {
             "available": True,
             "activeTimeframe": timeframe,
-            "snapshots": {timeframe: {"fresh": True, "confirmed": True, "robotV12": robot}}
+            "snapshots": {timeframe: {"fresh": True, "price": entry, "confirmed": True, "robotV12": robot}}
         }}
 
     def test_indicator_bridge_reads_both_targets_for_long(self):
