@@ -259,6 +259,15 @@ def fusionne_lectures_tradingview(r):
     return r
 
 
+def prix_tradingview_dans_zone(prix, zone_low, zone_high):
+    """True uniquement si le dernier prix du snapshot Pine reste dans la zone du plan."""
+    try:
+        p, low, high = float(prix), float(zone_low), float(zone_high)
+    except (TypeError, ValueError):
+        return False
+    return all(math.isfinite(x) for x in (p, low, high)) and low <= p <= high
+
+
 def plan_indicateur(r):
     """Plan Pine canonique M15 + bougie clôturée de déclenchement stratégie."""
     bridge = r.get("tv_indicator_mtf") or {}
@@ -287,6 +296,12 @@ def plan_indicateur(r):
 
     if snap.get("fresh") is not True:
         return {"timeframe": active_tf, "available": False, "reason": "snapshot TradingView actif périmé"}
+    try:
+        current_price = float(snap.get("price"))
+    except (TypeError, ValueError):
+        return {"timeframe": active_tf, "available": False, "reason": "prix TradingView actif absent"}
+    if not math.isfinite(current_price) or current_price <= 0:
+        return {"timeframe": active_tf, "available": False, "reason": "prix TradingView actif invalide"}
     if str(robot.get("planTimeframe") or "").upper() != "M15":
         return {"timeframe": active_tf, "available": False, "reason": "référence du plan différente de M15"}
     strategy = str(robot.get("strategy") or "").upper()
@@ -335,6 +350,7 @@ def plan_indicateur(r):
         "strategy": strategy, "available": True, "direction": direction,
         "entry": entry, "sl": sl, "tp": tp1, "tp1": tp1, "tp2": tp2,
         "zone_low": zone_low, "zone_high": zone_high, "decision": decision,
+        "price": current_price, "price_in_zone": prix_tradingview_dans_zone(current_price, zone_low, zone_high),
         "entry_bar_time": entry_bar_time, "entry_bar_open": entry_bar_open,
         "entry_bar_high": entry_bar_high, "entry_bar_low": entry_bar_low,
         "entry_bar_close": entry_bar_close, "triggered": triggered,
@@ -10590,8 +10606,28 @@ def lecture_tp1(r, d):
 
 
 def coach_fvg(r, d, prix, attente=True, tr=None):
-    """Lignes « coach » d'une entrée sur FVG (mêmes niveaux que l'indicateur sur la vue de validation) : zone, alignement 5 min + 15 min,
-    FVG qui bloque, SL protégé, manipulation (mèche qui dépasse puis revient), quand entrer. [] si l'indicateur garde son plan d'origine."""
+    """Lignes coach. Pour Pine v25, la zone et le prix viennent exclusivement du snapshot TradingView."""
+    if tr and str(tr.get("src") or "").startswith("Pine v25"):
+        try:
+            za, zb = sorted((float(tr["za"]), float(tr["zb"])))
+            tv_price = float(tr["tv_price"])
+            ut = str(tr.get("entry_timeframe") or "M15")
+        except (KeyError, TypeError, ValueError):
+            return []
+        if za <= tv_price <= zb:
+            pine_strategy = str(tr.get("strategie") or tr.get("strat") or "").upper()
+            local_strategy = str(tr.get("strat_filtre") or "").upper()
+            detail = f"Stratégie Pine {pine_strategy} ({ut})"
+            if local_strategy and local_strategy != pine_strategy:
+                detail += f" • filtre local {local_strategy}"
+            return [
+                f"📍 Prix TradingView dans la zone Pine M15 : {px(za)} → {px(zb)}",
+                f"🕯 Retest + clôture validés • {detail}",
+            ]
+        return [
+            f"⏳ Prix TradingView hors zone Pine M15 : {px(tv_price)} • zone {px(za)} → {px(zb)}",
+            "Aucune entrée au marché ; attendre le retour dans la zone.",
+        ]
     try:
         pe = pine_entree(r, d) if d in (1, -1) and r.get("b15") and "planH" in r else None
     except Exception:
@@ -11687,7 +11723,6 @@ def agent(m, r, cle, ferme):
             out.append(f"⏳ {ICONE.get(m, '')} {m} : sens Pine M15 différent de la lecture locale ; aucune entrée.")
             return out
         cle.pop("tv_bridge_wait_reason", None)
-
         # Les niveaux sont ceux du Pine, jamais recalculés ni ajustés par l'apprentissage SL.
         entry = float(plan_tv["entry"])
         stop = float(plan_tv["sl"])
@@ -11709,6 +11744,7 @@ def agent(m, r, cle, ferme):
             "src": "Pine v25 • plan M15", "sl_ut": "15 min",
             "rr": rr, "n1": "TP1 Pine", "n2": "TP2 Pine" if tp2 is not None else "",
             "entry_timeframe": plan_tv["entry_timeframe"],
+            "tv_price": plan_tv["price"],
             "entry_bar_time": plan_tv["entry_bar_time"],
             "entry_bar_close": plan_tv["entry_bar_close"],
             "pine_order_id": order_id,
@@ -11734,6 +11770,21 @@ def agent(m, r, cle, ferme):
                 ))
             return out
 
+        # Un déclencheur n'autorise pas à poursuivre le prix : le dernier prix TradingView
+        # doit encore se trouver dans la zone exacte du plan Pine M15.
+        if not plan_tv.get("price_in_zone"):
+            last_zone_wait = cle.get("pine_zone_wait_bar")
+            if last_zone_wait != plan_tv["entry_bar_time"]:
+                cle["pine_zone_wait_bar"] = plan_tv["entry_bar_time"]
+                out.append(
+                    f"⏳ {ICONE.get(m, '')} {m} : déclencheur Pine {plan_tv['entry_timeframe']} confirmé, "
+                    f"mais prix TradingView {px(plan_tv['price'])} hors zone M15 "
+                    f"{px(plan_tv['zone_low'])} → {px(plan_tv['zone_high'])}. "
+                    "Aucune entrée au marché ; attendre le retour dans la zone."
+                )
+            return out
+        cle.pop("pine_zone_wait_bar", None)
+
         # Déclencheur Pine clôturé : une seule entrée par bougie de validation.
         if cle.get("pine_entry_bar_done") == plan_tv["entry_bar_time"]:
             return out
@@ -11745,9 +11796,14 @@ def agent(m, r, cle, ferme):
             o, statut="entree", cree=r["t"], ouvert_t=time.time(),
             encore=0, atr_e=atr15, sl0=stop, profil=profil_trade(m, o, r),
             src="Pine v25 M15 / " + plan_tv["entry_timeframe"],
+            tv_price=plan_tv["price"],
             strategie=plan_tv["strategy"],
         )
         tr.update(strategie_trade(r, d))
+        # La stratégie et l'UT d'exécution du trade suivent le plan Pine v25.
+        # La lecture locale reste conservée à part pour expliquer un éventuel écart MTF.
+        tr["strat_filtre"] = tr.get("strat")
+        tr["strat"] = plan_tv["strategy"]
         tr["retour"] = retournement_confirme(cle, d, r)
         # Ne pas appliquer appliquer_marge_sl() : le SL est celui du plan Pine canonique.
         non, n_, w_ = memoire_refuse(tr["profil"])

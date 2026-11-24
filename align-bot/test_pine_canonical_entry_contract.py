@@ -2,6 +2,8 @@
 from pathlib import Path
 import unittest
 
+import align_bot as ab
+
 BOT = Path(__file__).resolve().parent / "align_bot.py"
 BRIDGE = Path(__file__).resolve().parent / "align_tv_bridge.py"
 PINE = Path(__file__).resolve().parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
@@ -45,6 +47,58 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn("retested_zone", plan)
         self.assertIn("candle_trigger", plan)
         self.assertIn("candle_before_stop", plan)
+
+    def test_plan_pine_exports_same_source_current_price_and_zone_state(self):
+        start = self.bot.index("def plan_indicateur(r):")
+        end = self.bot.index("\nTTL_KRAKEN", start)
+        plan = self.bot[start:end]
+        self.assertIn('current_price = float(snap.get("price"))', plan)
+        self.assertIn('"price": current_price', plan)
+        self.assertIn('"price_in_zone": prix_tradingview_dans_zone(current_price, zone_low, zone_high)', plan)
+
+    def test_agent_blocks_entry_when_tradingview_price_left_pine_zone(self):
+        start = self.bot.index("def agent(m, r, cle, ferme):")
+        end = self.bot.index("\n\ndef ", start + 1)
+        agent = self.bot[start:end]
+        self.assertIn('if not plan_tv.get("price_in_zone"):', agent)
+        self.assertIn("Aucune entrée au marché ; attendre le retour dans la zone.", agent)
+        self.assertLess(agent.index('if not plan_tv.get("price_in_zone")'), agent.index('cle["pine_entry_bar_done"]'))
+
+    def test_trade_strategy_and_execution_timeframe_follow_pine_with_local_filter_kept(self):
+        self.assertIn('tr["strat_filtre"] = tr.get("strat")', self.bot)
+        self.assertIn('tr["strat"] = plan_tv["strategy"]', self.bot)
+
+    def test_pine_v25_coach_never_recomputes_legacy_v24_zone(self):
+        start = self.bot.index("def coach_fvg(")
+        end = self.bot.index("\ndef pine_entree(", start)
+        coach = self.bot[start:end]
+        self.assertLess(coach.index('startswith("Pine v25")'), coach.index("pe = pine_entree(r, d)"))
+        self.assertIn('tv_price = float(tr["tv_price"])', coach)
+        self.assertIn('float(tr["za"]), float(tr["zb"])', coach)
+
+    def test_prix_tradingview_dans_zone_uses_closed_zone_boundaries_and_rejects_invalid_data(self):
+        self.assertTrue(ab.prix_tradingview_dans_zone(100, 99, 101))
+        self.assertTrue(ab.prix_tradingview_dans_zone(99, 99, 101))
+        self.assertTrue(ab.prix_tradingview_dans_zone(101, 99, 101))
+        self.assertFalse(ab.prix_tradingview_dans_zone(101.01, 99, 101))
+        self.assertFalse(ab.prix_tradingview_dans_zone(98.99, 99, 101))
+        self.assertFalse(ab.prix_tradingview_dans_zone(None, 99, 101))
+        self.assertFalse(ab.prix_tradingview_dans_zone(float("nan"), 99, 101))
+
+    def test_pine_v25_coach_reads_only_the_trade_snapshot_zone_and_price(self):
+        lines = ab.coach_fvg(
+            {}, 1, 999, attente=False,
+            tr={
+                "src": "Pine v25 M15 / M5", "za": 99, "zb": 101,
+                "tv_price": 100, "entry_timeframe": "M5",
+                "strategie": "DAY", "strat_filtre": "SWING",
+            },
+        )
+        self.assertEqual(len(lines), 2)
+        self.assertIn("99", lines[0])
+        self.assertIn("101", lines[0])
+        self.assertIn("Pine DAY (M5)", lines[1])
+        self.assertIn("filtre local SWING", lines[1])
 
     def test_live_sniper_notification_requires_confirmed_pine_levels(self):
         start = self.bot.index("def evenements_pine(etat, m, r, cle, now):")
