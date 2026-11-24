@@ -60,6 +60,7 @@ class TradingViewBridgeGateTests(unittest.TestCase):
         self.assertIn('ALIGN_REQUIRE_TV_BRIDGE: "1"', WORKFLOW_SOURCE)
         self.assertIn('"; active_age_ms=" + str(active_age)', WORKFLOW_SOURCE)
         self.assertIn('"; UT_périmées="', WORKFLOW_SOURCE)
+        self.assertIn('required = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1")', WORKFLOW_SOURCE)
         self.assertIn('"; last_rejection=" + rejection_text', WORKFLOW_SOURCE)
         self.assertIn("réponse bridge JSON non-objet pour", WORKFLOW_SOURCE)
 
