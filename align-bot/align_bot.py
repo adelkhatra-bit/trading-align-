@@ -4362,16 +4362,47 @@ def donnees_ia(m, r, cle):
         data["position_ouverte"] = {"sens": "LONG" if trx["d"] == 1 else "SHORT", "entrée": round(trx["e"], 2),
                                     "SL": round(trx["sl"], 2), "TP1": round(trx["tp1"], 2),
                                     "TP2": round(trx["tp2"], 2) if trx.get("tp2") else None, "statut": trx.get("statut")}
-    # Distance réelle au plan d'entrée et rythme observé : aide à décider si l'attente vaut la peine.
-    prix_actuel = float(r["m1"][-1]["c"])
+    # En mode bridge obligatoire, le coach ne mélange jamais le prix/plan Pine avec un ordre local de secours.
+    bridge_required = r.get("require_tv_bridge") is True
     plan = plan_indicateur(r)
+    bridge = r.get("tv_indicator_mtf") or {}
+    snapshots = bridge.get("snapshots") or {}
+    active_tf = str(bridge.get("activeTimeframe") or "").upper()
+    active_snap = snapshots.get(active_tf) or {}
+    try:
+        prix_tv = float(plan["price"]) if plan.get("available") else float(active_snap["price"])
+        if not math.isfinite(prix_tv) or prix_tv <= 0 or active_snap.get("fresh") is not True:
+            prix_tv = None
+    except (KeyError, TypeError, ValueError):
+        prix_tv = None
+    if bridge_required:
+        data["prix"] = round(prix_tv, 2) if prix_tv is not None else None
+        data["zone d'entrée"] = (
+            [round(plan["zone_low"], 2), round(plan["zone_high"], 2)]
+            if plan.get("available") else None
+        )
+        data["profil_strategie"] = (
+            {"mode": plan["strategy"], "direction": plan["direction"],
+             "horizon": {"SCALPING": "court terme", "DAY": "séance", "SWING": "plusieurs séances"}.get(plan["strategy"], "à réévaluer")}
+            if plan.get("available") else
+            {"mode": "ATTENTE", "direction": 0, "horizon": "aucun plan Pine frais exploitable"}
+        )
+        if plan.get("available"):
+            sens_pine = "LONG" if plan["direction"] == 1 else "SHORT"
+            etat_plan = "déclencheur confirmé" if plan.get("triggered") else "déclencheur en attente"
+            data["verdict du bot"] = f"Plan Pine v25 {sens_pine} : {etat_plan}; l'entrée reste soumise au garde-fou ROBOT V12."
+        else:
+            data["verdict du bot"] = "Aucune entrée autorisée : plan Pine v25 indisponible — " + str(plan.get("reason") or "données incomplètes")
+    # Distance réelle au plan : même prix TradingView que le snapshot du plan.
+    # Hors mode bridge, le comportement historique reste inchangé.
+    prix_actuel = prix_tv if bridge_required else float(r["m1"][-1]["c"])
     cible_entree = None
     origine_plan = None
     if plan.get("available"):
         cible_entree, origine_plan = float(plan["entry"]), "TradingView ROBOT V12 frais"
-    elif o.get("e") is not None:
+    elif not bridge_required and o.get("e") is not None:
         cible_entree, origine_plan = float(o["e"]), "ordre ALIGN actif"
-    if cible_entree is not None:
+    if cible_entree is not None and prix_actuel is not None:
         distance = abs(cible_entree - prix_actuel)
         data["distance_plan_entree"] = {
             "prix_actuel": round(prix_actuel, 5), "entree_visee": round(cible_entree, 5),
@@ -4380,18 +4411,28 @@ def donnees_ia(m, r, cle):
             "distance_en_ATR_15m": round(distance / max(float(r.get("atr") or 0), 1e-9), 2) if r.get("atr") else None
         }
     else:
-        data["distance_plan_entree"] = {"disponible": False, "raison": "aucun ordre ALIGN ni plan TradingView frais avec prix d'entrée exploitable"}
-    # Rythme des dernières bougies 5m : estimation indicative, jamais un compte à rebours garanti.
+        data["distance_plan_entree"] = {
+            "disponible": False,
+            "raison": "aucun plan Pine frais avec prix TradingView exploitable" if bridge_required
+                      else "aucun ordre ALIGN ni plan TradingView frais avec prix d'entrée exploitable"
+        }
+    # Le rythme 5m est un proxy local, pas le flux Pine : ne pas en déduire une ETA GOLD.
     b5 = r.get("b5") or []
     ranges = [max(float(b.get("h", 0)) - float(b.get("l", 0)), abs(float(b.get("h", 0)) - float(b.get("c", 0))), abs(float(b.get("l", 0)) - float(b.get("c", 0)))) for b in b5[-12:] if b.get("h") is not None and b.get("l") is not None and b.get("c") is not None]
     moyenne_5m = sum(ranges) / len(ranges) if ranges else 0
-    if cible_entree is not None and moyenne_5m > 0:
+    if bridge_required and m == "GOLD":
+        data["estimation_approche_entree"] = {
+            "disponible": False,
+            "raison": "historique 5m du flux spot TradingView non disponible; utiliser uniquement la prochaine clôture comme heure de réévaluation"
+        }
+    elif cible_entree is not None and prix_actuel is not None and moyenne_5m > 0:
         bougies = distance / moyenne_5m
         data["estimation_approche_entree"] = {
             "mouvement_moyen_5m": round(moyenne_5m, 5),
             "bougies_5m_indicatives": round(bougies, 1),
             "minutes_indicatives": round(bougies * 5),
-            "avertissement": "projection mécanique fondée sur les 12 dernières bougies, non prédictive et à ne pas traiter comme heure d'entrée"
+            "source_mouvement": "bougies 5m locales du bot (proxy, distinct du snapshot TradingView)" if bridge_required else "bougies 5m locales",
+            "avertissement": "projection mécanique non prédictive; jamais une heure d'entrée garantie"
         }
     else:
         data["estimation_approche_entree"] = {"disponible": False, "raison": "pas de plan d'entrée exploitable ou historique 5m insuffisant"}
