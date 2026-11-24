@@ -4381,6 +4381,29 @@ def donnees_ia(m, r, cle):
             [round(plan["zone_low"], 2), round(plan["zone_high"], 2)]
             if plan.get("available") else None
         )
+        def lecture_pine(tf, champ):
+            snap = snapshots.get(tf) or {}
+            if snap.get("fresh") is not True:
+                return None
+            valeur = snap.get(champ)
+            if champ == "direction":
+                return _direction_tv(valeur)
+            try:
+                nombre = float(valeur)
+                return round(nombre) if math.isfinite(nombre) else None
+            except (TypeError, ValueError):
+                return None
+
+        data["sens 1m/5m/15m/1h/4h/Daily"] = [
+            lecture_pine(tf, "direction") for tf in ("M1", "M5", "M15", "H1", "H4", "D1")
+        ]
+        data["RSI 5m/15m/1h/4h"] = [
+            lecture_pine(tf, "rsi") for tf in ("M5", "M15", "H1", "H4")
+        ]
+        data["lecture_multi_unites"] = {
+            tf: lecture_pine(tf, "direction") for tf in ("M5", "M15", "H1", "H4")
+        }
+        data["niveau de cassure 5 min"] = None
         data["profil_strategie"] = (
             {"mode": plan["strategy"], "direction": plan["direction"],
              "horizon": {"SCALPING": "court terme", "DAY": "séance", "SWING": "plusieurs séances"}.get(plan["strategy"], "à réévaluer")}
