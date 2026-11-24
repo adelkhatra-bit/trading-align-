@@ -13733,7 +13733,12 @@ def clavier_live(etat, cid, anglais=False):
         lignes.append([{"text": "🚀 Boost the live" if anglais else "🚀 Booster le live", "callback_data": "liveboost:x"}])
         lignes.append([{"text": LIVE_CHOIX[k][2], "callback_data": f"livemain:{k}"} for k in ("BTC", "GOLD")])
         lignes.append([{"text": LIVE_CHOIX[k][2], "callback_data": f"livemain:{k}"} for k in ("1", "5", "15", "60")])
-        lignes.append([{"text": f"🎙 Coach {k}", "callback_data": f"coachlive:{k}"} for k in ("BTC", "GOLD")])
+        lignes.append([{"text": (f"🎙 Commentary {k}" if anglais else f"🎙 Commentaire {k}"),
+                         "callback_data": f"coachlive:{k}"} for k in ("BTC", "GOLD")])
+        lignes.append([{"text": (f"🧑‍🏫 Next position {k}" if anglais else f"🧑‍🏫 Coach position {k}"),
+                         "callback_data": f"auto:{k}"} for k in ("BTC", "GOLD")])
+        lignes.append([{"text": (f"📊 12 timeframes {k}" if anglais else f"📊 12 UT {k}"),
+                         "callback_data": f"timeframes:{k}"} for k in ("BTC", "GOLD")])
         lignes.append([{"text": "🔎 Faire une analyse" if not anglais else "🔎 Research markets",
                         "callback_data": "analysechoice:BOTH"}])
         lignes.append([{"text": "🎯 Chercher une position" if not anglais else "🎯 Find a position",
