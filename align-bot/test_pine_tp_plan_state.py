@@ -22,11 +22,13 @@ class PineTpPlanStateTests(unittest.TestCase):
         self.assertIn("(na(tp2) != na(tp2M))", block)
         self.assertLess(block.index("if planTpChange"), block.index("if not tp1Ok and dirPlan"))
 
-    def test_visual_entry_line_and_label_are_preserved(self):
-        self.assertIn("lE   := line.new(x1, ent, x2, ent", self.source)
-        self.assertIn('eE   := label.new(x1, ent, "ENTRÉE " + px(ent)', self.source)
-        self.assertIn("line.delete(lE)", self.source)
-        self.assertIn("label.delete(eE)", self.source)
+    def test_visual_confirmation_line_and_label_are_preserved_without_entry_marker(self):
+        self.assertIn("lConf := line.new(bar_index, ent, bar_index + 30, ent", self.source)
+        self.assertIn('eConf := label.new(bar_index + 30, ent, "✅ CONFIRMATION"', self.source)
+        self.assertIn("line.delete(lConf)", self.source)
+        self.assertIn("label.delete(eConf)", self.source)
+        self.assertNotIn('eE := label.new(x1, ent, "ENTRÉE "', self.source)
+        self.assertNotIn("lE := line.new(x1, ent", self.source)
         self.assertIn("var table t = table.new(pos, 11, 3", self.source)
         self.assertIn("lZH := line.new(x1, zMil", self.source)
 
