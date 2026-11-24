@@ -19,25 +19,43 @@ Si l'**identité du projet** est ambiguë (autre dépôt, autre branche de produ
 | Marchés actifs | BTC, GOLD (`BTCUSD`, `XAUUSD`) uniquement | NASDAQ retiré de l'analyse, des entrées, de la surveillance et du suivi des positions ; toute ancienne mémoire NASDAQ est archivée pour audit et jamais rejouée |
 | Bot Telegram | `@align_mtf_adel_bot` | — |
 | Bande live | `docs/live/align-bande-live.user.js` (Tampermonkey) | Copies locales anciennes (12.2.3, 12.2.4…) |
-| Bridge TradingView | `align-bot/align_tv_bridge.py`, port **4100** | Ports 3000 / 4000 / 5001 et l'ancien tunnel `server.js` |
+| Bridge TradingView canonique | Worker mailbox Cloudflare → `align_tv_mailbox_feeder.py` → `align-bot/align_tv_bridge.py` dans le runner GitHub (`127.0.0.1:4100`) | Ancien cache Node `server.js` / port 4000, extension `tradingview-analyzer`, tunnel historique |
 
-## 2. Chaîne de données (une seule)
+## 2. Chaîne de données de production
 
 ```
-TradingView (indicateur v25, alerte « Any alert() function call »)
-  → bridge ROBOT V12 (align_tv_bridge.py, HTTPS dédié → 127.0.0.1:4100)
-  → align-bot.yml (lit /bridge/robot-v12/mtf avec ALIGN_TV_READ_TOKEN)
-  → align_bot.py (filtres news / R:R / risque)
-  → Telegram (@align_mtf_adel_bot) + live-data/live.json
+TradingView · Pine v25 · 2 alertes (BTCUSD et XAUUSD)
+  → Cloudflare Worker `align-tv-mailbox` · POST /ingest/tradingview
+  → Durable Object · dernier payload brut par symbole (pas de validation MTF)
+  → `align_tv_mailbox_feeder.py` · GET /mailbox puis POST inchangé
+  → `align_tv_bridge.py` · runner GitHub, 127.0.0.1:4100 (unique validation)
+  → `align-bot.yml` · GET /bridge/robot-v12/mtf
+  → `align-bot/align_bot.py` · filtres news / R:R / risque / mémoire
+  → Telegram (@align_mtf_adel_bot) + publication live-data/live.json
   → bande live (texte, animations, voix)
 ```
 
-Règle : quand `ALIGN_REQUIRE_TV_BRIDGE=1`, **aucun repli** sur des niveaux calculés ailleurs.
+Le bridge Python est éphémère dans le runner du workflow : **4100 n'est pas un service permanent du PC** et ne doit pas être exposé par un tunnel public. Le Worker ne remplace pas le bridge : il transporte et conserve le JSON brut. Le feeder le transmet sans compléter ni réécrire ses champs ; `BridgeStore` dans `align_tv_bridge.py` est l'unique validateur MTF.
+
+Le BOT peut aussi être configuré pour lire un bridge HTTPS externe via les secrets `ALIGN_TV_API_URL` et `ALIGN_TV_READ_TOKEN`. Cette voie remplace la voie mailbox dans le workflow ; elle ne doit être activée que si l'URL et le stockage visés ont été explicitement vérifiés. Ne jamais déduire l'identité du serveur à partir du seul chemin HTTP.
+
+### Deux routes identiques à ne pas confondre
+
+Le serveur historique `server.js` écoute par défaut sur **4000** et expose lui aussi `/bridge/robot-v12/mtf`. Ce nom de route identique masque deux stockages différents :
+
+- chemin canonique du BOT : mailbox Cloudflare → relais → BridgeStore Python du runner (12 UT : M1, M3, M5, M10, M15, M30, M45, H1, H2, H4, D1, W1) ;
+- chemin historique : extension `tradingview-analyzer` → `POST /tradingview/live` sur `server.js:4000` → cache Node `tradingview-mtf-cache.json` (9 UT : M1, M5, M15, M30, H1, H2, H4, D1, W1).
+
+Le serveur 4000 n'est pas le bridge utilisé dans les runs BOT #1074/#1075 : leurs journaux montrent le relais mailbox et le bridge runner 4100. Ce serveur et l'extension sont laissés en place, mais ne doivent pas servir à valider le BOT canonique ni à alimenter son healthcheck. Ne pas arrêter, modifier ou rediriger le port 4000 dans le cadre de ce flux.
+
+Le bridge exige les 12 UT du contrat Python. L'UT active du graphique peut être l'une des 9 UT acceptées par le BOT (M1, M5, M15, M30, H1, H2, H4, D1, W1) ; cela ne dispense jamais le payload de contenir M3, M10 et M45.
+
+Règle : quand `ALIGN_REQUIRE_TV_BRIDGE=1`, **aucun repli** sur des niveaux calculés ailleurs. Si une UT manque ou est périmée, le BOT reste en `WAIT` et n'émet aucun signal.
 
 ### Telegram : chemin applicatif unique
 
 - **Bot applicatif** : `align-bot/align_bot.py` (`@align_mtf_adel_bot`).
-- **Réception** : `boucle_polling_telegram` → `_traiter_lecture_rapide` pour les réponses immédiates → file d'updates → `traiter` pour les commandes et actions restantes.
+- **Réception** : un seul thread `boucle_polling_telegram_tracee` appelle `getUpdates`, acquitte rapidement les callbacks et pousse les updates dans `TELEGRAM_UPDATES`; `recevoir_updates_telegram` dépile cette file sur le thread principal, puis `traiter` route les commandes et actions. La boucle principale ne lance pas un second `getUpdates`.
 - **Sortie** : les appels applicatifs passent par `telegram()` puis `_telegram_sortant_autorise`; un blocage `TELEGRAM_PULL_BLOCK` n'est pas une livraison et ne doit jamais être compté comme telle.
 - **Commandes de diagnostic** : `/statut` et `/audit` restent sur le chemin rapide; `/diag` est traité par `traiter`, uniquement en chat privé, avec expéditeur = chat = propriétaire. Il interroge en lecture la même route MTF que le bot pour BTC et GOLD, affiche l'UT active et le nombre d'UT fraîches, puis lit `RUNNER_TEMP/align_diag.json` pour les compteurs STALE. Aucune écriture, aucun payload ni secret n'est exposé.
 - **Composants à ne pas confondre avec un second bot** : `server.js` expose des routes serveur/bridge mais ne contient pas d'appel direct à l'API Bot Telegram; `agent-bus.js` est un bus interne d'agents; l'extension `tradingview-analyzer` transmet des données au serveur mais n'appelle pas directement l'API Bot Telegram.
@@ -99,4 +117,4 @@ Ne jamais publier dans ce dépôt, les issues, les commentaires ou les logs publ
 | `audit/chatgpt-pilotage` | Rapports de vérification, audit, notes | Mainteneurs humains | Documentation audit seulement; aucun runtime |
 | `fix/ci-triggers` | Correctif E1 désormais intégré (historique) | — | — |
 
-**Précision:** Les lecteurs externes de `live-data` et la source/dossier GitHub Pages ne sont pas exhaustivement identifiés; Cloudflare Worker `align-tv-mailbox` reste NON VÉRIFIÉ. Cette matrice décrit les flux confirmés, pas un inventaire exhaustif.
+**Précision:** Le code du Worker `align-tv-mailbox` et sa liaison à la mailbox sont présents dans le dépôt. Les journaux du BOT #1075 (24/11/2026) confirment une lecture mailbox réussie et un relais jusqu'au bridge runner ; cette preuve ne valide pas les alertes TradingView, dont les payloads ont ensuite été rejetés pour `missing_mtf_timeframe:tf=M3`. Les lecteurs externes de `live-data` et la configuration complète de GitHub Pages restent à inventorier.

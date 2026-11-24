@@ -23,6 +23,14 @@ flowchart TD
   W -.->|preuves/logs| RX
 ```
 
+## 1 bis. Ancien chemin local à ne pas confondre
+
+`server.js` écoute par défaut sur le port **4000**. L'extension `tradingview-analyzer` scrape le graphique puis envoie ses données à `POST /tradingview/live`; le serveur alimente un cache Node séparé (`tradingview-mtf-cache.json`) et expose lui aussi `/bridge/robot-v12/mtf`.
+
+Ce chemin ancien n'est pas la mailbox Worker et ne lit pas le BridgeStore Python du runner. Il ne fait pas partie du chemin BOT montré au-dessus. Il contient un contrat de neuf UT (M1, M5, M15, M30, H1, H2, H4, D1, W1), tandis que le bridge canonique du BOT exige douze UT (M1, M3, M5, M10, M15, M30, M45, H1, H2, H4, D1, W1).
+
+Même nom de route HTTP ≠ même serveur, même cache ou même preuve de santé. Ne jamais utiliser une réponse du port 4000 pour valider la liaison Worker → relais → bridge runner. Ce repérage documentaire n'autorise ni arrêt ni modification du serveur 4000 ou de l'extension.
+
 ## 2. Responsabilité par composant
 
 | Composant | Responsabilité unique | Échec sûr attendu |
