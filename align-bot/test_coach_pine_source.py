@@ -126,7 +126,7 @@ class CoachPineSourceTests(unittest.TestCase):
         self.assertIn("aucune zone Entry/SL/TP", text)
         self.assertNotIn("998", text)
         self.assertNotIn("999", text)
-        self.assertIn("prochaine réévaluation", text)
+        self.assertIn("PROCHAINE RÉÉVALUATION", text)
 
     def test_live_countdown_uses_pine_entry_timeframe_and_zone_guard(self):
         r = self.base_market()
@@ -168,7 +168,7 @@ class CoachPineSourceTests(unittest.TestCase):
         self.assertIn("aucune zone Entry/SL/TP", message)
         self.assertNotIn("999", message)
         self.assertNotIn("998", message)
-        self.assertIn("12 unités", message)
+        self.assertIn("douze unités", message)
 
     def test_auto_coach_activation_displays_only_pine_entry_levels(self):
         r = self.base_market()
