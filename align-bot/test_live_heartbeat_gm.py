@@ -41,7 +41,7 @@ class HeartbeatGmTests(unittest.TestCase):
         self.assertIn("let ecranInFlight = false;", self.js)
         self.assertIn("if (!vivant || ecranInFlight || ecranRetryTimer || !prendreLeaseHeartbeat()) return;", self.js)
         self.assertIn("ecranRetryAttempt = 0;", self.js)
-        self.assertIn("const delay = delais[ecranRetryAttempt++];", self.js)
+        self.assertIn("const delay = Math.max(delais[ecranRetryAttempt++], Math.min(Number(retryAfterMs) || 0, 60000));", self.js)
         self.assertIn("clearTimeout(ecranRetryTimer)", self.js)
     def test_chaines_historiques_conservees(self):
         self.assertIn("PING|LIVE_SCREEN|", self.js)
