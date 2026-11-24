@@ -1780,7 +1780,7 @@ class AlignMtfRulesTest(unittest.TestCase):
              "tv_indicator_mtf": {"available": True, "activeTimeframe": "M15", "snapshots": snapshots}}
         message = align_bot.texte_timeframes("GOLD", r)
         for label in ("1 min", "3 min", "5 min", "10 min", "15 min", "30 min",
-                      "45 min", "1 heure", "2 heures", "4 heures", "1 jour", "1 semaine"):
+                      "45 min", "1 h", "2 h", "4 h", "1 jour", "1 semaine"):
             self.assertIn(label, message)
         self.assertIn("4 h : tendance principale", message)
         self.assertIn("1 h : confirme ou contredit", message)
