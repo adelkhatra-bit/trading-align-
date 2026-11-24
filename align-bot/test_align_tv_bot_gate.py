@@ -14,7 +14,7 @@ class TradingViewBridgeGateTests(unittest.TestCase):
     def test_bridge_failure_keeps_telegram_worker_alive_but_signals_fail_closed(self):
         duration_line = next(line for line in WORKFLOW_SOURCE.splitlines() if line.lstrip().startswith("DUREE_SEC:"))
         self.assertIn("github.event_name == 'workflow_dispatch' && '300'", duration_line)
-        self.assertIn("steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET != '1' && '120'", duration_line)
+        self.assertNotIn("steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET != '1' && '120'", duration_line)
         self.assertIn("|| '21000'", duration_line)
 
         self.assertIn('ALIGN_TV_BRIDGE_PRET: ${{ steps.bridge.outputs.ALIGN_TV_BRIDGE_PRET == \'1\' && \'1\' || \'0\' }}', WORKFLOW_SOURCE)
