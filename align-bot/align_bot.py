@@ -50,7 +50,7 @@ TELEGRAM_CALLBACK_HANDLER_PREFIXES = (
     "livemkt", "markets", "marketsmenu", "menulive", "next", "niveau",
     "offrir", "out", "plateforme", "position", "previous", "pub", "quiet",
     "rawdetails", "refus", "resume", "retirer", "results", "searchpos",
-    "son", "tfview", "timeframes", "trade", "tvoffre", "tvok", "vuegratuit", "why",
+    "son", "tfview", "timeframes", "trade", "tvoffre", "tvok", "vuegratuit", "why", "animlive",
 )
 
 
@@ -13804,6 +13804,10 @@ def clavier_live(etat, cid, anglais=False):
         lignes.append([{"text": "🎆 Objectif de likes atteint !", "callback_data": "likeok:x"}])
         lignes.append([{"text": "⏹ Live terminé" if live_actif(etat) else "🔴 Je lance le live",
                         "callback_data": "liveoff:x" if live_actif(etat) else "liveon:x"}])
+        animations_on = bool(etat.get("live_animations", True))
+        lignes.append([{"text": ("✨ Animations ON" if animations_on else "⏸ Animations OFF")
+                        if not anglais else ("✨ Animations ON" if animations_on else "⏸ Animations OFF"),
+                        "callback_data": "animlive:toggle"}])
     return json.dumps({"inline_keyboard": lignes}) if lignes else None
 
 def texte_choix_coach(m, anglais=False):
@@ -13862,7 +13866,7 @@ def live_annoncer_debut(etat, chats):
 
 def live_callback(etat, chats, cb, choix, mk, qui):
     """Boutons du live. Renvoie True si le bouton appartenait au live."""
-    if choix not in ("liveon", "liveoff", "liveboost", "livemain", "menulive", "likeobj", "likeok"):
+    if choix not in ("liveon", "liveoff", "liveboost", "livemain", "menulive", "likeobj", "likeok", "animlive"):
         return False
     anglais = qui in LANG_EN
     if choix in ("likeobj", "likeok"):          # v8.8 : réservé au propriétaire
@@ -13876,6 +13880,26 @@ def live_callback(etat, chats, cb, choix, mk, qui):
             obj = etat.pop("like_obj", "")
             live_publier(f"🎆 FÉLICITATIONS LA TEAM ! OBJECTIF {obj + ' ' if obj else ''}LIKES ATTEINT 🎉 • comme promis, la prochaine info arrive : viens dans la bio 👉")
             _envoi_sur(qui, text="🎆 Feu d'artifice envoyé sur le live !")
+        try:
+            telegram("answerCallbackQuery", callback_query_id=cb["id"])
+        except Exception:
+            pass
+        return True
+    if choix == "animlive":
+        if qui not in {str(x) for x in proprio(etat)}:
+            try:
+                telegram("answerCallbackQuery", callback_query_id=cb["id"], text="Commande réservée à l'administrateur")
+            except Exception:
+                pass
+            return True
+        animations_on = not bool(etat.get("live_animations", True))
+        etat["live_animations"] = animations_on
+        commande = "on" if animations_on else "off"
+        publie = live_publier(f"CMD:animations:{commande}:ALIGN")
+        _envoi_sur(qui, text=(
+            ("✨ Animations activées sur l'écran TradingView." if animations_on else "⏸ Animations coupées sur l'écran TradingView.")
+            if publie else "⚠️ La commande n'a pas pu être envoyée à l'écran TradingView."
+        ))
         try:
             telegram("answerCallbackQuery", callback_query_id=cb["id"])
         except Exception:
