@@ -21,23 +21,23 @@ class TradingViewBridgeGateTests(unittest.TestCase):
         self.assertIn('ALIGN_REQUIRE_TV_BRIDGE: "1"', WORKFLOW_SOURCE)
         self.assertRegex(
             WORKFLOW_SOURCE,
-            r"if:\\s*\\$\\{\\{\\s*always\\(\\)\\s*&&\\s*\\(steps\\.bridge\\.outputs\\.ALIGN_TV_BRIDGE_PRET\\s*!=\\s*'1'\\s*\\|\\|\\s*steps\\.bridge_final\\.outcome\\s*!=\\s*'success'\\)\\s*\\}\\}",
+            r"if:\s*\$\{\{\s*always\(\)\s*&&\s*\(steps\.bridge\.outputs\.ALIGN_TV_BRIDGE_PRET\s*!=\s*'1'\s*\|\|\s*steps\.bridge_final\.outcome\s*!=\s*'success'\)\s*\}\}",
         )
         self.assertIn("Bridge TradingView obligatoire — échec signalé", WORKFLOW_SOURCE)
         self.assertIn("exit 1", WORKFLOW_SOURCE)
 
     def test_bridge_preflight_embedded_python_compiles(self):
         section = WORKFLOW_SOURCE.split("name: Vérifier le bridge TradingView ROBOT V12", 1)[1]
-        start = section.index("if python3 - <<'PY'\\n") + len("if python3 - <<'PY'\\n")
-        end = section.index("\\n          PY\\n          then", start)
+        start = section.index("if python3 - <<'PY'\n") + len("if python3 - <<'PY'\n")
+        end = section.index("\n          PY\n          then", start)
         source = textwrap.dedent(section[start:end])
         compile(source, "<align-tv-bridge-preflight>", "exec")
 
     def test_postrun_bridge_gate_rechecks_all_twelve_snapshots_and_compiles(self):
         section = WORKFLOW_SOURCE.split("name: Vérifier le bridge TradingView après le worker", 1)[1]
-        marker = "python3 - <<'PY'\\n"
+        marker = "python3 - <<'PY'\n"
         start = section.index(marker) + len(marker)
-        end = section.index("\\n          PY", start)
+        end = section.index("\n          PY", start)
         source = textwrap.dedent(section[start:end])
         compile(source, "<align-tv-bridge-postrun>", "exec")
 
