@@ -21,9 +21,9 @@ from urllib.parse import parse_qs, urlsplit
 
 SOURCE = "ALIGN_MTF_PRO_V25"
 ALLOWED_SYMBOLS = {"BTCUSD", "XAUUSD"}
-# Le marché déclaré (input « Marché ALIGN » du Pine) doit correspondre au graphique
-# réellement calculé (syminfo.tickerid). Panne réelle du 18/11 : 12 alertes NAS100/XAUUSD
-# envoyaient « BTCUSD » → prix du Gold/NASDAQ dans la boîte BTC. Jamais de mélange de marchés.
+# Le symbole exporté par Pine est déduit du ticker du graphique ; le bridge vérifie
+# indépendamment syminfo.tickerid pour interdire tout mélange BTC / GOLD.
+# Incident du 18/11 : des alertes NAS100/XAUUSD avaient publié dans la boîte BTC.
 TICKER_MARKERS = {
     "BTCUSD": ("BTC", "XBT"),
     "XAUUSD": ("XAU", "GOLD"),

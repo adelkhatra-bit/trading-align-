@@ -36,7 +36,7 @@ Configurer exactement une alerte de snapshots par marché actif :
 2. Ajouter l'indicateur canonique **ALIGN MTF PRO v25 (Inside)**.
 3. Dans les paramètres, développer **Bridge ALIGN (optionnel)**.
 4. Activer **Envoyer les snapshots au ROBOT V12**.
-5. Régler **Marché ALIGN** sur le symbole correspondant au graphique : `BTCUSD` ou `XAUUSD`.
+5. Le symbole est détecté automatiquement depuis le ticker réel du graphique : BTC/XBT → `BTCUSD`, XAU/GOLD → `XAUUSD`. Aucun choix manuel du marché n'est nécessaire.
 6. Créer une alerte avec la condition **Any alert() function call**.
 7. Utiliser le webhook Cloudflare :
    `https://align-tv-mailbox.adel-khatra.workers.dev/ingest/tradingview`
