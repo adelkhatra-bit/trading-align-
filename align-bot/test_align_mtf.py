@@ -3822,13 +3822,7 @@ class PineOnlyEntryGateTests(unittest.TestCase):
         r["tv_indicator_mtf"]["snapshots"]["M5"]["price"] = 102.0
         r["tv_indicator_mtf"]["snapshots"]["M5"]["robotV12"]["entryTriggered"] = True
         state = {"t1m": 0}
-        with patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), \\
-             patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")), \\
-             patch.object(align_bot, "pause_entree_marche", return_value=None), \\
-             patch.object(align_bot, "bloque_dw", return_value=False), \\
-             patch.object(align_bot, "profil_trade", return_value={"mode": "DAY"}), \\
-             patch.object(align_bot, "memoire_refuse", return_value=(False, 0, 0)), \\
-             patch.object(align_bot, "strategie_trade", return_value={"strat": "DAY"}):
+        with patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")), patch.object(align_bot, "pause_entree_marche", return_value=None), patch.object(align_bot, "bloque_dw", return_value=False), patch.object(align_bot, "profil_trade", return_value={"mode": "DAY"}), patch.object(align_bot, "memoire_refuse", return_value=(False, 0, 0)), patch.object(align_bot, "strategie_trade", return_value={"strat": "DAY"}):
             out = align_bot.agent("BTC", r, state, "")
         self.assertFalse(state.get("trade"))
         self.assertEqual(state.get("ordre", {}).get("e"), 100.0)
