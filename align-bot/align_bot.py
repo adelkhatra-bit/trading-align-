@@ -14209,6 +14209,19 @@ def _demander_arret(signum, frame):
 
 RELEVE_VERIF_SEC = 30     # toutes les 30 s : un worker plus récent attend-il ? (GitHub n'a pas toujours transmis le SIGINT d'annulation)
 
+def statut_job_signaux(jobs):
+    """Un job signaux absent d'un run queued est pending ; seul un vrai skipped ne déclenche pas la relève."""
+    job = next((item for item in (jobs or []) if item.get("name") == "signaux"), None)
+    if job is None:
+        return "pending"
+    status = str(job.get("status") or "").lower()
+    if status in {"queued", "in_progress", "waiting", "pending", "requested"}:
+        return status
+    if job.get("conclusion") == "skipped":
+        return "skipped"
+    return "completed"
+
+
 def releve_en_attente(runs, mon_id):
     """Vrai si un run plus récent du worker ALIGN est en file / en cours : l'ancien doit s'arrêter LUI-MÊME pour sauver sa mémoire.
     Cause réelle constatée (13/11) : annulation douce jamais reçue → annulation forcée → mémoire non sauvée → doublons au redémarrage."""
@@ -14242,7 +14255,7 @@ def surveiller_releve():
                 jobs_req = urllib.request.Request(jobs_url, headers={"Authorization": "Bearer " + jeton, "Accept": "application/vnd.github+json", "User-Agent": "ALIGN-worker"})
                 with urllib.request.urlopen(jobs_req, timeout=15) as jobs_rep:
                     jobs = json.loads(jobs_rep.read().decode("utf-8")).get("jobs", [])
-                run["worker_job_status"] = next((j.get("status") for j in jobs if j.get("name") == "signaux" and j.get("status") in jobs_actifs), "skipped")
+                run["worker_job_status"] = statut_job_signaux(jobs)
             if releve_en_attente(runs, mon_id):
                 print("ALIGN_RELEVE_DETECTEE : arrêt propre + sauvegarde de la mémoire", flush=True)
                 _demander_arret(0, None)
