@@ -35,7 +35,7 @@ class GardeFousWorkflows(unittest.TestCase):
     def test_declencheurs_critiques_conserves(self):
         attendus = {
             "align-auto-repair.yml": [r"(?m)^  workflow_run:", r"types:\s*\[completed\]"],
-            "align-workflow-watchdog.yml": [r"(?m)^  schedule:"],
+            "align-workflow-watchdog.yml": [r"(?m)^  workflow_run:", r"(?m)^  workflow_dispatch:"],
             "align-bot.yml": [r"(?m)^  workflow_run:", r'workflows:\s*\["ALIGN MTF validation"\]', r"(?m)^  schedule:"],
             "align-bot-validation.yml": [r"(?m)^  pull_request:", r"(?m)^  push:"],
         }
@@ -92,9 +92,11 @@ class GardeFousWorkflows(unittest.TestCase):
         self.assertNotIn("suggestedActors", coordinator)
         self.assertIn("human maintainers only", coordinator)
 
-    def test_watchdog_reste_planifie(self):
+    def test_watchdog_reagit_aux_evenements_et_reste_declenchable_manuellement(self):
         texte = (WF / "align-workflow-watchdog.yml").read_text(encoding="utf-8")
-        self.assertRegex(texte, r"schedule:\s*\n\s*- cron:", "le watchdog n'est plus planifié")
+        self.assertRegex(texte, r"(?m)^  workflow_run:", "le watchdog ne réagit plus aux fins de workflow")
+        self.assertRegex(texte, r"(?m)^  workflow_dispatch:", "le watchdog n'est plus déclenchable manuellement")
+        self.assertNotRegex(texte, r"(?m)^  schedule:", "le polling périodique redondant est réintroduit")
 
     def test_validate_lance_toute_la_suite(self):
         texte = (WF / "align-bot-validation.yml").read_text(encoding="utf-8")
