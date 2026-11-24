@@ -46,6 +46,37 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn("candle_trigger", plan)
         self.assertIn("candle_before_stop", plan)
 
+    def test_plan_pine_exports_same_source_current_price_and_zone_state(self):
+        start = self.bot.index("def plan_indicateur(r):")
+        end = self.bot.index("\nTTL_KRAKEN", start)
+        plan = self.bot[start:end]
+        self.assertIn('current_price = float(snap.get("price"))', plan)
+        self.assertIn('"price": current_price', plan)
+        self.assertIn('"price_in_zone": zone_low <= current_price <= zone_high', plan)
+
+    def test_agent_blocks_entry_when_tradingview_price_left_pine_zone(self):
+        start = self.bot.index("def agent(m, r, cle, ferme):")
+        end = self.bot.index("\n\ndef ", start + 1)
+        agent = self.bot[start:end]
+        self.assertIn('if not plan_tv.get("price_in_zone"):', agent)
+        self.assertIn("Aucune entrée au marché ; attendre le retour dans la zone.", agent)
+        self.assertLess(agent.index('if not plan_tv.get("price_in_zone")'), agent.index('cle["pine_entry_bar_done"]'))
+
+    def test_agent_requires_local_strategy_to_match_pine_strategy(self):
+        start = self.bot.index("def agent(m, r, cle, ferme):")
+        end = self.bot.index("\n\ndef ", start + 1)
+        agent = self.bot[start:end]
+        self.assertIn('strategie_locale = (strategie_trade(r, d) or {}).get("strat")', agent)
+        self.assertIn('if strategie_locale != plan_tv["strategy"]:', agent)
+
+    def test_pine_v25_coach_never_recomputes_legacy_v24_zone(self):
+        start = self.bot.index("def coach_fvg(")
+        end = self.bot.index("\ndef pine_entree(", start)
+        coach = self.bot[start:end]
+        self.assertLess(coach.index('startswith("Pine v25")'), coach.index("pe = pine_entree(r, d)"))
+        self.assertIn('tv_price = float(tr["tv_price"])', coach)
+        self.assertIn('float(tr["za"]), float(tr["zb"])', coach)
+
     def test_live_sniper_notification_requires_confirmed_pine_levels(self):
         start = self.bot.index("def evenements_pine(etat, m, r, cle, now):")
         end = self.bot.index("\ndef texte_pine(", start)
