@@ -1767,19 +1767,27 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertIn("timeframes:GOLD", callbacks)
         self.assertIn("history:GOLD", callbacks)
 
-    def test_all_timeframe_breakdown_lists_every_calculated_unit_and_strategy_role(self):
-        r = {
-            "dirs": [1, -1, 1, 0, -1, 1, 0, 1, -1, 1, 1],
-            "rsis": [61, 45, 65, 50, 38, 54, 49, 63, 42, 68, 71],
+    def test_all_timeframe_breakdown_lists_all_twelve_fresh_pine_snapshots_and_strategy_role(self):
+        timeframes = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1")
+        directions = (1, -1, 1, 0, -1, 1, 0, 1, -1, 1, 1, -1)
+        rsis = (61, 45, 65, 50, 38, 54, 49, 63, 42, 68, 71, 44)
+        snapshots = {
+            tf: {"fresh": True, "direction": direction, "rsi": rsi}
+            for tf, direction, rsi in zip(timeframes, directions, rsis)
         }
+        snapshots["M15"]["robotV12"] = {"strategy": "DAY"}
+        r = {"dirs": [1] * 11, "rsis": [99] * 11,
+             "tv_indicator_mtf": {"available": True, "activeTimeframe": "M15", "snapshots": snapshots}}
         message = align_bot.texte_timeframes("GOLD", r)
         for label in ("1 min", "3 min", "5 min", "10 min", "15 min", "30 min",
-                      "45 min", "1 heure", "2 heures", "4 heures", "Daily"):
+                      "45 min", "1 heure", "2 heures", "4 heures", "1 jour", "1 semaine"):
             self.assertIn(label, message)
         self.assertIn("4 h : tendance principale", message)
         self.assertIn("1 h : confirme ou contredit", message)
         self.assertIn("5 min : timing", message)
         self.assertIn("RSI 68", message)
+        self.assertIn("Plan Pine : DAY", message)
+        self.assertNotIn("RSI 99", message)
 
     def test_all_timeframe_callback_remains_available_without_cluttering_default_analysis(self):
         import json
@@ -1792,7 +1800,15 @@ class AlignMtfRulesTest(unittest.TestCase):
             "id": "cb-timeframes", "data": "timeframes:BTC",
             "message": {"chat": {"id": 123, "type": "private"}}, "from": {"id": 123}
         }}
-        r = {"dirs": [1] * 11, "rsis": [55] * 11, "m1": [candle(1, c=100.0)], "confirme": 1}
+        snapshots = {
+            tf: {"fresh": True, "direction": 1, "rsi": 55}
+            for tf in ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1")
+        }
+        r = {
+            "dirs": [1] * 11, "rsis": [99] * 11,
+            "tv_indicator_mtf": {"available": True, "activeTimeframe": "M15", "snapshots": snapshots},
+            "m1": [candle(1, c=100.0)], "confirme": 1,
+        }
         with (
             patch.object(align_bot, "autorise", return_value=True),
             patch.dict(align_bot.DERNIERS, {"BTC": r}),
