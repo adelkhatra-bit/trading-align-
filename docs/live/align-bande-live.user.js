@@ -941,7 +941,7 @@
     try {
       if (typeof GM_xmlhttpRequest === 'function') {
         GM_xmlhttpRequest({ method: 'POST', url: url, data: corps, headers: { 'Content-Type': 'text/plain; charset=utf-8' }, timeout: 8000,
-          onload: r => { if (r && r.status >= 200 && r.status < 300) success(); else { const h = String(r && r.responseHeaders || ''); const m = h.match(/^retry-after:\\s*(\\d+)/im); failure(new Error('HTTP ' + (r && r.status)), m ? Number(m[1]) * 1000 : 0); } },
+          onload: r => { if (r && r.status >= 200 && r.status < 300) success(); else { const h = String(r && r.responseHeaders || ''); const m = h.match(/^retry-after:\s*(\d+)/im); failure(new Error('HTTP ' + (r && r.status)), m ? Number(m[1]) * 1000 : 0); } },
           onerror: err => failure(err || new Error('network error')),
           ontimeout: () => failure(new Error('timeout')) });
       } else {
