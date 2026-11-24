@@ -615,14 +615,5 @@ jobs:
               f.write(text)
           PY
 
-      - name: Archiver le journal du relais TradingView (diagnostic sans payload)
-        # Le job peut déjà être terminé quand GitHub évalue toujours() pendant le post-job.
-        # L'upload d'artefact dans cette phase retourne alors 403 job completed ; le log reste
-        # disponible dans la sortie du job et l'absence d'archive ne doit pas polluer le worker.
-        if: ${{ always() && !cancelled() && job.status != 'completed' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: align-tv-relay-log-${{ github.run_id }}
-          path: ${{ runner.temp }}/align_relais.safe.log
-          if-no-files-found: warn
-          retention-days: 3
+      # Le journal du relais reste dans la sortie du job. On ne crée pas un second
+      # artefact post-job : GitHub peut refuser sa finalisation après la clôture du job.
