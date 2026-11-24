@@ -5720,6 +5720,7 @@ def inscrire_auto(etat, cid, m, notifier=True):
                 f"🎯 SUIVI ACTIVÉ — {ICONE.get(m, '')} {m}",
                 f"🧭 Direction Pine v25 : {sens}",
                 f"⏳ Décision actuelle : {decision}",
+                f"💹 Prix TradingView : {px(plan['price'])}",
                 f"📍 Zone Pine M15 : {px(plan['zone_low'])} à {px(plan['zone_high'])}",
                 f"🎯 Entry {px(plan['entry'])} • 🛑 SL {px(plan['sl'])} • TP1 {px(plan['tp1'])}"
                 + (f" • TP2 {px(plan['tp2'])}" if plan.get("tp2") is not None else ""),
