@@ -7779,7 +7779,7 @@ def traiter(etat, chats, updates):
                 deja_ouverts = [m for m in marches_recherche if (etat.get(m) or {}).get("trade")]
                 precision_retard = (f"\n⚠️ Position déjà en cours sur {', '.join(deja_ouverts)} : je ne te ferai pas entrer en retard. Je cherche la prochaine entrée."
                                     if deja_ouverts else "")
-                boutons_stop = [[{"text": f"⏹ Arrêter {m}", "callback_data": f"coachstop:{m}"} for m in marches_recherche]]
+                boutons_stop = [[{"text": f"⏹ Arrêter {m}", "callback_data": f"autostop:{m}"} for m in marches_recherche]]
                 _envoi_sur(qui, text=(f"🎯 RECHERCHE DE POSITION ACTIVE — {noms}\n"
                                       "🔎 ALIGN surveille les configurations confirmées en continu.\n"
                                       "🔕 Aucun commentaire intermédiaire : je t'écris uniquement lorsqu'une position est confirmée.\n"
@@ -8128,6 +8128,14 @@ def traiter(etat, chats, updates):
                 except Exception:
                     pass
                 _envoi_sur(qui, text=f"🎙 COMMENTATEUR {ICONE.get(mk, '')} {mk}\n✅ Tu es déjà dans la chaîne\n👀 Il commente là-bas\n🙅 Pas de doublon ici")
+                continue
+            if choix == "autostop" and mk in MARCHES:
+                desinscrire_auto(etat, qui, mk)
+                try:
+                    telegram("answerCallbackQuery", callback_query_id=cb["id"], text="⏹ Suivi coach arrêté pour " + mk)
+                except Exception:
+                    pass
+                _envoi_sur(qui, text=f"⏹ SUIVI COACH ARRÊTÉ — {ICONE.get(mk, '')} {mk}\nLe suivi de l'autre marché reste inchangé.")
                 continue
             if choix in ("coachlive", "coachstop") and mk in MARCHES:
                 activer_coach_live(etat, qui, mk, choix == "coachlive")
@@ -13761,6 +13769,10 @@ def clavier_live(etat, cid, anglais=False):
                          "callback_data": f"auto:{k}"} for k in ("BTC", "GOLD")])
         lignes.append([{"text": (f"📊 12 timeframes {k}" if anglais else f"📊 12 UT {k}"),
                          "callback_data": f"timeframes:{k}"} for k in ("BTC", "GOLD")])
+        suivis_actifs = [k for k in ("BTC", "GOLD") if str(cid) in {str(x) for x in etat.get("auto", {}).get(k, [])}]
+        if suivis_actifs:
+            lignes.append([{"text": (f"⏹ Stop coach {k}" if anglais else f"⏹ Arrêter coach {k}"),
+                             "callback_data": f"autostop:{k}"} for k in suivis_actifs])
         lignes.append([{"text": "🔎 Faire une analyse" if not anglais else "🔎 Research markets",
                         "callback_data": "analysechoice:BOTH"}])
         lignes.append([{"text": "🎯 Chercher une position" if not anglais else "🎯 Find a position",
