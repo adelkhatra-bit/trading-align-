@@ -37,7 +37,7 @@ class HeartbeatGmTests(unittest.TestCase):
     def test_heartbeat_verifie_statut_http_et_retentatives(self):
         self.assertIn("r.status >= 200 && r.status < 300", self.js)
         self.assertIn("timeout: 8000", self.js)
-        self.assertIn("delais = [5000, 10000, 20000]", self.js)
+        self.assertIn("delais = [15000, 30000, 45000, 60000]", self.js)
         self.assertIn("let ecranInFlight = false;", self.js)
         self.assertIn("if (!vivant || ecranInFlight || ecranRetryTimer) return;", self.js)
         self.assertIn("ecranRetryAttempt = 0;", self.js)
