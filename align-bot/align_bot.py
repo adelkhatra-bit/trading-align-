@@ -44,7 +44,7 @@ TELEGRAM_PULL_BLOCK_LOGGED = set()
 # Préfixes routés par traiter() ou live_callback(). Les compteurs indiquent ceux réellement cliqués.
 TELEGRAM_CALLBACK_HANDLER_PREFIXES = (
     "analysechoice", "auto", "autoadm", "botmenu", "botoff", "boton",
-    "choixcanal", "coach", "coachlive", "coachstop", "details", "financeplus",
+    "choixcanal", "coach", "coachlive", "coachstop", "autostop", "details", "financeplus",
     "followmarket", "history", "in", "jno", "jok", "levels", "likeobj",
     "likeok", "liveboost", "livemain", "liveoff", "liveon", "livemenu",
     "livemkt", "markets", "marketsmenu", "menulive", "next", "niveau",
@@ -5769,6 +5769,27 @@ def inscrire_auto(etat, cid, m, notifier=True):
     if r:
         armer_clotures_multi(etat, cid, m, r)
     lancer_chrono(etat, cid, m, r)
+
+
+
+def desinscrire_auto(etat, cid, m):
+    """Arrête le suivi de la prochaine position pour un seul marché et un seul chat."""
+    cid = str(cid)
+    auto = etat.setdefault("auto", {}).setdefault(m, [])
+    etat["auto"][m] = [x for x in auto if str(x) != cid]
+    veille = etat.setdefault("veille_cloture", {}).setdefault(m, {})
+    veille.pop(cid, None)
+    chrono = etat.setdefault("chrono", {}).setdefault(m, {}).pop(cid, None)
+    if chrono and chrono.get("mid"):
+        try:
+            telegram("deleteMessage", chat_id=cid, message_id=chrono["mid"])
+        except Exception as ex:
+            print("suppression chrono coach", m, ex)
+    trade = (etat.get(m) or {}).get("trade") or {}
+    abonnes = trade.get("qui")
+    if isinstance(abonnes, dict):
+        abonnes.pop(cid, None)
+    return True
 
 
 def bot_on(etat, cid):
