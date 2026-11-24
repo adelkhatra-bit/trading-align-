@@ -4655,7 +4655,7 @@ def texte_timeframes(m, r, anglais=False):
             continue
         if snap.get("fresh") is not True:
             status = "stale — wait for a new snapshot" if anglais else "périmé — attendre un nouveau snapshot"
-            lignes.append(f"⏳ {label}: {status}")
+            lignes.append(f"⏳ {label}: {status}" if anglais else f"⏳ {label} : {status}")
             continue
         direction = _direction_tv(snap.get("direction"))
         if anglais:
