@@ -21,7 +21,7 @@ class TradingViewBridgeGateTests(unittest.TestCase):
         self.assertIn('ALIGN_REQUIRE_TV_BRIDGE: "1"', WORKFLOW_SOURCE)
         self.assertRegex(
             WORKFLOW_SOURCE,
-            r"if:\s*\$\{\{\s*always\(\)\s*&&\s*steps\.bridge\.outputs\.ALIGN_TV_BRIDGE_PRET\s*!=\s*'1'\s*\}\}",
+            r"if:\s*\$\{\{\s*always\(\)\s*&&\s*\(steps\.bridge\.outputs\.ALIGN_TV_BRIDGE_PRET\s*!=\s*'1'\s*\|\|\s*steps\.bridge_final\.outcome\s*!=\s*'success'\)\s*\}\}",
         )
         self.assertIn("Bridge TradingView obligatoire — échec signalé", WORKFLOW_SOURCE)
         self.assertIn("exit 1", WORKFLOW_SOURCE)
@@ -33,6 +33,22 @@ class TradingViewBridgeGateTests(unittest.TestCase):
         end = section.index("\n          PY\n          then", start)
         source = textwrap.dedent(section[start:end])
         compile(source, "<align-tv-bridge-preflight>", "exec")
+
+    def test_postrun_bridge_gate_rechecks_all_twelve_snapshots_and_compiles(self):
+        section = WORKFLOW_SOURCE.split("name: Vérifier le bridge TradingView après le worker", 1)[1]
+        start = section.index("run: |\\n") + len("run: |\\n")
+        end = section.index("\\n          PY", start)
+        source = textwrap.dedent(section[start:end])
+        compile(source, "<align-tv-bridge-postrun>", "exec")
+
+        self.assertIn('required = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1")', section)
+        self.assertIn('payload.get("ok") is not True or stale', section)
+        self.assertIn("price_age_ms <= 90000", section)
+        self.assertIn("BRIDGE_FINAL_CONFIRMED", section)
+        self.assertLess(
+            WORKFLOW_SOURCE.index("name: Vérifier le bridge TradingView après le worker"),
+            WORKFLOW_SOURCE.index("name: Bridge TradingView obligatoire — échec signalé"),
+        )
 
     def test_preflight_waits_for_fresh_snapshots_without_relaxing_bridge_guards(self):
         self.assertIn("deadline = time.monotonic() + 120", WORKFLOW_SOURCE)
