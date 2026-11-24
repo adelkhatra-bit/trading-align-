@@ -56,7 +56,7 @@ For each market, use the canonical **ALIGN MTF PRO v25 (Inside)** instance:
 1. Use a BTCUSD chart for BTC, or an XAUUSD chart for GOLD. The actual chart ticker and the indicator's **Marché ALIGN** input must represent the same market. Never set `XAUUSD` on a BTCUSD chart or `BTCUSD` on an XAUUSD chart.
 2. Enable **Envoyer les snapshots au ROBOT V12**.
 3. Set **Marché ALIGN** to `BTCUSD` or `XAUUSD`, matching that chart.
-4. Use a supported active chart timeframe: `M1`, `M3`, `M5`, `M10`, `M15`, `M30`, `M45`, `H1`, `H2`, `H4`, `D1` or `W1`.
+4. Use a ROBOT V12 supported active chart timeframe: `M1`, `M5`, `M15`, `M30`, `H1`, `H2`, `H4`, `D1` or `W1`. The payload still carries independent MTF readings for all 12 timeframes; `M3`, `M10` and `M45` are MTF inputs, not supported active chart contexts for the current bot/preflight.
 5. Create one alert per market with condition **Any alert() function call**. In the default mailbox mode, use the Worker URL shown in the canonical production path above. Do not create one webhook alert per timeframe.
 
 The payload contains independent readings and candle timestamps for all 12 timeframes: M1, M3, M5, M10, M15, M30, M45, H1, H2, H4, D1 and W1. Separate alerts for each timeframe are not required.
