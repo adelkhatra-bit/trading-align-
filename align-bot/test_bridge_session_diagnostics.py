@@ -43,7 +43,7 @@ class GoldClosedSessionDiagnostics(unittest.TestCase):
         self.assertNotIn("GOLD : BRIDGE INDISPONIBLE", report)
         self.assertNotIn("GOLD : BRIDGE INVALIDE", report)
 
-        def test_bridge_detail_reports_missing_and_stale_mtf_timeframes(self):
+    def test_bridge_detail_reports_missing_and_stale_mtf_timeframes(self):
         frames = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1")
         snapshots = {tf: {"fresh": True, "ageMs": 1000} for tf in frames}
         for tf, age in (("M3", 181000), ("M10", 601000), ("M45", 2701000)):
@@ -54,7 +54,7 @@ class GoldClosedSessionDiagnostics(unittest.TestCase):
         })
         self.assertIn("UT périmées M3 (181 s),M10 (601 s),M45 (2701 s)", detail)
 
-def test_bridge_diagnostic_still_checks_gold_when_cme_is_open(self):
+    def test_bridge_diagnostic_still_checks_gold_when_cme_is_open(self):
         btc = {"available": False, "reason": "r?ponse bridge invalide", "snapshots": {}}
         gold = {"available": False, "reason": "bridge inaccessible", "snapshots": {}}
         with tempfile.TemporaryDirectory() as runner_temp,              patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}),              patch.object(ab.time, "time", return_value=self.NOW),              patch.object(ab, "cme_ouvert", return_value=True),              patch.object(ab, "fetch_tv_mtf", side_effect=[btc, gold]) as fetch:
