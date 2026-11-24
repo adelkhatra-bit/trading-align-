@@ -16,7 +16,7 @@ jobs:
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 18
     steps:
       - name: Retire older production workers after validation
         env:
@@ -67,56 +67,79 @@ jobs:
                   and run.get("status") in active
               ]
 
-          old_runs = older_active_runs()
-          for run in old_runs:
-              run_id = run["id"]
+          # Traiter les anciens workers un par un : leurs sauvegardes cache ne doivent jamais se concurrencer.
+          while True:
+              pending = sorted(
+                  older_active_runs(),
+                  key=lambda item: int(item.get("id", 0)),
+              )
+              if not pending:
+                  print("ALIGN_OLD_WORKERS_STOPPED validated_sha=" + current_sha[:12])
+                  break
+
+              run_id = int(pending[0]["id"])
+              old_sha = str(pending[0].get("head_sha", ""))[:12]
               try:
                   request(f"/actions/runs/{run_id}/cancel", method="POST")
-                  print(f"ROLLING_OVER old_run={run_id} old_sha={run.get('head_sha', '')[:12]}")
+                  print(f"ROLLING_OVER old_run={run_id} old_sha={old_sha}")
               except urllib.error.HTTPError as exc:
                   if exc.code not in (404, 409):
                       raise
                   print(f"ROLL_OVER_RACE old_run={run_id} http={exc.code}")
 
-          # Give the old worker time to receive SIGINT, finish its current operation,
-          # and run its always() cache-save step before escalating.
-          grace_deadline = time.time() + 300
-          next_retry = time.time() + 30
-          while time.time() < grace_deadline:
-              remaining = older_active_runs()
-              if not remaining:
-                  print("ALIGN_OLD_WORKERS_STOPPED_GRACEFULLY validated_sha=" + current_sha[:12])
-                  break
-              if time.time() >= next_retry:
-                  for run in remaining:
+              # Laisser ce worker terminer son checkpoint avant d'en arrêter un autre.
+              grace_deadline = time.time() + 300
+              next_retry = time.time() + 30
+              while time.time() < grace_deadline:
+                  remaining = [
+                      item for item in older_active_runs()
+                      if int(item.get("id", 0)) == run_id
+                  ]
+                  if not remaining:
+                      print(f"ALIGN_OLD_WORKER_STOPPED_GRACEFULLY old_run={run_id}")
+                      break
+                  if time.time() >= next_retry:
                       try:
-                          request(f"/actions/runs/{run['id']}/cancel", method="POST")
-                          print(f"ROLLING_OVER_RETRY old_run={run['id']}")
+                          request(f"/actions/runs/{run_id}/cancel", method="POST")
+                          print(f"ROLLING_OVER_RETRY old_run={run_id}")
                       except urllib.error.HTTPError as exc:
                           if exc.code not in (404, 409):
                               raise
-                  next_retry = time.time() + 30
-              time.sleep(5)
+                      next_retry = time.time() + 30
+                  time.sleep(5)
 
-          # Escalate only after the full graceful window; never overlap two pollers.
-          for run in older_active_runs():
-              run_id = run["id"]
-              try:
-                  request(f"/actions/runs/{run_id}/force-cancel", method="POST")
-                  print(f"FORCE_RETIRING old_run={run_id} old_sha={run.get('head_sha', '')[:12]}")
-              except urllib.error.HTTPError as exc:
-                  if exc.code not in (404, 409):
-                      raise
-                  print(f"FORCE_RETIRE_RACE old_run={run_id} http={exc.code}")
+              remaining = [
+                  item for item in older_active_runs()
+                  if int(item.get("id", 0)) == run_id
+              ]
+              if remaining:
+                  try:
+                      request(f"/actions/runs/{run_id}/force-cancel", method="POST")
+                      print(f"FORCE_RETIRING old_run={run_id} old_sha={old_sha}")
+                  except urllib.error.HTTPError as exc:
+                      if exc.code not in (404, 409):
+                          raise
+                      print(f"FORCE_RETIRE_RACE old_run={run_id} http={exc.code}")
 
-          deadline = time.time() + 120
-          while time.time() < deadline:
-              remaining = older_active_runs()
-              if not remaining:
-                  print("ALIGN_OLD_WORKERS_STOPPED validated_sha=" + current_sha[:12])
-                  break
-              time.sleep(3)
-          else:
-              ids = ",".join(str(run["id"]) for run in remaining)
+                  deadline = time.time() + 120
+                  while time.time() < deadline:
+                      remaining = [
+                          item for item in older_active_runs()
+                          if int(item.get("id", 0)) == run_id
+                      ]
+                      if not remaining:
+                          print(f"ALIGN_OLD_WORKER_FORCE_STOPPED old_run={run_id}")
+                          break
+                      time.sleep(3)
+                  else:
+                      raise SystemExit(
+                          "Rollover refused to proceed; old worker is still active: "
+                          + str(run_id)
+                      )
+
+          # Vérification finale : aucun worker plus ancien ne doit subsister.
+          remaining = older_active_runs()
+          if remaining:
+              ids = ",".join(str(item["id"]) for item in remaining)
               raise SystemExit("Rollover refused to proceed; older workers are still active: " + ids)
           PY
