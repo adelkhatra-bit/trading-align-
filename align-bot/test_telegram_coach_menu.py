@@ -115,6 +115,52 @@ class TelegramCoachMenuTests(unittest.TestCase):
         select.assert_called_once_with(etat, "101", ("BTC", "GOLD"))
         self.assertIn("101", etat["recherche_positions_active"])
 
+    def test_search_positions_does_not_bypass_new_subscriber_opt_in(self):
+        for selected in ([], ["BTC"]):
+            with self.subTest(selected=selected):
+                etat = {
+                    "coach_pending": ["101"],
+                    "marches_par_chat": {"101": selected.copy()},
+                    "recherche_positions_active": [],
+                }
+                with patch.object(ab, "inscrire_auto") as activate:
+                    with patch.object(ab, "selectionner_marches_suivi") as save:
+                        marches = ab.demarrer_recherche_positions(etat, "101")
+                self.assertEqual(marches, ())
+                activate.assert_not_called()
+                save.assert_not_called()
+                self.assertEqual(etat["marches_par_chat"]["101"], selected)
+                self.assertEqual(etat["recherche_positions_active"], [])
+
+    def test_searchpos_callback_does_not_activate_pending_subscriber_before_market_validation(self):
+        etat = {
+            "coach_pending": ["101"],
+            "marches_par_chat": {"101": []},
+            "recherche_positions_active": [],
+        }
+        update = {
+            "update_id": 99103,
+            "callback_query": {
+                "id": "searchpos-pending-test",
+                "data": "searchpos:BOTH",
+                "message": {"chat": {"id": 101, "type": "private"}},
+                "from": {"id": 101},
+            },
+        }
+        with patch.object(ab, "telegram", return_value={"ok": True}) as telegram:
+            with patch.object(ab, "_envoi_sur") as send:
+                with patch.object(ab, "menu_marches") as markets_menu:
+                    with patch.object(ab, "inscrire_auto") as activate:
+                        ab.traiter(etat, set(), [update])
+
+        self.assertEqual(etat["marches_par_chat"]["101"], [])
+        self.assertEqual(etat["recherche_positions_active"], [])
+        self.assertEqual(etat["coach_pending"], ["101"])
+        activate.assert_not_called()
+        markets_menu.assert_called_once()
+        self.assertIn("valide", send.call_args.kwargs["text"].lower())
+        self.assertTrue(any(call.args[0] == "answerCallbackQuery" for call in telegram.call_args_list))
+
     def test_autostop_callback_removes_only_selected_market_and_its_chrono(self):
         etat = {
             "auto": {"BTC": ["101", "202"], "GOLD": ["101"]},
