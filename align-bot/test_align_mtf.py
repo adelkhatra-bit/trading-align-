@@ -128,12 +128,8 @@ class AlignMtfRulesTest(unittest.TestCase):
                     "signal": "LONG", "entry": 101, "sl": 99, "tp1": 105, "tp2": 108,
                     "planTimeframe": "M15", "entryTimeframe": trigger_tf, "strategy": strategy,
                     "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
-                "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
-                "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
                     "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
                     "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
-            "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
-            "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
                     "confirmed": True,
                 }
                 r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "H4", "snapshots": {
