@@ -1159,7 +1159,7 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
 
     def test_bande_version_12_2_14_voice_recovery_and_sync(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
-        self.assertIn("// @version      12.2.15", bande)
+        self.assertIn("// @version      12.2.16", bande)
         self.assertIn("const VERSION = '12.2.15';", bande)
         self.assertIn('let voixUtterance = null', bande)
         self.assertIn('voixUtterance = utterance;', bande)
