@@ -1769,7 +1769,7 @@ class AlignMtfRulesTest(unittest.TestCase):
 
     def test_all_timeframe_breakdown_lists_all_twelve_fresh_pine_snapshots_and_strategy_role(self):
         timeframes = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1")
-        directions = (1, -1, 1, 0, -1, 1, 0, 1, -1, 1, 1, -1)
+        directions = ("BULLISH", "BEARISH", "BULLISH", "NEUTRAL", "BEARISH", "BULLISH", "NEUTRAL", "BULLISH", "BEARISH", "BULLISH", "BULLISH", "BEARISH")
         rsis = (61, 45, 65, 50, 38, 54, 49, 63, 42, 68, 71, 44)
         snapshots = {
             tf: {"fresh": True, "direction": direction, "rsi": rsi}
