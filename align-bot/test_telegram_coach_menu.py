@@ -147,11 +147,11 @@ class TelegramCoachMenuTests(unittest.TestCase):
                 "from": {"id": 101},
             },
         }
-        with patch.object(ab, "telegram", return_value={"ok": True}) as telegram, \\
-             patch.object(ab, "_envoi_sur") as send, \\
-             patch.object(ab, "menu_marches") as markets_menu, \\
-             patch.object(ab, "inscrire_auto") as activate:
-            ab.traiter(etat, set(), [update])
+        with patch.object(ab, "telegram", return_value={"ok": True}) as telegram:
+            with patch.object(ab, "_envoi_sur") as send:
+                with patch.object(ab, "menu_marches") as markets_menu:
+                    with patch.object(ab, "inscrire_auto") as activate:
+                        ab.traiter(etat, set(), [update])
 
         self.assertEqual(etat["marches_par_chat"]["101"], [])
         self.assertEqual(etat["recherche_positions_active"], [])
