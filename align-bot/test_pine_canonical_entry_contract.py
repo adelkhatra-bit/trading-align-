@@ -54,7 +54,7 @@ class PineCanonicalEntryContract(unittest.TestCase):
         plan = self.bot[start:end]
         self.assertIn('current_price = float(snap.get("price"))', plan)
         self.assertIn('"price": current_price', plan)
-        self.assertIn('"price_in_zone": zone_low <= current_price <= zone_high', plan)
+        self.assertIn('"price_in_zone": prix_tradingview_dans_zone(current_price, zone_low, zone_high)', plan)
 
     def test_agent_blocks_entry_when_tradingview_price_left_pine_zone(self):
         start = self.bot.index("def agent(m, r, cle, ferme):")
@@ -64,12 +64,9 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn("Aucune entrée au marché ; attendre le retour dans la zone.", agent)
         self.assertLess(agent.index('if not plan_tv.get("price_in_zone")'), agent.index('cle["pine_entry_bar_done"]'))
 
-    def test_agent_requires_local_strategy_to_match_pine_strategy(self):
-        start = self.bot.index("def agent(m, r, cle, ferme):")
-        end = self.bot.index("\n\ndef ", start + 1)
-        agent = self.bot[start:end]
-        self.assertIn('strategie_locale = (strategie_trade(r, d) or {}).get("strat")', agent)
-        self.assertIn('if strategie_locale != plan_tv["strategy"]:', agent)
+    def test_trade_strategy_and_execution_timeframe_follow_pine_with_local_filter_kept(self):
+        self.assertIn('tr["strat_filtre"] = tr.get("strat")', self.bot)
+        self.assertIn('tr["strat"] = plan_tv["strategy"]', self.bot)
 
     def test_pine_v25_coach_never_recomputes_legacy_v24_zone(self):
         start = self.bot.index("def coach_fvg(")
