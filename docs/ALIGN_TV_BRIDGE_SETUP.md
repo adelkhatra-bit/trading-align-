@@ -45,6 +45,8 @@ Le Worker accepte cette route webhook uniquement depuis les quatre adresses IP o
 
 Il faut deux alertes distinctes : une pour BTCUSD et une pour XAUUSD. Ne pas créer une alerte par unité de temps : les douze unités sont transportées dans le même JSON.
 
+Le bridge accepte par défaut uniquement l'unité active **M15** (`ALIGN_TV_CANONICAL_ACTIVE_TF=M15`). Les alertes v25 supplémentaires en M5, H1, H4, D1 ou W1 sont ignorées et ne peuvent plus remplacer le snapshot M15. Pour changer volontairement la référence, configure `ALIGN_TV_CANONICAL_ACTIVE_TF` sur le runner bridge avec une valeur supportée : `M1, M3, M5, M10, M15, M30, M45, H1, H2, H4, D1, W1`.
+
 ### Important : copie serveur des alertes
 
 TradingView conserve une copie serveur du script, de ses paramètres et du contexte du graphique au moment de la création de l'alerte. Une alerte existante n'hérite pas automatiquement des changements du Pine ni des paramètres Bridge.
