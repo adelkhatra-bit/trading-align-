@@ -615,12 +615,5 @@ jobs:
               f.write(text)
           PY
 
-      - name: Archiver le journal du relais TradingView (diagnostic sans payload)
-        # N'archive que la copie sanitisee, jamais align_bridge.log ni les URLs de token.
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: align-tv-relay-log-${{ github.run_id }}
-          path: ${{ runner.temp }}/align_relais.safe.log
-          if-no-files-found: warn
-          retention-days: 3
+      # Le journal du relais reste dans la sortie du job. On ne crée pas un second
+      # artefact post-job : GitHub peut refuser sa finalisation après la clôture du job.

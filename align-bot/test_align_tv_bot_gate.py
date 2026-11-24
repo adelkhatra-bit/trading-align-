@@ -26,7 +26,6 @@ class TradingViewBridgeGateTests(unittest.TestCase):
         self.assertIn("Bridge TradingView obligatoire — échec signalé", WORKFLOW_SOURCE)
         self.assertIn("exit 1", WORKFLOW_SOURCE)
 
-
     def test_bridge_preflight_embedded_python_compiles(self):
         section = WORKFLOW_SOURCE.split("name: Vérifier le bridge TradingView ROBOT V12", 1)[1]
         start = section.index("if python3 - <<'PY'\n") + len("if python3 - <<'PY'\n")
@@ -101,20 +100,24 @@ class TradingViewBridgeGateTests(unittest.TestCase):
         self.assertIn("dernier envoi refusé : stale_or_future_entry_trigger_candle", detail)
 
     def test_signal_paths_require_tradingview_bridge_by_default(self):
-        # Both production analysis paths must fail closed until the Pine v25 bridge is live.
         gate = 'os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "1") == "1"'
         self.assertEqual(BOT_SOURCE.count(gate), 2)
         self.assertNotIn('os.environ.get("ALIGN_REQUIRE_TV_BRIDGE", "0") == "1"', BOT_SOURCE)
-    def test_relay_artifact_uploads_sanitized_copy_only(self):
-        sanitize = WORKFLOW_SOURCE[WORKFLOW_SOURCE.index("Sanitiser le journal du relais TradingView"):WORKFLOW_SOURCE.index("Archiver le journal du relais TradingView")]
-        artifact = WORKFLOW_SOURCE[WORKFLOW_SOURCE.index("Archiver le journal du relais TradingView"):]
+
+    def test_relay_log_is_sanitized_without_a_post_job_artifact(self):
+        marker = "name: Sanitiser le journal du relais TradingView"
+        self.assertIn(marker, WORKFLOW_SOURCE)
+        sanitize = WORKFLOW_SOURCE[WORKFLOW_SOURCE.index(marker):]
         self.assertIn("align_relais.safe.log", sanitize)
         self.assertIn(r"(/ingest/)[A-Za-z0-9_-]{32,128}", sanitize)
         self.assertIn("Bearer", sanitize)
         self.assertIn("token", sanitize)
-        self.assertRegex(artifact, r"path: .*align_relais.safe.log")
-        self.assertNotIn("path: ${{ runner.temp }}/align_relais.log", artifact)
         self.assertIn("Journal relais absent pour ce run.", sanitize)
+        self.assertNotIn("Archiver le journal du relais TradingView", WORKFLOW_SOURCE)
+        self.assertNotIn("align-tv-relay-log-", WORKFLOW_SOURCE)
+        self.assertNotIn("actions/upload-artifact@v4", sanitize)
+        self.assertNotIn("path: ${{ runner.temp }}/align_relais.log", sanitize)
+
 
 if __name__ == "__main__":
     unittest.main()
