@@ -115,6 +115,23 @@ class TelegramCoachMenuTests(unittest.TestCase):
         select.assert_called_once_with(etat, "101", ("BTC", "GOLD"))
         self.assertIn("101", etat["recherche_positions_active"])
 
+    def test_search_positions_does_not_bypass_new_subscriber_opt_in(self):
+        for selected in ([], ["BTC"]):
+            with self.subTest(selected=selected):
+                etat = {
+                    "coach_pending": ["101"],
+                    "marches_par_chat": {"101": selected.copy()},
+                    "recherche_positions_active": [],
+                }
+                with patch.object(ab, "inscrire_auto") as activate:
+                    with patch.object(ab, "selectionner_marches_suivi") as save:
+                        marches = ab.demarrer_recherche_positions(etat, "101")
+                self.assertEqual(marches, ())
+                activate.assert_not_called()
+                save.assert_not_called()
+                self.assertEqual(etat["marches_par_chat"]["101"], selected)
+                self.assertEqual(etat["recherche_positions_active"], [])
+
     def test_autostop_callback_removes_only_selected_market_and_its_chrono(self):
         etat = {
             "auto": {"BTC": ["101", "202"], "GOLD": ["101"]},
