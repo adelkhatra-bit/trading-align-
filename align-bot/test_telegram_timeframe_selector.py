@@ -63,13 +63,60 @@ class TelegramTimeframeSelectorTests(unittest.TestCase):
         self.assertNotIn("1 jour", labels)
         self.assertNotIn("1 semaine", labels)
 
+    def test_all_timeframes_summary_uses_all_twelve_fresh_pine_snapshots(self):
+        r = {
+            "dirs": [1] * 11,
+            "rsis": [99] * 11,
+            "tv_indicator_mtf": self.snapshot(),
+        }
+        text = ab.texte_timeframes("BTC", r)
+        self.assertIn("TOUTES LES UNITÉS", text)
+        self.assertIn("Source : TradingView · Pine v25", text)
+        self.assertIn("3 min : HAUSSIER", text)
+        self.assertIn("1 semaine : BAISSIER", text)
+        self.assertIn("RSI 62", text)
+        self.assertIn("RSI 42", text)
+        self.assertNotIn("RSI 99", text)
+
+    def test_all_timeframes_summary_fails_closed_for_missing_or_stale_snapshots(self):
+        r = {
+            "dirs": [1] * 11,
+            "rsis": [99] * 11,
+            "tv_indicator_mtf": {
+                "available": True,
+                "snapshots": {
+                    "M3": {"fresh": False, "direction": "BULLISH", "rsi": 70},
+                    "W1": {"fresh": True, "direction": "BEARISH", "rsi": 42},
+                },
+            },
+        }
+        text = ab.texte_timeframes("BTC", r)
+        self.assertIn("3 min : périmé", text)
+        self.assertIn("1 min : snapshot absent", text)
+        self.assertIn("1 semaine : BAISSIER", text)
+        self.assertNotIn("HAUSSIER", text)
+        self.assertNotIn("RSI 99", text)
+        self.assertNotIn("RSI 70", text)
+
+    def test_all_timeframes_summary_does_not_fallback_when_bridge_unavailable(self):
+        text = ab.texte_timeframes(
+            "BTC",
+            {"dirs": [1] * 11, "rsis": [99] * 11,
+             "tv_indicator_mtf": {"available": False}},
+        )
+        self.assertIn("Bridge TradingView indisponible", text)
+        self.assertNotIn("HAUSSIER", text)
+        self.assertNotIn("RSI 99", text)
+
     def test_english_all_timeframes_summary_is_translated(self):
-        text = ab.texte_timeframes("BTC", {"dirs": [1] * 11, "rsis": [60] * 11}, anglais=True)
+        text = ab.texte_timeframes("BTC", {"tv_indicator_mtf": self.snapshot()}, anglais=True)
         self.assertIn("ALL TIMEFRAMES", text)
         self.assertIn("BULLISH", text)
         self.assertIn("main trend", text)
+        self.assertIn("1 week", text)
         self.assertNotIn("TOUTES LES UNITÉS", text)
         self.assertNotIn("HAUSSIER", text)
+        self.assertNotIn("1 semaine", text)
     def test_tfview_callback_routes_market_and_timeframe_and_returns_selector(self):
         update = {"update_id": 99801, "callback_query": {
             "id": "tfview-btc-m3", "data": "tfview:BTC:M3",

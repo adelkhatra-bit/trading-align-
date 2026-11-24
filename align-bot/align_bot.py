@@ -4634,30 +4634,50 @@ def texte_vision(m, r, cle, anglais=False):
     return "\n".join(lignes)
 
 def texte_timeframes(m, r, anglais=False):
-    """Résumé des unités calculées, avec langue séparée et source d'analyse explicite."""
-    noms = (["1 min", "3 min", "5 min", "10 min", "15 min", "30 min", "45 min",
-             "1 hour", "2 hours", "4 hours", "Daily"] if anglais else
-            ["1 min", "3 min", "5 min", "10 min", "15 min", "30 min", "45 min",
-             "1 heure", "2 heures", "4 heures", "Daily"])
-    directions = [(("🟩 BULLISH ⬆️" if d == 1 else "🟥 BEARISH ⬇️" if d == -1 else "⬜ NEUTRAL ➖")
-                  if anglais else ("🟩 HAUSSIER ⬆️" if d == 1 else "🟥 BAISSIER ⬇️" if d == -1 else "⬜ NEUTRE ➖"))
-                  for d in (r.get("dirs") or [0] * 11)]
-    rsis = r.get("rsis") or []
-    prof = profil_strategie(r) if len(r.get("dirs") or []) >= 11 else {}
-    lignes = [f"⏱ ALL TIMEFRAMES — {ICONE.get(m, '')} {m}" if anglais
-              else f"⏱ TOUTES LES UNITÉS — {ICONE.get(m, '')} {m}"]
-    if prof.get("mode"):
-        lignes.append(f"🏷 Profile: {prof['mode']}" if anglais else f"🏷 Profil : {prof['mode']}")
-    lignes.append("")
-    for nom, direction, valeur in zip(noms, directions, rsis):
+    """Résumé des 12 snapshots Pine v25 ; aucune substitution par les lectures locales."""
+    bridge = (r or {}).get("tv_indicator_mtf") or {}
+    titre = f"⏱ ALL TIMEFRAMES — {ICONE.get(m, '')} {m}" if anglais else f"⏱ TOUTES LES UNITÉS — {ICONE.get(m, '')} {m}"
+    if bridge.get("available") is not True:
+        if anglais:
+            return titre + "\n📡 TradingView bridge unavailable.\nNo local timeframe estimate is substituted."
+        return titre + "\n📡 Bridge TradingView indisponible.\nAucune lecture locale de remplacement."
+    snapshots = bridge.get("snapshots") or {}
+    labels = dict(TELEGRAM_TF_VIEWS)
+    if anglais:
+        labels.update({"D1": "1 day", "W1": "1 week"})
+    lignes = [titre, "📡 Source: TradingView · Pine v25" if anglais else "📡 Source : TradingView · Pine v25", ""]
+    for tf, _ in TELEGRAM_TF_VIEWS:
+        label = labels[tf]
+        snap = snapshots.get(tf)
+        if not isinstance(snap, dict) or not snap:
+            status = "snapshot missing" if anglais else "snapshot absent"
+            lignes.append(f"⏳ {label}: {status}" if anglais else f"⏳ {label} : {status}")
+            continue
+        if snap.get("fresh") is not True:
+            status = "stale — wait for a new snapshot" if anglais else "périmé — attendre un nouveau snapshot"
+            lignes.append(f"⏳ {label}: {status}" if anglais else f"⏳ {label} : {status}")
+            continue
+        direction = _direction_tv(snap.get("direction"))
+        if anglais:
+            sens = "BULLISH ⬆️" if direction == 1 else "BEARISH ⬇️" if direction == -1 else "NEUTRAL ➖" if direction == 0 else "UNAVAILABLE"
+        else:
+            sens = "HAUSSIER ⬆️" if direction == 1 else "BAISSIER ⬇️" if direction == -1 else "NEUTRE ➖" if direction == 0 else "INDISPONIBLE"
         try:
-            rsi_txt = f"{float(valeur):.0f}"
+            valeur = float(snap.get("rsi"))
+            rsi_txt = f"{valeur:.0f}" if math.isfinite(valeur) else "—"
         except (TypeError, ValueError):
             rsi_txt = "—"
-        lignes.append(f"{nom}: {direction} — RSI {rsi_txt}" if anglais else f"{nom} : {direction} — RSI {rsi_txt}")
+        lignes.append(f"{label}: {sens} — RSI {rsi_txt}" if anglais else f"{label} : {sens} — RSI {rsi_txt}")
+    active_tf = str(bridge.get("activeTimeframe") or "").upper()
+    active_snap = snapshots.get(active_tf) or {}
+    robot = active_snap.get("robotV12") or {}
+    strategie = str(robot.get("strategy") or "").upper()
+    if strategie:
+        lignes.append("")
+        lignes.append(f"🏷 Pine plan: {strategie}" if anglais else f"🏷 Plan Pine : {strategie}")
     if anglais:
         lignes += ["", "🏔 4 h: main trend", "🔁 1 h: confirms or contradicts 4 h",
-                   "👀 15 min: preparation and breakout", "🎯 5 min: entry timing (candle close required)",
+                   "👀 15 min: preparation and breakout", "🎯 5 min: entry timing (closed candle required)",
                    "⚖️ SCALP: 1h + 15m + 5m + 1m — DAY: 4h + 1h + 15m + 5m — SWING: D/W + 4h + 1h",
                    "⚠️ One timeframe alone never authorizes an entry."]
     else:
@@ -4666,7 +4686,6 @@ def texte_timeframes(m, r, anglais=False):
                    "⚖️ SCALP : 1h + 15m + 5m + 1m — DAY : 4h + 1h + 15m + 5m — SWING : D/W + 4h + 1h",
                    "⚠️ Une unité seule n'autorise jamais une entrée."]
     return "\n".join(lignes)
-
 
 def clavier_timeframes(m, anglais=False):
     """Sélecteur de lecture seule des 12 snapshots MTF TradingView."""
