@@ -37,11 +37,11 @@ class HeartbeatGmTests(unittest.TestCase):
     def test_heartbeat_verifie_statut_http_et_retentatives(self):
         self.assertIn("r.status >= 200 && r.status < 300", self.js)
         self.assertIn("timeout: 8000", self.js)
-        self.assertIn("delais = [15000, 30000, 45000, 60000]", self.js)
+        self.assertIn("delais = [15000, 30000, 60000, 120000, 300000, 900000]", self.js)
         self.assertIn("let ecranInFlight = false;", self.js)
         self.assertIn("if (!vivant || ecranInFlight || ecranRetryTimer || !prendreLeaseHeartbeat()) return;", self.js)
         self.assertIn("ecranRetryAttempt = 0;", self.js)
-        self.assertIn("const delay = Math.max(delais[ecranRetryAttempt++], Math.min(Number(retryAfterMs) || 0, 60000));", self.js)
+        self.assertIn("const delay = Math.max(delais[index], Math.min(Number(retryAfterMs) || 0, 86400000));", self.js)
         self.assertIn("clearTimeout(ecranRetryTimer)", self.js)
     def test_jeton_ntfy_authentifie_le_compte_sans_exposer_le_secret(self):
         self.assertIn("// @grant        GM_getValue", self.js)
@@ -54,6 +54,7 @@ class HeartbeatGmTests(unittest.TestCase):
     def test_retry_after_daily_ntfy_est_respecte_jusqua_24h(self):
         self.assertIn("function delaiRetryNtfy(entetes)", self.js)
         self.assertIn("86400000", self.js)
+        self.assertIn(r"^retry-after:\\s*(\\d+)", self.js)
         self.assertIn("ratelimit-policy", self.js)
         self.assertNotIn("Math.min(Number(retryAfterMs) || 0, 60000)", self.js)
 
