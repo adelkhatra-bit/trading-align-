@@ -19,13 +19,12 @@ class MemoireDuBot(unittest.TestCase):
         self.assertEqual(save.count("actions/cache/save@v4"), 2)
         self.assertEqual(save.count("if: always()"), 3)                                 # clé + 2 sauvegardes, même sur annulation
 
-    def test_relay_log_artifact_is_always_uploaded_without_bridge_log(self):
-        step = self.t[self.t.index("Archiver le journal du relais TradingView"):]
-        self.assertIn("if: always()", step)
-        self.assertIn("actions/upload-artifact@v4", step)
-        paths = [line.strip() for line in step.splitlines() if line.strip().startswith("path:")]
-        self.assertEqual(paths, ["path: ${{ runner.temp }}/align_relais.safe.log"])
-        self.assertFalse(any("align_bridge.log" in path or path.endswith("/align_relais.log") for path in paths))
+    def test_relay_log_is_not_uploaded_as_a_post_job_artifact(self):
+        # Keep diagnostics in the job output; avoid artifact finalization after GitHub
+        # marks the job completed (403 "job is completed").
+        self.assertNotIn("Archiver le journal du relais TradingView", self.t)
+        self.assertNotIn("align-tv-relay-log-", self.t)
+        self.assertIn("Sanitiser le journal du relais TradingView", self.t)
 
     def test_restauration_par_prefixe_et_attente_de_l_ancien_worker_avant(self):
         self.assertIn("restore-keys: align-etat-", self.t)                              # les nouvelles clés commencent par ce préfixe
