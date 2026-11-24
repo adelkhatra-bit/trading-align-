@@ -563,15 +563,17 @@ plotchar(voirExpl and comp >= minSqz and nz(comp[1]) < minSqz, "Explosion à ven
 var bool tp1Ok = false
 var float tp1M = na
 var float tp2M = na
-if dirPlan != nz(dirPlan[1]) or na(tp1M)
+// Réinitialiser l'état de suivi si le plan validé change (direction, TP1 ou TP2).
+// Le rendu visuel reste strictement identique ; seul le rattachement aux niveaux actifs est corrigé.
+planTpChange = dirPlan != nz(dirPlan[1]) or na(tp1M) or na(tp2M) or
+     (not na(tp1) and tp1 != tp1M) or (not na(tp2) and tp2 != tp2M)
+if planTpChange
     tp1Ok := false
     tp1M := tp1
     tp2M := tp2
-if not tp1Ok and dirPlan != 0 and ((dirPlan == 1 and high >= tp1M) or (dirPlan == -1 and low <= tp1M))
+if not tp1Ok and dirPlan != 0 and not na(tp1M) and
+     ((dirPlan == 1 and high >= tp1M) or (dirPlan == -1 and low <= tp1M))
     tp1Ok := true
-if not tp1Ok
-    tp1M := tp1
-    tp2M := tp2
 // Les deux objectifs restent visibles dès qu'un plan existe. Après TP1, l'option accentue TP2 sans recréer de lignes superposées.
 if barstate.islast and voirTP2 and tp1Ok and voirPlan and dirPlan != 0
     if not na(lTP1)
