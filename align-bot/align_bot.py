@@ -3470,9 +3470,14 @@ def _telegram_sortant_autorise(methode, params):
     actifs = {str(x) for x in etat.get("recherche_positions_active", [])}
     texte = str(params.get("text") or params.get("caption") or "")
     # Maintenance bornée : seules les règles exactes BTC/GOLD peuvent être publiées
-    # automatiquement, uniquement dans le canal ALIGN explicitement configuré.
+    # automatiquement dans les destinations publiques explicitement enregistrées :
+    # canal VIP et chaînes BTC/GOLD. Aucun chat arbitraire n'est autorisé.
     regles = globals().get("REGLES")
-    if (methode == "sendMessage" and cid and cid == str(etat.get("canal") or "")
+    destinations_regles = {str(etat.get("canal") or "")}
+    destinations_regles.update(
+        str(value) for value in (etat.get("canaux_marche") or {}).values() if value
+    )
+    if (methode == "sendMessage" and cid and cid in destinations_regles
             and isinstance(regles, str) and texte == regles):
         return True
     # Pré-alerte privée : autorisation temporaire accordée par le routeur des abonnés coach.
@@ -3719,7 +3724,7 @@ def epingler(etat, cid):
     same_rules_header = pm_text.startswith(header) or pm_text.startswith("📌 RULES — ALIGN Signals")
     has_retired_market = bool(re.search(r"\b(?:NASDAQ|NAS100|NQ(?:=F|1!)?)\b", pm_text, re.IGNORECASE))
     chat_title = re.sub(r"[\x00-\x1f\x7f]+", " ", str((chat.get("result") or {}).get("title") or (chat.get("result") or {}).get("username") or "unknown")).strip()[:80]
-    print(f"ALIGN_RULES_PIN_CHECK target=configured_channel chat_title={chat_title!r} pinned={bool(pm)} rules_header={same_rules_header} nasdaq={has_retired_market}", flush=True)
+    print(f"ALIGN_RULES_PIN_CHECK target=registered_rules_destination chat_title={chat_title!r} pinned={bool(pm)} rules_header={same_rules_header} nasdaq={has_retired_market}", flush=True)
     if same_rules_header:
         has_btc_gold = "BTCUSD" in pm_text and "XAUUSD" in pm_text
         if has_btc_gold and not has_retired_market:
@@ -10459,6 +10464,16 @@ def destinataires(etat, chats):
     """Téléphones qui reçoivent les signaux + la chaîne VIP."""
     return list(chats) + ([etat["canal"]] if etat.get("canal") else [])
 
+
+def destinations_regles(etat, chats):
+    """Destinations publiques ALIGN dont les règles doivent être synchronisées."""
+    cibles = {str(etat.get("canal") or "")}
+    cibles.update(str(cid) for cid in (etat.get("canaux_marche") or {}).values() if cid)
+    if REGLES_PRIVEES_SPONTANEES:
+        cibles.update(str(cid) for cid in set(chats) | set(etat.get("prospects", [])) if cid)
+    cibles.discard("")
+    return sorted(cibles)
+
 def boutons(m):
     """Sur une alerte d'entrée, le seul choix proposé est de suivre cette position."""
     return json.dumps({"inline_keyboard": [[
@@ -14669,10 +14684,8 @@ def un_tour(etat, chats):
         except Exception as ex:
             print("live news", ex)
         if TOKEN:
-            canal_ = str(etat.get("canal") or "")
-            for cid in set(destinataires(etat, chats)) | set(etat.get("prospects", [])):
-                if str(cid) == canal_ or REGLES_PRIVEES_SPONTANEES:
-                    epingler(etat, cid)             # chaîne VIP toujours ; privé seulement si rallumé
+            for cid in destinations_regles(etat, chats):
+                epingler(etat, cid)                 # VIP + chaînes BTC/GOLD ; privés seulement si rallumés
             menu_canal_vip(etat)
             menu_canal_resultats(etat)
         # Aucun rappel promotionnel privé : une seule question quotidienne est autorisée.
