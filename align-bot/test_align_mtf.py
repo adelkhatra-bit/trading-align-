@@ -1254,7 +1254,7 @@ class AlignMtfRulesTest(unittest.TestCase):
              patch.object(align_bot, "prochaine_cloture_bougie", return_value=18000):
             data = align_bot.donnees_ia("GOLD", r, {})
         self.assertEqual(data["prochaine_reevaluation"]["unite_bloquante"], "4h")
-        self.assertIn("pas une prévision d'entrée", data["prochaine_reevaluation"]["signification"])
+        self.assertIn("jamais une prévision d'entrée", data["prochaine_reevaluation"]["signification"])
 
     def test_ai_context_calculates_distance_and_mechanical_approach_time_from_live_plan(self):
         from unittest.mock import patch
