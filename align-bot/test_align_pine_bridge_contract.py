@@ -61,10 +61,27 @@ if not tp1Ok
             1,
         )
         without_tp_change = without_tp_change.replace(
+            "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig or planGeometryMismatch",
+            "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig",
+            1,
+        )
+        without_tp_change = without_tp_change.replace(
             "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig",
             "if barstate.isconfirmed and (na(ent) or nouvelle15 or dirPlan != dirFig or strat != stratFig or slFranchi)",
             1,
         )
+        for marker, terminator in (
+            ("planGeometryMismatch = dirPlan != 0 and (", "\n)"),
+            ("bridgePlanGeometryOk = dirPlan == 1 ? (", ": false"),
+        ):
+            start = without_tp_change.find(marker)
+            if start != -1:
+                end = without_tp_change.find(terminator, start)
+                self.assertNotEqual(end, -1, marker)
+                end += len(terminator)
+                if without_tp_change[end:end + 1] == "\n":
+                    end += 1
+                without_tp_change = without_tp_change[:start] + without_tp_change[end:]
         without_settings = without_tp_change.replace(SETTINGS_BLOCK, "", 1)
         without_export = without_settings.split(EXPORT_MARKER, 1)[0]
         if without_export.endswith("\\n\\n"):
@@ -161,11 +178,30 @@ if not tp1Ok
             self.source,
         )
         self.assertIn(
-            "bridgePlanValid = dirPlan != 0 and dirPlan == dirFig and strat == stratFig and not na(ent)",
+            "bridgePlanValid = dirPlan != 0 and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and not na(ent)",
             self.source,
         )
         self.assertIn("dirFig := dirPlan", self.source)
         self.assertIn("stratFig := strat", self.source)
+
+    def test_gold_plan_geometry_is_recomputed_and_invalid_direction_is_suppressed(self):
+        self.assertIn("planGeometryMismatch = dirPlan != 0 and (", self.source)
+        self.assertIn("or planGeometryMismatch", self.source)
+        self.assertIn("bridgePlanGeometryOk = dirPlan == 1 ?", self.source)
+        self.assertIn("sl < zBas and ent >= zBas and ent <= zHaut and tp1 > zHaut", self.source)
+        self.assertIn("tp1 < zBas and ent >= zBas and ent <= zHaut and sl > zHaut", self.source)
+        self.assertIn("and bridgePlanGeometryOk", self.source)
+
+        def geometry_ok(direction, entry, stop, tp1, tp2, low, high):
+            if direction == 1:
+                return stop < low <= entry <= high < tp1 < tp2
+            if direction == -1:
+                return tp2 < tp1 < low <= entry <= high < stop
+            return False
+
+        self.assertFalse(geometry_ok(-1, 3515.12, 3503.42, 3575.13, 3610.0, 3506.34, 3515.12))
+        self.assertTrue(geometry_ok(-1, 3515.12, 3527.0, 3490.0, 3470.0, 3506.34, 3515.12))
+        self.assertTrue(geometry_ok(1, 3515.12, 3495.0, 3540.0, 3570.0, 3510.0, 3520.0))
 
     def test_higher_chart_uses_last_closed_lower_timeframe_intrabar_for_entry_trigger(self):
         export_block = self.source.split(EXPORT_MARKER, 1)[1]
