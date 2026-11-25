@@ -3469,6 +3469,12 @@ def _telegram_sortant_autorise(methode, params):
             return True
     actifs = {str(x) for x in etat.get("recherche_positions_active", [])}
     texte = str(params.get("text") or params.get("caption") or "")
+    # Maintenance bornée : seules les règles exactes BTC/GOLD peuvent être publiées
+    # automatiquement, uniquement dans le canal ALIGN explicitement configuré.
+    regles = globals().get("REGLES")
+    if (methode == "sendMessage" and cid and cid == str(etat.get("canal") or "")
+            and isinstance(regles, str) and texte == regles):
+        return True
     # Pré-alerte privée : autorisation temporaire accordée par le routeur des abonnés coach.
     # Uniquement sendMessage, même chat privé, marché opt-in actif, sans Entry/SL/TP.
     prealerte_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "coach_prealert_chat_id", "") or "")
@@ -3676,8 +3682,10 @@ REGLES = ("📌 RÈGLES — ALIGN Signaux\n"
 def epingler(etat, cid):
     """Synchronise la règle épinglée BTC/GOLD sans conserver un ancien message NASDAQ ni créer de doublon."""
     cid_key = str(cid)
-    epingles = etat.setdefault("epingles_v6", [])
-    pending = etat.setdefault("epingles_v6_pending", {})
+    # v7 invalide l'ancien marqueur v6 : la migration doit relire le pin réel
+    # une fois, même si l'ancienne mémoire disait déjà que les règles étaient synchronisées.
+    epingles = etat.setdefault("epingles_v7", [])
+    pending = etat.setdefault("epingles_v7_pending", {})
     if cid_key in {str(x) for x in epingles}:
         return
 
@@ -3709,9 +3717,10 @@ def epingler(etat, cid):
 
     pm_text = str(pm.get("text") or pm.get("caption") or "")
     same_rules_header = pm_text.startswith(header) or pm_text.startswith("📌 RULES — ALIGN Signals")
+    has_retired_market = bool(re.search(r"\b(?:NASDAQ|NAS100|NQ(?:=F|1!)?)\b", pm_text, re.IGNORECASE))
+    print(f"ALIGN_RULES_PIN_CHECK target=configured_channel pinned={bool(pm)} rules_header={same_rules_header} nasdaq={has_retired_market}", flush=True)
     if same_rules_header:
         has_btc_gold = "BTCUSD" in pm_text and "XAUUSD" in pm_text
-        has_retired_market = bool(re.search(r"\b(?:NASDAQ|NAS100|NQ(?:=F|1!)?)\b", pm_text, re.IGNORECASE))
         if has_btc_gold and not has_retired_market:
             epingles.append(cid_key)
             return
