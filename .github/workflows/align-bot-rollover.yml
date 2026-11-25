@@ -71,8 +71,6 @@ jobs:
           # sauvegarde state.json puis sort avec succès. Ne jamais appeler cancel/force-cancel :
           # ces API interrompent le worker et peuvent perdre la sauvegarde ou afficher une annulation.
           deadline = time.time() + 900
-          active_states = {"queued", "in_progress", "waiting", "pending", "requested"}
-
           while time.time() < deadline:
               pending = sorted(
                   older_active_runs(),
