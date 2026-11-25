@@ -99,7 +99,7 @@ alignBas  = bear >= minAlign
 surcharge = comp >= minSqz
 
 // ═════════ UT DU GRAPHIQUE : RSI, MOMENTUM, EXPLOSION ═════════
-[dC, sC, rC] = f_etat()
+[dC, sC, rC, _] = f_etat()
 rsiSig = ta.ema(rC, 9)
 rsiAchat = (ta.crossover(rC, rsiSig) and rC < 50) or ta.crossover(rC, 30) or ta.crossover(rC, 50)
 rsiVente = (ta.crossunder(rC, rsiSig) and rC > 50) or ta.crossunder(rC, 70) or ta.crossunder(rC, 50)
