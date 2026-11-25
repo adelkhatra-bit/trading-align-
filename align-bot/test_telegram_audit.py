@@ -27,12 +27,14 @@ class TelegramAuditTests(unittest.TestCase):
         self.old_token = ab.TOKEN
         self.old_pull_context = {
             key: getattr(ab.TELEGRAM_PULL_CONTEXT, key, None)
-            for key in ("chat_id", "private", "callback_action", "channel_setup_chat_id")
+            for key in ("chat_id", "private", "callback_action", "channel_setup_chat_id",
+                        "rules_setup_chat_id", "invite_setup_chat_id",
+                        "join_request_chat_id", "join_request_user_id")
         }
+        for key in self.old_pull_context:
+            setattr(ab.TELEGRAM_PULL_CONTEXT, key, None)
         ab.TELEGRAM_PULL_CONTEXT.chat_id = None
         ab.TELEGRAM_PULL_CONTEXT.private = False
-        ab.TELEGRAM_PULL_CONTEXT.callback_action = None
-        ab.TELEGRAM_PULL_CONTEXT.channel_setup_chat_id = None
         ab.TELEGRAM_PULL_MODE = False
         ab.TOKEN = "test-token"
 
@@ -208,6 +210,39 @@ class TelegramAuditTests(unittest.TestCase):
             result = ab.envoyer_son_piece("123456789")
         self.assertTrue(result["ok"])
         http.assert_called_once()
+
+    def test_pull_mode_scopes_invitation_management_to_exact_setup_channel(self):
+        ab.TELEGRAM_PULL_MODE = True
+        for method in ("createChatInviteLink", "createChatSubscriptionInviteLink", "exportChatInviteLink"):
+            with self.subTest(method=method):
+                self.assertFalse(ab._telegram_sortant_autorise(method, {"chat_id": "-1001"}))
+                ab.TELEGRAM_PULL_CONTEXT.invite_setup_chat_id = "-1001"
+                self.assertTrue(ab._telegram_sortant_autorise(method, {"chat_id": "-1001"}))
+                self.assertFalse(ab._telegram_sortant_autorise(method, {"chat_id": "-1002"}))
+                ab.TELEGRAM_PULL_CONTEXT.invite_setup_chat_id = None
+
+    def test_pull_mode_scopes_join_decisions_to_exact_channel_and_user(self):
+        ab.TELEGRAM_PULL_MODE = True
+        for method in ("approveChatJoinRequest", "declineChatJoinRequest"):
+            with self.subTest(method=method):
+                params = {"chat_id": "-1001", "user_id": "42"}
+                self.assertFalse(ab._telegram_sortant_autorise(method, params))
+                ab.TELEGRAM_PULL_CONTEXT.join_request_chat_id = "-1001"
+                ab.TELEGRAM_PULL_CONTEXT.join_request_user_id = "42"
+                self.assertTrue(ab._telegram_sortant_autorise(method, params))
+                self.assertFalse(ab._telegram_sortant_autorise(method, {"chat_id": "-1001", "user_id": "43"}))
+                self.assertFalse(ab._telegram_sortant_autorise(method, {"chat_id": "-1002", "user_id": "42"}))
+                ab.TELEGRAM_PULL_CONTEXT.join_request_chat_id = None
+                ab.TELEGRAM_PULL_CONTEXT.join_request_user_id = None
+
+    def test_invitation_and_join_helpers_restore_temporary_context(self):
+        with patch.object(ab, "telegram", return_value={"ok": True}) as api:
+            self.assertTrue(ab._telegram_lien_canal("createChatInviteLink", "-1001", name="test")["ok"])
+            self.assertEqual(ab.TELEGRAM_PULL_CONTEXT.invite_setup_chat_id, None)
+            self.assertTrue(ab._telegram_decision_demande("declineChatJoinRequest", "-1001", "42")["ok"])
+            self.assertEqual(ab.TELEGRAM_PULL_CONTEXT.join_request_chat_id, None)
+            self.assertEqual(ab.TELEGRAM_PULL_CONTEXT.join_request_user_id, None)
+        self.assertEqual(api.call_count, 2)
 
     def test_pull_mode_blocks_are_logged_once_without_chat_id_and_aggregate_counts(self):
         ab.TELEGRAM_PULL_BLOCK_LOGGED.clear()
