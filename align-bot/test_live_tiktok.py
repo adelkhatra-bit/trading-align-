@@ -853,6 +853,14 @@ class LiveAgendaMarketTimezoneTests(unittest.TestCase):
             )
 
 
+    def test_breaking_news_uses_existing_vocal_coach_path(self):
+        bande = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")).read_text(encoding="utf-8")
+        handler = bande[bande.index("if (txt.startsWith('NEWS:'))"):bande.index("if (txt.startsWith('CMD:pnl:'))")]
+        self.assertIn("montrer(t, false, 2, 'danger', true, 'marche')", handler)
+        vocal = bande[bande.index("function parlerLive("):bande.index("function recuIA(")]
+        self.assertIn("item.source !== 'ia' && item.source !== 'marche'", vocal)
+
+
 if __name__ == "__main__":
     unittest.main()
 

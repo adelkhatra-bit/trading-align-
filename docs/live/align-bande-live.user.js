@@ -884,7 +884,7 @@
     if (txt.startsWith('NEWS:')) {   // v10.6 (demande d'Adel) : news de dernière minute → la bande est COUPÉE et passe la news en priorité
       const [fr, en] = txt.slice(5).split('|'); const t = '🚨 NEWS DE DERNIÈRE MINUTE : ' + (fr || '').trim() + ' • le marché peut bouger fort • détails : lien en bio';
       EN.push([t, '🚨 BREAKING NEWS: ' + (en || fr || '').trim() + ' • the market can move hard • details: link in bio']);
-      montrer(t, false, 2, 'danger', true); coeurs(1, ['📢']); return;
+      montrer(t, false, 2, 'danger', true, 'marche'); coeurs(1, ['📢']); return;
     }
     if (txt.startsWith('CMD:pnl:')) { fenetrePnl(txt.split(':')[2], txt.split(':')[3]); return; }   // v9.9 : gain réel en cours
     if (txt.startsWith('CMD:plateforme:')) {          // le bot peut basculer la bande : tiktok / youtube / les2
