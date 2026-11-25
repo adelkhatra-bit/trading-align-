@@ -3577,6 +3577,10 @@ def _telegram_sortant_autorise(methode, params):
     if method in {"setChatDescription", "setChatPhoto"}:
         setup_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "channel_setup_chat_id", "") or "")
         return bool(params.get("chat_id")) and str(params.get("chat_id")) == setup_chat
+    if method in {"sendMessage", "pinChatMessage", "unpinChatMessage"}:
+        rules_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "rules_setup_chat_id", "") or "")
+        if rules_chat and str(params.get("chat_id") or "") == rules_chat:
+            return True
     cid = str(params.get("chat_id") or "")
     contexte = str(getattr(TELEGRAM_PULL_CONTEXT, "chat_id", "") or "")
     prive = bool(getattr(TELEGRAM_PULL_CONTEXT, "private", False))
@@ -3840,6 +3844,16 @@ REGLES = ("📌 RÈGLES — ALIGN Signaux\n"
           "🤝 Partage à tes amis :\n"
           "👉 https://t.me/align_mtf_adel_bot")
 
+def _telegram_regles_canal(methode, cid, **params):
+    """Autorisation temporaire et limitée aux mutations du message de règles de cette chaîne."""
+    ancien = getattr(TELEGRAM_PULL_CONTEXT, "rules_setup_chat_id", None)
+    TELEGRAM_PULL_CONTEXT.rules_setup_chat_id = str(cid)
+    try:
+        return telegram(methode, chat_id=cid, **params)
+    finally:
+        TELEGRAM_PULL_CONTEXT.rules_setup_chat_id = ancien
+
+
 def epingler(etat, cid):
     """Synchronise la règle épinglée BTC/GOLD sans conserver un ancien message NASDAQ ni créer de doublon."""
     cid_key = str(cid)
@@ -3854,7 +3868,7 @@ def epingler(etat, cid):
     pending_mid = pending.get(cid_key)
     if pending_mid:
         try:
-            pin = telegram("pinChatMessage", chat_id=cid, message_id=pending_mid, disable_notification="true")
+            pin = _telegram_regles_canal("pinChatMessage", cid, message_id=pending_mid, disable_notification="true")
             if isinstance(pin, dict) and pin.get("ok"):
                 epingles.append(cid_key)
                 pending.pop(cid_key, None)
@@ -3891,7 +3905,7 @@ def epingler(etat, cid):
             print("epingler: ancien message de règles sans message_id", cid)
             return
         try:
-            unpin = telegram("unpinChatMessage", chat_id=cid, message_id=old_mid)
+            unpin = _telegram_regles_canal("unpinChatMessage", cid, message_id=old_mid)
             if not isinstance(unpin, dict) or not unpin.get("ok"):
                 print("epingler unpin", cid, (unpin or {}).get("description", "ok=false"))
                 return
@@ -3900,7 +3914,7 @@ def epingler(etat, cid):
             return
 
     try:
-        res = telegram("sendMessage", chat_id=cid, text=REGLES, disable_notification="true")
+        res = _telegram_regles_canal("sendMessage", cid, text=REGLES, disable_notification="true")
         if not isinstance(res, dict) or not res.get("ok"):
             print("epingler sendMessage", cid, (res or {}).get("description", "ok=false"))
             return
@@ -3908,7 +3922,7 @@ def epingler(etat, cid):
         if not message_id:
             print("epingler sendMessage", cid, "message_id absent")
             return
-        pin = telegram("pinChatMessage", chat_id=cid, message_id=message_id, disable_notification="true")
+        pin = _telegram_regles_canal("pinChatMessage", cid, message_id=message_id, disable_notification="true")
         if isinstance(pin, dict) and pin.get("ok"):
             epingles.append(cid_key)
             pending.pop(cid_key, None)
