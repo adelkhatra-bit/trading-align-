@@ -3516,17 +3516,55 @@ def _telegram_envoyer_coach_prealerte(etat, cid, texte, marches):
         TELEGRAM_PULL_CONTEXT.coach_prealert_markets = anciens_marches
 
 
-def _telegram_envoyer_commentaire_coach_prive(etat, cid, m, texte, **kwargs):
-    """Autorisation temporaire pour le coach privé explicitement activé sur ce marché."""
-    ancien_chat = getattr(TELEGRAM_PULL_CONTEXT, "coach_commentary_chat_id", None)
-    ancien_marche = getattr(TELEGRAM_PULL_CONTEXT, "coach_commentary_market", None)
+def _telegram_envoyer_commentaire_coach_prive(etat, cid, m, texte, *, trade=None, position=None, fermeture=False, **kwargs):
+    """Autorisation temporaire du coach privé ; les suivis à niveaux exigent la position exacte de cet abonné."""
+    anciens = {
+        "coach_commentary_chat_id": getattr(TELEGRAM_PULL_CONTEXT, "coach_commentary_chat_id", None),
+        "coach_commentary_market": getattr(TELEGRAM_PULL_CONTEXT, "coach_commentary_market", None),
+        "coach_position_trade": getattr(TELEGRAM_PULL_CONTEXT, "coach_position_trade", None),
+        "coach_position_record": getattr(TELEGRAM_PULL_CONTEXT, "coach_position_record", None),
+        "coach_position_closure": getattr(TELEGRAM_PULL_CONTEXT, "coach_position_closure", False),
+    }
     TELEGRAM_PULL_CONTEXT.coach_commentary_chat_id = str(cid or "")
     TELEGRAM_PULL_CONTEXT.coach_commentary_market = str(m or "").upper()
+    TELEGRAM_PULL_CONTEXT.coach_position_trade = trade
+    TELEGRAM_PULL_CONTEXT.coach_position_record = position
+    TELEGRAM_PULL_CONTEXT.coach_position_closure = bool(fermeture)
     try:
         return _envoi_sur(cid, text=texte, **kwargs)
     finally:
-        TELEGRAM_PULL_CONTEXT.coach_commentary_chat_id = ancien_chat
-        TELEGRAM_PULL_CONTEXT.coach_commentary_market = ancien_marche
+        for attr, value in anciens.items():
+            setattr(TELEGRAM_PULL_CONTEXT, attr, value)
+
+
+def _telegram_envoyer_veille_cloture(etat, cid, m, texte, **kwargs):
+    """Autorisation temporaire d'une clôture UT uniquement pour l'abonné qui l'a explicitement demandée."""
+    ancien_chat = getattr(TELEGRAM_PULL_CONTEXT, "veille_cloture_chat_id", None)
+    ancien_marche = getattr(TELEGRAM_PULL_CONTEXT, "veille_cloture_market", None)
+    TELEGRAM_PULL_CONTEXT.veille_cloture_chat_id = str(cid or "")
+    TELEGRAM_PULL_CONTEXT.veille_cloture_market = str(m or "").upper()
+    try:
+        return _envoi_sur(cid, text=texte, **kwargs)
+    finally:
+        TELEGRAM_PULL_CONTEXT.veille_cloture_chat_id = ancien_chat
+        TELEGRAM_PULL_CONTEXT.veille_cloture_market = ancien_marche
+
+
+def _telegram_envoyer_radar(etat, cid, methode, **params):
+    """Autorisation temporaire du RADAR privé pour un abonné coach, avec édition/suppression du seul message mémorisé."""
+    if methode not in {"sendMessage", "editMessageText", "deleteMessage"}:
+        return {"ok": False, "blocked_by_pull_mode": True}
+    ancien_chat = getattr(TELEGRAM_PULL_CONTEXT, "radar_chat_id", None)
+    ancien_mid = getattr(TELEGRAM_PULL_CONTEXT, "radar_message_id", None)
+    TELEGRAM_PULL_CONTEXT.radar_chat_id = str(cid or "")
+    TELEGRAM_PULL_CONTEXT.radar_message_id = str(params.get("message_id") or "")
+    try:
+        if methode == "sendMessage":
+            return _envoi_sur(cid, **params)
+        return telegram(methode, chat_id=cid, **params)
+    finally:
+        TELEGRAM_PULL_CONTEXT.radar_chat_id = ancien_chat
+        TELEGRAM_PULL_CONTEXT.radar_message_id = ancien_mid
 
 
 def _telegram_envoyer_commentaire_canal(etat, m, canal, texte, **kwargs):
@@ -3659,10 +3697,47 @@ def _telegram_sortant_autorise(methode, params):
         "🎙 COACH COMMENTATEUR" in texte and "📂 Position :" in texte
         and isinstance(coach_trade, dict)
     )
+    coach_position_trade = getattr(TELEGRAM_PULL_CONTEXT, "coach_position_trade", None)
+    coach_position_record = getattr(TELEGRAM_PULL_CONTEXT, "coach_position_record", None)
+    coach_position_closure = bool(getattr(TELEGRAM_PULL_CONTEXT, "coach_position_closure", False))
+    trade_etat = (etat.get(coach_market) or {}).get("trade") if coach_market in MARCHES else None
+    position_exacte = (
+        isinstance(coach_position_trade, dict) and trade_etat is coach_position_trade
+        and isinstance(coach_position_record, dict)
+        and coach_position_trade.get("qui", {}).get(cid) is coach_position_record
+    )
+    if (methode == "sendMessage" and cid.isdecimal() and cid == coach_chat
+            and coach_market in MARCHES and position_exacte):
+        if coach_position_closure:
+            if coach_position_record.get("fini") is True and texte.startswith("🏁 CLÔTURE CONFIRMÉE"):
+                return True
+        elif coach_position_record.get("fini") is not True and coach_actif(etat, cid, coach_market):
+            return True
     if (methode == "sendMessage" and cid.isdecimal() and cid == coach_chat
             and coach_market in MARCHES and isinstance(coach_info, dict)
             and bot_on(etat, cid) and cid not in coach_quiet
             and (_telegram_position_attendue(texte) or not contient_niveaux(texte) or coach_position_summary)):
+        return True
+    # Clôture d'UT : uniquement pour un abonné qui suit explicitement ce marché.
+    veille_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "veille_cloture_chat_id", "") or "")
+    veille_market = str(getattr(TELEGRAM_PULL_CONTEXT, "veille_cloture_market", "") or "").upper()
+    veille_suivi = (etat.get("veille_cloture") or {}).get(veille_market, {}).get(cid) if veille_market in MARCHES else None
+    if (methode == "sendMessage" and cid.isdecimal() and cid == veille_chat
+            and veille_market in MARCHES and isinstance(veille_suivi, dict)
+            and marche_autorise(etat, cid, veille_market) and coach_actif(etat, cid, veille_market)
+            and (not contient_niveaux(texte) or autorise(etat, cid, cid))):
+        return True
+    # RADAR privé : opt-in coach du marché ; les niveaux ne sont visibles qu'aux VIP.
+    radar_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "radar_chat_id", "") or "")
+    radar_mid = str(getattr(TELEGRAM_PULL_CONTEXT, "radar_message_id", "") or "")
+    radar_mem = (etat.get("radar_mem") or {}).get(cid) or {}
+    radar_actif = cid.isdecimal() and any(coach_actif(etat, cid, m) for m in MARCHES)
+    if methode == "sendMessage" and cid == radar_chat and radar_actif:
+        if not contient_niveaux(texte) or autorise(etat, cid, cid):
+            return True
+    if (methode in {"editMessageText", "deleteMessage"} and cid == radar_chat and radar_actif
+            and radar_mid and str(params.get("message_id") or "") == radar_mid
+            and str(radar_mem.get("mid") or "") == radar_mid):
         return True
     # Commentaire public M15 / flash : uniquement dans la chaîne du marché configurée,
     # sous autorisation temporaire du producteur dédié. Jamais de niveau Entry/SL/TP ni de push privé.
@@ -7136,7 +7211,7 @@ def notifier_clotures(etat, m, r, cle):
                 if sig == suivi.get("sig_cl"):                       # même décision : jamais renvoyée (le RADAR montre l'état en continu)
                     derniers[tf] = int(bougie["t"])
                     continue
-                resultat = _envoi_sur(cid, text=texte_cl,
+                resultat = _telegram_envoyer_veille_cloture(etat, cid, m, texte_cl,
                                      reply_markup=markup_analyse(etat, m, r, cid))
                 if resultat is not None and not (isinstance(resultat, dict) and resultat.get("ok") is False):
                     suivi["sig_cl"], suivi["sig_t"] = sig, time.time()
@@ -7152,7 +7227,7 @@ def notifier_clotures(etat, m, r, cle):
         close = next((b for b in bars if int(b["t"]) > int(suivi.get("dernier_t", 0))), None)
         if not close:
             continue
-        resultat = _envoi_sur(cid, text=texte_cloture(m, tf, close, r, cle),
+        resultat = _telegram_envoyer_veille_cloture(etat, cid, m, texte_cloture(m, tf, close, r, cle),
                                reply_markup=markup_analyse(etat, m, r, cid))
         if resultat is None or (isinstance(resultat, dict) and resultat.get("ok") is False):
             continue
@@ -7306,7 +7381,10 @@ def noter(etat, cid, m, pos, sortie, motif):
                 [{"text": "⏸ Non, rester en pause", "callback_data": "next:no"}]
             ]
             clavier = json.dumps({"inline_keyboard": boutons_fin})
-    _envoi_sur(cid, reply_markup=clavier, text=texte)
+    trade = (etat.get(m) or {}).get("trade")
+    _telegram_envoyer_commentaire_coach_prive(
+        etat, cid, m, texte, trade=trade, position=pos, fermeture=True, reply_markup=clavier
+    )
 
 def texte_team(bj):
     """Bilan du jour SANS montant : nombre de TP et de SL ; la phrase « les profits ont couvert les SL » seulement si c'est VRAI."""
@@ -9483,11 +9561,14 @@ def destinataires_radar(etat, chats):
            for cid in (suivis or []) if coach_actif(etat, cid, m)}
     return sorted(out - {canal})
 
-def _radar_supprimer(cid, mid):
+def _radar_supprimer(cid, mid, etat=None):
     if not mid:
         return
     try:
-        telegram("deleteMessage", chat_id=cid, message_id=mid)
+        if isinstance(etat, dict):
+            _telegram_envoyer_radar(etat, cid, "deleteMessage", message_id=mid)
+        else:
+            telegram("deleteMessage", chat_id=cid, message_id=mid)
     except Exception:
         pass                                      # déjà supprimé ou trop ancien : sans gravité
 
@@ -9573,9 +9654,9 @@ def radar_tick(etat, chats, derniers, now=None):
                 continue
             change_tete = mem.get("mid") and focus != mem.get("focus", "") and now - float(mem.get("t", 0)) >= RADAR_REFRESH_SEC
             if alerte or change_tete or not mem.get("mid"):
-                res = _envoi_sur(cid, text=txt, **({} if alerte else {"disable_notification": "true"}))
+                res = _telegram_envoyer_radar(etat, cid, "sendMessage", text=txt, **({} if alerte else {"disable_notification": "true"}))
                 if isinstance(res, dict) and res.get("ok"):
-                    _radar_supprimer(cid, mem.get("mid"))
+                    _radar_supprimer(cid, mem.get("mid"), etat)
                     mem.update(mid=res["result"]["message_id"], t=now, fond=_radar_fond(txt), focus=focus, rang=rang)
                     if alerte:
                         mem["t_alerte"] = now
@@ -9584,7 +9665,7 @@ def radar_tick(etat, chats, derniers, now=None):
             if now - float(mem.get("t", 0)) < RADAR_REFRESH_SEC or _radar_fond(txt) == mem.get("fond"):
                 continue                          # rien de nouveau sur le fond, ou édition trop récente
             try:
-                telegram("editMessageText", chat_id=cid, message_id=mem["mid"], text=txt)
+                _telegram_envoyer_radar(etat, cid, "editMessageText", message_id=mem["mid"], text=txt)
                 mem.update(t=now, fond=_radar_fond(txt))
             except Exception as ex:
                 e = str(ex).lower()
@@ -11611,7 +11692,10 @@ def coach(etat, m, r, cle):
         if tr["qui"][c].get("fini"):
             continue
         for t in msgs:
-            _envoi_sur(c, text=humaniser(etat, c, t), reply_markup=markup_position(m))
+            _telegram_envoyer_commentaire_coach_prive(
+                etat, c, m, humaniser(etat, c, t), trade=tr, position=tr["qui"][c],
+                reply_markup=markup_position(m)
+            )
 
 def gerer_stop(etat, m, r, tr, c):
     """Vrai agent : monte le stop de l'abonné derrière chaque support (long) / résistance (short) franchi,
@@ -11662,7 +11746,10 @@ def gerer_stop(etat, m, r, tr, c):
                      "🙅 Jamais pile sur la mèche : elle peut être retouchée\n"
                      + ("💰 Ton gain est protégé" if d * (nouveau - e) > 0 else "🛡 Ta perte possible est réduite")
                      + f"\n📍 Repère prix   ≈ {px(nouveau)}")
-        _envoi_sur(c, reply_markup=markup_position(m), text=humaniser(etat, c, texte))
+        _telegram_envoyer_commentaire_coach_prive(
+            etat, c, m, humaniser(etat, c, texte), trade=tr, position=pos,
+            reply_markup=markup_position(m)
+        )
         return
     # Le marché respire : petit retour vers l'entrée, on ne bouge rien
     r5 = r["r5"][-1]
@@ -11670,10 +11757,13 @@ def gerer_stop(etat, m, r, tr, c):
     tps = pos.setdefault("cool_t", 0)
     if excès and time.time() - tps >= 45 * 60:
         pos["cool_t"] = time.time()
-        _envoi_sur(c, reply_markup=markup_position(m), text=humaniser(etat, c, 
-            f"😎 {ICONE.get(m, '')} {m} : reste cool\n🌬 Le marché respire\n"
-            "🕯 Il peut revenir un peu, c'est normal\n"
-            "🛑 Ne touche pas ton SL\n🎯 Cap sur le TP"))
+        _telegram_envoyer_commentaire_coach_prive(
+            etat, c, m, humaniser(etat, c,
+                f"😎 {ICONE.get(m, '')} {m} : reste cool\n🌬 Le marché respire\n"
+                "🕯 Il peut revenir un peu, c'est normal\n"
+                "🛑 Ne touche pas ton SL\n🎯 Cap sur le TP"),
+            trade=tr, position=pos, reply_markup=markup_position(m)
+        )
 
 def meche_suspecte(out, m, r, cle):
     """PRÉ-ALERTE pendant la bougie 15 min EN COURS : la mèche vient de passer sous le dernier plus bas
@@ -14006,7 +14096,7 @@ def ecran_vers_telegram(etat):
         court = "\n".join(txt.split("\n")[:3] + ["🧠 Pourquoi, où regarder : bouton En savoir plus 👇"])
         kb = json.loads(boutons_chaine_marche(etat) or '{"inline_keyboard": []}')
         kb.setdefault("inline_keyboard", []).insert(0, [{"text": "🧠 En savoir plus", "url": BOT_LIEN + "?start=ecran_" + m.lower()}])
-        _envoi_sur(canal, text=court, reply_markup=json.dumps(kb))     # AVEC son : l'écran intrigue, le téléphone donne la réponse
+        _telegram_envoyer_commentaire_canal(etat, m, canal, court, reply_markup=json.dumps(kb))  # AVEC son : l'écran intrigue, le téléphone donne la réponse
 
 def promo_apres_tp(etat, m, now=None):
     """Demande d'Adel (15/11) : quand on tape un TP, on remet en avant le parrainage (compte démo gratuit + codes prop firms)
