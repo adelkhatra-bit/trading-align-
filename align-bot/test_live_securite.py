@@ -59,15 +59,17 @@ class SecuriteVip(unittest.TestCase):
 
     def test_vip_link_is_the_paid_subscription_link_and_no_free_link_exists_in_code(self):
         src = (Path(ab.__file__)).read_text(encoding="utf-8")
-        self.assertGreaterEqual(len(re.findall(r'telegram\("createChatSubscriptionInviteLink"', src)), 2)
-        for m in re.finditer(r'telegram\("createChatSubscriptionInviteLink"[^)]*\)', src):
+        # Les créations VIP passent par le wrapper qui limite l’action au canal explicitement ciblé.
+        vip_calls = list(re.finditer(r'_telegram_lien_canal\("createChatSubscriptionInviteLink"[^)]*\)', src))
+        self.assertGreaterEqual(len(vip_calls), 2)
+        for m in vip_calls:
             self.assertIn("subscription_price=PRIX_STARS", m.group(0))
             self.assertIn("subscription_period=2592000", m.group(0))
-        # aucun lien d'invitation simple vers la chaîne VIP : createChatInviteLink ne vise que la chaîne de validation des résultats
-        for m in re.finditer(r'telegram\("createChatInviteLink"[^)]*\)', src):
+        # Le lien simple reste réservé au canal de validation, jamais au canal VIP.
+        for m in re.finditer(r'_telegram_lien_canal\("createChatInviteLink"[^)]*\)', src):
             self.assertIn('etat["canal_preuves"]', m.group(0))
             self.assertNotIn('etat["canal"]', m.group(0))
-        self.assertEqual(len(re.findall(r'telegram\("exportChatInviteLink"', src)), 1)  # un seul appel réel : révocation de l’ancien lien
+        self.assertEqual(len(re.findall(r'_telegram_lien_canal\("exportChatInviteLink"', src)), 1)  # révocation contrôlée de l’ancien lien
         self.assertNotIn("sendMessage\", chat_id=cid, text=etat[\"lien_primaire", src)
 
 
