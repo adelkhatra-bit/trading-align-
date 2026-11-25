@@ -78,7 +78,7 @@ class ActiveMarketsBTCGoldOnly(unittest.TestCase):
 
     def test_stale_rules_migrate_in_pull_mode_even_if_v6_memory_says_done(self):
         cid = "-100123"
-        old_text = ("📌 RÈGLES — ALIGN Signaux\\n"
+        old_text = ("📌 RÈGLES — ALIGN Signaux\n"
                     "📡 Marchés : BTC (BTCUSD) • GOLD (XAUUSD) • NASDAQ (NAS100)")
         state = {"canal": cid, "epingles_v6": [cid]}
         responses = [
@@ -103,7 +103,7 @@ class ActiveMarketsBTCGoldOnly(unittest.TestCase):
         cid = "-100123"
         old_text = ("📌 RÈGLES — ALIGN Signaux\n"
                     "📡 Marchés : BTC (BTCUSD) • GOLD (XAUUSD) • NASDAQ (NAS100)")
-        state = {"epingles_v5": [cid]}  # l'ancienne mémoire ne doit pas bloquer la migration v6
+        state = {"epingles_v5": [cid]}  # l'ancienne mémoire ne doit pas bloquer la migration v7
         with mock.patch.object(ab, "telegram", side_effect=[
             {"ok": True, "result": {"pinned_message": {"message_id": 19, "text": old_text}}},
             {"ok": True, "result": True},
