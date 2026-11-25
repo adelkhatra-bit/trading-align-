@@ -44,6 +44,44 @@ if not tp1Ok
     tp2M := tp2
 """
         without_tp_change = self.source[:tp_start] + baseline_tp_state + self.source[tp_end:]
+        without_tp_change = without_tp_change.replace(
+            "[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]",
+            "[d, sqz ? 1 : 0, ta.rsi(close, lenRsi)]",
+            1,
+        )
+        for bridge_time in (
+            "bridgeTimeM1", "bridgeTimeM3", "bridgeTimeM5", "bridgeTimeM10",
+            "bridgeTimeM15", "bridgeTimeM30", "bridgeTimeM45", "bridgeTimeH1",
+            "bridgeTimeH2", "bridgeTimeH4", "bridgeTimeD1", "bridgeTimeW1",
+        ):
+            without_tp_change = without_tp_change.replace(f", {bridge_time}]", "]", 1)
+        without_tp_change = without_tp_change.replace(
+            "[dC, sC, rC, _] = f_etat()",
+            "[dC, sC, rC] = f_etat()",
+            1,
+        )
+        without_tp_change = without_tp_change.replace(
+            "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig or planGeometryMismatch",
+            "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig",
+            1,
+        )
+        without_tp_change = without_tp_change.replace(
+            "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig",
+            "if barstate.isconfirmed and (na(ent) or nouvelle15 or dirPlan != dirFig or strat != stratFig or slFranchi)",
+            1,
+        )
+        for marker, terminator in (
+            ("planGeometryMismatch = dirPlan != 0 and (", "\n)"),
+            ("bridgePlanGeometryOk = dirPlan == 1 ? (", ": false"),
+        ):
+            start = without_tp_change.find(marker)
+            if start != -1:
+                end = without_tp_change.find(terminator, start)
+                self.assertNotEqual(end, -1, marker)
+                end += len(terminator)
+                if without_tp_change[end:end + 1] == "\n":
+                    end += 1
+                without_tp_change = without_tp_change[:start] + without_tp_change[end:]
         without_settings = without_tp_change.replace(SETTINGS_BLOCK, "", 1)
         without_export = without_settings.split(EXPORT_MARKER, 1)[0]
         if without_export.endswith("\\n\\n"):
@@ -77,9 +115,24 @@ if not tp1Ok
         for tf in ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1"):
             self.assertIn('"' + tf + '"', self.source)
         self.assertIn(">= 20000", self.source)
-        self.assertLessEqual(self.source.count("request.security("), 40)
-        for variable, tf in (("bridgeTimeM3", "3"), ("bridgeTimeM10", "10"), ("bridgeTimeM45", "45")):
-            self.assertIn(f'{variable} = request.security(syminfo.tickerid, "{tf}", time, lookahead=barmerge.lookahead_off)', self.source)
+        request_calls = self.source.count("request.security(") + self.source.count("request.security_lower_tf(")
+        self.assertLessEqual(request_calls, 40)
+        for variable, tuple_head in (
+            ("bridgeTimeM1", "d1, s1, r1"),
+            ("bridgeTimeM3", "d2, s2, r2"),
+            ("bridgeTimeM5", "d5, s5, r5"),
+            ("bridgeTimeM10", "d10, s10, r10"),
+            ("bridgeTimeM15", "d15, s15, r15"),
+            ("bridgeTimeM30", "d30, s30, r30"),
+            ("bridgeTimeM45", "d45, s45, r45"),
+            ("bridgeTimeH1", "d60, s60, r60"),
+            ("bridgeTimeH2", "d120, s120, r120"),
+            ("bridgeTimeH4", "d240, s240, r240"),
+            ("bridgeTimeD1", "dD, sD, rD"),
+            ("bridgeTimeW1", "dW, sW, rW"),
+        ):
+            self.assertIn(f"[{tuple_head}, {variable}]", self.source)
+            self.assertNotIn(f"{variable} = request.security(", self.source)
         self.assertIn('bridgeTfSeconds == 180 ? "M3"', self.source)
         self.assertIn('bridgeTfSeconds == 600 ? "M10"', self.source)
         self.assertIn('bridgeTfSeconds == 2700 ? "M45"', self.source)
@@ -118,6 +171,38 @@ if not tp1Ok
         self.assertIn('f_align_v25_json_num(bridgePlanValid ? zBas : na)', export_block)
         self.assertIn('f_align_v25_json_num(bridgePlanValid ? zHaut : na)', export_block)
         self.assertIn('f_align_v25_json_num(bridgePlanValid ? (zBas + zHaut) / 2 : na)', export_block)
+
+    def test_plan_refreshes_on_direction_or_strategy_change_and_bridge_rejects_stale_plan(self):
+        self.assertIn(
+            "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig",
+            self.source,
+        )
+        self.assertIn(
+            "bridgePlanValid = dirPlan != 0 and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and not na(ent)",
+            self.source,
+        )
+        self.assertIn("dirFig := dirPlan", self.source)
+        self.assertIn("stratFig := strat", self.source)
+
+    def test_gold_plan_geometry_is_recomputed_and_invalid_direction_is_suppressed(self):
+        self.assertIn("planGeometryMismatch = dirPlan != 0 and (", self.source)
+        self.assertIn("or planGeometryMismatch", self.source)
+        self.assertIn("bridgePlanGeometryOk = dirPlan == 1 ?", self.source)
+        self.assertIn("sl < zBas and ent >= zBas and ent <= zHaut and tp1 > zHaut", self.source)
+        self.assertIn("tp1 < zBas and ent >= zBas and ent <= zHaut and sl > zHaut", self.source)
+        self.assertIn("and bridgePlanGeometryOk", self.source)
+
+        def geometry_ok(direction, entry, stop, tp1, tp2, low, high):
+            if direction == 1:
+                return stop < low <= entry <= high < tp1 < tp2
+            if direction == -1:
+                return tp2 < tp1 < low <= entry <= high < stop
+            return False
+
+        # Regression fixture captured from the live XAUUSD SHORT payload rejected by the bridge.
+        self.assertFalse(geometry_ok(-1, 3515.12, 3503.42, 3575.13, 3610.0, 3506.34, 3515.12))
+        self.assertTrue(geometry_ok(-1, 3515.12, 3527.0, 3490.0, 3470.0, 3506.34, 3515.12))
+        self.assertTrue(geometry_ok(1, 3515.12, 3495.0, 3540.0, 3570.0, 3510.0, 3520.0))
 
     def test_higher_chart_uses_last_closed_lower_timeframe_intrabar_for_entry_trigger(self):
         export_block = self.source.split(EXPORT_MARKER, 1)[1]

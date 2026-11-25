@@ -95,23 +95,34 @@ class BridgeStoreTests(unittest.TestCase):
         pine_path = Path(__file__).resolve().parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
         pine = pine_path.read_text(encoding="utf-8")
         expected = {
-            "bridgeTimeM1": 'request.security(syminfo.tickerid, "1", time, lookahead=barmerge.lookahead_off)',
-            "bridgeTimeM3": 'request.security(syminfo.tickerid, "3", time, lookahead=barmerge.lookahead_off)',
-            "bridgeTimeM5": 'request.security(syminfo.tickerid, "5", time, lookahead=barmerge.lookahead_off)',
-            "bridgeTimeM10": 'request.security(syminfo.tickerid, "10", time, lookahead=barmerge.lookahead_off)',
-            "bridgeTimeM15": 'request.security(syminfo.tickerid, "15", time, lookahead=barmerge.lookahead_off)',
-            "bridgeTimeM30": 'request.security(syminfo.tickerid, "30", time, lookahead=barmerge.lookahead_off)',
-            "bridgeTimeM45": 'request.security(syminfo.tickerid, "45", time, lookahead=barmerge.lookahead_off)',
-            "bridgeTimeH1": 'request.security(syminfo.tickerid, "60", time, lookahead=barmerge.lookahead_off)',
-            "bridgeTimeH2": 'request.security(syminfo.tickerid, "120", time, lookahead=barmerge.lookahead_off)',
-            "bridgeTimeH4": 'request.security(syminfo.tickerid, "240", time, lookahead=barmerge.lookahead_off)',
-            "bridgeTimeD1": 'request.security(syminfo.tickerid, "D", time, lookahead=barmerge.lookahead_off)',
-            "bridgeTimeW1": 'request.security(syminfo.tickerid, "W", time, lookahead=barmerge.lookahead_off)',
+            "bridgeTimeM1": '"1"',
+            "bridgeTimeM3": '"3"',
+            "bridgeTimeM5": '"5"',
+            "bridgeTimeM10": '"10"',
+            "bridgeTimeM15": '"15"',
+            "bridgeTimeM30": '"30"',
+            "bridgeTimeM45": '"45"',
+            "bridgeTimeH1": '"60"',
+            "bridgeTimeH2": '"120"',
+            "bridgeTimeH4": '"240"',
+            "bridgeTimeD1": '"D"',
+            "bridgeTimeW1": '"W"',
         }
-        for variable, expression in expected.items():
+        pine_lines = pine.splitlines()
+        for variable, interval in expected.items():
             with self.subTest(timeframe=variable):
-                self.assertIn(f"{variable} = {expression}", pine)
-                self.assertNotIn(f"{variable} = time(", pine)
+                self.assertTrue(
+                    any(
+                        variable in line
+                        and "request.security(syminfo.tickerid," in line
+                        and interval in line
+                        and "f_etat()" in line
+                        for line in pine_lines
+                    ),
+                    msg=f"{variable} must be returned by its matching request.security() tuple",
+                )
+        self.assertIn('[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]', pine)
+        self.assertNotIn('lookahead=barmerge.lookahead_off)', pine)
 
     def test_accepts_snapshot_and_exposes_workflow_contract(self):
         status, result = self.store.ingest(valid_payload(), INGEST, BASE_MS)
