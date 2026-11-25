@@ -18,8 +18,8 @@
 - Prove project identity from the canonical GitHub repository, exact branch and SHA, and file provenance. An open port, process name, folder name, browser tab, or old branch label is not proof.
 - Claude Chrome conversation history is a discovery index, not proof that a change reached GitHub. Verify source material and decisions in the actual source conversation, then independently confirm each claimed change in the canonical repository and commit history.
 - Never assume a `claude/*` branch is current or authoritative because of its name. Verify ancestry, base, SHA, changed files, dependencies, and tests before considering any source.
-- During recovery, do not delete old files, branches, projects, servers, or history. First create a provenance inventory (source conversation, repository, branch, SHA, paths, dependencies, tests), propose minimal extraction, and preserve a rollback point.
-- No mass merge, mass copy, broad cleanup, or replacement of the Telegram/ALIGN foundation. Preserve verified Telegram, Pine, MTF, bridge, AI, server, state, and live-overlay behavior unless a narrowly scoped change is proven necessary and explicitly approved.
+- During recovery, do not delete old files, branches, projects, servers, or history without provenance. For an owner-authorized scope cleanup, preserve a complete pre-cleanup branch snapshot, prove candidate files have no production consumer, and remove only the unrelated active-tree copy through a reviewed PR. Never delete the archive snapshot.
+- No mass merge, mass copy, or replacement of the Telegram/ALIGN foundation. When the owner explicitly requests scope isolation, inventory every candidate, verify imports/workflows/runtime consumers, create an exact pre-cleanup archive, remove only proven unrelated legacy components on a dedicated PR, and run the complete ALIGN validation suite. Preserve verified Telegram, Pine, MTF, Cloudflare mailbox, ROBOT V12 bridge, AI, state, and live-overlay behavior.
 - If the Claude Chrome source conversation or exact project/branch cannot be accessed, report the missing evidence. Never fill gaps by guessing or substituting another agent's history.
 
 ## Branch and change discipline
@@ -33,6 +33,7 @@
 
 ## Stable baseline and zero regression
 - The latest verified, working version is the baseline; identify its exact SHA and evidence for each task rather than hard-coding a possibly stale SHA.
+- Active runtime boundary: `align-bot/`, `cloud/align-tv-mailbox/`, `docs/live/`, `scripts/align_*.py`, `scripts/validate_align_source_of_truth.py`, and the ALIGN GitHub workflows. Read-only Topstep/MetaAPI safety checks remain only where they are explicitly connected to ALIGN; no legacy local server, generic dashboard, MT5 bridge, or second TradingView extension may be treated as a production dependency.
 - Preserve the TradingView indicator design and all validated Claude-era v12.2 behavior: live band, animations, AI commentary/bubbles, controls, time display, and MTF dashboard. Do not simplify, remove, rename, or reposition these without explicit approval.
 - Preserve Pine v24 / ROBOT V12 behavior and all established integrations. Recover only modules whose source, version, dependencies, and compatibility are verified.
 - If a change fails any required test, do not merge or deploy it. Isolate the failure, fix and retest, or revert only that change to the last verified stable state without overwriting other work.
