@@ -57,6 +57,7 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         with patch.object(ab, "TOKEN", "test-token"), \
              patch.object(ab, "TELEGRAM_PULL_MODE", True), \
              patch.object(ab, "DERNIER_ETAT", state), \
+             patch.object(ab, "LANG_EN", {"101"}), \
              patch.object(ab, "http_json", return_value={"ok": True, "result": {"message_id": 43}}) as request, \
              patch.object(ab, "texte_coach_live", return_value="🎙 COACH COMMENTATEUR\nℹ️ Info, pas une entrée"), \
              patch.object(ab, "markup_analyse", return_value=None):
@@ -64,6 +65,8 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
 
         self.assertEqual(request.call_count, 1)
         self.assertIn("101", str(request.call_args))
+        self.assertIn("LIVE COMMENTATOR", str(request.call_args))
+        self.assertNotIn("COACH COMMENTATEUR", str(request.call_args))
         self.assertEqual(state["coach_live"]["BTC"]["101"]["dernier_t"], 1000)
 
     def test_private_coach_flash_commentary_is_fully_translated(self):
