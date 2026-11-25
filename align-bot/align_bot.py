@@ -3674,20 +3674,77 @@ REGLES = ("📌 RÈGLES — ALIGN Signaux\n"
           "👉 https://t.me/align_mtf_adel_bot")
 
 def epingler(etat, cid):
-    """Envoie les règles et les épingle en haut de la conversation (une seule fois par conversation)."""
-    if cid in etat.setdefault("epingles_v5", []):
+    """Synchronise la règle épinglée BTC/GOLD sans conserver un ancien message NASDAQ ni créer de doublon."""
+    cid_key = str(cid)
+    epingles = etat.setdefault("epingles_v6", [])
+    pending = etat.setdefault("epingles_v6_pending", {})
+    if cid_key in {str(x) for x in epingles}:
         return
-    try:                                  # mémoire perdue (redémarrage) : on regarde ce qui est DÉJÀ épinglé — jamais deux fois les mêmes règles
-        pm = ((telegram("getChat", chat_id=cid) or {}).get("result") or {}).get("pinned_message") or {}
-        if str(pm.get("text") or "").startswith(REGLES.split("\n")[0].strip()[:18]):
-            etat["epingles_v5"].append(cid)
+
+    # Si l'envoi précédent a réussi mais pas l'épinglage, réessayer le même message.
+    pending_mid = pending.get(cid_key)
+    if pending_mid:
+        try:
+            pin = telegram("pinChatMessage", chat_id=cid, message_id=pending_mid, disable_notification="true")
+            if isinstance(pin, dict) and pin.get("ok"):
+                epingles.append(cid_key)
+                pending.pop(cid_key, None)
+            else:
+                print("epingler pin pending", cid, (pin or {}).get("description", "ok=false"))
+        except Exception as ex:
+            print("epingler pin pending", cid, ex)
+        return
+
+    header = REGLES.split("\n", 1)[0].strip()
+    try:
+        chat = telegram("getChat", chat_id=cid)
+        if not isinstance(chat, dict) or not chat.get("ok"):
+            print("epingler getChat", cid, "réponse invalide")
             return
+        pm = (chat.get("result") or {}).get("pinned_message") or {}
     except Exception as ex:
+        # Sans lecture fiable du message épinglé, ne pas envoyer une copie qui pourrait faire doublon.
         print("epingler getChat", cid, ex)
+        return
+
+    pm_text = str(pm.get("text") or pm.get("caption") or "")
+    same_rules_header = pm_text.startswith(header) or pm_text.startswith("📌 RULES — ALIGN Signals")
+    if same_rules_header:
+        has_btc_gold = "BTCUSD" in pm_text and "XAUUSD" in pm_text
+        has_retired_market = bool(re.search(r"\b(?:NASDAQ|NAS100|NQ(?:=F|1!)?)\b", pm_text, re.IGNORECASE))
+        if has_btc_gold and not has_retired_market:
+            epingles.append(cid_key)
+            return
+        old_mid = pm.get("message_id")
+        if not old_mid:
+            print("epingler: ancien message de règles sans message_id", cid)
+            return
+        try:
+            unpin = telegram("unpinChatMessage", chat_id=cid, message_id=old_mid)
+            if not isinstance(unpin, dict) or not unpin.get("ok"):
+                print("epingler unpin", cid, (unpin or {}).get("description", "ok=false"))
+                return
+        except Exception as ex:
+            print("epingler unpin", cid, ex)
+            return
+
     try:
         res = telegram("sendMessage", chat_id=cid, text=REGLES, disable_notification="true")
-        telegram("pinChatMessage", chat_id=cid, message_id=res["result"]["message_id"], disable_notification="true")
-        etat["epingles_v5"].append(cid)
+        if not isinstance(res, dict) or not res.get("ok"):
+            print("epingler sendMessage", cid, (res or {}).get("description", "ok=false"))
+            return
+        message_id = (res.get("result") or {}).get("message_id")
+        if not message_id:
+            print("epingler sendMessage", cid, "message_id absent")
+            return
+        pin = telegram("pinChatMessage", chat_id=cid, message_id=message_id, disable_notification="true")
+        if isinstance(pin, dict) and pin.get("ok"):
+            epingles.append(cid_key)
+            pending.pop(cid_key, None)
+        else:
+            # Le message existe déjà : mémoriser son ID pour ne pas le renvoyer au prochain cycle.
+            pending[cid_key] = message_id
+            print("epingler pin", cid, (pin or {}).get("description", "ok=false"))
     except Exception as ex:
         print("epingler", cid, ex)
 
