@@ -329,7 +329,8 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("🔇 COACH VOCAL OFF", source)
         self.assertIn("🔊 COACH VOCAL ON", source)
         self.assertIn("voixBtn.remove()", source)
-        self.assertIn("voiceOnce: source === 'marche' && bulle && i === 0", source)
+        self.assertIn("voiceOnce: source === 'marche' && (bulle || g === 'danger') && i === 0", source)
+        self.assertIn("if (source === 'marche' && (bulle || g === 'danger') && anglaisTraduit)", source)
         self.assertIn("const voixDuree = m.voiceOnce ? parlerLive(m) : 0", source)
         self.assertIn("items[0].replayEN = items[nPass / 2]", source)
         # End-to-end linkage: bot IA payload -> ntfy receiver -> AI bubble -> voice narration.
