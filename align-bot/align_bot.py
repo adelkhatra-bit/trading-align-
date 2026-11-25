@@ -3717,9 +3717,10 @@ def epingler(etat, cid):
 
     pm_text = str(pm.get("text") or pm.get("caption") or "")
     same_rules_header = pm_text.startswith(header) or pm_text.startswith("📌 RULES — ALIGN Signals")
+    has_retired_market = bool(re.search(r"\b(?:NASDAQ|NAS100|NQ(?:=F|1!)?)\b", pm_text, re.IGNORECASE))
+    print(f"ALIGN_RULES_PIN_CHECK target=configured_channel pinned={bool(pm)} rules_header={same_rules_header} nasdaq={has_retired_market}", flush=True)
     if same_rules_header:
         has_btc_gold = "BTCUSD" in pm_text and "XAUUSD" in pm_text
-        has_retired_market = bool(re.search(r"\b(?:NASDAQ|NAS100|NQ(?:=F|1!)?)\b", pm_text, re.IGNORECASE))
         if has_btc_gold and not has_retired_market:
             epingles.append(cid_key)
             return
