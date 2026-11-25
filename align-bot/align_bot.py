@@ -3709,7 +3709,8 @@ def _telegram_sortant_autorise(methode, params):
     if (methode == "sendMessage" and cid.isdecimal() and cid == coach_chat
             and coach_market in MARCHES and position_exacte):
         if coach_position_closure:
-            if coach_position_record.get("fini") is True and texte.startswith("🏁 CLÔTURE CONFIRMÉE"):
+            if (coach_position_record.get("fini") is True and texte.startswith("🏁 CLÔTURE CONFIRMÉE")
+                    and cid not in coach_quiet):
                 return True
         elif (coach_position_record.get("fini") is not True
               and bot_on(etat, cid) and cid not in coach_quiet):
@@ -7331,6 +7332,7 @@ def prix_actuel(m):
 def noter(etat, cid, m, pos, sortie, motif):
     """Enregistre la clôture et arrête les nouvelles propositions après TP/SL, sans couper les autres positions ouvertes."""
     cid = str(cid)
+    notifier_cloture = bot_on(etat, cid) and cid not in {str(x) for x in (etat.get("quiet") or [])}
     pts = pos["d"] * (sortie - pos["e"])
     pct = pts / pos["e"] * 100
     motif_haut = str(motif).upper()
@@ -7384,7 +7386,7 @@ def noter(etat, cid, m, pos, sortie, motif):
             clavier = json.dumps({"inline_keyboard": boutons_fin})
     trade = (etat.get(m) or {}).get("trade")
     _telegram_envoyer_commentaire_coach_prive(
-        etat, cid, m, texte, trade=trade, position=pos, fermeture=True, reply_markup=clavier
+        etat, cid, m, texte, trade=trade, position=pos, fermeture=notifier_cloture, reply_markup=clavier
     )
 
 def texte_team(bj):
