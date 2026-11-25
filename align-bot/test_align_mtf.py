@@ -3703,10 +3703,9 @@ class PineOnlyEntryGateTests(unittest.TestCase):
         r["dirs"] = [0] * 11
         r["require_tv_bridge"] = True
         state = {"t1m": 0}
-        with patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), \\
-             patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")):
+        with patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")):
             out = align_bot.agent("BTC", r, state, "")
-        message = "\\n".join(str(item[0] if isinstance(item, tuple) else item) for item in out)
+        message = " ".join(str(item[0] if isinstance(item, tuple) else item) for item in out)
         self.assertIn("aucune direction multi-UT confirmée", message)
         self.assertIn("Aucun plan Entry/SL/TP émis", message)
         self.assertNotIn("bridge Pine", message)
