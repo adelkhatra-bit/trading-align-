@@ -9668,7 +9668,11 @@ def radar_tick(etat, chats, derniers, now=None):
             if now - float(mem.get("t", 0)) < RADAR_REFRESH_SEC or _radar_fond(txt) == mem.get("fond"):
                 continue                          # rien de nouveau sur le fond, ou édition trop récente
             try:
-                _telegram_envoyer_radar(etat, cid, "editMessageText", message_id=mem["mid"], text=txt)
+                resultat_edit = _telegram_envoyer_radar(etat, cid, "editMessageText", message_id=mem["mid"], text=txt)
+                if isinstance(resultat_edit, dict) and resultat_edit.get("blocked_by_pull_mode"):
+                    continue
+                if not isinstance(resultat_edit, dict) or resultat_edit.get("ok") is not True:
+                    raise RuntimeError(str((resultat_edit or {}).get("description", "édition RADAR non confirmée"))[:160])
                 mem.update(t=now, fond=_radar_fond(txt))
             except Exception as ex:
                 e = str(ex).lower()
