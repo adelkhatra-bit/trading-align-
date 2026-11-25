@@ -329,7 +329,8 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("🔇 COACH VOCAL OFF", source)
         self.assertIn("🔊 COACH VOCAL ON", source)
         self.assertIn("voixBtn.remove()", source)
-        self.assertIn("voiceOnce: source === 'marche' && bulle && i === 0", source)
+        self.assertIn("voiceOnce: source === 'marche' && (bulle || g === 'danger') && i === 0", source)
+        self.assertIn("if (source === 'marche' && (bulle || g === 'danger') && anglaisTraduit)", source)
         self.assertIn("const voixDuree = m.voiceOnce ? parlerLive(m) : 0", source)
         self.assertIn("items[0].replayEN = items[nPass / 2]", source)
         # End-to-end linkage: bot IA payload -> ntfy receiver -> AI bubble -> voice narration.
@@ -859,6 +860,9 @@ class LiveAgendaMarketTimezoneTests(unittest.TestCase):
         self.assertIn("montrer(t, false, 2, 'danger', true, 'marche')", handler)
         vocal = bande[bande.index("function parlerLive("):bande.index("function recuIA(")]
         self.assertIn("item.source !== 'ia' && item.source !== 'marche'", vocal)
+        # Les breaking news restent visuellement une alerte, mais déclenchent aussi la narration FR puis EN.
+        self.assertIn("voiceOnce: source === 'marche' && (bulle || g === 'danger') && i === 0", bande)
+        self.assertIn("if (source === 'marche' && (bulle || g === 'danger') && anglaisTraduit)", bande)
 
 
 if __name__ == "__main__":
@@ -1177,10 +1181,10 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", *rel)
         return Path(path).read_text(encoding="utf-8")
 
-    def test_bande_version_12_2_14_voice_recovery_and_sync(self):
+    def test_bande_version_12_2_24_voice_recovery_and_sync(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
-        self.assertIn("// @version      12.2.23", bande)
-        self.assertIn("const VERSION = '12.2.23';", bande)
+        self.assertIn("// @version      12.2.24", bande)
+        self.assertIn("const VERSION = '12.2.24';", bande)
         self.assertIn('let voixUtterance = null', bande)
         self.assertIn('voixUtterance = utterance;', bande)
         self.assertIn("setInterval(pingEcran, 45000)", bande)
@@ -1204,7 +1208,7 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
         self.assertIn("let dernierCommentaireIA = null", bande)
         self.assertIn("market: (source === 'ia' || source === 'marche') ? codeMarche() : ''", bande)
-        self.assertIn("voiceOnce: source === 'marche' && bulle && i === 0", bande)
+        self.assertIn("voiceOnce: source === 'marche' && (bulle || g === 'danger') && i === 0", bande)
         self.assertIn("if (dernier && dernier.market && dernier.market === codeMarche())", bande)
         self.assertIn("attente.source !== 'ia' || (attente.market && attente.market === codeMarche())", bande)
         self.assertIn("items[i].replayEN = commentaireEN", bande)
