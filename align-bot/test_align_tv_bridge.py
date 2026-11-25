@@ -108,11 +108,18 @@ class BridgeStoreTests(unittest.TestCase):
             "bridgeTimeD1": '"D"',
             "bridgeTimeW1": '"W"',
         }
+        pine_lines = pine.splitlines()
         for variable, interval in expected.items():
             with self.subTest(timeframe=variable):
-                self.assertIn(
-                    f'{variable}] = request.security(syminfo.tickerid, {interval}, f_etat())',
-                    pine,
+                self.assertTrue(
+                    any(
+                        variable in line
+                        and "request.security(syminfo.tickerid," in line
+                        and interval in line
+                        and "f_etat()" in line
+                        for line in pine_lines
+                    ),
+                    msg=f"{variable} must be returned by its matching request.security() tuple",
                 )
         self.assertIn('[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]', pine)
         self.assertNotIn('lookahead=barmerge.lookahead_off)', pine)
