@@ -274,9 +274,11 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
             )
             self.assertTrue(result.get("ok"))
             self.assertEqual(request.call_count, 1)
-            self.assertFalse(ab._telegram_sortant_autorise(
-                "sendMessage", {"chat_id": "101", "text": "Entrée 100 / SL 95 / TP 110"}
-            ))
+            denied_non_closure = ab._telegram_envoyer_commentaire_coach_prive(
+                state, "101", "BTC", "Entrée 100 / SL 95 / TP 110",
+                trade=trade, position=position, fermeture=True
+            )
+            self.assertTrue(denied_non_closure.get("blocked_by_pull_mode"))
 
     def test_candle_close_push_requires_exact_veille_cloture_opt_in(self):
         state = {"veille_cloture": {"BTC": {"101": {"tf": "15m"}}}}
