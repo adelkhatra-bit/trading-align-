@@ -14,7 +14,8 @@ Si l'**identité du projet** est ambiguë (autre dépôt, autre branche de produ
 | Dépôt | `adelkhatra-bit/trading-align-` | `trading-auto` (ancien nom), `trading-dashboard-4000` (autre projet) |
 | Branche du code | `main` | — |
 | Branche des données publiées | `live-data` (`live.json` à la racine) | Ne jamais y mettre de code, ne jamais la fusionner dans `main` |
-| Indicateur actif | `align-bot/pine/ALIGN_MTF_PRO_v25.pine` | `ALIGN_MTF_PRO_v24*.pine`, `*_PROPOSITION*.pine`, `PROPOSITION_v25_sniper.diff` = historique |
+| Indicateur de données/bridge (unique) | `align-bot/pine/ALIGN_MTF_PRO_v25.pine` | Tout autre script ne peut alimenter le BOT ou le bridge |
+| Compagnon visuel (clôtures de bougies) | `align-bot/pine/ALIGN_MTF_PRO_v24.pine` | Visuel uniquement : aucune alerte sortante, aucun bridge, aucune donnée consommée par ROBOT V12 ; autres `v24*`, propositions et diffs = historique |
 | Titre TradingView | `ALIGN MTF PRO v25 (Inside)` (court : `ALIGN MTF v25`), Pine `//@version=6` | Tout autre titre = mauvais script |
 | Marchés actifs | BTC, GOLD (`BTCUSD`, `XAUUSD`) uniquement | NASDAQ retiré de l'analyse, des entrées, de la surveillance et du suivi des positions ; toute ancienne mémoire NASDAQ est archivée pour audit et jamais rejouée |
 | Bot Telegram | `@align_mtf_adel_bot` | — |
@@ -34,6 +35,8 @@ TradingView · Pine v25 · 2 alertes (BTCUSD et XAUUSD)
   → Telegram (@align_mtf_adel_bot) + publication live-data/live.json
   → bande live (texte, animations, voix)
 ```
+
+Le script compagnon `ALIGN_MTF_PRO_v24.pine` peut rester chargé sur le graphique pour ses visuels de clôture de bougie. Il ne fait pas partie de la chaîne de données : aucune alerte sortante, aucun webhook, aucun bridge et aucune lecture par ROBOT V12. Le v25 reste l'unique source des snapshots et décisions transmises au BOT.
 
 Le bridge Python est éphémère dans le runner du workflow : **4100 n'est pas un service permanent du PC** et ne doit pas être exposé par un tunnel public. Le Worker ne remplace pas le bridge : il transporte et conserve le JSON brut. Le feeder le transmet sans compléter ni réécrire ses champs ; `BridgeStore` dans `align_tv_bridge.py` est l'unique validateur MTF.
 
