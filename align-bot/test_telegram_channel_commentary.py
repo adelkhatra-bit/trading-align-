@@ -254,6 +254,17 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
             )
             self.assertTrue(wrong_chat.get("blocked_by_pull_mode"))
             self.assertTrue(wrong_trade.get("blocked_by_pull_mode"))
+            state["bot_off"] = ["101"]
+            stopped = ab._telegram_envoyer_commentaire_coach_prive(
+                state, "101", "BTC", "⚠️ BTC\n🛑 Stop 95", trade=trade, position=position
+            )
+            state["bot_off"] = []
+            state["quiet"] = ["101"]
+            quiet = ab._telegram_envoyer_commentaire_coach_prive(
+                state, "101", "BTC", "⚠️ BTC\n🛑 Stop 95", trade=trade, position=position
+            )
+            self.assertTrue(stopped.get("blocked_by_pull_mode"))
+            self.assertTrue(quiet.get("blocked_by_pull_mode"))
         self.assertEqual(getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_commentary_chat_id", None), old["chat"])
         self.assertEqual(getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_commentary_market", None), old["market"])
         self.assertEqual(getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_position_trade", None), old["trade"])
@@ -278,7 +289,12 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
                 state, "101", "BTC", "Entrée 100 / SL 95 / TP 110",
                 trade=trade, position=position, fermeture=True
             )
+            state["quiet"] = ["101"]
+            denied_quiet = ab._telegram_envoyer_commentaire_coach_prive(
+                state, "101", "BTC", message, trade=trade, position=position, fermeture=True
+            )
             self.assertTrue(denied_non_closure.get("blocked_by_pull_mode"))
+            self.assertTrue(denied_quiet.get("blocked_by_pull_mode"))
 
     def test_candle_close_push_requires_exact_veille_cloture_opt_in(self):
         state = {"veille_cloture": {"BTC": {"101": {"tf": "15m"}}}}
@@ -293,6 +309,8 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
             denied = ab._telegram_envoyer_veille_cloture(state, "101", "BTC", "Entry 100 / SL 95 / TP 110")
         self.assertTrue(ok.get("ok"))
         self.assertTrue(denied.get("blocked_by_pull_mode"))
+        wrong_user = ab._telegram_envoyer_veille_cloture(state, "202", "BTC", "🕯 Clôture 15 min : biais inchangé")
+        self.assertTrue(wrong_user.get("blocked_by_pull_mode"))
         self.assertEqual(request.call_count, 1)
 
     def test_radar_send_edit_delete_are_scoped_to_opted_in_user_and_exact_message(self):
