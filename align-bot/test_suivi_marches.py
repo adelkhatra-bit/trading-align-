@@ -246,7 +246,7 @@ class SuiviMarchesTest(unittest.TestCase):
 
 
 class MigrationMarchesBtcGoldOnlyTest(unittest.TestCase):
-    def test_legacy_nasdaq_state_is_archived_and_removed_from_active_database(self):
+    def test_legacy_nasdaq_state_and_archive_are_purged_from_persisted_database(self):
         legacy_trade = {"d": -1, "e": 100, "sl": 105, "tp1": 90, "qui": {"42": {"fini": False}}}
         etat = {
             "schema_version": 3,
@@ -267,8 +267,7 @@ class MigrationMarchesBtcGoldOnlyTest(unittest.TestCase):
         self.assertEqual(ab.MARCHES_HISTORIQUES, ("BTC", "GOLD"))
         self.assertEqual(etat["marches_actifs"], ["BTC", "GOLD"])
         self.assertNotIn("NASDAQ", etat)
-        self.assertEqual(etat["archives_marches_retirees"]["NASDAQ"][0]["state"]["trade"], legacy_trade)
-        self.assertTrue(etat["archives_marches_retirees"]["NASDAQ"][0]["open_trade"])
+        self.assertNotIn("archives_marches_retirees", etat)
         self.assertEqual(etat["marches_par_chat"], {"42": ["GOLD"], "43": [], "44": "BOTH"})
         for key in ("auto", "auto_marches", "coach_live", "canaux_marche", "canal_live", "liens_marche", "veille_cloture", "pause_auto"):
             self.assertNotIn("NASDAQ", etat.get(key, {}))
@@ -276,9 +275,8 @@ class MigrationMarchesBtcGoldOnlyTest(unittest.TestCase):
         self.assertEqual(ab.marches_choisis(etat, "44"), {"BTC", "GOLD"})
         self.assertEqual(ab.en_position(etat, "42"), [])
 
-        archive_count = len(etat["archives_marches_retirees"]["NASDAQ"])
         self.assertFalse(ab.migrer_scope_marches_btc_gold_only(etat))
-        self.assertEqual(len(etat["archives_marches_retirees"]["NASDAQ"]), archive_count)
+        self.assertNotIn("archives_marches_retirees", etat)
 
     def test_legacy_market_selection_cannot_reintroduce_nasdaq(self):
         etat = {"marches_par_chat": {}, "auto": {}}
