@@ -25,7 +25,11 @@ flowchart TD
 
 ## 1 bis. Périmètre historique isolé
 
-L'ancien serveur Node sur le port 4000, l'extension `tradingview-analyzer`, les passerelles MT5 et l'interface locale ont été identifiés comme un ancien ensemble indépendant. La PR #960 propose leur retrait de la branche active `main`. Ils restent présents sur `main` tant que cette PR n'est pas fusionnée ; la branche de PR porte le nettoyage et l'archive `archive/pre-align-scope-cleanup-20261125` conserve l'état complet antérieur. Ils ne participent pas à la chaîne de production ALIGN et ne doivent pas être relancés ni utilisés pour valider le BOT.
+L'ancien serveur Node sur le port 4000, l'extension `tradingview-analyzer`, les passerelles MT5 et l'interface locale ont été retirés de l'arbre actif `main` par la PR #960, fusionnée le 25/11/2026 (merge commit `f0d2d59a92a0512451e7b87bd9c733edad10688c`). Le snapshot intégral antérieur est conservé dans `archive/pre-align-scope-cleanup-20261125` à partir du commit `d6c342ef3e779aa17aa2cab0b6fd4ea22d05e853`. Ces éléments historiques ne participent pas à la chaîne ALIGN de production et ne doivent pas être restaurés ni utilisés pour valider le BOT.
+
+## 1 ter. Frontière IA / agents de code
+
+L'IA de commentaire marché utilisée par `align_bot.py` est un fournisseur runtime qui lit les données ALIGN ; elle ne fait pas de maintenance du dépôt. Le watchdog et le coordinateur d'auto-réparation signalent des incidents aux mainteneurs humains. Aucun relais Copilot, profil d'agent personnalisé ou assignation automatique d'agent de code n'est présent dans le périmètre actif. Les changements de code restent soumis à une PR, aux validations et à une revue humaine.
 
 ## 2. Responsabilité par composant
 
@@ -62,8 +66,8 @@ L'ancien serveur Node sur le port 4000, l'extension `tradingview-analyzer`, les 
 | `.github/workflows/` | CI, worker, supervision | Garder; chaque workflow doit avoir un rôle non chevauchant |
 | `cloud/` | Mailbox/edge | Garder; vérifier contrats depuis tests |
 | `docs/live/` | Assets live/public | Garder; préserver animations/design |
-| Ancien serveur Node, `tradingview-analyzer/`, MT5, `src/`, `lib/`, `studio/`, `public/` | Ancienne plateforme locale indépendante | Retrait proposé par PR #960 ; snapshot complet dans `archive/pre-align-scope-cleanup-20261125` |
-| `agent-export/`, `analysis/`, `trading/`, `store/`, `utils/`, `tests/`, `bridge/` | Ancien runtime/outillage local | Retrait proposé par PR #960 après vérification des dépendances; snapshot conservé dans l'archive |
+| Ancien serveur Node, `tradingview-analyzer/`, MT5, `src/`, `lib/`, `studio/`, `public/` | Ancienne plateforme locale indépendante | Retiré de `main` par la PR #960 fusionnée ; snapshot complet conservé dans `archive/pre-align-scope-cleanup-20261125` |
+| `agent-export/`, `analysis/`, `trading/`, `store/`, `utils/`, `tests/`, `bridge/` | Ancien runtime/outillage local | Retiré de `main` par la PR #960 ; éléments historiques disponibles uniquement dans l'archive de référence |
 | Documentation historique à la racine | Redondance/ambiguïté | Ne pas supprimer en masse; indexer puis archiver après preuve de non-référence |
 
 **Constat de nettoyage :** la racine contient beaucoup de rapports, plans et documents de session en doublon. Ils encombrent l'orientation mais ne prouvent pas que les dossiers de code sont inutiles. Le nettoyage doit commencer par la documentation, l'indexation et l'analyse des dépendances, pas par une suppression aveugle.
