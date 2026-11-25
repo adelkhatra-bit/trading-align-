@@ -509,8 +509,8 @@
     // v7.3 (règle d'Adel, 15/11) : chaque info passe 2 fois en français PUIS 2 fois en anglais
     const traductionEN = enAnglais(texte), anglaisTraduit = traductionEN !== texte;
     const nPass = Math.max(4, 2 * (fois || 1)), items = [];
-    for (let i = 0; i < nPass; i++) items.push({ texte: (i >= nPass / 2 ? '🇬🇧 ' : '🇫🇷 ') + plateforme(i >= nPass / 2 ? traductionEN : texte), bulle, g, en: i >= nPass / 2, anglaisTraduit, source: source || 'live', market: (source === 'ia' || source === 'marche') ? codeMarche() : '', voiceOnce: source === 'marche' && bulle && i === 0 });
-    if (source === 'marche' && bulle && anglaisTraduit) items[0].replayEN = items[nPass / 2];
+    for (let i = 0; i < nPass; i++) items.push({ texte: (i >= nPass / 2 ? '🇬🇧 ' : '🇫🇷 ') + plateforme(i >= nPass / 2 ? traductionEN : texte), bulle, g, en: i >= nPass / 2, anglaisTraduit, source: source || 'live', market: (source === 'ia' || source === 'marche') ? codeMarche() : '', voiceOnce: source === 'marche' && (bulle || g === 'danger') && i === 0 });
+    if (source === 'marche' && (bulle || g === 'danger') && anglaisTraduit) items[0].replayEN = items[nPass / 2];
     if (source === 'ia') {
       const commentaireEN = anglaisTraduit ? items[nPass / 2] : null;
       for (let i = 0; i < nPass / 2; i++) items[i].replayEN = commentaireEN;
