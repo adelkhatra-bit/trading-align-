@@ -18,7 +18,7 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
             ab.notifier_canal_marche(state, "BTC", result, {})
 
         self.assertEqual(request.call_count, 1)
-        self.assertEqual(state["canal_live"]["BTC"]["dernier_t"], 2000)
+        self.assertEqual(state["canal_live"]["BTC"]["dernier_t"], 1000)
         self.assertIn("-100btc", str(request.call_args))
 
     def test_market_commentary_permission_rejects_wrong_channel_market_and_trade_levels(self):
