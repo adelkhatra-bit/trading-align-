@@ -11302,7 +11302,7 @@ def coach(etat, m, r, cle):
         if 0 <= reste <= 30 * 60 and f"news{ev['t']}" not in vu:
             vu.append(f"news{ev['t']}")
             msgs.append(f"📰 {m}\nNews dans   {round(reste / 60)} min\n"
-                        + ("🔒 Mets ton SL à BE (prix d'entrée)" if prog > 0.2 else "✂️ Le trade n'avance pas\n✂️ Je coupe avant la news"))
+                        + ("🔎 Vérifie ton SL actuel\n🙅 Ne le déplace pas à BE sans validation des critères de protection du coach." if prog > 0.2 else "✂️ Le trade n'avance pas\n✂️ Je coupe avant la news"))
     for c in dedans:
         # Le stop perso d'abord : s'il vient de sortir l'abonné, il ne reçoit plus aucun suivi (BE, direction TP…)
         # (vu le 14/11 : Adel sorti à son stop, puis « mets-toi à BE » / « direction TP1 » quand même)
