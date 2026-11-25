@@ -3546,10 +3546,42 @@ def _telegram_sortant_autorise(methode, params):
     """Aucun push spontané : réponse privée à une action explicite, ou entrée attendue après demande."""
     if not TELEGRAM_PULL_MODE:
         return True
-    if methode == "answerCallbackQuery":
+    # Politique explicite pour les méthodes Telegram qui ne sont pas des envois.
+    # Les lectures et accusés de protocole restent disponibles ; les mutations déjà
+    # utilisées par ALIGN sont listées explicitement. Toute nouvelle méthode doit être
+    # examinée et ajoutée volontairement : aucun appel inconnu ne passe par défaut.
+    method = str(methode or "")
+    if method in {"answerCallbackQuery", "answerPreCheckoutQuery"}:
         return True
-    if not methode.startswith(("send", "copy", "forward", "edit")):
+    if method.startswith("get"):
         return True
+    methodes_non_message_autorisees = {
+        "deleteMessage",
+        "pinChatMessage",
+        "unpinChatMessage",
+        "setChatDescription",
+        "setMyCommands",
+        "setChatMenuButton",
+        "setMyShortDescription",
+        "setMyDescription",
+        "approveChatJoinRequest",
+        "createChatInviteLink",
+        "createChatSubscriptionInviteLink",
+        "exportChatInviteLink",
+    }
+    if method in methodes_non_message_autorisees:
+        return True
+    if not method.startswith(("send", "copy", "forward", "edit")):
+        action = str(getattr(TELEGRAM_PULL_CONTEXT, "callback_action", "") or "").split(":", 1)[0][:40] or "outside_callback"
+        log_key = (method[:40], action)
+        should_log = False
+        with TELEGRAM_AUDIT_LOCK:
+            if log_key not in TELEGRAM_PULL_BLOCK_LOGGED:
+                TELEGRAM_PULL_BLOCK_LOGGED.add(log_key)
+                should_log = True
+        if should_log:
+            print(f"TELEGRAM_PULL_BLOCK method={method[:40]} action={action} (first occurrence)", flush=True)
+        return False
     cid = str(params.get("chat_id") or "")
     contexte = str(getattr(TELEGRAM_PULL_CONTEXT, "chat_id", "") or "")
     prive = bool(getattr(TELEGRAM_PULL_CONTEXT, "private", False))
