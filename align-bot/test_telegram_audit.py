@@ -159,9 +159,13 @@ class TelegramAuditTests(unittest.TestCase):
 
     def test_pull_mode_keeps_known_read_and_protocol_methods_available(self):
         ab.TELEGRAM_PULL_MODE = True
-        for method in ("getMe", "getUpdates", "answerCallbackQuery", "answerPreCheckoutQuery"):
+        for method in ("getMe", "getUpdates", "getChat", "getChatMember",
+                       "answerCallbackQuery", "answerPreCheckoutQuery"):
             with self.subTest(method=method):
                 self.assertTrue(ab._telegram_sortant_autorise(method, {}))
+        for method in ("getUnknownMethod", "sendUnknownMethod", "unknownMutation"):
+            with self.subTest(method=method):
+                self.assertFalse(ab._telegram_sortant_autorise(method, {}))
 
     def test_pull_mode_blocks_are_logged_once_without_chat_id_and_aggregate_counts(self):
         ab.TELEGRAM_PULL_BLOCK_LOGGED.clear()
