@@ -67,7 +67,7 @@ class SecuriteVip(unittest.TestCase):
         for m in re.finditer(r'telegram\("createChatInviteLink"[^)]*\)', src):
             self.assertIn('etat["canal_preuves"]', m.group(0))
             self.assertNotIn('etat["canal"]', m.group(0))
-        self.assertEqual(src.count('"exportChatInviteLink"'), 1)                # utilisé seulement pour RÉVOQUER l'ancien lien
+        self.assertEqual(len(re.findall(r'telegram\("exportChatInviteLink"', src)), 1)  # un seul appel réel : révocation de l’ancien lien
         self.assertNotIn("sendMessage\", chat_id=cid, text=etat[\"lien_primaire", src)
 
 
