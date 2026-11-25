@@ -4104,3 +4104,26 @@ class TelegramPullChronometerTest(unittest.TestCase):
         self.assertEqual(observed_scope, [True])
         self.assertEqual(state["chrono"]["BTC"], {})
         self.assertEqual(state["auto"]["BTC"], [])
+
+
+class VerdictOptionalPullbackZoneTests(unittest.TestCase):
+    def test_verdict_skips_daily_weekly_retest_check_when_no_pullback_candidate_exists(self):
+        r = {"confirme": 1, "m1": [{"c": 100.0}]}
+        with unittest.mock.patch.object(align_bot, "etire", return_value=False), \
+             unittest.mock.patch.object(align_bot, "bloque_dw", return_value=False) as bloque, \
+             unittest.mock.patch.object(align_bot, "zone_repli", return_value=None) as repli:
+            titre, detail = align_bot.verdict(r, {})
+        self.assertIn("PATIENCE", titre)
+        bloque.assert_called_once_with(r, 1, 100.0)
+        repli.assert_called_once_with(r, 1)
+
+    def test_verdict_still_blocks_when_existing_pullback_candidate_is_weekly_extreme(self):
+        r = {"confirme": 1, "m1": [{"c": 100.0}], "posD": 0.95, "posW": 0.9}
+        with unittest.mock.patch.object(align_bot, "etire", return_value=False), \
+             unittest.mock.patch.object(align_bot, "bloque_dw", side_effect=[False, True]) as bloque, \
+             unittest.mock.patch.object(align_bot, "zone_repli", return_value={"e": 105.0}) as repli:
+            titre, detail = align_bot.verdict(r, {})
+        self.assertIn("N'ENTRE PAS", titre)
+        self.assertIn("zone extrême", detail)
+        self.assertEqual(bloque.call_args_list[1].args, (r, 1, 105.0))
+        repli.assert_called_once_with(r, 1)

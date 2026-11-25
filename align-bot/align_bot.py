@@ -2197,7 +2197,12 @@ def verdict(r, cle):
         return ("🔴🔴 N'ENTRE PAS", "⏳ " + attente.replace("🔜 Prochaine entrée : ", "") + "\n🔔 Je te préviens dès que le setup est confirmé")
     if etire(r, al):
         return ("⛔ TROP TARD — le marché est déjà parti", "😎 Patience, on trouve une autre entrée\n" + prochaine(r, cle))
-    if bloque_dw(r, al, r["m1"][-1]["c"]) or (not cle.get("ordre") and bloque_dw(r, al, zone_repli(r, al)["e"])):
+    bloque_zone_extreme = bloque_dw(r, al, r["m1"][-1]["c"])
+    if not bloque_zone_extreme and not cle.get("ordre"):
+        candidat_repli = zone_repli(r, al)
+        if candidat_repli is not None:
+            bloque_zone_extreme = bloque_dw(r, al, candidat_repli["e"])
+    if bloque_zone_extreme:
         return ("🔴🔴 N'ENTRE PAS", f"📍 Prix {zone_txt(r['posD'])} Daily / {zone_txt(r['posW'])} Weekly\n🔄 Pas de poursuite du {'LONG' if al == 1 else 'SHORT'} en zone extrême. Attendre le repli ou une inversion confirmée.")
     zone = bool(cle.get("attente_rsi"))
     return (f"🟡 PATIENCE   {SENS[al]} bientôt\n🚦 ⏳ JE N'ENTRE PAS ENCORE" + (f"\n💰 TP visé ≈ {px(cle['ordre']['tp1'])}" if cle.get("ordre") else ""),
