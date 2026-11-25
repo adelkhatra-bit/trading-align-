@@ -67,9 +67,8 @@ jobs:
                   and run.get("status") in active
               ]
 
-          # Le worker actif détecte lui-même le nouveau job et termine son tour,
-          # sauvegarde state.json puis sort avec succès. Ne jamais appeler cancel/force-cancel :
-          # ces API interrompent le worker et peuvent perdre la sauvegarde ou afficher une annulation.
+          # Le worker actif termine son tour, sauvegarde state.json puis sort avec succès.
+          # Le rollover n'envoie aucune requête API d'arrêt ou d'annulation.
           deadline = time.time() + 900
           while time.time() < deadline:
               pending = sorted(
