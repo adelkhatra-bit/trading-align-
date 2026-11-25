@@ -67,75 +67,34 @@ jobs:
                   and run.get("status") in active
               ]
 
-          # Traiter les anciens workers un par un : leurs sauvegardes cache ne doivent jamais se concurrencer.
-          while True:
+          # Le worker actif termine son tour, sauvegarde state.json puis sort avec succès.
+          # Le rollover n'envoie aucune requête API d'arrêt ou d'annulation.
+          deadline = time.time() + 900
+          while time.time() < deadline:
               pending = sorted(
                   older_active_runs(),
                   key=lambda item: int(item.get("id", 0)),
               )
               if not pending:
-                  print("ALIGN_OLD_WORKERS_STOPPED validated_sha=" + current_sha[:12])
+                  print("ALIGN_OLD_WORKERS_STOPPED_GRACEFULLY validated_sha=" + current_sha[:12])
                   break
 
-              run_id = int(pending[0]["id"])
-              old_sha = str(pending[0].get("head_sha", ""))[:12]
-              try:
-                  request(f"/actions/runs/{run_id}/cancel", method="POST")
-                  print(f"ROLLING_OVER old_run={run_id} old_sha={old_sha}")
-              except urllib.error.HTTPError as exc:
-                  if exc.code not in (404, 409):
-                      raise
-                  print(f"ROLL_OVER_RACE old_run={run_id} http={exc.code}")
-
-              # Laisser ce worker terminer son checkpoint avant d'en arrêter un autre.
-              grace_deadline = time.time() + 300
-              next_retry = time.time() + 30
-              while time.time() < grace_deadline:
-                  remaining = [
-                      item for item in older_active_runs()
-                      if int(item.get("id", 0)) == run_id
-                  ]
-                  if not remaining:
-                      print(f"ALIGN_OLD_WORKER_STOPPED_GRACEFULLY old_run={run_id}")
-                      break
-                  if time.time() >= next_retry:
-                      try:
-                          request(f"/actions/runs/{run_id}/cancel", method="POST")
-                          print(f"ROLLING_OVER_RETRY old_run={run_id}")
-                      except urllib.error.HTTPError as exc:
-                          if exc.code not in (404, 409):
-                              raise
-                      next_retry = time.time() + 30
-                  time.sleep(5)
-
-              remaining = [
-                  item for item in older_active_runs()
-                  if int(item.get("id", 0)) == run_id
-              ]
-              if remaining:
-                  try:
-                      request(f"/actions/runs/{run_id}/force-cancel", method="POST")
-                      print(f"FORCE_RETIRING old_run={run_id} old_sha={old_sha}")
-                  except urllib.error.HTTPError as exc:
-                      if exc.code not in (404, 409):
-                          raise
-                      print(f"FORCE_RETIRE_RACE old_run={run_id} http={exc.code}")
-
-                  deadline = time.time() + 120
-                  while time.time() < deadline:
-                      remaining = [
-                          item for item in older_active_runs()
-                          if int(item.get("id", 0)) == run_id
-                      ]
-                      if not remaining:
-                          print(f"ALIGN_OLD_WORKER_FORCE_STOPPED old_run={run_id}")
-                          break
-                      time.sleep(3)
-                  else:
-                      raise SystemExit(
-                          "Rollover refused to proceed; old worker is still active: "
-                          + str(run_id)
-                      )
+              details = []
+              for item in pending:
+                  details.append(
+                      f"{int(item.get('id', 0))}:{item.get('status', 'unknown')}:"
+                      f"{str(item.get('head_sha', ''))[:12]}"
+                  )
+              print("WAITING_FOR_GRACEFUL_WORKER_EXIT " + ",".join(details), flush=True)
+              time.sleep(10)
+          else:
+              pending = older_active_runs()
+              if pending:
+                  ids = ",".join(str(int(item.get("id", 0))) for item in pending)
+                  raise SystemExit(
+                      "Rollover stopped safely: older worker did not exit gracefully; "
+                      "no cancellation was sent; active run IDs=" + ids
+                  )
 
           # Vérification finale : aucun worker plus ancien ne doit subsister.
           remaining = older_active_runs()
