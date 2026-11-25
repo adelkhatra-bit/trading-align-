@@ -4170,12 +4170,45 @@ def _appel_ia(url, modele, cle, messages, recherche=False):
                             "messages": [m for m in messages if m.get("role") != "system"]}).encode()
         h["x-api-key"] = cle; h["anthropic-version"] = "2023-06-01"
     else:
-        corps = json.dumps({"model": modele, "temperature": 0.4, "max_tokens": 1000, "messages": messages}).encode()
+        groq = "api.groq.com" in url
+        corps_ = {"model": modele, "temperature": 0.4, "max_tokens": 1000, "messages": messages}
+        service_tier = None
+        if groq:
+            service_tier = (os.environ.get("GROQ_SERVICE_TIER") or "auto").strip().lower()
+            if service_tier not in {"auto", "on_demand", "flex"}:
+                raise ValueError("GROQ_SERVICE_TIER doit être auto, on_demand ou flex")
+            corps_["service_tier"] = service_tier
+        corps = json.dumps(corps_).encode()
         if cle:
             h["Authorization"] = f"Bearer {cle}"
     # Chaque fournisseur dispose de 10 s maximum ; un timeout déclenche immédiatement le fournisseur suivant.
-    with urllib.request.urlopen(urllib.request.Request(url, data=corps, headers=h), timeout=10) as rep_:
-        j = json.loads(rep_.read().decode())
+    requete = urllib.request.Request(url, data=corps, headers=h)
+    try:
+        with urllib.request.urlopen(requete, timeout=10) as rep_:
+            j = json.loads(rep_.read().decode())
+    except urllib.error.HTTPError as ex:
+        # Certains comptes Groq ne disposent pas du tier Flex. Si « auto » est refusé
+        # explicitement comme paramètre, retenter une seule fois en On-Demand ; les 429
+        # de quota et les 498 de capacité restent des échecs normaux avec repli fournisseur.
+        try:
+            error_body = ex.read().decode("utf-8", "replace")
+        except Exception:
+            error_body = ""
+        try:
+            error_json = json.loads(error_body) if error_body else {}
+        except Exception:
+            error_json = {}
+        error_message = str((error_json.get("error") or {}).get("message") or error_body).lower()
+        tier_unsupported = "service_tier" in error_message and any(
+            word in error_message for word in ("unsupported", "not supported", "invalid", "unknown", "not available")
+        )
+        if not (not gemini and not anthropic and groq and service_tier == "auto"
+                and ex.code in (400, 422) and tier_unsupported):
+            raise RuntimeError(f"HTTP Error {ex.code}: {error_body or ex.reason}") from ex
+        corps_["service_tier"] = "on_demand"
+        requete = urllib.request.Request(url, data=json.dumps(corps_).encode(), headers=h)
+        with urllib.request.urlopen(requete, timeout=10) as rep_:
+            j = json.loads(rep_.read().decode())
     if gemini:
         cand = (j.get("candidates") or [{}])[0]
         txt = "".join(p_.get("text", "") for p_ in (cand.get("content") or {}).get("parts", [])).strip()
