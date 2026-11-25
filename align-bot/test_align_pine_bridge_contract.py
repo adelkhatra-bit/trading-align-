@@ -55,6 +55,11 @@ if not tp1Ok
             "bridgeTimeH2", "bridgeTimeH4", "bridgeTimeD1", "bridgeTimeW1",
         ):
             without_tp_change = without_tp_change.replace(f", {bridge_time}]", "]", 1)
+        without_tp_change = without_tp_change.replace(
+            "[dC, sC, rC, _] = f_etat()",
+            "[dC, sC, rC] = f_etat()",
+            1,
+        )
         without_settings = without_tp_change.replace(SETTINGS_BLOCK, "", 1)
         without_export = without_settings.split(EXPORT_MARKER, 1)[0]
         if without_export.endswith("\\n\\n"):
