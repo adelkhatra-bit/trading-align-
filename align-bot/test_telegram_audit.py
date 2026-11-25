@@ -167,6 +167,28 @@ class TelegramAuditTests(unittest.TestCase):
             with self.subTest(method=method):
                 self.assertFalse(ab._telegram_sortant_autorise(method, {}))
 
+    def test_pull_mode_blocks_multipart_audio_outside_private_request(self):
+        ab.TELEGRAM_PULL_MODE = True
+        ab.TELEGRAM_PULL_CONTEXT.chat_id = None
+        ab.TELEGRAM_PULL_CONTEXT.private = False
+        with patch.object(ab.urllib.request, "urlopen") as http:
+            result = ab.envoyer_son_piece("123456789")
+        self.assertTrue(result["blocked_by_pull_mode"])
+        http.assert_not_called()
+
+    def test_pull_mode_allows_multipart_audio_for_matching_private_request(self):
+        ab.TELEGRAM_PULL_MODE = True
+        ab.TELEGRAM_PULL_CONTEXT.chat_id = "123456789"
+        ab.TELEGRAM_PULL_CONTEXT.private = True
+        rep = type("Response", (), {"read": lambda self: b'{"ok":true,"result":{}}',
+                                    "__enter__": lambda self: self,
+                                    "__exit__": lambda self, *args: None})()
+        with patch.object(ab.urllib.request, "urlopen", return_value=rep) as http, \
+             patch.object(ab, "_telegram_verifie_cooldown"):
+            result = ab.envoyer_son_piece("123456789")
+        self.assertTrue(result["ok"])
+        http.assert_called_once()
+
     def test_pull_mode_blocks_are_logged_once_without_chat_id_and_aggregate_counts(self):
         ab.TELEGRAM_PULL_BLOCK_LOGGED.clear()
         ab.TELEGRAM_PULL_MODE = True
