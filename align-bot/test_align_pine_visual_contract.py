@@ -1,5 +1,6 @@
 from pathlib import Path
 import hashlib
+import re
 import unittest
 
 PINE = Path(__file__).parent / "pine" / "ALIGN_MTF_PRO_v24.pine"
@@ -19,7 +20,7 @@ rsiVente = (ta.crossunder(rC, rsiSig) and rC > 50) or ta.crossunder(rC, 70) or t
 """
 VISUAL_ONLY_MARKER = """// VISUEL UNIQUEMENT — aucune alerte sortante, aucun bridge, aucune donnée consommée par ROBOT V12.
 """
-BASELINE_ALERT_BLOCK = """// ═════════ ALERTES (créer une alerte « N'importe quel appel alert() ») ═════════
+BASELINE_ALERT_BLOCK = r"""// ═════════ ALERTES (créer une alerte « N'importe quel appel alert() ») ═════════
 if sigHaut
     alert(syminfo.ticker + " " + nomSigH + " | " + pqH + " | " + str.replace_all(planH, "\n", " | "), alert.freq_once_per_bar_close)
 if sigBas
@@ -52,8 +53,7 @@ class VisualOnlyPineContractTests(unittest.TestCase):
         self.assertNotIn("rsiVente = (ta.crossunder(", self.source)
 
     def test_visual_companion_has_no_outbound_alerts_or_bridge(self):
-        import re
-        self.assertIsNone(re.search(r"\\balert(?:condition)?\\s*\\(", self.source))
+        self.assertIsNone(re.search(r"\balert(?:condition)?\s*\(", self.source))
         self.assertNotIn("bridgePayload", self.source)
         self.assertNotIn("bridgeEnabled", self.source)
         self.assertNotIn("ALIGN_MTF_PRO_V25", self.source)
@@ -63,7 +63,7 @@ class VisualOnlyPineContractTests(unittest.TestCase):
         normalized = normalized.replace(VISUAL_ONLY_MARKER, BASELINE_ALERT_BLOCK, 1)
         raw = normalized.encode("utf-8")
         git_blob = hashlib.sha1(
-            b"blob " + str(len(raw)).encode("ascii") + b"\\0" + raw
+            b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw
         ).hexdigest()
         self.assertEqual(git_blob, BASELINE_GIT_BLOB_SHA)
 
