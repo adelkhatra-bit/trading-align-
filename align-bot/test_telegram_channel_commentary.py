@@ -71,6 +71,29 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         self.assertNotIn("COACH COMMENTATEUR", sent_text)
         self.assertEqual(state["coach_live"]["BTC"]["101"]["dernier_t"], 1000)
 
+    def test_confirmed_private_position_message_is_fully_translated(self):
+        trade = {
+            "d": 1, "e": 100.0, "sl": 95.0, "tp1": 110.0, "tp2": 120.0,
+            "sl_ut": "5 min",
+        }
+        french = (
+            "🎯 POSITION ALIGN DÉTECTÉE — BTC\\n"
+            + ab.resume_ordre(trade)
+            + "\\n📍 Suivi actif : SL / passage à BE / TP."
+            + "\\nℹ️ ALIGN ne transmet aucun ordre à ton broker."
+        )
+        english = ab.traduire(french)
+        for expected in (
+            "ALIGN POSITION DETECTED", "Entry 100", "chart 5 min", "(wick)",
+            "Active tracking:", "move to BE", "does not send any orders to your broker",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, english)
+        for french_label in ("POSITION ALIGN DÉTECTÉE", "Entrée 100", "vue 5 min",
+                             "mèche", "Suivi actif", "passage à BE", "ne transmet aucun ordre"):
+            with self.subTest(french_label=french_label):
+                self.assertNotIn(french_label, english)
+
     def test_private_coach_flash_commentary_is_fully_translated(self):
         market = {
             "m1": [
