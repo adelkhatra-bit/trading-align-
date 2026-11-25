@@ -50,6 +50,30 @@ class CoachEnDirect(unittest.TestCase):
         self.assertIn("9", etat["coach_live"]["GOLD"])
         self.assertFalse(any("TERMINÉ" in x for x in envoyes))
 
+
+class CoachStopPolicy(unittest.TestCase):
+    def test_news_alert_never_advises_early_break_even_from_tp_progress_alone(self):
+        now = 1_800_000_000
+        sent = []
+        etat = {"cal": {"ev": [{"t": now + 5 * 60, "titre": "CPI"}]}}
+        tr = {
+            "d": 1, "e": 100.0, "sl": 95.0, "tp1": 120.0, "tp2": 130.0,
+            "statut": "entree", "qui": {"123": {"e": 100.0, "sl": 95.0, "tp1": 120.0, "fini": False}},
+        }
+        cle = {"trade": tr}
+        r = {
+            "m1": [{"c": 106.0}], "r5": [50.0], "dirs": [0] * 11,
+            "niveaux": [], "atr": 1.0,
+        }
+        with mock.patch.object(ab.time, "time", return_value=now), mock.patch.object(ab, "gerer_stop"), mock.patch.object(ab, "_envoi_sur", side_effect=lambda cid, **kwargs: sent.append(kwargs["text"]) or {"ok": True}):
+            ab.coach(etat, "BTC", r, cle)
+        news = [message for message in sent if "News dans" in message]
+        self.assertEqual(len(news), 1)
+        self.assertIn("Vérifie ton SL actuel", news[0])
+        self.assertIn("Ne le déplace pas à BE", news[0])
+        self.assertNotIn("Mets ton SL à BE", news[0])
+
+
 class FlashCommentateur(unittest.TestCase):
     def test_mouvement_brusque(self):
         r = {"atr": 100, "m1": [dict(o=1000, c=990), dict(o=990, c=960), dict(o=960, c=930)], "b15": []}

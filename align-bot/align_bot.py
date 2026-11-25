@@ -10617,7 +10617,7 @@ def annonces_et_sessions(etat, maintenant, derniers):
         if 55 * 60 < reste <= 60 * 60 and f"ev60{e['t']}{e['titre']}" not in vus:
             vus.append(f"ev60{e['t']}{e['titre']}")
             out.append(f"📰 NEWS USA DANS 1 H — {heure(e['t'])}\n🗞 {e['titre']}\n🚦 ⏳ JE N'ENTRE PAS ENCORE\n"
-                       f"🛑 Pas de nouvelle position à partir de {heure(e['t'] - 15 * 60)}\n🔒 En position ? Mets-toi à BE si tu es en gain\n"
+                       f"🛑 Pas de nouvelle position à partir de {heure(e['t'] - 15 * 60)}\n🔒 En position ? Vérifie ton SL ; ne le déplace pas sans validation du coach\n"
                        f"📊 Prévu : {e.get('prev') or '?'} • avant : {e.get('avant') or '?'}")
         if 35 * 60 < reste <= 40 * 60 and f"ev40{e['t']}{e['titre']}" not in vus:
             vus.append(f"ev40{e['t']}{e['titre']}")
@@ -10668,7 +10668,7 @@ def annonces_et_sessions(etat, maintenant, derniers):
                            f"🟥 Topstep / prop firms : tout fermé avant {heure(tp_)} (sinon fermeture automatique)\n"
                            f"🌙 Broker (CFD) / CME : fermeture {heure(cme_)}\n"
                            f"🔓 Réouverture : {'dimanche ' if week else ''}{heure(rouv_)} (heure de Paris)\n"
-                           + ("🔒 Tu es en position : mets-toi à BE si tu es en gain\n🛡 Vérifie que ton SL est bien placé\n" if tr_g else "🛡 Ne pas ouvrir de position avant la fermeture\n")
+                           + ("🔒 Tu es en position : vérifie ton SL ; ne le déplace pas sans validation du coach\n🛡 Vérifie que ton SL est bien placé\n" if tr_g else "🛡 Ne pas ouvrir de position avant la fermeture\n")
                            + ("💥 Week-end : le prix peut s'ouvrir loin (écart), sécurise tes gains" if week else "💥 À la réouverture le prix peut sauter (écart)"))
     # Ouvertures / fermetures de marché : voir alertes_courtes() (préavis 15 et 5 min, FR/EN, regroupées)
     del vus[:-200]
@@ -11302,7 +11302,7 @@ def coach(etat, m, r, cle):
         if 0 <= reste <= 30 * 60 and f"news{ev['t']}" not in vu:
             vu.append(f"news{ev['t']}")
             msgs.append(f"📰 {m}\nNews dans   {round(reste / 60)} min\n"
-                        + ("🔒 Mets ton SL à BE (prix d'entrée)" if prog > 0.2 else "✂️ Le trade n'avance pas\n✂️ Je coupe avant la news"))
+                        + ("🔎 Vérifie ton SL actuel\n🙅 Ne le déplace pas à BE sans validation des critères de protection du coach." if prog > 0.2 else "✂️ Le trade n'avance pas\n✂️ Je coupe avant la news"))
     for c in dedans:
         # Le stop perso d'abord : s'il vient de sortir l'abonné, il ne reçoit plus aucun suivi (BE, direction TP…)
         # (vu le 14/11 : Adel sorti à son stop, puis « mets-toi à BE » / « direction TP1 » quand même)
