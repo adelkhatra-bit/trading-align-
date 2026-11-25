@@ -3557,7 +3557,7 @@ def _telegram_sortant_autorise(methode, params):
         "deleteMessage", "pinChatMessage", "unpinChatMessage",
         "setChatDescription", "setMyCommands", "setChatMenuButton",
         "setMyShortDescription", "setMyDescription", "setChatPhoto",
-        "approveChatJoinRequest", "createChatInviteLink",
+        "approveChatJoinRequest", "declineChatJoinRequest", "createChatInviteLink",
         "createChatSubscriptionInviteLink", "exportChatInviteLink",
     }
     if method not in methodes_telegram_connues:
@@ -3581,6 +3581,16 @@ def _telegram_sortant_autorise(methode, params):
         rules_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "rules_setup_chat_id", "") or "")
         if rules_chat and str(params.get("chat_id") or "") == rules_chat:
             return True
+    invite_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "invite_setup_chat_id", "") or "")
+    if (method in {"createChatInviteLink", "createChatSubscriptionInviteLink", "exportChatInviteLink"}
+            and invite_chat and str(params.get("chat_id") or "") == invite_chat):
+        return True
+    join_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "join_request_chat_id", "") or "")
+    join_user = str(getattr(TELEGRAM_PULL_CONTEXT, "join_request_user_id", "") or "")
+    if (method in {"approveChatJoinRequest", "declineChatJoinRequest"}
+            and join_chat and str(params.get("chat_id") or "") == join_chat
+            and join_user and str(params.get("user_id") or "") == join_user):
+        return True
     cid = str(params.get("chat_id") or "")
     contexte = str(getattr(TELEGRAM_PULL_CONTEXT, "chat_id", "") or "")
     prive = bool(getattr(TELEGRAM_PULL_CONTEXT, "private", False))
@@ -3852,6 +3862,33 @@ def _telegram_regles_canal(methode, cid, **params):
         return telegram(methode, chat_id=cid, **params)
     finally:
         TELEGRAM_PULL_CONTEXT.rules_setup_chat_id = ancien
+
+
+def _telegram_lien_canal(methode, cid, **params):
+    """Autorisation temporaire pour gérer un lien sur le canal ALIGN exact."""
+    if methode not in {"createChatInviteLink", "createChatSubscriptionInviteLink", "exportChatInviteLink"}:
+        return {"ok": False, "blocked_by_pull_mode": True}
+    ancien = getattr(TELEGRAM_PULL_CONTEXT, "invite_setup_chat_id", None)
+    TELEGRAM_PULL_CONTEXT.invite_setup_chat_id = str(cid)
+    try:
+        return telegram(methode, chat_id=cid, **params)
+    finally:
+        TELEGRAM_PULL_CONTEXT.invite_setup_chat_id = ancien
+
+
+def _telegram_decision_demande(methode, cid, uid):
+    """Autorisation temporaire d'accepter/refuser une demande précise sur le canal configuré."""
+    if methode not in {"approveChatJoinRequest", "declineChatJoinRequest"}:
+        return {"ok": False, "blocked_by_pull_mode": True}
+    ancien_chat = getattr(TELEGRAM_PULL_CONTEXT, "join_request_chat_id", None)
+    ancien_user = getattr(TELEGRAM_PULL_CONTEXT, "join_request_user_id", None)
+    TELEGRAM_PULL_CONTEXT.join_request_chat_id = str(cid)
+    TELEGRAM_PULL_CONTEXT.join_request_user_id = str(uid)
+    try:
+        return telegram(methode, chat_id=cid, user_id=uid)
+    finally:
+        TELEGRAM_PULL_CONTEXT.join_request_chat_id = ancien_chat
+        TELEGRAM_PULL_CONTEXT.join_request_user_id = ancien_user
 
 
 def epingler(etat, cid):
@@ -7916,7 +7953,9 @@ def decider_entree(etat, cb, ok, cle_d):
     if not d:
         _envoi_sur(str(cb["message"]["chat"]["id"]), text="ℹ️ Demande déjà traitée"); return
     try:
-        telegram("approveChatJoinRequest" if ok else "declineChatJoinRequest", chat_id=d["chat"], user_id=d["user"])
+        if str(d.get("chat")) != str(etat.get("canal_preuves") or "") or str(cb.get("from", {}).get("id")) not in {str(x) for x in proprio(etat)}:
+            raise PermissionError("demande d'entrée hors du canal de validation ou décision non propriétaire")
+        _telegram_decision_demande("approveChatJoinRequest" if ok else "declineChatJoinRequest", d["chat"], d["user"])
         _envoi_sur(str(cb["message"]["chat"]["id"]), text=("✅ Accepté : il est entré" if ok else "❌ Refusé : il n'entre pas"))
     except Exception as ex:
         _envoi_sur(str(cb["message"]["chat"]["id"]), text=f"⚠️ Impossible : {str(ex)[:120]}")
@@ -7925,7 +7964,7 @@ def lien_validation(etat):
     """Lien d'entrée du groupe ALIGN Résultats AVEC validation (chaque entrée passe par toi)."""
     if etat.get("canal_preuves") and not etat.get("lien_preuves_valid"):
         try:
-            res = telegram("createChatInviteLink", chat_id=etat["canal_preuves"], name="ALIGN Résultats (validation)", creates_join_request="true")
+            res = _telegram_lien_canal("createChatInviteLink", etat["canal_preuves"], name="ALIGN Résultats (validation)", creates_join_request="true")
             etat["lien_preuves_valid"] = res["result"]["invite_link"]
         except Exception as ex:
             print("lien validation", ex)
@@ -10356,8 +10395,8 @@ def connecter_canal(etat, mcm):
         texte = f"✅ Bot connecté à la chaîne « {etat['canal_nom']} ». Les signaux y seront publiés automatiquement."
         try:
             if chat.get("type") == "channel" and (not etat.get("lien") or etat.get("prix_lien", 500) != PRIX_STARS):
-                res = telegram("createChatSubscriptionInviteLink", chat_id=cid, name="Abonnement VIP",
-                               subscription_period=2592000, subscription_price=PRIX_STARS)["result"]
+                res = _telegram_lien_canal("createChatSubscriptionInviteLink", cid, name="Abonnement VIP",
+                                           subscription_period=2592000, subscription_price=PRIX_STARS)["result"]
                 etat["lien"] = res["invite_link"]; etat["prix_lien"] = PRIX_STARS
             if etat.get("lien"):
                 texte += f"\n💳 Lien d'abonnement ({PRIX_STARS} ⭐ / mois) : {etat['lien']}\nC'est ce lien que tu partages pour vendre l'accès."
@@ -14695,8 +14734,8 @@ def un_tour(etat, chats):
                 and time.time() - etat.get("essai_lien", 0) > 3600:
             etat["essai_lien"] = time.time()
             try:
-                etat["lien"] = telegram("createChatSubscriptionInviteLink", chat_id=etat["canal"], name="Abonnement VIP",
-                                        subscription_period=2592000, subscription_price=PRIX_STARS)["result"]["invite_link"]
+                etat["lien"] = _telegram_lien_canal("createChatSubscriptionInviteLink", etat["canal"], name="Abonnement VIP",
+                                                    subscription_period=2592000, subscription_price=PRIX_STARS)["result"]["invite_link"]
                 etat["prix_lien"] = PRIX_STARS
                 for p in proprio(etat):
                     telegram("sendMessage", chat_id=p, text=f"💳 Lien d'abonnement VIP créé ({PRIX_STARS} ⭐ / mois ≈ 49,90 €) :\n{etat['lien']}\n\n👉 C'est ce lien que tu partages pour vendre l'accès.")
@@ -14706,7 +14745,7 @@ def un_tour(etat, chats):
         # Seul le lien d'abonnement payant (Stars) permet d'entrer : partager un lien ne donne jamais l'accès gratuit.
         if etat.get("canal") and not etat.get("lien_primaire_revoque_v1"):
             try:
-                telegram("exportChatInviteLink", chat_id=etat["canal"])
+                _telegram_lien_canal("exportChatInviteLink", etat["canal"])
                 etat["lien_primaire_revoque_v1"] = time.time()
             except Exception as ex:
                 print("révocation lien VIP", ex)
