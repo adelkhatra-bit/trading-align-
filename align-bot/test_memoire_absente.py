@@ -77,8 +77,7 @@ class MemoireAbsente(unittest.TestCase):
         for table in ("auto", "auto_marches", "coach_live", "canaux_marche",
                       "canal_live", "liens_marche", "veille_cloture", "pause_auto"):
             self.assertNotIn("NASDAQ", state.get(table, {}), table)
-        self.assertEqual(state["archives_marches_retirees"]["NASDAQ"][0]["state"]["trade"], legacy_trade)
-        self.assertTrue(state["archives_marches_retirees"]["NASDAQ"][0]["open_trade"])
+        self.assertNotIn("archives_marches_retirees", state)
 
     def test_api_muette_compte_comme_deja_en_service(self):
         with mock.patch.object(ab, "_api_github", side_effect=OSError("réseau")):
