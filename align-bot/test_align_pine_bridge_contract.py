@@ -199,6 +199,7 @@ if not tp1Ok
                 return tp2 < tp1 < low <= entry <= high < stop
             return False
 
+        # Regression fixture captured from the live XAUUSD SHORT payload rejected by the bridge.
         self.assertFalse(geometry_ok(-1, 3515.12, 3503.42, 3575.13, 3610.0, 3506.34, 3515.12))
         self.assertTrue(geometry_ok(-1, 3515.12, 3527.0, 3490.0, 3470.0, 3506.34, 3515.12))
         self.assertTrue(geometry_ok(1, 3515.12, 3495.0, 3540.0, 3570.0, 3510.0, 3520.0))
