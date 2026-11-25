@@ -3546,32 +3546,21 @@ def _telegram_sortant_autorise(methode, params):
     """Aucun push spontané : réponse privée à une action explicite, ou entrée attendue après demande."""
     if not TELEGRAM_PULL_MODE:
         return True
-    # Politique explicite pour les méthodes Telegram qui ne sont pas des envois.
-    # Les lectures et accusés de protocole restent disponibles ; les mutations déjà
-    # utilisées par ALIGN sont listées explicitement. Toute nouvelle méthode doit être
-    # examinée et ajoutée volontairement : aucun appel inconnu ne passe par défaut.
+    # Politique fermée : seules les méthodes Telegram réellement utilisées par ALIGN
+    # sont reconnues. Une nouvelle méthode (y compris get*/send*) exige une revue explicite.
     method = str(methode or "")
-    if method in {"answerCallbackQuery", "answerPreCheckoutQuery"}:
-        return True
-    if method.startswith("get"):
-        return True
-    methodes_non_message_autorisees = {
-        "deleteMessage",
-        "pinChatMessage",
-        "unpinChatMessage",
-        "setChatDescription",
-        "setMyCommands",
-        "setChatMenuButton",
-        "setMyShortDescription",
-        "setMyDescription",
-        "approveChatJoinRequest",
-        "createChatInviteLink",
-        "createChatSubscriptionInviteLink",
-        "exportChatInviteLink",
+    methodes_telegram_connues = {
+        "answerCallbackQuery", "answerPreCheckoutQuery",
+        "getChat", "getChatMember", "getUpdates", "getMe",
+        "sendMessage", "sendPhoto", "sendPoll", "sendInvoice",
+        "copyMessage", "editMessageText", "editMessageReplyMarkup",
+        "deleteMessage", "pinChatMessage", "unpinChatMessage",
+        "setChatDescription", "setMyCommands", "setChatMenuButton",
+        "setMyShortDescription", "setMyDescription",
+        "approveChatJoinRequest", "createChatInviteLink",
+        "createChatSubscriptionInviteLink", "exportChatInviteLink",
     }
-    if method in methodes_non_message_autorisees:
-        return True
-    if not method.startswith(("send", "copy", "forward", "edit")):
+    if method not in methodes_telegram_connues:
         action = str(getattr(TELEGRAM_PULL_CONTEXT, "callback_action", "") or "").split(":", 1)[0][:40] or "outside_callback"
         log_key = (method[:40], action)
         should_log = False
@@ -3582,6 +3571,9 @@ def _telegram_sortant_autorise(methode, params):
         if should_log:
             print(f"TELEGRAM_PULL_BLOCK method={method[:40]} action={action} (first occurrence)", flush=True)
         return False
+    if method in {"answerCallbackQuery", "answerPreCheckoutQuery",
+                  "getChat", "getChatMember", "getUpdates", "getMe"}:
+        return True
     cid = str(params.get("chat_id") or "")
     contexte = str(getattr(TELEGRAM_PULL_CONTEXT, "chat_id", "") or "")
     prive = bool(getattr(TELEGRAM_PULL_CONTEXT, "private", False))
