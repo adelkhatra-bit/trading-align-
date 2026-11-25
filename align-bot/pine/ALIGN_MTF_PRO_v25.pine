@@ -306,7 +306,7 @@ if retDir != 0 and bar_index - retBar > 40
     retDir := 0
 retConf = retDir != 0 and dirPlan == retDir
 retTxt = retDir == 0 ? "" : retConf ? "✅ RETOURNEMENT CONFIRMÉ : " + (retDir == 1 ? "LONG" : "SHORT") + (strat != "" ? " • " + strat : "") : "⛔ SL cassé à la clôture : " + (retDir == 1 ? "SHORT" : "LONG") + " annulé ↩ RETOURNEMENT en cours (attendre la confirmation 15 min / 1h)"
-if barstate.isconfirmed and (na(ent) or nouvelle15 or dirPlan != dirFig or strat != stratFig or slFranchi)
+if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig
     ent := entC
     tp1 := tp1C
     tp2 := tp2C
@@ -618,7 +618,7 @@ f_align_v25_json_int(int v) =>
 
 bridgeTfSeconds = timeframe.in_seconds()
 bridgeTf = bridgeTfSeconds == 60 ? "M1" : bridgeTfSeconds == 180 ? "M3" : bridgeTfSeconds == 300 ? "M5" : bridgeTfSeconds == 600 ? "M10" : bridgeTfSeconds == 900 ? "M15" : bridgeTfSeconds == 1800 ? "M30" : bridgeTfSeconds == 2700 ? "M45" : bridgeTfSeconds == 3600 ? "H1" : bridgeTfSeconds == 7200 ? "H2" : bridgeTfSeconds == 14400 ? "H4" : bridgeTfSeconds == 86400 ? "D1" : bridgeTfSeconds == 604800 ? "W1" : "UNSUPPORTED"
-bridgePlanValid = dirPlan != 0 and not na(ent) and not na(sl) and not na(tp1) and not na(tp2)
+bridgePlanValid = dirPlan != 0 and dirPlan == dirFig and strat == stratFig and not na(ent) and not na(sl) and not na(tp1) and not na(tp2)
 bridgeSignal = bridgePlanValid ? (dirPlan == 1 ? "LONG" : "SHORT") : "WAIT"
 bridgeClosedMtfOk = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan)
 bridgeConfirmed = bridgePlanValid and etatS == "CONFIRMÉ" and scoreV >= 75 and bridgeClosedMtfOk
