@@ -173,12 +173,12 @@ if not tp1Ok
 
     def test_bridge_exports_fixed_m15_plan_zone_and_strategy_trigger(self):
         export_block = self.source.split(EXPORT_MARKER, 1)[1]
-        self.assertIn("\"M15\":{\"direction\":' + f_align_v25_json_int(d15Strat)", export_block)
+        self.assertIn('"planTimeframe":"M15"', export_block)
         self.assertIn('"entryTimeframe":"', export_block)
         self.assertIn('"entryZoneLow":', export_block)
         self.assertIn('"entryZoneHigh":', export_block)
         self.assertIn('"entryDecision":', export_block)
-        self.assertIn("\"M5\":{\"direction\":' + f_align_v25_json_int(d5Strat)", export_block)
+        self.assertIn('strat == "SWING" ? "H1" : strat == "DAY" ? "M5" : strat == "SCALPING" ? "M1"', export_block)
         self.assertIn('f_align_v25_json_num(bridgePlanValid ? zBas : na)', export_block)
         self.assertIn('f_align_v25_json_num(bridgePlanValid ? zHaut : na)', export_block)
         self.assertIn('f_align_v25_json_num(bridgePlanValid ? (zBas + zHaut) / 2 : na)', export_block)
