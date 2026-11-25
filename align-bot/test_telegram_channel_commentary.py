@@ -296,7 +296,7 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         with patch.object(ab, "TOKEN", "test-token"), \
              patch.object(ab, "TELEGRAM_PULL_MODE", True), \
              patch.object(ab, "DERNIER_ETAT", state), \
-             patch.object(ab, "coach_actif", return_value=True), \
+             patch.object(ab, "coach_actif", side_effect=lambda etat, cid, m: str(cid) == "101" and m == "BTC"), \
              patch.object(ab, "autorise", return_value=False), \
              patch.object(ab, "http_json", return_value={"ok": True, "result": {"message_id": 54}}) as request:
             sent = ab._telegram_envoyer_radar(state, "101", "sendMessage", text="📡 RADAR BTC — proche, alignement pas encore atteint")
