@@ -22,7 +22,7 @@ Si l'**identité du projet** est ambiguë (autre dépôt, autre branche de produ
 | Marchés actifs | BTC, GOLD (`BTCUSD`, `XAUUSD`) uniquement | NASDAQ retiré de l'analyse, des entrées, de la surveillance et du suivi des positions ; toute ancienne mémoire NASDAQ est archivée pour audit et jamais rejouée |
 | Bot Telegram | `@align_mtf_adel_bot` | — |
 | Bande live | `docs/live/align-bande-live.user.js` (Tampermonkey) | Copies locales anciennes (12.2.3, 12.2.4…) |
-| Bridge TradingView canonique | Worker mailbox Cloudflare → `align_tv_mailbox_feeder.py` → `align-bot/align_tv_bridge.py` dans le runner GitHub (`127.0.0.1:4100`) | Ancien cache Node `server.js` / port 4000, extension `tradingview-analyzer`, tunnel historique |
+| Bridge TradingView canonique | Worker mailbox Cloudflare → `align_tv_mailbox_feeder.py` → `align-bot/align_tv_bridge.py` dans le runner GitHub (`127.0.0.1:4100`) | Ancien serveur Node/extension/MT5 : retrait proposé par la PR #960 ; pas encore retirés de `main` tant que la PR n'est pas fusionnée |
 
 ### Périmètre strict de `live-data`
 
@@ -48,14 +48,9 @@ Le bridge Python est éphémère dans le runner du workflow : **4100 n'est pas u
 
 Le BOT peut aussi être configuré pour lire un bridge HTTPS externe via les secrets `ALIGN_TV_API_URL` et `ALIGN_TV_READ_TOKEN`. Cette voie remplace la voie mailbox dans le workflow ; elle ne doit être activée que si l'URL et le stockage visés ont été explicitement vérifiés. Ne jamais déduire l'identité du serveur à partir du seul chemin HTTP.
 
-### Deux routes identiques à ne pas confondre
+### Ancien chemin local — retrait proposé, non encore appliqué à main
 
-Le serveur historique `server.js` écoute par défaut sur **4000** et expose lui aussi `/bridge/robot-v12/mtf`. Ce nom de route identique masque deux stockages différents :
-
-- chemin canonique du BOT : mailbox Cloudflare → relais → BridgeStore Python du runner (12 UT : M1, M3, M5, M10, M15, M30, M45, H1, H2, H4, D1, W1) ;
-- chemin historique : extension `tradingview-analyzer` → `POST /tradingview/live` sur `server.js:4000` → cache Node `tradingview-mtf-cache.json` (9 UT : M1, M5, M15, M30, H1, H2, H4, D1, W1).
-
-Le serveur 4000 n'est pas le bridge utilisé dans les runs BOT #1074/#1075 : leurs journaux montrent le relais mailbox et le bridge runner 4100. Ce serveur et l'extension sont laissés en place, mais ne doivent pas servir à valider le BOT canonique ni à alimenter son healthcheck. Ne pas arrêter, modifier ou rediriger le port 4000 dans le cadre de ce flux.
+L'ancien serveur Node sur le port 4000, son cache MTF, l'extension `tradingview-analyzer`, les outils MT5 et l'interface locale ont été identifiés comme une plateforme indépendante de la chaîne ALIGN de production. La PR #960 propose leur retrait de la branche active `main` pour éviter les faux branchements et les mises à jour concurrentes. Leur état exact avant nettoyage est conservé dans `archive/pre-align-scope-cleanup-20261125`. Tant que la PR n'est pas fusionnée, ces composants restent présents sur `main` ; la branche de PR est la seule version nettoyée. Ils ne doivent pas être redémarrés, déployés ni utilisés comme source de données ou de validation ALIGN.
 
 Le bridge exige les 12 UT du contrat Python. L'UT active du graphique peut être l'une des 9 UT acceptées par le BOT (M1, M5, M15, M30, H1, H2, H4, D1, W1) ; cela ne dispense jamais le payload de contenir M3, M10 et M45.
 
@@ -67,7 +62,7 @@ Règle : quand `ALIGN_REQUIRE_TV_BRIDGE=1`, **aucun repli** sur des niveaux calc
 - **Réception** : un seul thread `boucle_polling_telegram_tracee` appelle `getUpdates`, acquitte rapidement les callbacks et pousse les updates dans `TELEGRAM_UPDATES`; `recevoir_updates_telegram` dépile cette file sur le thread principal, puis `traiter` route les commandes et actions. La boucle principale ne lance pas un second `getUpdates`.
 - **Sortie** : les appels applicatifs passent par `telegram()` puis `_telegram_sortant_autorise`; un blocage `TELEGRAM_PULL_BLOCK` n'est pas une livraison et ne doit jamais être compté comme telle.
 - **Commandes de diagnostic** : `/statut` et `/audit` restent sur le chemin rapide; `/diag` est traité par `traiter`, uniquement en chat privé, avec expéditeur = chat = propriétaire. Il interroge en lecture la même route MTF que le bot pour BTC et GOLD, affiche l'UT active et le nombre d'UT fraîches, puis lit `RUNNER_TEMP/align_diag.json` pour les compteurs STALE. Aucune écriture, aucun payload ni secret n'est exposé.
-- **Composants à ne pas confondre avec un second bot** : `server.js` expose des routes serveur/bridge mais ne contient pas d'appel direct à l'API Bot Telegram; `agent-bus.js` est un bus interne d'agents; l'extension `tradingview-analyzer` transmet des données au serveur mais n'appelle pas directement l'API Bot Telegram.
+- **Périmètre applicatif** : le seul bot applicatif est `align-bot/align_bot.py`. L'ancien serveur Node, son bus d'agents et l'extension locale sont visés par la PR #960 et ne sont pas des composants du bot Telegram. Leur retrait de `main` n'est pas effectif tant que cette PR n'est pas fusionnée.
 - Les contrôles `getMe` / `getWebhookInfo` des workflows sont des précontrôles d'identité et de réception; ils ne remplacent pas le chemin applicatif du bot ni un test de livraison.
 
 ## 3. Règles d'unité de temps (confusion connue)

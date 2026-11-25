@@ -23,13 +23,9 @@ flowchart TD
   W -.->|preuves/logs| RX
 ```
 
-## 1 bis. Ancien chemin local à ne pas confondre
+## 1 bis. Périmètre historique isolé
 
-`server.js` écoute par défaut sur le port **4000**. L'extension `tradingview-analyzer` scrape le graphique puis envoie ses données à `POST /tradingview/live`; le serveur alimente un cache Node séparé (`tradingview-mtf-cache.json`) et expose lui aussi `/bridge/robot-v12/mtf`.
-
-Ce chemin ancien n'est pas la mailbox Worker et ne lit pas le BridgeStore Python du runner. Il ne fait pas partie du chemin BOT montré au-dessus. Il contient un contrat de neuf UT (M1, M5, M15, M30, H1, H2, H4, D1, W1), tandis que le bridge canonique du BOT exige douze UT (M1, M3, M5, M10, M15, M30, M45, H1, H2, H4, D1, W1).
-
-Même nom de route HTTP ≠ même serveur, même cache ou même preuve de santé. Ne jamais utiliser une réponse du port 4000 pour valider la liaison Worker → relais → bridge runner. Ce repérage documentaire n'autorise ni arrêt ni modification du serveur 4000 ou de l'extension.
+L'ancien serveur Node sur le port 4000, l'extension `tradingview-analyzer`, les passerelles MT5 et l'interface locale ont été identifiés comme un ancien ensemble indépendant. La PR #960 propose leur retrait de la branche active `main`. Ils restent présents sur `main` tant que cette PR n'est pas fusionnée ; la branche de PR porte le nettoyage et l'archive `archive/pre-align-scope-cleanup-20261125` conserve l'état complet antérieur. Ils ne participent pas à la chaîne de production ALIGN et ne doivent pas être relancés ni utilisés pour valider le BOT.
 
 ## 2. Responsabilité par composant
 
@@ -66,8 +62,8 @@ Même nom de route HTTP ≠ même serveur, même cache ou même preuve de santé
 | `.github/workflows/` | CI, worker, supervision | Garder; chaque workflow doit avoir un rôle non chevauchant |
 | `cloud/` | Mailbox/edge | Garder; vérifier contrats depuis tests |
 | `docs/live/` | Assets live/public | Garder; préserver animations/design |
-| `tradingview-analyzer/`, `src/`, `lib/`, `studio/`, `public/` | Extension/UI et outils | Pas de fusion/suppression avant cartographie des imports, scripts et builds |
-| `agent-export/`, `analysis/`, `trading/`, `store/`, `utils/`, `tests/`, `bridge/` | Outils, données, archives ou sous-systèmes potentiellement historiques | Identifier références et usages; déplacer seulement avec tests de liens/consommateurs |
+| Ancien serveur Node, `tradingview-analyzer/`, MT5, `src/`, `lib/`, `studio/`, `public/` | Ancienne plateforme locale indépendante | Retrait proposé par PR #960 ; snapshot complet dans `archive/pre-align-scope-cleanup-20261125` |
+| `agent-export/`, `analysis/`, `trading/`, `store/`, `utils/`, `tests/`, `bridge/` | Ancien runtime/outillage local | Retrait proposé par PR #960 après vérification des dépendances; snapshot conservé dans l'archive |
 | Documentation historique à la racine | Redondance/ambiguïté | Ne pas supprimer en masse; indexer puis archiver après preuve de non-référence |
 
 **Constat de nettoyage :** la racine contient beaucoup de rapports, plans et documents de session en doublon. Ils encombrent l'orientation mais ne prouvent pas que les dossiers de code sont inutiles. Le nettoyage doit commencer par la documentation, l'indexation et l'analyse des dépendances, pas par une suppression aveugle.
