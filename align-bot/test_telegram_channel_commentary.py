@@ -245,13 +245,15 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
             )
             self.assertTrue(result.get("ok"))
             self.assertEqual(request.call_count, 1)
-            self.assertFalse(ab._telegram_sortant_autorise(
-                "sendMessage", {"chat_id": "202", "text": "⚠️ BTC\n🛑 Stop 95"}
-            ))
-            state["BTC"]["trade"] = {"qui": {"101": position}}
-            self.assertFalse(ab._telegram_sortant_autorise(
-                "sendMessage", {"chat_id": "101", "text": "⚠️ BTC\n🛑 Stop 95"}
-            ))
+            wrong_chat = ab._telegram_envoyer_commentaire_coach_prive(
+                state, "202", "BTC", "⚠️ BTC\n🛑 Stop 95", trade=trade, position=position
+            )
+            other_trade = {"qui": {"101": position}}
+            wrong_trade = ab._telegram_envoyer_commentaire_coach_prive(
+                state, "101", "BTC", "⚠️ BTC\n🛑 Stop 95", trade=other_trade, position=position
+            )
+            self.assertTrue(wrong_chat.get("blocked_by_pull_mode"))
+            self.assertTrue(wrong_trade.get("blocked_by_pull_mode"))
         self.assertEqual(getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_commentary_chat_id", None), old["chat"])
         self.assertEqual(getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_commentary_market", None), old["market"])
         self.assertEqual(getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_position_trade", None), old["trade"])
