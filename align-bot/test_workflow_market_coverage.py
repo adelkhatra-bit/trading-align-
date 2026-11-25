@@ -93,7 +93,7 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.assertNotIn("ROLLING_OVER", script)
 
     def test_worker_rollover_serializes_memory_saves(self):
-        script = self.rollover[self.rollover.index("          active_states ="):]
+        script = self.rollover[self.rollover.index("          # Le worker actif détecte lui-même"):]
         self.assertIn("older_active_runs()", script)
         self.assertIn("pending = sorted(", script)
         self.assertIn("ALIGN_OLD_WORKERS_STOPPED_GRACEFULLY", script)
