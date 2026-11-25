@@ -201,7 +201,7 @@ if not tp1Ok
             self.source,
         )
         self.assertIn(
-            "bridgePlanValid = dirPlan != 0 and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and not na(ent)",
+            'bridgePlanValid = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and not na(ent)',
             self.source,
         )
         self.assertIn("dirFig := dirPlan", self.source)
