@@ -3,6 +3,7 @@
 > Read `docs/ALIGN_SOURCE_DE_VERITE.md` first: canonical repository, branches, indicator, data chain and secret status.
 
 ## Scope and identity
+- **Single project identity:** ALIGN TRADING is the canonical product name. `Trading Auto` / `trading-auto` is a historical/internal alias for the same project, not another project or code version. All maintenance, updates, issues and PRs must resolve to this single repository and its canonical branches. Do not create a parallel Trading Auto repository or branch family.
 - This repository is the canonical project: `adelkhatra-bit/trading-align-`.
 - Production code branch: `main`. Public live-data publication branch: `live-data`.
 - Markets: BTC and GOLD only. NASDAQ is fully removed from active analysis, new entries, monitoring and position follow-up. Legacy NASDAQ state is archived for audit only and must never be reactivated or replayed. Telegram bot: `@align_mtf_adel_bot`.
@@ -13,7 +14,7 @@
 ## Historical provenance reference - Claude Chrome and ALIGN
 - Claude Chrome is preserved as a historical provenance/source-history reference only. It is not a repository-managed agent and grants no coding agent access or write authorization. Keep historical session provenance distinct; do not substitute another source or infer unverified history.
 - The only target repository is `adelkhatra-bit/trading-align-`. `main` is the production code branch and `live-data` is only the generated public-data branch.
-- The former `trading-auto` environment, its pages, servers, workers, Puppeteer sessions, ports, and similarly named local folders are out of scope. Do not inspect their operational data, connect to their ports, reuse their files, change their processes, or delete them during ALIGN work.
+- `Trading Auto` is a historical/internal alias for this exact same ALIGN TRADING project, not a separate repository, product, runtime, server, or codebase. Treat mentions of `Trading Auto`, `trading-auto`, `ALIGN`, and `ALIGN TRADING` as references to this one project when provenance points to this canonical repository. Never split work by these names or create a second source of truth. The canonical product name is `ALIGN TRADING`; the canonical repository is `adelkhatra-bit/trading-align-`; the canonical code branch is `main`.
 - Prove project identity from the canonical GitHub repository, exact branch and SHA, and file provenance. An open port, process name, folder name, browser tab, or old branch label is not proof.
 - Claude Chrome conversation history is a discovery index, not proof that a change reached GitHub. Verify source material and decisions in the actual source conversation, then independently confirm each claimed change in the canonical repository and commit history.
 - Never assume a `claude/*` branch is current or authoritative because of its name. Verify ancestry, base, SHA, changed files, dependencies, and tests before considering any source.
