@@ -224,5 +224,96 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         self.assertNotIn("Commentaire aux clôtures", translated_activation)
 
 
+    def test_position_followup_allows_levels_only_for_exact_active_position_owner(self):
+        position = {"fini": False, "e": 100.0, "sl": 95.0}
+        trade = {"qui": {"101": position}}
+        state = {"auto": {"BTC": ["101"]}, "BTC": {"trade": trade}}
+        old = {
+            "chat": getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_commentary_chat_id", None),
+            "market": getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_commentary_market", None),
+            "trade": getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_position_trade", None),
+            "position": getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_position_record", None),
+            "closure": getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_position_closure", False),
+        }
+        with patch.object(ab, "TOKEN", "test-token"), \
+             patch.object(ab, "TELEGRAM_PULL_MODE", True), \
+             patch.object(ab, "DERNIER_ETAT", state), \
+             patch.object(ab, "coach_actif", return_value=True), \
+             patch.object(ab, "http_json", return_value={"ok": True, "result": {"message_id": 51}}) as request:
+            result = ab._telegram_envoyer_commentaire_coach_prive(
+                state, "101", "BTC", "⚠️ BTC\n🛑 Stop 95", trade=trade, position=position
+            )
+            self.assertTrue(result.get("ok"))
+            self.assertEqual(request.call_count, 1)
+            self.assertFalse(ab._telegram_sortant_autorise(
+                "sendMessage", {"chat_id": "202", "text": "⚠️ BTC\n🛑 Stop 95"}
+            ))
+            state["BTC"]["trade"] = {"qui": {"101": position}}
+            self.assertFalse(ab._telegram_sortant_autorise(
+                "sendMessage", {"chat_id": "101", "text": "⚠️ BTC\n🛑 Stop 95"}
+            ))
+        self.assertEqual(getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_commentary_chat_id", None), old["chat"])
+        self.assertEqual(getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_commentary_market", None), old["market"])
+        self.assertEqual(getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_position_trade", None), old["trade"])
+        self.assertEqual(getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_position_record", None), old["position"])
+        self.assertEqual(getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_position_closure", False), old["closure"])
+
+    def test_position_closure_is_allowed_once_for_the_exact_finished_trade_owner(self):
+        position = {"fini": True, "e": 100.0, "sl": 95.0}
+        trade = {"qui": {"101": position}}
+        state = {"BTC": {"trade": trade}, "auto": {"BTC": []}, "bot_off": ["101"]}
+        message = "🏁 CLÔTURE CONFIRMÉE — TP — BTC\nEntrée 100\nSortie confirmée 110"
+        with patch.object(ab, "TOKEN", "test-token"), \
+             patch.object(ab, "TELEGRAM_PULL_MODE", True), \
+             patch.object(ab, "DERNIER_ETAT", state), \
+             patch.object(ab, "http_json", return_value={"ok": True, "result": {"message_id": 52}}) as request:
+            result = ab._telegram_envoyer_commentaire_coach_prive(
+                state, "101", "BTC", message, trade=trade, position=position, fermeture=True
+            )
+            self.assertTrue(result.get("ok"))
+            self.assertEqual(request.call_count, 1)
+            self.assertFalse(ab._telegram_sortant_autorise(
+                "sendMessage", {"chat_id": "101", "text": "Entrée 100 / SL 95 / TP 110"}
+            ))
+
+    def test_candle_close_push_requires_exact_veille_cloture_opt_in(self):
+        state = {"veille_cloture": {"BTC": {"101": {"tf": "15m"}}}}
+        with patch.object(ab, "TOKEN", "test-token"), \
+             patch.object(ab, "TELEGRAM_PULL_MODE", True), \
+             patch.object(ab, "DERNIER_ETAT", state), \
+             patch.object(ab, "coach_actif", return_value=True), \
+             patch.object(ab, "marche_autorise", return_value=True), \
+             patch.object(ab, "autorise", return_value=False), \
+             patch.object(ab, "http_json", return_value={"ok": True, "result": {"message_id": 53}}) as request:
+            ok = ab._telegram_envoyer_veille_cloture(state, "101", "BTC", "🕯 Clôture 15 min : biais inchangé")
+            denied = ab._telegram_envoyer_veille_cloture(state, "101", "BTC", "Entry 100 / SL 95 / TP 110")
+        self.assertTrue(ok.get("ok"))
+        self.assertTrue(denied.get("blocked_by_pull_mode"))
+        self.assertEqual(request.call_count, 1)
+
+    def test_radar_send_edit_delete_are_scoped_to_opted_in_user_and_exact_message(self):
+        state = {"radar_mem": {"101": {"mid": 42}}}
+        with patch.object(ab, "TOKEN", "test-token"), \
+             patch.object(ab, "TELEGRAM_PULL_MODE", True), \
+             patch.object(ab, "DERNIER_ETAT", state), \
+             patch.object(ab, "coach_actif", return_value=True), \
+             patch.object(ab, "autorise", return_value=False), \
+             patch.object(ab, "http_json", return_value={"ok": True, "result": {"message_id": 54}}) as request:
+            sent = ab._telegram_envoyer_radar(state, "101", "sendMessage", text="📡 RADAR BTC — proche, alignement pas encore atteint")
+            denied_levels = ab._telegram_envoyer_radar(state, "101", "sendMessage", text="Entry 100 / SL 95 / TP 110")
+            edited = ab._telegram_envoyer_radar(state, "101", "editMessageText", message_id=42, text="📡 RADAR BTC — mise à jour")
+            deleted = ab._telegram_envoyer_radar(state, "101", "deleteMessage", message_id=42)
+            denied_wrong_id = ab._telegram_envoyer_radar(state, "101", "editMessageText", message_id=99, text="📡 RADAR BTC")
+            denied_other_chat = ab._telegram_envoyer_radar(state, "202", "sendMessage", text="📡 RADAR BTC")
+        self.assertTrue(sent.get("ok"))
+        self.assertTrue(denied_levels.get("blocked_by_pull_mode"))
+        self.assertTrue(edited.get("ok"))
+        self.assertTrue(deleted.get("ok"))
+        self.assertTrue(denied_wrong_id.get("blocked_by_pull_mode"))
+        self.assertTrue(denied_other_chat.get("blocked_by_pull_mode"))
+        self.assertEqual(request.call_count, 3)
+
+
+
 if __name__ == "__main__":
     unittest.main()
