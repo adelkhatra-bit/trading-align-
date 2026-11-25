@@ -44,6 +44,17 @@ if not tp1Ok
     tp2M := tp2
 """
         without_tp_change = self.source[:tp_start] + baseline_tp_state + self.source[tp_end:]
+        without_tp_change = without_tp_change.replace(
+            "[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]",
+            "[d, sqz ? 1 : 0, ta.rsi(close, lenRsi)]",
+            1,
+        )
+        for bridge_time in (
+            "bridgeTimeM1", "bridgeTimeM3", "bridgeTimeM5", "bridgeTimeM10",
+            "bridgeTimeM15", "bridgeTimeM30", "bridgeTimeM45", "bridgeTimeH1",
+            "bridgeTimeH2", "bridgeTimeH4", "bridgeTimeD1", "bridgeTimeW1",
+        ):
+            without_tp_change = without_tp_change.replace(f", {bridge_time}]", "]", 1)
         without_settings = without_tp_change.replace(SETTINGS_BLOCK, "", 1)
         without_export = without_settings.split(EXPORT_MARKER, 1)[0]
         if without_export.endswith("\\n\\n"):
@@ -77,9 +88,24 @@ if not tp1Ok
         for tf in ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1"):
             self.assertIn('"' + tf + '"', self.source)
         self.assertIn(">= 20000", self.source)
-        self.assertLessEqual(self.source.count("request.security("), 40)
-        for variable, tf in (("bridgeTimeM3", "3"), ("bridgeTimeM10", "10"), ("bridgeTimeM45", "45")):
-            self.assertIn(f'{variable} = request.security(syminfo.tickerid, "{tf}", time, lookahead=barmerge.lookahead_off)', self.source)
+        request_calls = self.source.count("request.security(") + self.source.count("request.security_lower_tf(")
+        self.assertLessEqual(request_calls, 40)
+        for variable, tuple_head in (
+            ("bridgeTimeM1", "d1, s1, r1"),
+            ("bridgeTimeM3", "d2, s2, r2"),
+            ("bridgeTimeM5", "d5, s5, r5"),
+            ("bridgeTimeM10", "d10, s10, r10"),
+            ("bridgeTimeM15", "d15, s15, r15"),
+            ("bridgeTimeM30", "d30, s30, r30"),
+            ("bridgeTimeM45", "d45, s45, r45"),
+            ("bridgeTimeH1", "d60, s60, r60"),
+            ("bridgeTimeH2", "d120, s120, r120"),
+            ("bridgeTimeH4", "d240, s240, r240"),
+            ("bridgeTimeD1", "dD, sD, rD"),
+            ("bridgeTimeW1", "dW, sW, rW"),
+        ):
+            self.assertIn(f"[{tuple_head}, {variable}]", self.source)
+            self.assertNotIn(f"{variable} = request.security(", self.source)
         self.assertIn('bridgeTfSeconds == 180 ? "M3"', self.source)
         self.assertIn('bridgeTfSeconds == 600 ? "M10"', self.source)
         self.assertIn('bridgeTfSeconds == 2700 ? "M45"', self.source)
