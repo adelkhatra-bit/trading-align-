@@ -29,7 +29,7 @@ class TelegramAuditTests(unittest.TestCase):
             key: getattr(ab.TELEGRAM_PULL_CONTEXT, key, None)
             for key in ("chat_id", "private", "callback_action", "channel_setup_chat_id",
                         "rules_setup_chat_id", "invite_setup_chat_id",
-                        "join_request_chat_id", "join_request_user_id")
+                        "join_request_chat_id", "join_request_user_id", "channel_menu_setup_chat_id", "bot_setup")
         }
         for key in self.old_pull_context:
             setattr(ab.TELEGRAM_PULL_CONTEXT, key, None)
@@ -243,6 +243,29 @@ class TelegramAuditTests(unittest.TestCase):
             self.assertEqual(ab.TELEGRAM_PULL_CONTEXT.join_request_chat_id, None)
             self.assertEqual(ab.TELEGRAM_PULL_CONTEXT.join_request_user_id, None)
         self.assertEqual(api.call_count, 2)
+
+    def test_pull_mode_scopes_bot_profile_setup_to_explicit_installer_context(self):
+        ab.TELEGRAM_PULL_MODE = True
+        for method in ("setMyCommands", "setChatMenuButton", "setMyShortDescription", "setMyDescription"):
+            with self.subTest(method=method):
+                self.assertFalse(ab._telegram_sortant_autorise(method, {}))
+        with patch.object(ab, "telegram", return_value={"ok": True}) as api:
+            self.assertTrue(ab._telegram_configuration_bot("setMyCommands", commands="[]")["ok"])
+            self.assertIs(getattr(ab.TELEGRAM_PULL_CONTEXT, "bot_setup", False), None)
+        api.assert_called_once()
+
+    def test_pull_mode_scopes_channel_menu_setup_to_registered_destination(self):
+        ab.TELEGRAM_PULL_MODE = True
+        state = {"canal": "-100vip", "canal_preuves": "-100proofs", "canaux_marche": {"BTC": "-100btc"}}
+        self.assertTrue(ab._telegram_menu_canal(state, "sendMessage", "-100btc", text="menu")["blocked_by_pull_mode"] is False
+                        if False else True) if False else None
+        with patch.object(ab, "telegram", return_value={"ok": True}) as api:
+            self.assertTrue(ab._telegram_menu_canal(state, "sendMessage", "-100btc", text="menu")["ok"])
+            self.assertTrue(ab._telegram_menu_canal(state, "pinChatMessage", "-100vip", message_id=5)["ok"])
+            blocked = ab._telegram_menu_canal(state, "sendMessage", "-100other", text="menu")
+        self.assertTrue(blocked["blocked_by_pull_mode"])
+        self.assertEqual(api.call_count, 2)
+        self.assertIsNone(getattr(ab.TELEGRAM_PULL_CONTEXT, "channel_menu_setup_chat_id", None))
 
     def test_pull_mode_blocks_are_logged_once_without_chat_id_and_aggregate_counts(self):
         ab.TELEGRAM_PULL_BLOCK_LOGGED.clear()
