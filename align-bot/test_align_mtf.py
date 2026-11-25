@@ -3700,7 +3700,7 @@ class PineOnlyEntryGateTests(unittest.TestCase):
     def test_healthy_bridge_without_direction_reports_mtf_wait_not_bridge_failure(self):
         from unittest.mock import patch
         r = self._market()
-        r["dirs"] = [0] * 11
+        r["confirme"] = 0
         r["require_tv_bridge"] = True
         state = {"t1m": 0}
         with patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")):
