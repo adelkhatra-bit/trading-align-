@@ -79,18 +79,24 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         script = textwrap.dedent(self.rollover[start:end])
         compile(script, "<align-worker-rollover>", "exec")
         self.assertIn("timeout-minutes: 18", self.rollover)
-        self.assertIn("grace_deadline = time.time() + 300", self.rollover)
-        self.assertIn("deadline = time.time() + 120", self.rollover)
+        self.assertIn("deadline = time.time() + 900", self.rollover)
+        self.assertIn("time.sleep(10)", self.rollover)
+
+    def test_worker_rollover_waits_for_graceful_exit_without_cancelling(self):
+        script = self.rollover[self.rollover.index("          # Le worker actif détecte lui-même"):]
+        self.assertIn("ALIGN_OLD_WORKERS_STOPPED_GRACEFULLY", script)
+        self.assertIn("WAITING_FOR_GRACEFUL_WORKER_EXIT", script)
+        self.assertIn("no cancellation was sent", script)
+        self.assertNotIn("/cancel", script)
+        self.assertNotIn("/force-cancel", script)
+        self.assertNotIn("FORCE_RETIRING", script)
+        self.assertNotIn("ROLLING_OVER", script)
 
     def test_worker_rollover_serializes_memory_saves(self):
-        script = self.rollover[self.rollover.index("          # Traiter les anciens workers un par un"):]
-        self.assertIn("while True:", script)
+        script = self.rollover[self.rollover.index("          active_states ="):]
+        self.assertIn("older_active_runs()", script)
         self.assertIn("pending = sorted(", script)
-        self.assertIn("item for item in older_active_runs()", script)
-        self.assertIn("if int(item.get(\"id\", 0)) == run_id", script)
-        self.assertIn("ALIGN_OLD_WORKER_STOPPED_GRACEFULLY", script)
-        self.assertIn("FORCE_RETIRING old_run=", script)
-        self.assertNotIn("for run in old_runs:", script)
+        self.assertIn("ALIGN_OLD_WORKERS_STOPPED_GRACEFULLY", script)
 
     def test_worker_rollover_recognizes_both_legacy_and_renamed_worker(self):
         self.assertIn("if run.get(\"name\") in {", self.rollover)
