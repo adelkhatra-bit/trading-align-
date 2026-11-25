@@ -25,12 +25,22 @@ class TelegramAuditTests(unittest.TestCase):
         ab.CALLBACKS_ACK_FAILED.clear()
         self.old_pull_mode = ab.TELEGRAM_PULL_MODE
         self.old_token = ab.TOKEN
+        self.old_pull_context = {
+            key: getattr(ab.TELEGRAM_PULL_CONTEXT, key, None)
+            for key in ("chat_id", "private", "callback_action", "channel_setup_chat_id")
+        }
+        ab.TELEGRAM_PULL_CONTEXT.chat_id = None
+        ab.TELEGRAM_PULL_CONTEXT.private = False
+        ab.TELEGRAM_PULL_CONTEXT.callback_action = None
+        ab.TELEGRAM_PULL_CONTEXT.channel_setup_chat_id = None
         ab.TELEGRAM_PULL_MODE = False
         ab.TOKEN = "test-token"
 
     def tearDown(self):
         ab.TELEGRAM_PULL_MODE = self.old_pull_mode
         ab.TOKEN = self.old_token
+        for key, value in self.old_pull_context.items():
+            setattr(ab.TELEGRAM_PULL_CONTEXT, key, value)
         ab.CALLBACKS_ACKNOWLEDGED.clear()
         ab.CALLBACKS_ACK_FAILED.clear()
 
