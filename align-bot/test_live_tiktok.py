@@ -859,6 +859,9 @@ class LiveAgendaMarketTimezoneTests(unittest.TestCase):
         self.assertIn("montrer(t, false, 2, 'danger', true, 'marche')", handler)
         vocal = bande[bande.index("function parlerLive("):bande.index("function recuIA(")]
         self.assertIn("item.source !== 'ia' && item.source !== 'marche'", vocal)
+        # Les breaking news restent visuellement une alerte, mais déclenchent aussi la narration FR puis EN.
+        self.assertIn("voiceOnce: source === 'marche' && (bulle || g === 'danger') && i === 0", bande)
+        self.assertIn("if (source === 'marche' && (bulle || g === 'danger') && anglaisTraduit)", bande)
 
 
 if __name__ == "__main__":
