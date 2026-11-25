@@ -15,7 +15,7 @@ Si l'**identité du projet** est ambiguë (autre dépôt, autre branche de produ
 | Projet | **ALIGN TRADING** | Loki / KEEP, Inside Dombes, Nino & Luciole : autres projets |
 | Dépôt | `adelkhatra-bit/trading-align-` | `trading-dashboard-4000` (autre projet) |
 | Branche du code | `main` | — |
-| Branche des données publiées | `live-data` (`live.json` à la racine) | Ne jamais y mettre de code, ne jamais la fusionner dans `main` |
+| Branche des données publiées | `live-data` (racine : `live.json` et, si créé, `fermes.json` uniquement) | Aucun code/HTML/docs/workflow/Pine/JS ; ne jamais la fusionner dans `main` |
 | Indicateur de données/bridge (unique) | `align-bot/pine/ALIGN_MTF_PRO_v25.pine` | Tout autre script ne peut alimenter le BOT ou le bridge |
 | Compagnon visuel (clôtures de bougies) | `align-bot/pine/ALIGN_MTF_PRO_v24.pine` | Visuel uniquement : aucune alerte sortante, aucun bridge, aucune donnée consommée par ROBOT V12 ; autres `v24*`, propositions et diffs = historique |
 | Titre TradingView | `ALIGN MTF PRO v25 (Inside)` (court : `ALIGN MTF v25`), Pine `//@version=6` | Tout autre titre = mauvais script |
@@ -23,6 +23,10 @@ Si l'**identité du projet** est ambiguë (autre dépôt, autre branche de produ
 | Bot Telegram | `@align_mtf_adel_bot` | — |
 | Bande live | `docs/live/align-bande-live.user.js` (Tampermonkey) | Copies locales anciennes (12.2.3, 12.2.4…) |
 | Bridge TradingView canonique | Worker mailbox Cloudflare → `align_tv_mailbox_feeder.py` → `align-bot/align_tv_bridge.py` dans le runner GitHub (`127.0.0.1:4100`) | Ancien cache Node `server.js` / port 4000, extension `tradingview-analyzer`, tunnel historique |
+
+### Périmètre strict de `live-data`
+
+La branche `live-data` ne transporte que les données générées à la racine : `live.json` et `fermes.json` (ce dernier est créé par le BOT au besoin). Elle ne contient aucun code, page HTML, workflow, documentation ou indicateur. Le code et la page live restent exclusivement dans `main`. Le snapshot `archive/live-data-full-tree-20261125` est une sauvegarde historique de l'ancien arbre complet : il n'est ni une branche de développement ni une source de déploiement. Le contrôle CI vérifie automatiquement le contenu distant de `live-data`.
 
 ## 2. Chaîne de données de production
 

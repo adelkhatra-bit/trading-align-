@@ -25,10 +25,10 @@
 ## Branch and change discipline
 1. Start every task by recording repository, current default branch, source branch, target branch, PR number, exact head/base SHAs, latest relevant workflow runs, and working-tree state when available.
 2. `main` is the production code branch. Never commit directly to it. Make code changes on the existing PR branch for the same issue when its head/base and purpose are verified; otherwise create one focused branch from the latest verified `main`.
-3. `live-data` is a publication/data branch for generated public live state (including `live.json`). Do not treat it as a code-development branch, merge it into `main`, or overwrite its generated data with source code.
+3. `live-data` is a publication-only branch. Its root may contain only `live.json` and, when created by the bot, `fermes.json`. No source code, workflow, HTML, documentation, Pine, JavaScript, or other application files may exist there. Never develop on or merge this branch into `main`. CI verifies its remote tree on every validation run.
 4. A fix branch must target the intended base explicitly. Never infer a branch from its name. Verify the PR head, base, SHA, changed files, and workflow results.
 5. One issue, one focused branch, one minimal change. Do not bundle unrelated fixes, mass-merge PRs, or transplant modules without checking dependencies and provenance.
-6. Preserve unrelated commits and user work. No force-push, hard reset, destructive cleanup, or broad revert. For rollback, use a reviewed, narrowly scoped revert on a separate branch.
+6. Preserve unrelated commits and user work. No force-push, hard reset, destructive cleanup, or broad revert on code branches. The one-time `live-data` cleanup was performed only after archiving its exact old head; any future rewrite of that publication branch requires explicit owner authorization, a fresh archive, preservation of generated data, and the CI tree guard. For code rollback, use a reviewed, narrowly scoped revert on a separate branch.
 7. Before writing, inspect the exact current file and blob SHA. After writing, inspect the resulting diff and commit. Never claim a change succeeded without read-back proof.
 
 ## Stable baseline and zero regression

@@ -36,6 +36,10 @@ jobs:
           python-version: "3.11"
       - name: Compile all Python files
         run: python -m compileall -q align-bot
+      - name: Enforce canonical ALIGN identity and data-only publication branch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/validate_align_source_of_truth.py
       - name: Compile human-only ALIGN incident coordinator
         run: python -m py_compile scripts/align_auto_repair.py
       - name: Compile watchdog Python script
