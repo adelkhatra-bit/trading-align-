@@ -227,7 +227,8 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
     def test_position_followup_allows_levels_only_for_exact_active_position_owner(self):
         position = {"fini": False, "e": 100.0, "sl": 95.0}
         trade = {"qui": {"101": position}}
-        state = {"auto": {"BTC": ["101"]}, "BTC": {"trade": trade}}
+        # Suivi manuel explicite : le membre est dans trade["qui"], même sans abonnement auto/radar.
+        state = {"auto": {"BTC": []}, "bot_off": [], "BTC": {"trade": trade}}
         old = {
             "chat": getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_commentary_chat_id", None),
             "market": getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_commentary_market", None),
@@ -238,7 +239,6 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         with patch.object(ab, "TOKEN", "test-token"), \
              patch.object(ab, "TELEGRAM_PULL_MODE", True), \
              patch.object(ab, "DERNIER_ETAT", state), \
-             patch.object(ab, "coach_actif", return_value=True), \
              patch.object(ab, "http_json", return_value={"ok": True, "result": {"message_id": 51}}) as request:
             result = ab._telegram_envoyer_commentaire_coach_prive(
                 state, "101", "BTC", "⚠️ BTC\n🛑 Stop 95", trade=trade, position=position
