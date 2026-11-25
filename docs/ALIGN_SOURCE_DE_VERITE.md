@@ -66,10 +66,9 @@ Règle : quand `ALIGN_REQUIRE_TV_BRIDGE=1`, **aucun repli** sur des niveaux calc
 - Le **plan** (Entry / SL / TP1 / TP2) est calculé sur **M15 clôturé**.
 - Le **déclencheur** dépend de la stratégie : SCALPING = M1, DAY = M5, SWING = H1.
 - Un même timeframe ne doit avoir **qu'une seule** direction dans un message.
-- Cohérence MTF : `d5Strat` et `d15Strat` utilisent désormais les bougies clôturées
-  pour BTC comme pour GOLD. `lecture_5m` / `lecture_15m` et `mtf.M5` / `mtf.M15`
-  exposent ainsi la même direction confirmée ; aucune entrée ne repose sur une bougie M5/M15
-  encore ouverte. Le contrat Pine vérifie cette identité.
+  Écart connu à corriger (non encore prouvé en direct) : dans le payload bridge du v25,
+  `lecture_5m` / `lecture_15m` utilisent la bougie clôturée (`d5Fermee`, `d15Fermee`)
+  alors que `mtf.M5` / `mtf.M15` utilisent `d5Strat` / `d15Strat`, la bougie courante pour BTC.
 - Un TP déjà touché ne redevient jamais un objectif ; un signal dont le SL est dépassé n'est jamais réémis.
 
 ## 4. Fusion : qui peut fusionner quoi
