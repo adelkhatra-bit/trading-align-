@@ -3439,6 +3439,19 @@ def _telegram_envoyer_coach_prealerte(etat, cid, texte, marches):
         TELEGRAM_PULL_CONTEXT.coach_prealert_markets = anciens_marches
 
 
+def _telegram_envoyer_commentaire_canal(etat, m, canal, texte, **kwargs):
+    """Autorisation bornée : commentaire M15 / flash dans la seule chaîne du marché concernée."""
+    ancien_chat = getattr(TELEGRAM_PULL_CONTEXT, "market_commentary_chat_id", None)
+    ancien_marche = getattr(TELEGRAM_PULL_CONTEXT, "market_commentary_market", None)
+    TELEGRAM_PULL_CONTEXT.market_commentary_chat_id = str(canal or "")
+    TELEGRAM_PULL_CONTEXT.market_commentary_market = str(m or "").upper()
+    try:
+        return _envoi_sur(canal, text=texte, **kwargs)
+    finally:
+        TELEGRAM_PULL_CONTEXT.market_commentary_chat_id = ancien_chat
+        TELEGRAM_PULL_CONTEXT.market_commentary_market = ancien_marche
+
+
 def _telegram_sortant_autorise(methode, params):
     """Aucun push spontané : réponse privée à une action explicite, ou entrée attendue après demande."""
     if not TELEGRAM_PULL_MODE:
@@ -3497,6 +3510,15 @@ def _telegram_sortant_autorise(methode, params):
     canaux_news = {str(v) for v in (etat.get("canaux_marche") or {}).values() if v}
     if (cid and cid == news_chat and cid in canaux_news and methode == "sendMessage"
             and texte.startswith("🚨 NEWS DE DERNIÈRE MINUTE")):
+        return True
+    # Commentaire public M15 / flash : uniquement dans la chaîne du marché configurée,
+    # sous autorisation temporaire du producteur dédié. Jamais de niveau Entry/SL/TP ni de push privé.
+    commentaire_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "market_commentary_chat_id", "") or "")
+    commentaire_marche = str(getattr(TELEGRAM_PULL_CONTEXT, "market_commentary_market", "") or "").upper()
+    canal_commentaire = str((etat.get("canaux_marche") or {}).get(commentaire_marche) or "")
+    if (methode == "sendMessage" and cid and cid == commentaire_chat == canal_commentaire
+            and commentaire_marche in MARCHES
+            and not _telegram_position_attendue(texte) and not contient_niveaux(texte)):
         return True
     if cid and cid in actifs and methode in ("sendMessage", "sendPhoto", "editMessageText") and _telegram_position_attendue(texte):
         marches_signal = marches_message(texte)
@@ -6682,8 +6704,9 @@ def notifier_canal_marche(etat, m, r, cle):
     if int(info.get("dernier_t", 0)) < int(b["t"]):
         # Marqué AVANT l'envoi : une coupure réseau après livraison ne doit jamais donner 4 bilans identiques (vu le 14/11 à 20:24)
         info["dernier_t"] = int(b["t"])
-        _envoi_sur(canal, text=texte_coach_live(m, b, r, cle, None, public=True), reply_markup=boutons_chaine_marche(etat),
-                   disable_notification="true")      # commentaire = sans son : les abonnés restent tranquilles
+        _telegram_envoyer_commentaire_canal(etat, m, canal, texte_coach_live(m, b, r, cle, None, public=True),
+                                            reply_markup=boutons_chaine_marche(etat),
+                                            disable_notification="true")  # commentaire = sans son : les abonnés restent tranquilles
         return
     flash = flash_commentateur(m, r, cle)
     t15 = int(((r.get("b15") or [{}])[-1]).get("t") or 0)
@@ -6693,7 +6716,8 @@ def notifier_canal_marche(etat, m, r, cle):
         info["flash_t"] = time.time()
         if "MÈCHE" in flash:
             info["meche_t15"] = t15
-        _envoi_sur(canal, text=flash, reply_markup=boutons_chaine_marche(etat), disable_notification="true")
+        _telegram_envoyer_commentaire_canal(etat, m, canal, flash, reply_markup=boutons_chaine_marche(etat),
+                                            disable_notification="true")
         tr_ = cle.get("trade") or {}
         live_bande(etat, texte_bande_flash(flash, tr_.get("d"), m), f"pulse{m}", 600, toujours=True)
 
