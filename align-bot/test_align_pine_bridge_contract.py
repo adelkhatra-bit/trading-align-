@@ -11,6 +11,18 @@ bridgeEnabled = input.bool(true, "Envoyer les snapshots au ROBOT V12", group=grp
 
 """
 EXPORT_MARKER = "// ═════════ BRIDGE ALIGN — export structuré du Pine v25 (sans toucher aux signaux/visuels) ═════════"
+RSI_CROSSOVER_BLOCK = """rsiCrossSigUp   = ta.crossover(rC, rsiSig)
+rsiCross30Up     = ta.crossover(rC, 30)
+rsiCross50Up     = ta.crossover(rC, 50)
+rsiCrossSigDown  = ta.crossunder(rC, rsiSig)
+rsiCross70Down   = ta.crossunder(rC, 70)
+rsiCross50Down   = ta.crossunder(rC, 50)
+rsiAchat = (rsiCrossSigUp and rC < 50) or rsiCross30Up or rsiCross50Up
+rsiVente = (rsiCrossSigDown and rC > 50) or rsiCross70Down or rsiCross50Down
+"""
+RSI_CROSSOVER_BASELINE_BLOCK = """rsiAchat = (ta.crossover(rC, rsiSig) and rC < 50) or ta.crossover(rC, 30) or ta.crossover(rC, 50)
+rsiVente = (ta.crossunder(rC, rsiSig) and rC > 50) or ta.crossunder(rC, 70) or ta.crossunder(rC, 50)
+"""
 
 
 class CanonicalPineBridgeContractTests(unittest.TestCase):
@@ -60,6 +72,12 @@ if not tp1Ok
             "[dC, sC, rC] = f_etat()",
             1,
         )
+        self.assertIn(RSI_CROSSOVER_BLOCK, self.source)
+        without_tp_change = without_tp_change.replace(
+            RSI_CROSSOVER_BLOCK,
+            RSI_CROSSOVER_BASELINE_BLOCK,
+            1,
+        )
         without_tp_change = without_tp_change.replace(
             "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig or planGeometryMismatch",
             "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig",
@@ -89,6 +107,11 @@ if not tp1Ok
         raw = without_export.encode("utf-8")
         git_blob = hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\\0" + raw).hexdigest()
         self.assertEqual(git_blob, BASELINE_GIT_BLOB_SHA)
+
+    def test_rsi_crossovers_are_evaluated_unconditionally_on_every_bar(self):
+        self.assertIn(RSI_CROSSOVER_BLOCK, self.source)
+        self.assertNotIn("rsiAchat = (ta.crossover(", self.source)
+        self.assertNotIn("rsiVente = (ta.crossunder(", self.source)
 
     def test_only_btc_and_gold_are_supported_for_signals_and_bridge(self):
         self.assertNotIn('input.string("BTCUSD", "Marché ALIGN"', self.source)
