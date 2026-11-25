@@ -83,7 +83,7 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.assertIn("time.sleep(10)", self.rollover)
 
     def test_worker_rollover_waits_for_graceful_exit_without_cancelling(self):
-        script = self.rollover[self.rollover.index("          # Le worker actif détecte lui-même"):]
+        script = self.rollover[self.rollover.index("          # Le worker actif termine son tour"):]
         self.assertIn("ALIGN_OLD_WORKERS_STOPPED_GRACEFULLY", script)
         self.assertIn("WAITING_FOR_GRACEFUL_WORKER_EXIT", script)
         self.assertIn("no cancellation was sent", script)
@@ -93,7 +93,7 @@ class ProductionMarketCoverageTest(unittest.TestCase):
         self.assertNotIn("ROLLING_OVER", script)
 
     def test_worker_rollover_serializes_memory_saves(self):
-        script = self.rollover[self.rollover.index("          # Le worker actif détecte lui-même"):]
+        script = self.rollover[self.rollover.index("          # Le worker actif termine son tour"):]
         self.assertIn("older_active_runs()", script)
         self.assertIn("pending = sorted(", script)
         self.assertIn("ALIGN_OLD_WORKERS_STOPPED_GRACEFULLY", script)
