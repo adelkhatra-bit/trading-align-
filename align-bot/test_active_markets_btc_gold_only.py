@@ -55,5 +55,64 @@ class ActiveMarketsBTCGoldOnly(unittest.TestCase):
                                                   "NASDAQ : ancienne alerte"), [])
 
 
+    def test_pinned_rules_text_lists_only_btc_and_gold(self):
+        self.assertIn("BTC (BTCUSD)", ab.REGLES)
+        self.assertIn("GOLD (XAUUSD)", ab.REGLES)
+        self.assertNotRegex(ab.REGLES, r"\b(?:NASDAQ|NAS100|NQ)\b")
+
+    def test_stale_nasdaq_pinned_rules_are_unpinned_and_replaced_once(self):
+        cid = "-100123"
+        old_text = ("📌 RÈGLES — ALIGN Signaux\n"
+                    "📡 Marchés : BTC (BTCUSD) • GOLD (XAUUSD) • NASDAQ (NAS100)")
+        state = {"epingles_v5": [cid]}  # l'ancienne mémoire ne doit pas bloquer la migration v6
+        with mock.patch.object(ab, "telegram", side_effect=[
+            {"ok": True, "result": {"pinned_message": {"message_id": 19, "text": old_text}}},
+            {"ok": True, "result": True},
+            {"ok": True, "result": {"message_id": 20}},
+            {"ok": True, "result": True},
+        ]) as telegram:
+            ab.epingler(state, cid)
+        self.assertEqual([c.args[0] for c in telegram.call_args_list],
+                         ["getChat", "unpinChatMessage", "sendMessage", "pinChatMessage"])
+        self.assertEqual(state["epingles_v6"], [cid])
+        self.assertNotIn(cid, state.get("epingles_v6_pending", {}))
+        sent = telegram.call_args_list[2].kwargs["text"]
+        self.assertEqual(sent, ab.REGLES)
+        self.assertNotIn("NASDAQ", sent)
+
+    def test_current_btc_gold_pinned_rules_are_not_duplicated(self):
+        cid = "-100123"
+        state = {"epingles_v5": [cid]}
+        with mock.patch.object(ab, "telegram", return_value={
+            "ok": True, "result": {"pinned_message": {"message_id": 20, "text": ab.REGLES}}
+        }) as telegram:
+            ab.epingler(state, cid)
+        self.assertEqual(telegram.call_count, 1)
+        self.assertEqual(telegram.call_args.args[0], "getChat")
+        self.assertEqual(state["epingles_v6"], [cid])
+
+    def test_failed_unpin_does_not_send_a_duplicate_rules_message(self):
+        cid = "-100123"
+        old_text = ("📌 RÈGLES — ALIGN Signaux\n"
+                    "📡 Marchés : BTC (BTCUSD) • GOLD (XAUUSD) • NASDAQ (NAS100)")
+        with mock.patch.object(ab, "telegram", side_effect=[
+            {"ok": True, "result": {"pinned_message": {"message_id": 19, "text": old_text}}},
+            {"ok": False, "description": "not enough rights"},
+        ]) as telegram:
+            ab.epingler({}, cid)
+        self.assertEqual(telegram.call_count, 2)
+        self.assertEqual(telegram.call_args_list[1].args[0], "unpinChatMessage")
+
+    def test_pending_rules_message_is_pinned_without_resending(self):
+        cid = "-100123"
+        state = {"epingles_v6_pending": {cid: 20}}
+        with mock.patch.object(ab, "telegram", return_value={"ok": True, "result": True}) as telegram:
+            ab.epingler(state, cid)
+        self.assertEqual(telegram.call_count, 1)
+        self.assertEqual(telegram.call_args.args[0], "pinChatMessage")
+        self.assertEqual(state["epingles_v6"], [cid])
+        self.assertNotIn(cid, state["epingles_v6_pending"])
+
+
 if __name__ == "__main__":
     unittest.main()
