@@ -106,6 +106,18 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
                 self.assertFalse(ab._telegram_sortant_autorise(
                     "sendMessage", {"chat_id": "101", "text": "Entrée 100 / SL 95 / TP 110"}
                 ))
+                state["BTC"] = {"trade": {"d": 1, "e": 100, "sl": 95, "tp1": 110}}
+                coach_summary = (
+                    "🎙 COACH COMMENTATEUR\\n📂 Position : 🟢 LONG\\n"
+                    "🟡 Entrée : 100\\n🔴 SL : 95\\n🔵 TP1 : 110"
+                )
+                self.assertTrue(ab._telegram_sortant_autorise(
+                    "sendMessage", {"chat_id": "101", "text": coach_summary}
+                ))
+                state["BTC"]["trade"] = None
+                self.assertFalse(ab._telegram_sortant_autorise(
+                    "sendMessage", {"chat_id": "101", "text": coach_summary}
+                ))
                 self.assertFalse(ab._telegram_sortant_autorise(
                     "sendPhoto", {"chat_id": "101", "caption": "🎙 BILAN 15 MIN"}
                 ))
