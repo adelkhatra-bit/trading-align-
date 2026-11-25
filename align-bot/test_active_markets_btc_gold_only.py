@@ -76,6 +76,41 @@ class ActiveMarketsBTCGoldOnly(unittest.TestCase):
                 "sendMessage", {"chat_id": "-100999", "text": ab.REGLES}
             ))
 
+    def test_pull_mode_allows_exact_rules_to_registered_market_channels_only(self):
+        state = {"canal": "-100vip", "canaux_marche": {"BTC": "-100btc", "GOLD": "-100gold"}}
+        with mock.patch.object(ab, "TELEGRAM_PULL_MODE", True), \
+             mock.patch.object(ab, "DERNIER_ETAT", state), \
+             mock.patch.object(ab.TELEGRAM_PULL_CONTEXT, "chat_id", None, create=True), \
+             mock.patch.object(ab.TELEGRAM_PULL_CONTEXT, "private", False, create=True):
+            for cid in ("-100vip", "-100btc", "-100gold"):
+                with self.subTest(chat=cid):
+                    self.assertTrue(ab._telegram_sortant_autorise(
+                        "sendMessage", {"chat_id": cid, "text": ab.REGLES}
+                    ))
+            self.assertFalse(ab._telegram_sortant_autorise(
+                "sendMessage", {"chat_id": "-100random", "text": ab.REGLES}
+            ))
+            self.assertFalse(ab._telegram_sortant_autorise(
+                "sendMessage", {"chat_id": "-100btc", "text": "Message spontané"}
+            ))
+
+    def test_rules_destinations_include_vip_and_market_channels_not_private_chats(self):
+        state = {
+            "canal": "-100vip",
+            "canaux_marche": {"BTC": "-100btc", "GOLD": "-100gold"},
+            "prospects": ["555"],
+        }
+        with mock.patch.object(ab, "REGLES_PRIVEES_SPONTANEES", False):
+            self.assertEqual(
+                set(ab.destinations_regles(state, ["123", "456"])),
+                {"-100vip", "-100btc", "-100gold"},
+            )
+        with mock.patch.object(ab, "REGLES_PRIVEES_SPONTANEES", True):
+            self.assertEqual(
+                set(ab.destinations_regles(state, ["123"])),
+                {"-100vip", "-100btc", "-100gold", "123", "555"},
+            )
+
     def test_stale_rules_migrate_in_pull_mode_even_if_v6_memory_says_done(self):
         cid = "-100123"
         old_text = ("📌 RÈGLES — ALIGN Signaux\n"
@@ -118,6 +153,18 @@ class ActiveMarketsBTCGoldOnly(unittest.TestCase):
         sent = telegram.call_args_list[2].kwargs["text"]
         self.assertEqual(sent, ab.REGLES)
         self.assertNotIn("NASDAQ", sent)
+
+    def test_pin_diagnostic_identifies_configured_chat_title_without_chat_id(self):
+        state = {}
+        with mock.patch.object(ab, "telegram", side_effect=[
+            {"ok": True, "result": {"title": "ALIGN Gratuit", "pinned_message": {}}},
+            {"ok": True, "result": {"message_id": 21}},
+            {"ok": True, "result": True},
+        ]), mock.patch("builtins.print") as log:
+            ab.epingler(state, "-100123")
+        output = " ".join(str(call.args[0]) for call in log.call_args_list)
+        self.assertIn("chat_title='ALIGN Gratuit'", output)
+        self.assertNotIn("-100123", output)
 
     def test_current_btc_gold_pinned_rules_are_not_duplicated(self):
         cid = "-100123"
