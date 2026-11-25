@@ -3711,7 +3711,8 @@ def _telegram_sortant_autorise(methode, params):
         if coach_position_closure:
             if coach_position_record.get("fini") is True and texte.startswith("🏁 CLÔTURE CONFIRMÉE"):
                 return True
-        elif coach_position_record.get("fini") is not True and coach_actif(etat, cid, coach_market):
+        elif (coach_position_record.get("fini") is not True
+              and bot_on(etat, cid) and cid not in coach_quiet):
             return True
     if (methode == "sendMessage" and cid.isdecimal() and cid == coach_chat
             and coach_market in MARCHES and isinstance(coach_info, dict)
