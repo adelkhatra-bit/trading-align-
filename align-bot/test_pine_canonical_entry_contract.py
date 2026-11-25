@@ -121,6 +121,14 @@ class PineCanonicalEntryContract(unittest.TestCase):
             self.assertIn(key, payload)
         self.assertIn('"planTimeframe":"M15"', payload)
 
+    def test_bridge_never_exports_executable_plan_without_selected_strategy(self):
+        marker = "bridgePlanValid ="
+        line = next(line for line in self.pine.splitlines() if line.startswith(marker))
+        self.assertIn('strat != ""', line)
+        self.assertIn('bridgeEntryTf = strat == "SWING"', self.pine)
+        self.assertIn('"UNSUPPORTED")', self.pine)
+        self.assertIn('bridgeSignal = bridgePlanValid ?', self.pine)
+
     def test_market_scope_remains_btc_and_gold_only_in_indicator(self):
         self.assertIn('bridgeMarket = isBtc ? "BTCUSD" : isGold ? "XAUUSD" : "UNSUPPORTED"', self.pine)
         self.assertNotIn('input.string("BTCUSD", "Marché ALIGN"', self.pine)
