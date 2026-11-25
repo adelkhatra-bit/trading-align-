@@ -119,6 +119,18 @@ class ActiveMarketsBTCGoldOnly(unittest.TestCase):
         self.assertEqual(sent, ab.REGLES)
         self.assertNotIn("NASDAQ", sent)
 
+    def test_pin_diagnostic_identifies_configured_chat_title_without_chat_id(self):
+        state = {}
+        with mock.patch.object(ab, "telegram", side_effect=[
+            {"ok": True, "result": {"title": "ALIGN Gratuit", "pinned_message": {}}},
+            {"ok": True, "result": {"message_id": 21}},
+            {"ok": True, "result": True},
+        ]), mock.patch("builtins.print") as log:
+            ab.epingler(state, "-100123")
+        output = " ".join(str(call.args[0]) for call in log.call_args_list)
+        self.assertIn("chat_title='ALIGN Gratuit'", output)
+        self.assertNotIn("-100123", output)
+
     def test_current_btc_gold_pinned_rules_are_not_duplicated(self):
         cid = "-100123"
         state = {"epingles_v5": [cid]}
