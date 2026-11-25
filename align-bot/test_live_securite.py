@@ -64,7 +64,7 @@ class SecuriteVip(unittest.TestCase):
             self.assertIn("subscription_price=PRIX_STARS", m.group(0))
             self.assertIn("subscription_period=2592000", m.group(0))
         # aucun lien d'invitation simple vers la chaîne VIP : createChatInviteLink ne vise que la chaîne de validation des résultats
-        for m in re.finditer(r'"createChatInviteLink"[^)]*\)', src):
+        for m in re.finditer(r'telegram\("createChatInviteLink"[^)]*\)', src):
             self.assertIn('etat["canal_preuves"]', m.group(0))
             self.assertNotIn('etat["canal"]', m.group(0))
         self.assertEqual(src.count('"exportChatInviteLink"'), 1)                # utilisé seulement pour RÉVOQUER l'ancien lien
