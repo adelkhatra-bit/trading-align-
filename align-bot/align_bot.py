@@ -14846,30 +14846,23 @@ def un_tour(etat, chats):
 STATE_SCHEMA_VERSION = 4
 
 def migrer_scope_marches_btc_gold_only(etat):
-    """Retire NASDAQ de la mémoire opérationnelle, en archivant ses anciennes données sans les rejouer."""
+    """Purge durablement NASDAQ de la mémoire persistée ; BTC et GOLD sont les seuls marchés conservés."""
     if not isinstance(etat, dict):
         raise RuntimeError("ÉTAT ALIGN INVALIDE — migration des marchés impossible")
     archives = etat.get("archives_marches_retirees")
-    if archives is None:
-        archives = {}
-    if not isinstance(archives, dict):
+    if archives is not None and not isinstance(archives, dict):
         raise RuntimeError("ÉTAT ALIGN INVALIDE — archive des marchés retirés illisible")
 
+    # L'ancien état NASDAQ et son éventuelle archive sont supprimés, jamais rejoués ni recopiés.
     legacy = etat.pop("NASDAQ", None)
-    if legacy is not None:
-        history = archives.get("NASDAQ")
-        if history is None:
-            history = []
-        elif not isinstance(history, list):
-            history = [history]
-        history.append({
-            "archive_t": int(time.time()),
-            "state": legacy,
-            "open_trade": bool((legacy or {}).get("trade")) if isinstance(legacy, dict) else False,
-        })
-        archives["NASDAQ"] = history
-    if archives:
-        etat["archives_marches_retirees"] = archives
+    archive_nasdaq = isinstance(archives, dict) and "NASDAQ" in archives
+    if archive_nasdaq:
+        archives.pop("NASDAQ", None)
+    if isinstance(archives, dict):
+        if archives:
+            etat["archives_marches_retirees"] = archives
+        else:
+            etat.pop("archives_marches_retirees", None)
 
     # Tables indexées par marché : aucune souscription ou configuration NASDAQ ne reste active.
     for key in ("auto", "auto_marches", "coach_live", "canaux_marche", "canal_live", "liens_marche", "veille_cloture", "pause_auto"):
@@ -14890,7 +14883,7 @@ def migrer_scope_marches_btc_gold_only(etat):
             preferences[cid] = actifs[0] if isinstance(raw, str) and len(actifs) == 1 else actifs
 
     etat["marches_actifs"] = list(MARCHES)
-    return legacy is not None
+    return legacy is not None or archive_nasdaq
 
 def _bot_deja_en_service():
     """Vrai si le bot a déjà tourné (live-data/live.json existe). En cas de doute (API muette) : vrai."""
@@ -14939,7 +14932,7 @@ def charger_etat():
         print("TELEGRAM_PULL_MIGRATION=enabled; legacy push subscriptions and queued messages cleared", flush=True)
     archive_nasdaq = migrer_scope_marches_btc_gold_only(etat)
     if archive_nasdaq:
-        print("MARKET_SCOPE_MIGRATION=BTC,GOLD_ONLY; NASDAQ archived and removed from active state", flush=True)
+        print("MARKET_SCOPE_MIGRATION=BTC,GOLD_ONLY; NASDAQ purged from persisted state and archives", flush=True)
     etat["schema_version"] = STATE_SCHEMA_VERSION
     if version < STATE_SCHEMA_VERSION:
         print(f"STATE_MIGRATION={version}->{STATE_SCHEMA_VERSION} (conservation des données)", flush=True)
