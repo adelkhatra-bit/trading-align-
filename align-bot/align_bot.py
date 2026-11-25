@@ -7945,7 +7945,8 @@ def demande_entree(etat, jr):
         _envoi_sur(pid, text=txt, reply_markup=kb)
 
 def decider_entree(etat, cb, ok, cle_d):
-    d = etat.setdefault("demandes_entree", {}).pop(cle_d, None)
+    demandes = etat.setdefault("demandes_entree", {})
+    d = demandes.get(cle_d)
     try:
         telegram("answerCallbackQuery", callback_query_id=cb["id"], text="✅ Accepté" if ok else "❌ Refusé")
     except Exception:
@@ -7955,7 +7956,10 @@ def decider_entree(etat, cb, ok, cle_d):
     try:
         if str(d.get("chat")) != str(etat.get("canal_preuves") or "") or str(cb.get("from", {}).get("id")) not in {str(x) for x in proprio(etat)}:
             raise PermissionError("demande d'entrée hors du canal de validation ou décision non propriétaire")
-        _telegram_decision_demande("approveChatJoinRequest" if ok else "declineChatJoinRequest", d["chat"], d["user"])
+        resultat = _telegram_decision_demande("approveChatJoinRequest" if ok else "declineChatJoinRequest", d["chat"], d["user"])
+        if not isinstance(resultat, dict) or resultat.get("ok") is not True:
+            raise RuntimeError("Telegram n'a pas confirmé la décision")
+        demandes.pop(cle_d, None)
         _envoi_sur(str(cb["message"]["chat"]["id"]), text=("✅ Accepté : il est entré" if ok else "❌ Refusé : il n'entre pas"))
     except Exception as ex:
         _envoi_sur(str(cb["message"]["chat"]["id"]), text=f"⚠️ Impossible : {str(ex)[:120]}")
