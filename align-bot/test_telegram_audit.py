@@ -149,6 +149,20 @@ class TelegramAuditTests(unittest.TestCase):
         self.assertEqual(ab.TELEGRAM_AUDIT["pull_blocks"]["sendMessage"], 1)
         self.assertNotIn("123456789", repr(ab.TELEGRAM_AUDIT))
 
+    def test_pull_mode_denies_unknown_non_message_methods_by_default(self):
+        ab.TELEGRAM_PULL_MODE = True
+        with patch.object(ab, "http_json") as http:
+            result = ab.telegram("unknownMutation", chat_id="123456789")
+        self.assertTrue(result["blocked_by_pull_mode"])
+        http.assert_not_called()
+        self.assertEqual(ab.TELEGRAM_AUDIT["pull_blocks"]["unknownMutation"], 1)
+
+    def test_pull_mode_keeps_known_read_and_protocol_methods_available(self):
+        ab.TELEGRAM_PULL_MODE = True
+        for method in ("getMe", "getUpdates", "answerCallbackQuery", "answerPreCheckoutQuery"):
+            with self.subTest(method=method):
+                self.assertTrue(ab._telegram_sortant_autorise(method, {}))
+
     def test_pull_mode_blocks_are_logged_once_without_chat_id_and_aggregate_counts(self):
         ab.TELEGRAM_PULL_BLOCK_LOGGED.clear()
         ab.TELEGRAM_PULL_MODE = True
