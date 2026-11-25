@@ -3546,9 +3546,55 @@ def _telegram_sortant_autorise(methode, params):
     """Aucun push spontané : réponse privée à une action explicite, ou entrée attendue après demande."""
     if not TELEGRAM_PULL_MODE:
         return True
-    if methode == "answerCallbackQuery":
+    # Politique fermée : seules les méthodes Telegram réellement utilisées par ALIGN
+    # sont reconnues. Une nouvelle méthode (y compris get*/send*) exige une revue explicite.
+    method = str(methode or "")
+    methodes_telegram_connues = {
+        "answerCallbackQuery", "answerPreCheckoutQuery",
+        "getChat", "getChatMember", "getUpdates", "getMe",
+        "sendMessage", "sendPhoto", "sendPoll", "sendInvoice", "sendAudio",
+        "copyMessage", "editMessageText", "editMessageReplyMarkup",
+        "deleteMessage", "pinChatMessage", "unpinChatMessage",
+        "setChatDescription", "setMyCommands", "setChatMenuButton",
+        "setMyShortDescription", "setMyDescription", "setChatPhoto",
+        "approveChatJoinRequest", "declineChatJoinRequest", "createChatInviteLink",
+        "createChatSubscriptionInviteLink", "exportChatInviteLink",
+    }
+    if method not in methodes_telegram_connues:
+        action = str(getattr(TELEGRAM_PULL_CONTEXT, "callback_action", "") or "").split(":", 1)[0][:40] or "outside_callback"
+        log_key = (method[:40], action)
+        should_log = False
+        with TELEGRAM_AUDIT_LOCK:
+            if log_key not in TELEGRAM_PULL_BLOCK_LOGGED:
+                TELEGRAM_PULL_BLOCK_LOGGED.add(log_key)
+                should_log = True
+        if should_log:
+            print(f"TELEGRAM_PULL_BLOCK method={method[:40]} action={action} (first occurrence)", flush=True)
+        return False
+    if method in {"answerCallbackQuery", "answerPreCheckoutQuery",
+                  "getChat", "getChatMember", "getUpdates", "getMe"}:
         return True
-    if not methode.startswith(("send", "copy", "forward", "edit")):
+    if method in {"setMyCommands", "setChatMenuButton", "setMyShortDescription", "setMyDescription"}:
+        return getattr(TELEGRAM_PULL_CONTEXT, "bot_setup", False) is True
+    if method in {"setChatDescription", "setChatPhoto"}:
+        setup_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "channel_setup_chat_id", "") or "")
+        return bool(params.get("chat_id")) and str(params.get("chat_id")) == setup_chat
+    if method in {"sendMessage", "pinChatMessage", "unpinChatMessage"}:
+        rules_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "rules_setup_chat_id", "") or "")
+        if rules_chat and str(params.get("chat_id") or "") == rules_chat:
+            return True
+        menu_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "channel_menu_setup_chat_id", "") or "")
+        if menu_chat and str(params.get("chat_id") or "") == menu_chat:
+            return True
+    invite_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "invite_setup_chat_id", "") or "")
+    if (method in {"createChatInviteLink", "createChatSubscriptionInviteLink", "exportChatInviteLink"}
+            and invite_chat and str(params.get("chat_id") or "") == invite_chat):
+        return True
+    join_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "join_request_chat_id", "") or "")
+    join_user = str(getattr(TELEGRAM_PULL_CONTEXT, "join_request_user_id", "") or "")
+    if (method in {"approveChatJoinRequest", "declineChatJoinRequest"}
+            and join_chat and str(params.get("chat_id") or "") == join_chat
+            and join_user and str(params.get("user_id") or "") == join_user):
         return True
     cid = str(params.get("chat_id") or "")
     contexte = str(getattr(TELEGRAM_PULL_CONTEXT, "chat_id", "") or "")
@@ -3813,6 +3859,72 @@ REGLES = ("📌 RÈGLES — ALIGN Signaux\n"
           "🤝 Partage à tes amis :\n"
           "👉 https://t.me/align_mtf_adel_bot")
 
+def _telegram_regles_canal(methode, cid, **params):
+    """Autorisation temporaire et limitée aux mutations du message de règles de cette chaîne."""
+    ancien = getattr(TELEGRAM_PULL_CONTEXT, "rules_setup_chat_id", None)
+    TELEGRAM_PULL_CONTEXT.rules_setup_chat_id = str(cid)
+    try:
+        return telegram(methode, chat_id=cid, **params)
+    finally:
+        TELEGRAM_PULL_CONTEXT.rules_setup_chat_id = ancien
+
+
+def _telegram_configuration_bot(methode, **params):
+    """Autorisation temporaire des seules commandes/description du bot pendant leur installation."""
+    if methode not in {"setMyCommands", "setChatMenuButton", "setMyShortDescription", "setMyDescription"}:
+        return {"ok": False, "blocked_by_pull_mode": True}
+    ancien = getattr(TELEGRAM_PULL_CONTEXT, "bot_setup", False)
+    TELEGRAM_PULL_CONTEXT.bot_setup = True
+    try:
+        return telegram(methode, **params)
+    finally:
+        TELEGRAM_PULL_CONTEXT.bot_setup = ancien
+
+
+def _telegram_menu_canal(etat, methode, cid, **params):
+    """Autorisation temporaire pour publier/épingler un menu ALIGN sur une chaîne enregistrée."""
+    if methode not in {"sendMessage", "pinChatMessage", "unpinChatMessage"}:
+        return {"ok": False, "blocked_by_pull_mode": True}
+    destinations = {str(etat.get("canal") or ""), str(etat.get("canal_preuves") or "")}
+    destinations.update(str(x) for x in (etat.get("canaux_marche") or {}).values() if x)
+    cible = str(cid or "")
+    if not cible or cible not in destinations:
+        return {"ok": False, "blocked_by_pull_mode": True}
+    ancien = getattr(TELEGRAM_PULL_CONTEXT, "channel_menu_setup_chat_id", None)
+    TELEGRAM_PULL_CONTEXT.channel_menu_setup_chat_id = cible
+    try:
+        return telegram(methode, chat_id=cid, **params)
+    finally:
+        TELEGRAM_PULL_CONTEXT.channel_menu_setup_chat_id = ancien
+
+
+def _telegram_lien_canal(methode, cid, **params):
+    """Autorisation temporaire pour gérer un lien sur le canal ALIGN exact."""
+    if methode not in {"createChatInviteLink", "createChatSubscriptionInviteLink", "exportChatInviteLink"}:
+        return {"ok": False, "blocked_by_pull_mode": True}
+    ancien = getattr(TELEGRAM_PULL_CONTEXT, "invite_setup_chat_id", None)
+    TELEGRAM_PULL_CONTEXT.invite_setup_chat_id = str(cid)
+    try:
+        return telegram(methode, chat_id=cid, **params)
+    finally:
+        TELEGRAM_PULL_CONTEXT.invite_setup_chat_id = ancien
+
+
+def _telegram_decision_demande(methode, cid, uid):
+    """Autorisation temporaire d'accepter/refuser une demande précise sur le canal configuré."""
+    if methode not in {"approveChatJoinRequest", "declineChatJoinRequest"}:
+        return {"ok": False, "blocked_by_pull_mode": True}
+    ancien_chat = getattr(TELEGRAM_PULL_CONTEXT, "join_request_chat_id", None)
+    ancien_user = getattr(TELEGRAM_PULL_CONTEXT, "join_request_user_id", None)
+    TELEGRAM_PULL_CONTEXT.join_request_chat_id = str(cid)
+    TELEGRAM_PULL_CONTEXT.join_request_user_id = str(uid)
+    try:
+        return telegram(methode, chat_id=cid, user_id=uid)
+    finally:
+        TELEGRAM_PULL_CONTEXT.join_request_chat_id = ancien_chat
+        TELEGRAM_PULL_CONTEXT.join_request_user_id = ancien_user
+
+
 def epingler(etat, cid):
     """Synchronise la règle épinglée BTC/GOLD sans conserver un ancien message NASDAQ ni créer de doublon."""
     cid_key = str(cid)
@@ -3827,7 +3939,7 @@ def epingler(etat, cid):
     pending_mid = pending.get(cid_key)
     if pending_mid:
         try:
-            pin = telegram("pinChatMessage", chat_id=cid, message_id=pending_mid, disable_notification="true")
+            pin = _telegram_regles_canal("pinChatMessage", cid, message_id=pending_mid, disable_notification="true")
             if isinstance(pin, dict) and pin.get("ok"):
                 epingles.append(cid_key)
                 pending.pop(cid_key, None)
@@ -3864,7 +3976,7 @@ def epingler(etat, cid):
             print("epingler: ancien message de règles sans message_id", cid)
             return
         try:
-            unpin = telegram("unpinChatMessage", chat_id=cid, message_id=old_mid)
+            unpin = _telegram_regles_canal("unpinChatMessage", cid, message_id=old_mid)
             if not isinstance(unpin, dict) or not unpin.get("ok"):
                 print("epingler unpin", cid, (unpin or {}).get("description", "ok=false"))
                 return
@@ -3873,7 +3985,7 @@ def epingler(etat, cid):
             return
 
     try:
-        res = telegram("sendMessage", chat_id=cid, text=REGLES, disable_notification="true")
+        res = _telegram_regles_canal("sendMessage", cid, text=REGLES, disable_notification="true")
         if not isinstance(res, dict) or not res.get("ok"):
             print("epingler sendMessage", cid, (res or {}).get("description", "ok=false"))
             return
@@ -3881,7 +3993,7 @@ def epingler(etat, cid):
         if not message_id:
             print("epingler sendMessage", cid, "message_id absent")
             return
-        pin = telegram("pinChatMessage", chat_id=cid, message_id=message_id, disable_notification="true")
+        pin = _telegram_regles_canal("pinChatMessage", cid, message_id=message_id, disable_notification="true")
         if isinstance(pin, dict) and pin.get("ok"):
             epingles.append(cid_key)
             pending.pop(cid_key, None)
@@ -4141,8 +4253,8 @@ def menu_canal_resultats(etat):
     texte = "\n".join(["📌 ALIGN RÉSULTATS", "━━━━━━━━━━━━━━━", "🏆 Ici : les gains des membres", "📊 Les TP / SL du bot : dans chaque chaîne",
                         "📸 Ton gain : bouton Partager mon gain du coach", "⚠️ Pas un conseil financier | Not financial advice", RISQUE_COMPLET])
     try:
-        res = telegram("sendMessage", chat_id=canal, text=texte, reply_markup=json.dumps({"inline_keyboard": kb}), disable_notification="true")
-        telegram("pinChatMessage", chat_id=canal, message_id=res["result"]["message_id"], disable_notification="true")
+        res = _telegram_menu_canal(etat, "sendMessage", canal, text=texte, reply_markup=json.dumps({"inline_keyboard": kb}), disable_notification="true")
+        _telegram_menu_canal(etat, "pinChatMessage", canal, message_id=res["result"]["message_id"], disable_notification="true")
         etat["menu_res_v1"] = res["result"]["message_id"]
     except Exception as ex:
         print("menu résultats", ex)
@@ -4160,7 +4272,7 @@ def menu_canal_vip(etat):
             etat["menu_vip_v3"] = pm.get("message_id") or 1
             return
         if "MENU ALIGN VIP" in str(pm.get("text") or "") and pm.get("message_id"):
-            telegram("unpinChatMessage", chat_id=etat["canal"], message_id=pm["message_id"])      # ancien menu sans Live
+            _telegram_menu_canal(etat, "unpinChatMessage", etat["canal"], message_id=pm["message_id"])      # ancien menu sans Live
     except Exception as ex:
         print("menu VIP getChat", ex)
     bot = etat.get("bot") or "align_mtf_adel_bot"
@@ -4173,8 +4285,8 @@ def menu_canal_vip(etat):
         [{"text": "🏆 Gagnantes", "url": lien("gagnantes")}, {"text": "❌ Perdantes", "url": lien("perdantes")}],
         [{"text": "🔴 Le live ALIGN", "url": LIVE_LIEN}]]})
     try:
-        res = telegram("sendMessage", chat_id=etat["canal"], text="💎 MENU ALIGN VIP\n👇 Touche un bouton : il s'ouvre dans ton bot", reply_markup=kb, disable_notification="true")
-        telegram("pinChatMessage", chat_id=etat["canal"], message_id=res["result"]["message_id"], disable_notification="true")
+        res = _telegram_menu_canal(etat, "sendMessage", etat["canal"], text="💎 MENU ALIGN VIP\n👇 Touche un bouton : il s'ouvre dans ton bot", reply_markup=kb, disable_notification="true")
+        _telegram_menu_canal(etat, "pinChatMessage", etat["canal"], message_id=res["result"]["message_id"], disable_notification="true")
         etat["menu_vip_v3"] = res["result"]["message_id"]
     except Exception as ex:
         print("menu VIP", ex)
@@ -6085,6 +6197,11 @@ SON_PIECE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "
 def envoyer_son_piece(cid):
     """Envoie le son « pièce » (créé pour ALIGN, libre de droits). Le bot ne peut pas imposer une sonnerie :
     la personne l'enregistre elle-même comme son de notification de ce chat."""
+    # Cet envoi multipart contourne telegram() : appliquer le même contrôle Pull avant le réseau.
+    if not _telegram_sortant_autorise("sendAudio", {"chat_id": str(cid)}):
+        _telegram_audit("pull_block", "sendAudio", getattr(TELEGRAM_PULL_CONTEXT, "callback_action", ""))
+        return {"ok": False, "blocked_by_pull_mode": True,
+                "description": "Envoi audio bloqué par le mode Telegram sur demande"}
     anglais = str(cid) in LANG_EN
     legende = ("🔔 ALIGN coin sound\n👆 Long-press this sound → Save for notifications\n⚙️ Then pick it in this chat's notification settings"
                if anglais else
@@ -6604,6 +6721,9 @@ LIENS_CHAINES = {"BTC": "https://t.me/+udAxidycXfdmN2Jk", "GOLD": "https://t.me/
 
 def photo_canal(cid):
     """Met le logo ALIGN (le même que le bot) comme photo de la chaîne : envoi multipart de l'image."""
+    if not _telegram_sortant_autorise("setChatPhoto", {"chat_id": str(cid)}):
+        _telegram_audit("pull_block", "setChatPhoto", getattr(TELEGRAM_PULL_CONTEXT, "callback_action", ""))
+        return False
     try:
         req = urllib.request.Request(LOGO_URL, headers={"User-Agent": "align-bot"})
         with urllib.request.urlopen(req, timeout=30) as rep:
@@ -6690,7 +6810,7 @@ def epingler_menus_chaines(etat):
             continue
         info["menu_essai"] = time.time()
         texte, kb = menu_chaine(etat, m)
-        res = _envoi_sur(canal, text=texte, reply_markup=kb, disable_notification="true")
+        res = _telegram_menu_canal(etat, "sendMessage", canal, text=texte, reply_markup=kb, disable_notification="true")
         try:
             mid = res["result"]["message_id"]
         except Exception as ex:
@@ -6699,12 +6819,12 @@ def epingler_menus_chaines(etat):
         info["menu_v"] = MENU_CHAINE_VERSION       # publié : jamais republié (pas de doublon), même si l'épinglage échoue
         try:
             if info.get("menu_mid"):
-                telegram("unpinChatMessage", chat_id=canal, message_id=info["menu_mid"])     # l'ancien menu n'est plus épinglé
+                _telegram_menu_canal(etat, "unpinChatMessage", canal, message_id=info["menu_mid"])     # l'ancien menu n'est plus épinglé
         except Exception:
             pass
         info["menu_mid"] = mid
         try:
-            telegram("pinChatMessage", chat_id=canal, message_id=mid, disable_notification="true")
+            _telegram_menu_canal(etat, "pinChatMessage", canal, message_id=mid, disable_notification="true")
         except Exception as ex:
             print("épingler menu chaîne", m, ex)
 
@@ -6786,18 +6906,23 @@ def preparer_chaines(etat):
     Réussi = fait une fois pour toutes ; échec = nouvel essai au plus toutes les heures."""
     if not TOKEN:
         return
-    for m, canal in (etat.get("canaux_marche") or {}).items():
-        info = etat.setdefault("canal_live", {}).setdefault(m, {})
-        if info.get("photo_ok") is not True and time.time() - float(info.get("photo_essai", 0)) >= 3600:
-            info["photo_essai"] = time.time()
-            info["photo_ok"] = bool(photo_canal(canal)) or False
-        desc = DESCRIPTIONS_CHAINES.get(m)
-        if desc and info.get("desc_ok") != desc and time.time() - float(info.get("desc_essai", 0)) >= 3600:
-            info["desc_essai"] = time.time()
-            res = telegram("setChatDescription", chat_id=canal, description=desc)
-            ok = isinstance(res, dict) and (res.get("ok") or "not modified" in str(res.get("description", "")))
-            if ok:
-                info["desc_ok"] = desc
+    ancien_setup = getattr(TELEGRAM_PULL_CONTEXT, "channel_setup_chat_id", None)
+    try:
+        for m, canal in (etat.get("canaux_marche") or {}).items():
+            info = etat.setdefault("canal_live", {}).setdefault(m, {})
+            TELEGRAM_PULL_CONTEXT.channel_setup_chat_id = str(canal)
+            if info.get("photo_ok") is not True and time.time() - float(info.get("photo_essai", 0)) >= 3600:
+                info["photo_essai"] = time.time()
+                info["photo_ok"] = bool(photo_canal(canal)) or False
+            desc = DESCRIPTIONS_CHAINES.get(m)
+            if desc and info.get("desc_ok") != desc and time.time() - float(info.get("desc_essai", 0)) >= 3600:
+                info["desc_essai"] = time.time()
+                res = telegram("setChatDescription", chat_id=canal, description=desc)
+                ok = isinstance(res, dict) and (res.get("ok") or "not modified" in str(res.get("description", "")))
+                if ok:
+                    info["desc_ok"] = desc
+    finally:
+        TELEGRAM_PULL_CONTEXT.channel_setup_chat_id = ancien_setup
 
 
 def notifier_canal_marche(etat, m, r, cle):
@@ -7369,13 +7494,13 @@ def installer_menu(etat):
           ("resultats", "📈 My results"), ("gain", "📸 Share my profit"), ("vip", "💎 Become VIP"),
           ("live", "🔴 The live"), ("gagnantes", "🏆 Winning trades"), ("perdantes", "❌ Losing trades"), ("boutons", "⌨️ Bring back the buttons"), ("francais", "🌐 Français")]
     try:
-        res_fr = telegram("setMyCommands", commands=json.dumps([{"command": c, "description": d} for c, d in fr]))
+        res_fr = _telegram_configuration_bot("setMyCommands", commands=json.dumps([{"command": c, "description": d} for c, d in fr]))
         if not isinstance(res_fr, dict) or res_fr.get("ok") is not True:
             raise RuntimeError("setMyCommands FR non confirmé par Telegram")
         res_en = telegram("setMyCommands", commands=json.dumps([{"command": c, "description": d} for c, d in en]), language_code="en")
         if not isinstance(res_en, dict) or res_en.get("ok") is not True:
             raise RuntimeError("setMyCommands EN non confirmé par Telegram")
-        res_menu = telegram("setChatMenuButton", menu_button=json.dumps({"type": "commands"}))
+        res_menu = _telegram_configuration_bot("setChatMenuButton", menu_button=json.dumps({"type": "commands"}))
         if not isinstance(res_menu, dict) or res_menu.get("ok") is not True:
             raise RuntimeError("setChatMenuButton non confirmé par Telegram")
         print("TELEGRAM_MENU_COMMANDS_OK fr=/live en=/live")
@@ -7386,8 +7511,8 @@ def installer_menu(etat):
             pass
         except Exception as ex:
             print("nom", ex)
-        telegram("setMyShortDescription", short_description="🎁 ALIGN Gratuit : 1 position BTC / Gold proposée chaque jour • 💎 Tout le reste dans ALIGN VIP")
-        telegram("setMyDescription", description=("🎁 ALIGN Gratuit — BTC & Gold\n\n🎁 1 position proposée chaque jour, expliquée en bougies\n"
+        _telegram_configuration_bot("setMyShortDescription", short_description="🎁 ALIGN Gratuit : 1 position BTC / Gold proposée chaque jour • 💎 Tout le reste dans ALIGN VIP")
+        _telegram_configuration_bot("setMyDescription", description=("🎁 ALIGN Gratuit — BTC & Gold\n\n🎁 1 position proposée chaque jour, expliquée en bougies\n"
                                                   "🔒 Les autres : tu sais qu'elles arrivent, sans le sens\n\n"
                                                   "💎 ALIGN VIP 49,90 € / mois : toutes les positions, le sens, les niveaux et le coach (BE, TP)\n"
                                                   "🤖 Les abonnés au suivi sont enregistrés automatiquement à l'ouverture du signal.\n"
@@ -7854,7 +7979,8 @@ def demande_entree(etat, jr):
         _envoi_sur(pid, text=txt, reply_markup=kb)
 
 def decider_entree(etat, cb, ok, cle_d):
-    d = etat.setdefault("demandes_entree", {}).pop(cle_d, None)
+    demandes = etat.setdefault("demandes_entree", {})
+    d = demandes.get(cle_d)
     try:
         telegram("answerCallbackQuery", callback_query_id=cb["id"], text="✅ Accepté" if ok else "❌ Refusé")
     except Exception:
@@ -7862,7 +7988,12 @@ def decider_entree(etat, cb, ok, cle_d):
     if not d:
         _envoi_sur(str(cb["message"]["chat"]["id"]), text="ℹ️ Demande déjà traitée"); return
     try:
-        telegram("approveChatJoinRequest" if ok else "declineChatJoinRequest", chat_id=d["chat"], user_id=d["user"])
+        if str(d.get("chat")) != str(etat.get("canal_preuves") or "") or str(cb.get("from", {}).get("id")) not in {str(x) for x in proprio(etat)}:
+            raise PermissionError("demande d'entrée hors du canal de validation ou décision non propriétaire")
+        resultat = _telegram_decision_demande("approveChatJoinRequest" if ok else "declineChatJoinRequest", d["chat"], d["user"])
+        if not isinstance(resultat, dict) or resultat.get("ok") is not True:
+            raise RuntimeError("Telegram n'a pas confirmé la décision")
+        demandes.pop(cle_d, None)
         _envoi_sur(str(cb["message"]["chat"]["id"]), text=("✅ Accepté : il est entré" if ok else "❌ Refusé : il n'entre pas"))
     except Exception as ex:
         _envoi_sur(str(cb["message"]["chat"]["id"]), text=f"⚠️ Impossible : {str(ex)[:120]}")
@@ -7871,7 +8002,7 @@ def lien_validation(etat):
     """Lien d'entrée du groupe ALIGN Résultats AVEC validation (chaque entrée passe par toi)."""
     if etat.get("canal_preuves") and not etat.get("lien_preuves_valid"):
         try:
-            res = telegram("createChatInviteLink", chat_id=etat["canal_preuves"], name="ALIGN Résultats (validation)", creates_join_request="true")
+            res = _telegram_lien_canal("createChatInviteLink", etat["canal_preuves"], name="ALIGN Résultats (validation)", creates_join_request="true")
             etat["lien_preuves_valid"] = res["result"]["invite_link"]
         except Exception as ex:
             print("lien validation", ex)
@@ -10302,8 +10433,8 @@ def connecter_canal(etat, mcm):
         texte = f"✅ Bot connecté à la chaîne « {etat['canal_nom']} ». Les signaux y seront publiés automatiquement."
         try:
             if chat.get("type") == "channel" and (not etat.get("lien") or etat.get("prix_lien", 500) != PRIX_STARS):
-                res = telegram("createChatSubscriptionInviteLink", chat_id=cid, name="Abonnement VIP",
-                               subscription_period=2592000, subscription_price=PRIX_STARS)["result"]
+                res = _telegram_lien_canal("createChatSubscriptionInviteLink", cid, name="Abonnement VIP",
+                                           subscription_period=2592000, subscription_price=PRIX_STARS)["result"]
                 etat["lien"] = res["invite_link"]; etat["prix_lien"] = PRIX_STARS
             if etat.get("lien"):
                 texte += f"\n💳 Lien d'abonnement ({PRIX_STARS} ⭐ / mois) : {etat['lien']}\nC'est ce lien que tu partages pour vendre l'accès."
@@ -14641,8 +14772,8 @@ def un_tour(etat, chats):
                 and time.time() - etat.get("essai_lien", 0) > 3600:
             etat["essai_lien"] = time.time()
             try:
-                etat["lien"] = telegram("createChatSubscriptionInviteLink", chat_id=etat["canal"], name="Abonnement VIP",
-                                        subscription_period=2592000, subscription_price=PRIX_STARS)["result"]["invite_link"]
+                etat["lien"] = _telegram_lien_canal("createChatSubscriptionInviteLink", etat["canal"], name="Abonnement VIP",
+                                                    subscription_period=2592000, subscription_price=PRIX_STARS)["result"]["invite_link"]
                 etat["prix_lien"] = PRIX_STARS
                 for p in proprio(etat):
                     telegram("sendMessage", chat_id=p, text=f"💳 Lien d'abonnement VIP créé ({PRIX_STARS} ⭐ / mois ≈ 49,90 €) :\n{etat['lien']}\n\n👉 C'est ce lien que tu partages pour vendre l'accès.")
@@ -14652,7 +14783,7 @@ def un_tour(etat, chats):
         # Seul le lien d'abonnement payant (Stars) permet d'entrer : partager un lien ne donne jamais l'accès gratuit.
         if etat.get("canal") and not etat.get("lien_primaire_revoque_v1"):
             try:
-                telegram("exportChatInviteLink", chat_id=etat["canal"])
+                _telegram_lien_canal("exportChatInviteLink", etat["canal"])
                 etat["lien_primaire_revoque_v1"] = time.time()
             except Exception as ex:
                 print("révocation lien VIP", ex)

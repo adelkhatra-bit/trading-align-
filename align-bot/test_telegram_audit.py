@@ -25,12 +25,24 @@ class TelegramAuditTests(unittest.TestCase):
         ab.CALLBACKS_ACK_FAILED.clear()
         self.old_pull_mode = ab.TELEGRAM_PULL_MODE
         self.old_token = ab.TOKEN
+        self.old_pull_context = {
+            key: getattr(ab.TELEGRAM_PULL_CONTEXT, key, None)
+            for key in ("chat_id", "private", "callback_action", "channel_setup_chat_id",
+                        "rules_setup_chat_id", "invite_setup_chat_id",
+                        "join_request_chat_id", "join_request_user_id", "channel_menu_setup_chat_id", "bot_setup")
+        }
+        for key in self.old_pull_context:
+            setattr(ab.TELEGRAM_PULL_CONTEXT, key, None)
+        ab.TELEGRAM_PULL_CONTEXT.chat_id = None
+        ab.TELEGRAM_PULL_CONTEXT.private = False
         ab.TELEGRAM_PULL_MODE = False
         ab.TOKEN = "test-token"
 
     def tearDown(self):
         ab.TELEGRAM_PULL_MODE = self.old_pull_mode
         ab.TOKEN = self.old_token
+        for key, value in self.old_pull_context.items():
+            setattr(ab.TELEGRAM_PULL_CONTEXT, key, value)
         ab.CALLBACKS_ACKNOWLEDGED.clear()
         ab.CALLBACKS_ACK_FAILED.clear()
 
@@ -148,6 +160,110 @@ class TelegramAuditTests(unittest.TestCase):
         self.assertTrue(result["blocked_by_pull_mode"])
         self.assertEqual(ab.TELEGRAM_AUDIT["pull_blocks"]["sendMessage"], 1)
         self.assertNotIn("123456789", repr(ab.TELEGRAM_AUDIT))
+
+    def test_pull_mode_denies_unknown_non_message_methods_by_default(self):
+        ab.TELEGRAM_PULL_MODE = True
+        with patch.object(ab, "http_json") as http:
+            result = ab.telegram("unknownMutation", chat_id="123456789")
+        self.assertTrue(result["blocked_by_pull_mode"])
+        http.assert_not_called()
+        self.assertEqual(ab.TELEGRAM_AUDIT["pull_blocks"]["unknownMutation"], 1)
+
+    def test_pull_mode_keeps_known_read_and_protocol_methods_available(self):
+        ab.TELEGRAM_PULL_MODE = True
+        for method in ("getMe", "getUpdates", "getChat", "getChatMember",
+                       "answerCallbackQuery", "answerPreCheckoutQuery"):
+            with self.subTest(method=method):
+                self.assertTrue(ab._telegram_sortant_autorise(method, {}))
+        for method in ("getUnknownMethod", "sendUnknownMethod", "unknownMutation"):
+            with self.subTest(method=method):
+                self.assertFalse(ab._telegram_sortant_autorise(method, {}))
+
+    def test_pull_mode_blocks_multipart_audio_outside_private_request(self):
+        ab.TELEGRAM_PULL_MODE = True
+        ab.TELEGRAM_PULL_CONTEXT.chat_id = None
+        ab.TELEGRAM_PULL_CONTEXT.private = False
+        with patch.object(ab.urllib.request, "urlopen") as http:
+            result = ab.envoyer_son_piece("123456789")
+        self.assertTrue(result["blocked_by_pull_mode"])
+        http.assert_not_called()
+
+    def test_pull_mode_scopes_channel_photo_and_description_to_setup_context(self):
+        ab.TELEGRAM_PULL_MODE = True
+        ab.TELEGRAM_PULL_CONTEXT.channel_setup_chat_id = None
+        self.assertFalse(ab._telegram_sortant_autorise("setChatPhoto", {"chat_id": "-1001"}))
+        self.assertFalse(ab._telegram_sortant_autorise("setChatDescription", {"chat_id": "-1001"}))
+        ab.TELEGRAM_PULL_CONTEXT.channel_setup_chat_id = "-1001"
+        self.assertTrue(ab._telegram_sortant_autorise("setChatPhoto", {"chat_id": "-1001"}))
+        self.assertTrue(ab._telegram_sortant_autorise("setChatDescription", {"chat_id": "-1001"}))
+        self.assertFalse(ab._telegram_sortant_autorise("setChatPhoto", {"chat_id": "-1002"}))
+
+    def test_pull_mode_allows_multipart_audio_for_matching_private_request(self):
+        ab.TELEGRAM_PULL_MODE = True
+        ab.TELEGRAM_PULL_CONTEXT.chat_id = "123456789"
+        ab.TELEGRAM_PULL_CONTEXT.private = True
+        rep = type("Response", (), {"read": lambda self: b'{"ok":true,"result":{}}',
+                                    "__enter__": lambda self: self,
+                                    "__exit__": lambda self, *args: None})()
+        with patch.object(ab.urllib.request, "urlopen", return_value=rep) as http, \
+             patch.object(ab, "_telegram_verifie_cooldown"):
+            result = ab.envoyer_son_piece("123456789")
+        self.assertTrue(result["ok"])
+        http.assert_called_once()
+
+    def test_pull_mode_scopes_invitation_management_to_exact_setup_channel(self):
+        ab.TELEGRAM_PULL_MODE = True
+        for method in ("createChatInviteLink", "createChatSubscriptionInviteLink", "exportChatInviteLink"):
+            with self.subTest(method=method):
+                self.assertFalse(ab._telegram_sortant_autorise(method, {"chat_id": "-1001"}))
+                ab.TELEGRAM_PULL_CONTEXT.invite_setup_chat_id = "-1001"
+                self.assertTrue(ab._telegram_sortant_autorise(method, {"chat_id": "-1001"}))
+                self.assertFalse(ab._telegram_sortant_autorise(method, {"chat_id": "-1002"}))
+                ab.TELEGRAM_PULL_CONTEXT.invite_setup_chat_id = None
+
+    def test_pull_mode_scopes_join_decisions_to_exact_channel_and_user(self):
+        ab.TELEGRAM_PULL_MODE = True
+        for method in ("approveChatJoinRequest", "declineChatJoinRequest"):
+            with self.subTest(method=method):
+                params = {"chat_id": "-1001", "user_id": "42"}
+                self.assertFalse(ab._telegram_sortant_autorise(method, params))
+                ab.TELEGRAM_PULL_CONTEXT.join_request_chat_id = "-1001"
+                ab.TELEGRAM_PULL_CONTEXT.join_request_user_id = "42"
+                self.assertTrue(ab._telegram_sortant_autorise(method, params))
+                self.assertFalse(ab._telegram_sortant_autorise(method, {"chat_id": "-1001", "user_id": "43"}))
+                self.assertFalse(ab._telegram_sortant_autorise(method, {"chat_id": "-1002", "user_id": "42"}))
+                ab.TELEGRAM_PULL_CONTEXT.join_request_chat_id = None
+                ab.TELEGRAM_PULL_CONTEXT.join_request_user_id = None
+
+    def test_invitation_and_join_helpers_restore_temporary_context(self):
+        with patch.object(ab, "telegram", return_value={"ok": True}) as api:
+            self.assertTrue(ab._telegram_lien_canal("createChatInviteLink", "-1001", name="test")["ok"])
+            self.assertEqual(ab.TELEGRAM_PULL_CONTEXT.invite_setup_chat_id, None)
+            self.assertTrue(ab._telegram_decision_demande("declineChatJoinRequest", "-1001", "42")["ok"])
+            self.assertEqual(ab.TELEGRAM_PULL_CONTEXT.join_request_chat_id, None)
+            self.assertEqual(ab.TELEGRAM_PULL_CONTEXT.join_request_user_id, None)
+        self.assertEqual(api.call_count, 2)
+
+    def test_pull_mode_scopes_bot_profile_setup_to_explicit_installer_context(self):
+        ab.TELEGRAM_PULL_MODE = True
+        for method in ("setMyCommands", "setChatMenuButton", "setMyShortDescription", "setMyDescription"):
+            with self.subTest(method=method):
+                self.assertFalse(ab._telegram_sortant_autorise(method, {}))
+        with patch.object(ab, "telegram", return_value={"ok": True}) as api:
+            self.assertTrue(ab._telegram_configuration_bot("setMyCommands", commands="[]")["ok"])
+            self.assertIs(getattr(ab.TELEGRAM_PULL_CONTEXT, "bot_setup", False), None)
+        api.assert_called_once()
+
+    def test_pull_mode_scopes_channel_menu_setup_to_registered_destination(self):
+        ab.TELEGRAM_PULL_MODE = True
+        state = {"canal": "-100vip", "canal_preuves": "-100proofs", "canaux_marche": {"BTC": "-100btc"}}
+        with patch.object(ab, "telegram", return_value={"ok": True}) as api:
+            self.assertTrue(ab._telegram_menu_canal(state, "sendMessage", "-100btc", text="menu")["ok"])
+            self.assertTrue(ab._telegram_menu_canal(state, "pinChatMessage", "-100vip", message_id=5)["ok"])
+            blocked = ab._telegram_menu_canal(state, "sendMessage", "-100other", text="menu")
+        self.assertTrue(blocked["blocked_by_pull_mode"])
+        self.assertEqual(api.call_count, 2)
+        self.assertIsNone(getattr(ab.TELEGRAM_PULL_CONTEXT, "channel_menu_setup_chat_id", None))
 
     def test_pull_mode_blocks_are_logged_once_without_chat_id_and_aggregate_counts(self):
         ab.TELEGRAM_PULL_BLOCK_LOGGED.clear()
