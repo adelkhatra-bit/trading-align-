@@ -257,8 +257,6 @@ class TelegramAuditTests(unittest.TestCase):
     def test_pull_mode_scopes_channel_menu_setup_to_registered_destination(self):
         ab.TELEGRAM_PULL_MODE = True
         state = {"canal": "-100vip", "canal_preuves": "-100proofs", "canaux_marche": {"BTC": "-100btc"}}
-        self.assertTrue(ab._telegram_menu_canal(state, "sendMessage", "-100btc", text="menu")["blocked_by_pull_mode"] is False
-                        if False else True) if False else None
         with patch.object(ab, "telegram", return_value={"ok": True}) as api:
             self.assertTrue(ab._telegram_menu_canal(state, "sendMessage", "-100btc", text="menu")["ok"])
             self.assertTrue(ab._telegram_menu_canal(state, "pinChatMessage", "-100vip", message_id=5)["ok"])
