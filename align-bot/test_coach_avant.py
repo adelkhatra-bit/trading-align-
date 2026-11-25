@@ -65,9 +65,7 @@ class CoachStopPolicy(unittest.TestCase):
             "m1": [{"c": 106.0}], "r5": [50.0], "dirs": [0] * 11,
             "niveaux": [], "atr": 1.0,
         }
-        with mock.patch.object(ab.time, "time", return_value=now), \\
-             mock.patch.object(ab, "gerer_stop"), \\
-             mock.patch.object(ab, "_envoi_sur", side_effect=lambda cid, **kwargs: sent.append(kwargs["text"]) or {"ok": True}):
+        with mock.patch.object(ab.time, "time", return_value=now), mock.patch.object(ab, "gerer_stop"), mock.patch.object(ab, "_envoi_sur", side_effect=lambda cid, **kwargs: sent.append(kwargs["text"]) or {"ok": True}):
             ab.coach(etat, "BTC", r, cle)
         news = [message for message in sent if "News dans" in message]
         self.assertEqual(len(news), 1)
