@@ -1,4 +1,5 @@
 import unittest
+import urllib.parse
 from unittest.mock import patch
 
 import align_bot as ab
@@ -65,8 +66,9 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
 
         self.assertEqual(request.call_count, 1)
         self.assertIn("101", str(request.call_args))
-        self.assertIn("LIVE COMMENTATOR", str(request.call_args))
-        self.assertNotIn("COACH COMMENTATEUR", str(request.call_args))
+        sent_text = urllib.parse.parse_qs(request.call_args.args[1].decode())["text"][0]
+        self.assertIn("LIVE COMMENTATOR", sent_text)
+        self.assertNotIn("COACH COMMENTATEUR", sent_text)
         self.assertEqual(state["coach_live"]["BTC"]["101"]["dernier_t"], 1000)
 
     def test_private_coach_flash_commentary_is_fully_translated(self):
