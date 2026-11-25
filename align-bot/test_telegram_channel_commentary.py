@@ -307,9 +307,9 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
              patch.object(ab, "http_json", return_value={"ok": True, "result": {"message_id": 53}}) as request:
             ok = ab._telegram_envoyer_veille_cloture(state, "101", "BTC", "🕯 Clôture 15 min : biais inchangé")
             denied = ab._telegram_envoyer_veille_cloture(state, "101", "BTC", "Entry 100 / SL 95 / TP 110")
+            wrong_user = ab._telegram_envoyer_veille_cloture(state, "202", "BTC", "🕯 Clôture 15 min : biais inchangé")
         self.assertTrue(ok.get("ok"))
         self.assertTrue(denied.get("blocked_by_pull_mode"))
-        wrong_user = ab._telegram_envoyer_veille_cloture(state, "202", "BTC", "🕯 Clôture 15 min : biais inchangé")
         self.assertTrue(wrong_user.get("blocked_by_pull_mode"))
         self.assertEqual(request.call_count, 1)
 
