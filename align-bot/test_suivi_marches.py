@@ -411,28 +411,34 @@ class FeteEtManipTest(unittest.TestCase):
 
 
 class EpinglesSansDoublon(unittest.TestCase):
-    """Les règles ne sont jamais ré-épinglées si elles le sont déjà (mémoire perdue au redémarrage = plus de notifications en double)."""
+    """Les règles ne sont jamais ré-épinglées si elles le sont déjà ; les anciennes versions sont migrées sans doublon."""
     def test_deja_epinglees(self):
         from unittest.mock import patch
         appels = []
         def tg(meth, **k):
             appels.append(meth)
-            return {"result": {"pinned_message": {"text": ab.REGLES, "message_id": 5}}} if meth == "getChat" else {"result": {"message_id": 9}}
+            return {"ok": True, "result": {"pinned_message": {"text": ab.REGLES, "message_id": 5}}} if meth == "getChat" else {"ok": True, "result": {"message_id": 9}}
         etat = {}
         with patch.object(ab, "telegram", side_effect=tg):
             ab.epingler(etat, "42")
         self.assertEqual(appels, ["getChat"])
-        self.assertIn("42", etat["epingles_v5"])
+        self.assertIn("42", etat["epingles_v6"])
 
     def test_pas_encore_epinglees(self):
         from unittest.mock import patch
         appels = []
         def tg(meth, **k):
             appels.append(meth)
-            return {"result": {}} if meth == "getChat" else {"result": {"message_id": 9}}
+            if meth == "getChat":
+                return {"ok": True, "result": {}}
+            if meth == "sendMessage":
+                return {"ok": True, "result": {"message_id": 9}}
+            return {"ok": True, "result": True}
+        etat = {}
         with patch.object(ab, "telegram", side_effect=tg):
-            ab.epingler({}, "42")
+            ab.epingler(etat, "42")
         self.assertEqual(appels, ["getChat", "sendMessage", "pinChatMessage"])
+        self.assertIn("42", etat["epingles_v6"])
 
 if __name__ == "__main__":
     unittest.main()
