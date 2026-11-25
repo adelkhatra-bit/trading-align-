@@ -3567,6 +3567,44 @@ def _telegram_envoyer_radar(etat, cid, methode, **params):
         TELEGRAM_PULL_CONTEXT.radar_message_id = ancien_mid
 
 
+def _telegram_envoyer_jauge(etat, m, cid, cle, methode, *, nettoyage=False, **params):
+    """Autorisation temporaire de la jauge du marché, limitée à l'abonné, au canal VIP ou au message exact."""
+    if methode not in {"sendMessage", "editMessageText", "deleteMessage"}:
+        return {"ok": False, "blocked_by_pull_mode": True}
+    anciens = {
+        "jauge_chat_id": getattr(TELEGRAM_PULL_CONTEXT, "jauge_chat_id", None),
+        "jauge_market": getattr(TELEGRAM_PULL_CONTEXT, "jauge_market", None),
+        "jauge_state": getattr(TELEGRAM_PULL_CONTEXT, "jauge_state", None),
+        "jauge_message_id": getattr(TELEGRAM_PULL_CONTEXT, "jauge_message_id", None),
+        "jauge_cleanup": getattr(TELEGRAM_PULL_CONTEXT, "jauge_cleanup", False),
+        "jauge_channel": getattr(TELEGRAM_PULL_CONTEXT, "jauge_channel", False),
+    }
+    TELEGRAM_PULL_CONTEXT.jauge_chat_id = str(cid or "")
+    TELEGRAM_PULL_CONTEXT.jauge_market = str(m or "").upper()
+    TELEGRAM_PULL_CONTEXT.jauge_state = cle
+    TELEGRAM_PULL_CONTEXT.jauge_message_id = str(params.get("message_id") or "")
+    TELEGRAM_PULL_CONTEXT.jauge_cleanup = bool(nettoyage)
+    TELEGRAM_PULL_CONTEXT.jauge_channel = bool(str(cid or "") and str(cid) == str(etat.get("canal") or ""))
+    try:
+        return telegram(methode, chat_id=cid, **params)
+    finally:
+        for attr, value in anciens.items():
+            setattr(TELEGRAM_PULL_CONTEXT, attr, value)
+
+
+def _telegram_jauge_operation_ok(resultat, methode):
+    if not isinstance(resultat, dict):
+        return False
+    if resultat.get("ok") is True:
+        return True
+    description = str(resultat.get("description") or "").lower()
+    if methode == "editMessageText" and "not modified" in description:
+        return True
+    if methode == "deleteMessage" and any(x in description for x in ("not found", "message_id_invalid")):
+        return True
+    return False
+
+
 def _telegram_envoyer_commentaire_canal(etat, m, canal, texte, **kwargs):
     """Autorisation bornée : commentaire M15 / flash dans la seule chaîne du marché concernée."""
     ancien_chat = getattr(TELEGRAM_PULL_CONTEXT, "market_commentary_chat_id", None)
@@ -3741,6 +3779,39 @@ def _telegram_sortant_autorise(methode, params):
             and radar_mid and str(params.get("message_id") or "") == radar_mid
             and str(radar_mem.get("mid") or "") == radar_mid):
         return True
+    # Jauge de progression : abonné explicite / position personnelle, ou canal VIP configuré.
+    jauge_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "jauge_chat_id", "") or "")
+    jauge_market = str(getattr(TELEGRAM_PULL_CONTEXT, "jauge_market", "") or "").upper()
+    jauge_state = getattr(TELEGRAM_PULL_CONTEXT, "jauge_state", None)
+    jauge_mid = str(getattr(TELEGRAM_PULL_CONTEXT, "jauge_message_id", "") or "")
+    jauge_cleanup = bool(getattr(TELEGRAM_PULL_CONTEXT, "jauge_cleanup", False))
+    jauge_channel = bool(getattr(TELEGRAM_PULL_CONTEXT, "jauge_channel", False))
+    jauge_state_exact = jauge_market in MARCHES and isinstance(jauge_state, dict) and etat.get(jauge_market) is jauge_state
+    jauge_mem_mid = str(((jauge_state or {}).get("jauge") or {}).get(cid) or "") if jauge_state_exact else ""
+    jauge_message_id = str(params.get("message_id") or "")
+    if (methode in {"sendMessage", "editMessageText", "deleteMessage"} and cid
+            and cid == jauge_chat and jauge_state_exact):
+        if (methode == "deleteMessage" and jauge_cleanup and jauge_mid
+                and jauge_message_id == jauge_mid == jauge_mem_mid):
+            return True
+        if jauge_channel and cid == str(etat.get("canal") or ""):
+            if methode == "sendMessage" and not jauge_mem_mid:
+                return True
+            if methode == "editMessageText" and jauge_mid and jauge_message_id == jauge_mid == jauge_mem_mid:
+                return True
+        elif cid.isdecimal():
+            position_jauge = (((jauge_state.get("trade") or {}).get("qui") or {}).get(cid))
+            en_position_jauge = isinstance(position_jauge, dict) and not position_jauge.get("fini")
+            jauge_optin = marche_autorise(etat, cid, jauge_market) and (
+                coach_actif(etat, cid, jauge_market) or en_position_jauge
+            )
+            if methode == "sendMessage" and jauge_optin and not jauge_mem_mid:
+                if not contient_niveaux(texte) or en_position_jauge or autorise(etat, cid, cid):
+                    return True
+            if (methode == "editMessageText" and jauge_optin and jauge_mid
+                    and jauge_message_id == jauge_mid == jauge_mem_mid):
+                if not contient_niveaux(texte) or en_position_jauge or autorise(etat, cid, cid):
+                    return True
     # Commentaire public M15 / flash : uniquement dans la chaîne du marché configurée,
     # sous autorisation temporaire du producteur dédié. Jamais de niveau Entry/SL/TP ni de push privé.
     commentaire_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "market_commentary_chat_id", "") or "")
@@ -10912,32 +10983,48 @@ def jauge(m, r, cle, cid=None, canal=False):
 
 def maj_jauge(etat, m, r, cle, chats, canal=None):
     for cid in list(chats) + ([canal] if canal else []):
-        if cid != canal and (not marche_autorise(etat, cid, m) or
-                              (not coach_actif(etat, cid, m) and not en_position(etat, cid))):
-            mid = cle.get("jauge", {}).pop(cid, None)
-            cle.get("jauge_txt", {}).pop(cid, None)
+        cid = str(cid)
+        if cid != str(canal or "") and (not marche_autorise(etat, cid, m) or
+                                         (not coach_actif(etat, cid, m) and not en_position(etat, cid))):
+            mid = (cle.get("jauge") or {}).get(cid)
             if mid:
-                try: telegram("deleteMessage", chat_id=cid, message_id=mid)
-                except Exception: pass
+                try:
+                    resultat = _telegram_envoyer_jauge(etat, m, cid, cle, "deleteMessage", nettoyage=True, message_id=mid)
+                    if _telegram_jauge_operation_ok(resultat, "deleteMessage"):
+                        cle.get("jauge", {}).pop(cid, None)
+                        cle.get("jauge_txt", {}).pop(cid, None)
+                except Exception as ex:
+                    print("jauge suppression", ex)
+            else:
+                cle.get("jauge_txt", {}).pop(cid, None)
             continue
-        txt = jauge(m, r, cle, cid, cid == canal)
-        mid = cle.get("jauge", {}).get(cid)
+        txt = jauge(m, r, cle, cid, cid == str(canal or ""))
+        mid = (cle.get("jauge") or {}).get(cid)
         try:
             if txt and mid:
                 derniere_maj = cle.setdefault("jauge_t", {}).get(cid, 0)
                 if cle.setdefault("jauge_txt", {}).get(cid) != txt and time.time() - derniere_maj >= JAUGE_REFRESH_SEC:
-                    telegram("editMessageText", chat_id=cid, message_id=mid, text=txt)
+                    resultat = _telegram_envoyer_jauge(etat, m, cid, cle, "editMessageText", message_id=mid, text=txt)
+                    if not _telegram_jauge_operation_ok(resultat, "editMessageText"):
+                        continue
                     cle["jauge_t"][cid] = time.time()
                 else:
                     continue
             elif txt:
-                res = telegram("sendMessage", chat_id=cid, text=txt, disable_notification="true")
-                cle.setdefault("jauge", {})[cid] = res["result"]["message_id"]
+                resultat = _telegram_envoyer_jauge(etat, m, cid, cle, "sendMessage", text=txt, disable_notification="true")
+                if not _telegram_jauge_operation_ok(resultat, "sendMessage"):
+                    continue
+                nouveau_mid = (resultat.get("result") or {}).get("message_id")
+                if not nouveau_mid:
+                    continue
+                cle.setdefault("jauge", {})[cid] = nouveau_mid
             if txt:
                 cle.setdefault("jauge_txt", {})[cid] = txt
             elif mid:
-                telegram("deleteMessage", chat_id=cid, message_id=mid)
-                cle["jauge"].pop(cid, None)
+                resultat = _telegram_envoyer_jauge(etat, m, cid, cle, "deleteMessage", nettoyage=True, message_id=mid)
+                if _telegram_jauge_operation_ok(resultat, "deleteMessage"):
+                    cle.get("jauge", {}).pop(cid, None)
+                    cle.get("jauge_txt", {}).pop(cid, None)
         except Exception as ex:
             print("jauge", ex)
 
