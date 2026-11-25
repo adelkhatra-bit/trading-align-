@@ -3601,10 +3601,15 @@ def _telegram_sortant_autorise(methode, params):
     coach_users = (etat.get("coach_live") or {}).get(coach_market) or {}
     coach_info = coach_users.get(cid) if isinstance(coach_users, dict) else None
     coach_quiet = {str(x) for x in (etat.get("quiet") or [])}
+    coach_trade = (etat.get(coach_market) or {}).get("trade") if coach_market in MARCHES else None
+    coach_position_summary = (
+        "🎙 COACH COMMENTATEUR" in texte and "📂 Position :" in texte
+        and isinstance(coach_trade, dict)
+    )
     if (methode == "sendMessage" and cid.isdecimal() and cid == coach_chat
             and coach_market in MARCHES and isinstance(coach_info, dict)
             and bot_on(etat, cid) and cid not in coach_quiet
-            and (_telegram_position_attendue(texte) or not contient_niveaux(texte))):
+            and (_telegram_position_attendue(texte) or not contient_niveaux(texte) or coach_position_summary)):
         return True
     # Commentaire public M15 / flash : uniquement dans la chaîne du marché configurée,
     # sous autorisation temporaire du producteur dédié. Jamais de niveau Entry/SL/TP ni de push privé.
