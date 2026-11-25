@@ -2795,6 +2795,83 @@ TRAD.update({
     "⛔ SL cassé à la clôture :": "⛔ SL broken at the close:", "annulé ↩ RETOURNEMENT en cours (attendre la confirmation 15 min / 1h)": "cancelled ↩ REVERSAL in progress (wait for the 15 min / 1h confirmation)",
     "✅ RETOURNEMENT CONFIRMÉ :": "✅ REVERSAL CONFIRMED:", "petites unités contre le plan": "small timeframes against the plan", ": le retournement se prépare": ": a reversal is building",
 })
+
+# Les cartes du commentateur sont traduites explicitement : les libellés courts
+# ne doivent pas laisser des fragments français dans une conversation anglaise.
+TRAD.update({
+    "🎙 COACH COMMENTATEUR ACTIVÉ": "🎙 LIVE COMMENTATOR ACTIVATED",
+    "🎙 COACH COMMENTATEUR": "🎙 LIVE COMMENTATOR",
+    "👁 EN DIRECT": "👁 LIVE",
+    "📊 BILAN 15 MIN": "📊 15-MINUTE SUMMARY",
+    "ℹ️ Info, pas une entrée": "ℹ️ Information, not an entry",
+    "🟢 Bougie en hausse": "🟢 Candle rising",
+    "🔴 Bougie en baisse": "🔴 Candle falling",
+    "⚪ Bougie à plat": "⚪ Flat candle",
+    "👁 Mèche haute : rejet": "👁 Upper wick: rejection",
+    "👁 Mèche basse : rejet": "👁 Lower wick: rejection",
+    "👁 Mouvement franc 💪": "👁 Strong move 💪",
+    "👁 Le marché hésite 🤏": "👁 Market is hesitating 🤏",
+    "📉 Unités :": "📉 Timeframes:",
+    "📈 Unités :": "📈 Timeframes:",
+    "➖ Unités partagées": "➖ Mixed timeframes",
+    "📏 Écart :": "📏 Range:",
+    "🧭 Tendance :": "🧭 Trend:",
+    "🟢 hausse": "🟢 rising",
+    "🔴 baisse": "🔴 falling",
+    "➖ floue": "➖ unclear",
+    "⚡ Compression : ça charge": "⚡ Compression: pressure is building",
+    "📂 Bot : ": "📂 Bot: ",
+    "🟢 LONG en cours": "🟢 LONG ongoing",
+    "🔴 SHORT en cours": "🔴 SHORT ongoing",
+    "📂 Position :": "📂 Position:",
+    "✅ Entrée encore possible": "✅ Entry still possible",
+    "⛔ Trop tard pour entrer": "⛔ Too late to enter",
+    "🔵 TP1 : touché ✅": "🔵 TP1: hit ✅",
+    "🔵 TP1 :": "🔵 TP1:",
+    "🔵 TP2 :": "🔵 TP2:",
+    "🟡 Entrée :": "🟡 Entry:",
+    "🔴 SL :": "🔴 SL:",
+    "⚠️ Rebond possible": "⚠️ Possible bounce",
+    "👍 On laisse courir": "👍 Let it run",
+    "👀 Prix DANS la zone": "👀 Price IN the zone",
+    "👀 Zone à ": "👀 Zone at ",
+    "⏱ Prochaine :": "⏱ Next:",
+    "📂 POSITIONS DU BOT": "📂 BOT POSITIONS",
+    "🎯 POSITION ALIGN DÉTECTÉE": "🎯 ALIGN POSITION DETECTED",
+    " • Entrée ": " • Entry ",
+    " • vue ": " • chart ",
+    "(mèche)": "(wick)",
+    "📍 Suivi actif :": "📍 Active tracking:",
+    "passage à BE": "move to BE",
+    "ℹ️ ALIGN ne transmet aucun ordre à ton broker.": "ℹ️ ALIGN does not send any orders to your broker.",
+    "🎙 Ton commentateur ": "🎙 Your commentator ",
+    "👉 Il est dans ta chaîne": "👉 It is in your channel",
+    "🔕 Ici, plus de doublon": "🔕 No duplicate messages here",
+    "🎙 ÇA BOUGE !": "🎙 IT'S MOVING!",
+    "🔴 Les vendeurs accélèrent": "🔴 Sellers are accelerating",
+    "🟢 Les acheteurs accélèrent": "🟢 Buyers are accelerating",
+    " en 3 min": " in 3 min",
+    "🎙 GROSSE MÈCHE !": "🎙 BIG WICK!",
+    "👀 15 min en cours : rejet à ": "👀 15-min candle forming: rejection at ",
+    "🔴 Les vendeurs repoussent le prix": "🔴 Sellers are pushing price down",
+    "🟢 Les acheteurs rachètent": "🟢 Buyers are buying the dip",
+    "✅ Dans le sens du bot": "✅ With the bot's direction",
+    "🚀 Direction TP2": "🚀 Toward TP2",
+    "🎯 Direction TP1": "🎯 Toward TP1",
+    "👍 On laisse courir": "👍 Let it run",
+    "⚠️ Contre le bot": "⚠️ Against the bot",
+    "🔒 SL à BE : zéro risque": "🔒 SL at BE: risk-free",
+    "🧊 On garde la tête froide": "🧊 Keep a cool head",
+    "⏳ La clôture 15 min décide": "⏳ The 15-min close decides",
+    "🧭 Dans le sens de la tendance": "🧭 With the trend",
+    "↩ Contre la tendance : rebond ?": "↩ Counter-trend bounce?",
+    "➖ Pas de tendance nette": "➖ No clear trend",
+    "⏳ J'attends la clôture 15 min": "⏳ Waiting for the 15-min close",
+    "🔎 Surveillance continue : je cherche une configuration d'entrée confirmée, sans inventer de signal.": "🔎 Continuous monitoring: I look for a confirmed entry setup and never invent a signal.",
+    "🕯 Commentaire aux clôtures 15 min utiles ; aucune Entry/SL/TP sans confirmation Pine.": "🕯 Commentary at relevant 15-minute closes; no Entry/SL/TP without Pine confirmation.",
+    "📍 Dès qu'une position est ouverte par ALIGN, je poursuis son suivi.": "📍 As soon as ALIGN opens a position, I continue tracking it.",
+    "⏹ Pour arrêter : le bouton sous mes messages.": "⏹ To stop: use the button below my messages."
+})
 _CLES = sorted(TRAD, key=len, reverse=True)
 BOUTONS_FR = ["🤖 Mon bot", "📸 Partager mon gain", "🟠 Analyse BTC", "🥇 Analyse Gold", "✅ Je suis rentré", "🚪 Je suis sorti", "📈 Mes résultats",
               "🧩 Indicateur TradingView", "💎 Devenir VIP", "📡 Mes marchés", "❌ Non", "🎙 Mes chaînes"]
@@ -3439,6 +3516,32 @@ def _telegram_envoyer_coach_prealerte(etat, cid, texte, marches):
         TELEGRAM_PULL_CONTEXT.coach_prealert_markets = anciens_marches
 
 
+def _telegram_envoyer_commentaire_coach_prive(etat, cid, m, texte, **kwargs):
+    """Autorisation temporaire pour le coach privé explicitement activé sur ce marché."""
+    ancien_chat = getattr(TELEGRAM_PULL_CONTEXT, "coach_commentary_chat_id", None)
+    ancien_marche = getattr(TELEGRAM_PULL_CONTEXT, "coach_commentary_market", None)
+    TELEGRAM_PULL_CONTEXT.coach_commentary_chat_id = str(cid or "")
+    TELEGRAM_PULL_CONTEXT.coach_commentary_market = str(m or "").upper()
+    try:
+        return _envoi_sur(cid, text=texte, **kwargs)
+    finally:
+        TELEGRAM_PULL_CONTEXT.coach_commentary_chat_id = ancien_chat
+        TELEGRAM_PULL_CONTEXT.coach_commentary_market = ancien_marche
+
+
+def _telegram_envoyer_commentaire_canal(etat, m, canal, texte, **kwargs):
+    """Autorisation bornée : commentaire M15 / flash dans la seule chaîne du marché concernée."""
+    ancien_chat = getattr(TELEGRAM_PULL_CONTEXT, "market_commentary_chat_id", None)
+    ancien_marche = getattr(TELEGRAM_PULL_CONTEXT, "market_commentary_market", None)
+    TELEGRAM_PULL_CONTEXT.market_commentary_chat_id = str(canal or "")
+    TELEGRAM_PULL_CONTEXT.market_commentary_market = str(m or "").upper()
+    try:
+        return _envoi_sur(canal, text=texte, **kwargs)
+    finally:
+        TELEGRAM_PULL_CONTEXT.market_commentary_chat_id = ancien_chat
+        TELEGRAM_PULL_CONTEXT.market_commentary_market = ancien_marche
+
+
 def _telegram_sortant_autorise(methode, params):
     """Aucun push spontané : réponse privée à une action explicite, ou entrée attendue après demande."""
     if not TELEGRAM_PULL_MODE:
@@ -3497,6 +3600,32 @@ def _telegram_sortant_autorise(methode, params):
     canaux_news = {str(v) for v in (etat.get("canaux_marche") or {}).values() if v}
     if (cid and cid == news_chat and cid in canaux_news and methode == "sendMessage"
             and texte.startswith("🚨 NEWS DE DERNIÈRE MINUTE")):
+        return True
+    # Commentaire / position du coach privé : uniquement pour l'utilisateur inscrit au coach
+    # du marché exact. Les niveaux ne passent que dans un message de position ALIGN confirmée.
+    coach_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "coach_commentary_chat_id", "") or "")
+    coach_market = str(getattr(TELEGRAM_PULL_CONTEXT, "coach_commentary_market", "") or "").upper()
+    coach_users = (etat.get("coach_live") or {}).get(coach_market) or {}
+    coach_info = coach_users.get(cid) if isinstance(coach_users, dict) else None
+    coach_quiet = {str(x) for x in (etat.get("quiet") or [])}
+    coach_trade = (etat.get(coach_market) or {}).get("trade") if coach_market in MARCHES else None
+    coach_position_summary = (
+        "🎙 COACH COMMENTATEUR" in texte and "📂 Position :" in texte
+        and isinstance(coach_trade, dict)
+    )
+    if (methode == "sendMessage" and cid.isdecimal() and cid == coach_chat
+            and coach_market in MARCHES and isinstance(coach_info, dict)
+            and bot_on(etat, cid) and cid not in coach_quiet
+            and (_telegram_position_attendue(texte) or not contient_niveaux(texte) or coach_position_summary)):
+        return True
+    # Commentaire public M15 / flash : uniquement dans la chaîne du marché configurée,
+    # sous autorisation temporaire du producteur dédié. Jamais de niveau Entry/SL/TP ni de push privé.
+    commentaire_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "market_commentary_chat_id", "") or "")
+    commentaire_marche = str(getattr(TELEGRAM_PULL_CONTEXT, "market_commentary_market", "") or "").upper()
+    canal_commentaire = str((etat.get("canaux_marche") or {}).get(commentaire_marche) or "")
+    if (methode == "sendMessage" and cid and cid == commentaire_chat == canal_commentaire
+            and commentaire_marche in MARCHES
+            and not _telegram_position_attendue(texte) and not contient_niveaux(texte)):
         return True
     if cid and cid in actifs and methode in ("sendMessage", "sendPhoto", "editMessageText") and _telegram_position_attendue(texte):
         marches_signal = marches_message(texte)
@@ -6682,8 +6811,9 @@ def notifier_canal_marche(etat, m, r, cle):
     if int(info.get("dernier_t", 0)) < int(b["t"]):
         # Marqué AVANT l'envoi : une coupure réseau après livraison ne doit jamais donner 4 bilans identiques (vu le 14/11 à 20:24)
         info["dernier_t"] = int(b["t"])
-        _envoi_sur(canal, text=texte_coach_live(m, b, r, cle, None, public=True), reply_markup=boutons_chaine_marche(etat),
-                   disable_notification="true")      # commentaire = sans son : les abonnés restent tranquilles
+        _telegram_envoyer_commentaire_canal(etat, m, canal, texte_coach_live(m, b, r, cle, None, public=True),
+                                            reply_markup=boutons_chaine_marche(etat),
+                                            disable_notification="true")  # commentaire = sans son : les abonnés restent tranquilles
         return
     flash = flash_commentateur(m, r, cle)
     t15 = int(((r.get("b15") or [{}])[-1]).get("t") or 0)
@@ -6693,7 +6823,8 @@ def notifier_canal_marche(etat, m, r, cle):
         info["flash_t"] = time.time()
         if "MÈCHE" in flash:
             info["meche_t15"] = t15
-        _envoi_sur(canal, text=flash, reply_markup=boutons_chaine_marche(etat), disable_notification="true")
+        _telegram_envoyer_commentaire_canal(etat, m, canal, flash, reply_markup=boutons_chaine_marche(etat),
+                                            disable_notification="true")
         tr_ = cle.get("trade") or {}
         live_bande(etat, texte_bande_flash(flash, tr_.get("d"), m), f"pulse{m}", 600, toujours=True)
 
@@ -6748,9 +6879,12 @@ def notifier_coach_live(etat, m, r, cle):
         if not bot_on(etat, cid) or str(cid) in silencieux:
             continue
         if dans_chaine(etat, cid, m):
+            _telegram_envoyer_commentaire_coach_prive(
+                etat, cid, m,
+                f"🎙 Ton commentateur {ICONE.get(m, '')} {m}\n👉 Il est dans ta chaîne\n🔕 Ici, plus de doublon",
+                reply_markup=json.dumps({"inline_keyboard": [[{"text": f"🎙 Ouvrir {m}", "url": LIENS_CHAINES.get(m, BOT_LIEN)}]]})
+            )
             abonnes.pop(cid, None)
-            _envoi_sur(cid, text=f"🎙 Ton commentateur {ICONE.get(m, '')} {m}\n👉 Il est dans ta chaîne\n🔕 Ici, plus de doublon",
-                       reply_markup=json.dumps({"inline_keyboard": [[{"text": f"🎙 Ouvrir {m}", "url": LIENS_CHAINES.get(m, BOT_LIEN)}]]}))
             continue
 
         # Une position nouvellement détectée ne doit pas attendre la prochaine clôture M15.
@@ -6771,8 +6905,9 @@ def notifier_coach_live(etat, m, r, cle):
                            + resume_ordre(trade)
                            + "\n📍 Suivi actif : SL / passage à BE / TP.\n"
                            "ℹ️ ALIGN ne transmet aucun ordre à ton broker.")
-                resultat = _envoi_sur(cid, text=message,
-                                      reply_markup=markup_analyse(etat, m, r, cid))
+                resultat = _telegram_envoyer_commentaire_coach_prive(
+                    etat, cid, m, message, reply_markup=markup_analyse(etat, m, r, cid)
+                )
                 if isinstance(resultat, dict) and resultat.get("ok") is True:
                     info["position_key"] = position_key
                     position_envoyee = True
@@ -6787,11 +6922,13 @@ def notifier_coach_live(etat, m, r, cle):
         if int(info.get("dernier_t", 0)) >= int(b["t"]):
             flash = flash_commentateur(m, r, cle)
             if flash and time.time() - float(info.get("flash_t", 0)) >= 300:
-                if _envoi_sur(cid, text=flash) is not None:
+                if _telegram_envoyer_commentaire_coach_prive(etat, cid, m, flash) is not None:
                     info["flash_t"] = time.time()
             continue
-        resultat = _envoi_sur(cid, text=texte_coach_live(m, b, r, cle, positions_bot(etat)),
-                              reply_markup=markup_analyse(etat, m, r, cid))
+        resultat = _telegram_envoyer_commentaire_coach_prive(
+            etat, cid, m, texte_coach_live(m, b, r, cle, positions_bot(etat)),
+            reply_markup=markup_analyse(etat, m, r, cid)
+        )
         if isinstance(resultat, dict) and resultat.get("ok") is True:
             info["dernier_t"] = int(b["t"])       # clôture consommée uniquement après acceptation Telegram
 
