@@ -1195,7 +1195,8 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
     def test_voice_button_replays_last_visible_ai_comment_in_french_then_english(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
         self.assertIn("let dernierCommentaireIA = null", bande)
-        self.assertIn("market: source === 'ia' ? codeMarche() : ''", bande)
+        self.assertIn("market: (source === 'ia' || source === 'marche') ? codeMarche() : ''", bande)
+        self.assertIn("voiceOnce: source === 'marche' && bulle && i === 0", bande)
         self.assertIn("if (dernier && dernier.market && dernier.market === codeMarche())", bande)
         self.assertIn("attente.source !== 'ia' || (attente.market && attente.market === codeMarche())", bande)
         self.assertIn("items[i].replayEN = commentaireEN", bande)
