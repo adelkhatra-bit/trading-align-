@@ -476,10 +476,18 @@ jobs:
                   print("ALIGN_STATE_POST_AUDIT_ERROR=" + error)
               raise SystemExit(1)
 
-          archives = state.get("archives_marches_retirees") or {}
-          history = archives.get("NASDAQ") if isinstance(archives, dict) else []
+          archives = state.get("archives_marches_retirees")
+          if isinstance(archives, dict) and "NASDAQ" in archives:
+              errors.append("archive NASDAQ encore présente")
+          elif archives is not None and not isinstance(archives, dict):
+              errors.append("archives_marches_retirees invalide")
+          if errors:
+              for error in errors:
+                  print("ALIGN_STATE_POST_AUDIT_ERROR=" + error)
+              raise SystemExit(1)
+
           print("ALIGN_STATE_POST_AUDIT schema=4 active_markets=BTC,GOLD nasdaq_active=false "
-                + "nasdaq_archived=" + str(len(history or []))
+                + "nasdaq_archived=0"
                 + " subscribers=" + str(len(state.get("chats", [])))
                 + " prospects=" + str(len(state.get("prospects") or []))
                 + " telegram_offset_present=" + str(state.get("offset") is not None)
