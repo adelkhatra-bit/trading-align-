@@ -8,10 +8,12 @@ Si l'**identité du projet** est ambiguë (autre dépôt, autre branche de produ
 
 ## 1. Identité du projet
 
+**Un seul projet, deux appellations historiques :** `ALIGN TRADING` est le nom canonique du produit et `Trading Auto` / `trading-auto` est un ancien nom technique du même projet. Ce n'est ni un second dépôt, ni un second serveur à maintenir, ni une version concurrente. Toute demande ou trace mentionnant Trading Auto doit être rattachée à ce dépôt canonique après vérification de la branche et du SHA. Pour toute nouvelle mise à jour, utiliser exclusivement ce dépôt et une PR vers `main`. Ne jamais créer de copie parallèle ni supprimer de code historique sans inventaire de provenance et comparaison.
+
 | Élément | Valeur canonique | Pièges connus (NE PAS utiliser) |
 |---|---|---|
 | Projet | **ALIGN TRADING** | Loki / KEEP, Inside Dombes, Nino & Luciole : autres projets |
-| Dépôt | `adelkhatra-bit/trading-align-` | `trading-auto` (ancien nom), `trading-dashboard-4000` (autre projet) |
+| Dépôt | `adelkhatra-bit/trading-align-` | `trading-dashboard-4000` (autre projet) |
 | Branche du code | `main` | — |
 | Branche des données publiées | `live-data` (`live.json` à la racine) | Ne jamais y mettre de code, ne jamais la fusionner dans `main` |
 | Indicateur de données/bridge (unique) | `align-bot/pine/ALIGN_MTF_PRO_v25.pine` | Tout autre script ne peut alimenter le BOT ou le bridge |
