@@ -176,6 +176,16 @@ class TelegramAuditTests(unittest.TestCase):
         self.assertTrue(result["blocked_by_pull_mode"])
         http.assert_not_called()
 
+    def test_pull_mode_scopes_channel_photo_and_description_to_setup_context(self):
+        ab.TELEGRAM_PULL_MODE = True
+        ab.TELEGRAM_PULL_CONTEXT.channel_setup_chat_id = None
+        self.assertFalse(ab._telegram_sortant_autorise("setChatPhoto", {"chat_id": "-1001"}))
+        self.assertFalse(ab._telegram_sortant_autorise("setChatDescription", {"chat_id": "-1001"}))
+        ab.TELEGRAM_PULL_CONTEXT.channel_setup_chat_id = "-1001"
+        self.assertTrue(ab._telegram_sortant_autorise("setChatPhoto", {"chat_id": "-1001"}))
+        self.assertTrue(ab._telegram_sortant_autorise("setChatDescription", {"chat_id": "-1001"}))
+        self.assertFalse(ab._telegram_sortant_autorise("setChatPhoto", {"chat_id": "-1002"}))
+
     def test_pull_mode_allows_multipart_audio_for_matching_private_request(self):
         ab.TELEGRAM_PULL_MODE = True
         ab.TELEGRAM_PULL_CONTEXT.chat_id = "123456789"
