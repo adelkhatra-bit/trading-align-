@@ -3556,7 +3556,7 @@ def _telegram_sortant_autorise(methode, params):
         "copyMessage", "editMessageText", "editMessageReplyMarkup",
         "deleteMessage", "pinChatMessage", "unpinChatMessage",
         "setChatDescription", "setMyCommands", "setChatMenuButton",
-        "setMyShortDescription", "setMyDescription",
+        "setMyShortDescription", "setMyDescription", "setChatPhoto",
         "approveChatJoinRequest", "createChatInviteLink",
         "createChatSubscriptionInviteLink", "exportChatInviteLink",
     }
@@ -3574,6 +3574,9 @@ def _telegram_sortant_autorise(methode, params):
     if method in {"answerCallbackQuery", "answerPreCheckoutQuery",
                   "getChat", "getChatMember", "getUpdates", "getMe"}:
         return True
+    if method in {"setChatDescription", "setChatPhoto"}:
+        setup_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "channel_setup_chat_id", "") or "")
+        return bool(params.get("chat_id")) and str(params.get("chat_id")) == setup_chat
     cid = str(params.get("chat_id") or "")
     contexte = str(getattr(TELEGRAM_PULL_CONTEXT, "chat_id", "") or "")
     prive = bool(getattr(TELEGRAM_PULL_CONTEXT, "private", False))
@@ -6633,6 +6636,9 @@ LIENS_CHAINES = {"BTC": "https://t.me/+udAxidycXfdmN2Jk", "GOLD": "https://t.me/
 
 def photo_canal(cid):
     """Met le logo ALIGN (le même que le bot) comme photo de la chaîne : envoi multipart de l'image."""
+    if not _telegram_sortant_autorise("setChatPhoto", {"chat_id": str(cid)}):
+        _telegram_audit("pull_block", "setChatPhoto", getattr(TELEGRAM_PULL_CONTEXT, "callback_action", ""))
+        return False
     try:
         req = urllib.request.Request(LOGO_URL, headers={"User-Agent": "align-bot"})
         with urllib.request.urlopen(req, timeout=30) as rep:
@@ -6815,18 +6821,23 @@ def preparer_chaines(etat):
     Réussi = fait une fois pour toutes ; échec = nouvel essai au plus toutes les heures."""
     if not TOKEN:
         return
-    for m, canal in (etat.get("canaux_marche") or {}).items():
-        info = etat.setdefault("canal_live", {}).setdefault(m, {})
-        if info.get("photo_ok") is not True and time.time() - float(info.get("photo_essai", 0)) >= 3600:
-            info["photo_essai"] = time.time()
-            info["photo_ok"] = bool(photo_canal(canal)) or False
-        desc = DESCRIPTIONS_CHAINES.get(m)
-        if desc and info.get("desc_ok") != desc and time.time() - float(info.get("desc_essai", 0)) >= 3600:
-            info["desc_essai"] = time.time()
-            res = telegram("setChatDescription", chat_id=canal, description=desc)
-            ok = isinstance(res, dict) and (res.get("ok") or "not modified" in str(res.get("description", "")))
-            if ok:
-                info["desc_ok"] = desc
+    ancien_setup = getattr(TELEGRAM_PULL_CONTEXT, "channel_setup_chat_id", None)
+    try:
+        for m, canal in (etat.get("canaux_marche") or {}).items():
+            info = etat.setdefault("canal_live", {}).setdefault(m, {})
+            TELEGRAM_PULL_CONTEXT.channel_setup_chat_id = str(canal)
+            if info.get("photo_ok") is not True and time.time() - float(info.get("photo_essai", 0)) >= 3600:
+                info["photo_essai"] = time.time()
+                info["photo_ok"] = bool(photo_canal(canal)) or False
+            desc = DESCRIPTIONS_CHAINES.get(m)
+            if desc and info.get("desc_ok") != desc and time.time() - float(info.get("desc_essai", 0)) >= 3600:
+                info["desc_essai"] = time.time()
+                res = telegram("setChatDescription", chat_id=canal, description=desc)
+                ok = isinstance(res, dict) and (res.get("ok") or "not modified" in str(res.get("description", "")))
+                if ok:
+                    info["desc_ok"] = desc
+    finally:
+        TELEGRAM_PULL_CONTEXT.channel_setup_chat_id = ancien_setup
 
 
 def notifier_canal_marche(etat, m, r, cle):
