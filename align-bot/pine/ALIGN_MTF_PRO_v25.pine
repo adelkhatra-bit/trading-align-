@@ -258,8 +258,8 @@ uW  = nz(dW) == dP
 uD  = nz(dD) == dP
 d4Strat = isGold ? nz(d240Fermee) : nz(d240)
 d1hStrat = isGold ? nz(d60Fermee) : nz(d60)
-d15Strat = nz(d15Fermee)
-d5Strat = nz(d5Fermee)
+d15Strat = isGold ? nz(d15Fermee) : nz(d15)
+d5Strat = isGold ? nz(d5Fermee) : nz(d5)
 u4  = d4Strat == dP
 u1h = d1hStrat == dP
 u15 = d15Strat == dP
