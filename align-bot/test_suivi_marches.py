@@ -422,7 +422,7 @@ class EpinglesSansDoublon(unittest.TestCase):
         with patch.object(ab, "telegram", side_effect=tg):
             ab.epingler(etat, "42")
         self.assertEqual(appels, ["getChat"])
-        self.assertIn("42", etat["epingles_v6"])
+        self.assertIn("42", etat["epingles_v7"])
 
     def test_pas_encore_epinglees(self):
         from unittest.mock import patch
@@ -438,7 +438,7 @@ class EpinglesSansDoublon(unittest.TestCase):
         with patch.object(ab, "telegram", side_effect=tg):
             ab.epingler(etat, "42")
         self.assertEqual(appels, ["getChat", "sendMessage", "pinChatMessage"])
-        self.assertIn("42", etat["epingles_v6"])
+        self.assertIn("42", etat["epingles_v7"])
 
 if __name__ == "__main__":
     unittest.main()
