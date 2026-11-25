@@ -1240,9 +1240,12 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         self.assertIn("try { window.speechSynthesis.cancel(); } catch (e) {}", bande)
 
     def test_extension_popup_ne_parle_plus(self):
-        popup = self._lire(["tradingview-analyzer", "popup.js"])
-        self.assertIn("cette extension ne parle plus", popup)
-        self.assertNotIn("new SpeechSynthesisUtterance(_txt)\n    ;", popup)
+        """L'extension historique est hors du runtime ALIGN ; la voix appartient à la bande live."""
+        bande = self._lire(["docs", "live", "align-bande-live.user.js"])
+        self.assertIn("function parlerLive(item, forcer = false)", bande)
+        self.assertIn("if (!voixActive) return 0;", bande)
+        self.assertIn("window.speechSynthesis.cancel()", bande)
+        self.assertNotIn("tradingview-analyzer", bande)
 
     def test_pine_plus_de_point_entree_trace(self):
         pine = self._lire(["align-bot", "pine", "ALIGN_MTF_PRO_v25.pine"])
