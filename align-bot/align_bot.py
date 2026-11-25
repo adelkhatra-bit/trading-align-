@@ -3552,7 +3552,7 @@ def _telegram_sortant_autorise(methode, params):
     methodes_telegram_connues = {
         "answerCallbackQuery", "answerPreCheckoutQuery",
         "getChat", "getChatMember", "getUpdates", "getMe",
-        "sendMessage", "sendPhoto", "sendPoll", "sendInvoice",
+        "sendMessage", "sendPhoto", "sendPoll", "sendInvoice", "sendAudio",
         "copyMessage", "editMessageText", "editMessageReplyMarkup",
         "deleteMessage", "pinChatMessage", "unpinChatMessage",
         "setChatDescription", "setMyCommands", "setChatMenuButton",
@@ -6109,6 +6109,11 @@ SON_PIECE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "
 def envoyer_son_piece(cid):
     """Envoie le son « pièce » (créé pour ALIGN, libre de droits). Le bot ne peut pas imposer une sonnerie :
     la personne l'enregistre elle-même comme son de notification de ce chat."""
+    # Cet envoi multipart contourne telegram() : appliquer le même contrôle Pull avant le réseau.
+    if not _telegram_sortant_autorise("sendAudio", {"chat_id": str(cid)}):
+        _telegram_audit("pull_block", "sendAudio", getattr(TELEGRAM_PULL_CONTEXT, "callback_action", ""))
+        return {"ok": False, "blocked_by_pull_mode": True,
+                "description": "Envoi audio bloqué par le mode Telegram sur demande"}
     anglais = str(cid) in LANG_EN
     legende = ("🔔 ALIGN coin sound\n👆 Long-press this sound → Save for notifications\n⚙️ Then pick it in this chat's notification settings"
                if anglais else
