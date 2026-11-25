@@ -3574,6 +3574,8 @@ def _telegram_sortant_autorise(methode, params):
     if method in {"answerCallbackQuery", "answerPreCheckoutQuery",
                   "getChat", "getChatMember", "getUpdates", "getMe"}:
         return True
+    if method in {"setMyCommands", "setChatMenuButton", "setMyShortDescription", "setMyDescription"}:
+        return getattr(TELEGRAM_PULL_CONTEXT, "bot_setup", False) is True
     if method in {"setChatDescription", "setChatPhoto"}:
         setup_chat = str(getattr(TELEGRAM_PULL_CONTEXT, "channel_setup_chat_id", "") or "")
         return bool(params.get("chat_id")) and str(params.get("chat_id")) == setup_chat
@@ -3865,6 +3867,18 @@ def _telegram_regles_canal(methode, cid, **params):
         return telegram(methode, chat_id=cid, **params)
     finally:
         TELEGRAM_PULL_CONTEXT.rules_setup_chat_id = ancien
+
+
+def _telegram_configuration_bot(methode, **params):
+    """Autorisation temporaire des seules commandes/description du bot pendant leur installation."""
+    if methode not in {"setMyCommands", "setChatMenuButton", "setMyShortDescription", "setMyDescription"}:
+        return {"ok": False, "blocked_by_pull_mode": True}
+    ancien = getattr(TELEGRAM_PULL_CONTEXT, "bot_setup", False)
+    TELEGRAM_PULL_CONTEXT.bot_setup = True
+    try:
+        return telegram(methode, **params)
+    finally:
+        TELEGRAM_PULL_CONTEXT.bot_setup = ancien
 
 
 def _telegram_menu_canal(etat, methode, cid, **params):
@@ -7480,13 +7494,13 @@ def installer_menu(etat):
           ("resultats", "📈 My results"), ("gain", "📸 Share my profit"), ("vip", "💎 Become VIP"),
           ("live", "🔴 The live"), ("gagnantes", "🏆 Winning trades"), ("perdantes", "❌ Losing trades"), ("boutons", "⌨️ Bring back the buttons"), ("francais", "🌐 Français")]
     try:
-        res_fr = telegram("setMyCommands", commands=json.dumps([{"command": c, "description": d} for c, d in fr]))
+        res_fr = _telegram_configuration_bot("setMyCommands", commands=json.dumps([{"command": c, "description": d} for c, d in fr]))
         if not isinstance(res_fr, dict) or res_fr.get("ok") is not True:
             raise RuntimeError("setMyCommands FR non confirmé par Telegram")
         res_en = telegram("setMyCommands", commands=json.dumps([{"command": c, "description": d} for c, d in en]), language_code="en")
         if not isinstance(res_en, dict) or res_en.get("ok") is not True:
             raise RuntimeError("setMyCommands EN non confirmé par Telegram")
-        res_menu = telegram("setChatMenuButton", menu_button=json.dumps({"type": "commands"}))
+        res_menu = _telegram_configuration_bot("setChatMenuButton", menu_button=json.dumps({"type": "commands"}))
         if not isinstance(res_menu, dict) or res_menu.get("ok") is not True:
             raise RuntimeError("setChatMenuButton non confirmé par Telegram")
         print("TELEGRAM_MENU_COMMANDS_OK fr=/live en=/live")
@@ -7497,8 +7511,8 @@ def installer_menu(etat):
             pass
         except Exception as ex:
             print("nom", ex)
-        telegram("setMyShortDescription", short_description="🎁 ALIGN Gratuit : 1 position BTC / Gold proposée chaque jour • 💎 Tout le reste dans ALIGN VIP")
-        telegram("setMyDescription", description=("🎁 ALIGN Gratuit — BTC & Gold\n\n🎁 1 position proposée chaque jour, expliquée en bougies\n"
+        _telegram_configuration_bot("setMyShortDescription", short_description="🎁 ALIGN Gratuit : 1 position BTC / Gold proposée chaque jour • 💎 Tout le reste dans ALIGN VIP")
+        _telegram_configuration_bot("setMyDescription", description=("🎁 ALIGN Gratuit — BTC & Gold\n\n🎁 1 position proposée chaque jour, expliquée en bougies\n"
                                                   "🔒 Les autres : tu sais qu'elles arrivent, sans le sens\n\n"
                                                   "💎 ALIGN VIP 49,90 € / mois : toutes les positions, le sens, les niveaux et le coach (BE, TP)\n"
                                                   "🤖 Les abonnés au suivi sont enregistrés automatiquement à l'ouverture du signal.\n"
