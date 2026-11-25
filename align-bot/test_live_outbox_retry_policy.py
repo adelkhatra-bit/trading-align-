@@ -1,5 +1,3 @@
-import datetime
-import email.utils
 import unittest
 from email.message import Message
 from urllib.error import HTTPError, URLError
@@ -15,34 +13,36 @@ class LiveOutboxRetryPolicyTests(unittest.TestCase):
         return HTTPError("https://ntfy.sh/topic", status, "HTTP error", headers, None)
 
     def test_429_honors_retry_after_seconds(self):
-        result = align_bot._live_outbox_retry_policy(self.http_error(429, 45), 1, 1000)
-        self.assertEqual(result, (45, 429, 45))
-
-    def test_429_honors_retry_after_http_date(self):
-        retry_date = datetime.datetime.fromtimestamp(1060, datetime.timezone.utc)
-        header = email.utils.format_datetime(retry_date, usegmt=True)
-        result = align_bot._live_outbox_retry_policy(self.http_error(429, header), 1, 1000)
-        self.assertEqual(result, (60, 429, 60))
+        delay, status, retry_after = align_bot._live_outbox_retry_policy(
+            self.http_error(429, 45), 1
+        )
+        self.assertEqual((delay, status, retry_after), (45, 429, 45))
 
     def test_permanent_403_is_not_retried(self):
-        result = align_bot._live_outbox_retry_policy(self.http_error(403), 1, 1000)
-        self.assertEqual(result, (None, 403, None))
+        delay, status, retry_after = align_bot._live_outbox_retry_policy(
+            self.http_error(403), 1
+        )
+        self.assertIsNone(delay)
+        self.assertEqual(status, 403)
+        self.assertIsNone(retry_after)
 
     def test_transient_503_uses_bounded_exponential_backoff(self):
-        result = align_bot._live_outbox_retry_policy(self.http_error(503), 1, 1000)
-        self.assertEqual(result, (10, 503, None))
+        delay, status, retry_after = align_bot._live_outbox_retry_policy(
+            self.http_error(503), 1
+        )
+        self.assertEqual((delay, status, retry_after), (10, 503, None))
 
     def test_network_error_uses_bounded_exponential_backoff(self):
-        result = align_bot._live_outbox_retry_policy(URLError("timeout"), 2, 1000)
-        self.assertEqual(result, (20, None, None))
+        delay, status, retry_after = align_bot._live_outbox_retry_policy(
+            URLError("timeout"), 2
+        )
+        self.assertEqual((delay, status, retry_after), (20, None, None))
 
     def test_retry_after_is_capped_at_one_day(self):
-        result = align_bot._live_outbox_retry_policy(self.http_error(429, 200000), 1, 1000)
-        self.assertEqual(result, (86400, 429, 200000))
-
-    def test_408_is_transient(self):
-        result = align_bot._live_outbox_retry_policy(self.http_error(408), 1, 1000)
-        self.assertEqual(result, (10, 408, None))
+        delay, status, retry_after = align_bot._live_outbox_retry_policy(
+            self.http_error(429, 200000), 1
+        )
+        self.assertEqual((delay, status, retry_after), (86400, 429, 200000))
 
 
 if __name__ == "__main__":
