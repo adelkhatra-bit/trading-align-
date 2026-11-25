@@ -66,8 +66,7 @@ class AIProviderModelConfig(unittest.TestCase):
             def read(self):
                 return json.dumps({"choices": [{"message": {"content": "Réponse IA Groq de test."}}]}).encode()
 
-        with patch.dict("os.environ", {"GROQ_SERVICE_TIER": "auto"}), \\
-             patch("align_bot.urllib.request.urlopen", return_value=FakeResponse()) as request:
+        with patch.dict("os.environ", {"GROQ_SERVICE_TIER": "auto"}), patch("align_bot.urllib.request.urlopen", return_value=FakeResponse()) as request:
             ab._appel_ia("https://api.groq.com/openai/v1/chat/completions", "model-test", "key",
                          [{"role": "user", "content": "test"}])
         payload = json.loads(request.call_args.args[0].data.decode())
@@ -83,8 +82,7 @@ class AIProviderModelConfig(unittest.TestCase):
             def read(self):
                 return json.dumps({"choices": [{"message": {"content": "Réponse IA Groq de test."}}]}).encode()
 
-        with patch.dict("os.environ", {"GROQ_SERVICE_TIER": "on_demand"}), \\
-             patch("align_bot.urllib.request.urlopen", return_value=FakeResponse()) as request:
+        with patch.dict("os.environ", {"GROQ_SERVICE_TIER": "on_demand"}), patch("align_bot.urllib.request.urlopen", return_value=FakeResponse()) as request:
             ab._appel_ia("https://api.groq.com/openai/v1/chat/completions", "model-test", "key",
                          [{"role": "user", "content": "test"}])
         payload = json.loads(request.call_args.args[0].data.decode())
@@ -106,8 +104,7 @@ class AIProviderModelConfig(unittest.TestCase):
             "https://api.groq.com/openai/v1/chat/completions", 400, "Bad Request", {},
             io.BytesIO(b'{"error":{"message":"service_tier auto is not supported for this account"}}'),
         )
-        with patch.dict("os.environ", {"GROQ_SERVICE_TIER": "auto"}), \\
-             patch("align_bot.urllib.request.urlopen", side_effect=[unsupported, FakeResponse()]) as request:
+        with patch.dict("os.environ", {"GROQ_SERVICE_TIER": "auto"}), patch("align_bot.urllib.request.urlopen", side_effect=[unsupported, FakeResponse()]) as request:
             reply = ab._appel_ia("https://api.groq.com/openai/v1/chat/completions", "model-test", "key",
                                  [{"role": "user", "content": "test"}])
         self.assertIn("Réponse IA Groq", reply)
