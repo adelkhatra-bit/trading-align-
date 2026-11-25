@@ -65,5 +65,41 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         self.assertEqual(getattr(ab.TELEGRAM_PULL_CONTEXT, "market_commentary_market", None), old_market)
 
 
+    def test_live_coach_commentary_and_activation_are_fully_translated(self):
+        candle = {"o": 100.0, "h": 102.0, "l": 99.0, "c": 101.0, "t": 2000}
+        market = {
+            "m1": [{"c": 101.0}],
+            "b15": [candle, {"o": 100.0, "h": 102.0, "l": 99.0, "c": 101.0, "t": 2000}],
+            "confirme": 1,
+            "dirs": [1] * 11,
+            "sqzs": [0] * 11,
+        }
+        with patch.object(ab, "prochaine_cloture_bougie", return_value=3000):
+            french = ab.texte_coach_live("BTC", candle, market, {}, public=True)
+        english = ab.traduire(french)
+        for expected in (
+            "LIVE COMMENTATOR", "LIVE", "15-MINUTE SUMMARY", "Information, not an entry",
+            "Candle rising", "Range:", "Trend:", "Timeframes:", "Next:",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, english)
+        for french_label in ("COACH COMMENTATEUR", "BILAN 15 MIN", "Bougie en hausse",
+                             "Écart :", "Tendance :", "Unités :", "Prochaine :"):
+            with self.subTest(french_label=french_label):
+                self.assertNotIn(french_label, english)
+
+        activation = (
+            "🎙 COACH COMMENTATEUR ACTIVÉ — BTC\n"
+            "🔎 Surveillance continue : je cherche une configuration d'entrée confirmée, sans inventer de signal.\n"
+            "🕯 Commentaire aux clôtures 15 min utiles ; aucune Entry/SL/TP sans confirmation Pine.\n"
+            "📍 Dès qu'une position est ouverte par ALIGN, je poursuis son suivi.\n"
+            "⏹ Pour arrêter : le bouton sous mes messages."
+        )
+        translated_activation = ab.traduire(activation)
+        self.assertIn("LIVE COMMENTATOR ACTIVATED", translated_activation)
+        self.assertNotIn("Surveillance continue", translated_activation)
+        self.assertNotIn("Commentaire aux clôtures", translated_activation)
+
+
 if __name__ == "__main__":
     unittest.main()
