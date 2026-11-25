@@ -329,12 +329,13 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("🔇 COACH VOCAL OFF", source)
         self.assertIn("🔊 COACH VOCAL ON", source)
         self.assertIn("voixBtn.remove()", source)
-        self.assertNotIn("parlerLive(m)", source)
+        self.assertIn("voiceOnce: source === 'marche' && bulle && i === 0", source)
+        self.assertIn("const voixDuree = m.voiceOnce ? parlerLive(m) : 0", source)
+        self.assertIn("items[0].replayEN = items[nPass / 2]", source)
         # End-to-end linkage: bot IA payload -> ntfy receiver -> AI bubble -> voice narration.
         self.assertIn("if (txt.startsWith('IA:')) { recuIA(txt.slice(3)); return; }", source)
         self.assertIn("const fr = { texte: '🇫🇷 ' + plateforme(phrase), source: 'ia'", source)
         self.assertIn("coeurs(1, ['🧠', '📡'], undefined, phrase, anglais)", source)
-        self.assertIn("const voixDuree = 0;", source)
         self.assertIn("montrer(txt, bulle, 2, '', false, bulle ? 'marche' : 'live')", source)  # BULLE de marché envoyée au vocal
         self.assertIn("const traductionEN = enAnglais(texte), anglaisTraduit = traductionEN !== texte", source)
         self.assertIn("item.source === 'marche' && !item.anglaisTraduit", source)  # évite la voix anglaise sur une bulle restée en français
@@ -1194,7 +1195,8 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
     def test_voice_button_replays_last_visible_ai_comment_in_french_then_english(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
         self.assertIn("let dernierCommentaireIA = null", bande)
-        self.assertIn("market: source === 'ia' ? codeMarche() : ''", bande)
+        self.assertIn("market: (source === 'ia' || source === 'marche') ? codeMarche() : ''", bande)
+        self.assertIn("voiceOnce: source === 'marche' && bulle && i === 0", bande)
         self.assertIn("if (dernier && dernier.market && dernier.market === codeMarche())", bande)
         self.assertIn("attente.source !== 'ia' || (attente.market && attente.market === codeMarche())", bande)
         self.assertIn("items[i].replayEN = commentaireEN", bande)

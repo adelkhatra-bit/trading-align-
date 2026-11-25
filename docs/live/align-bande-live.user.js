@@ -509,7 +509,8 @@
     // v7.3 (règle d'Adel, 15/11) : chaque info passe 2 fois en français PUIS 2 fois en anglais
     const traductionEN = enAnglais(texte), anglaisTraduit = traductionEN !== texte;
     const nPass = Math.max(4, 2 * (fois || 1)), items = [];
-    for (let i = 0; i < nPass; i++) items.push({ texte: (i >= nPass / 2 ? '🇬🇧 ' : '🇫🇷 ') + plateforme(i >= nPass / 2 ? traductionEN : texte), bulle, g, en: i >= nPass / 2, anglaisTraduit, source: source || 'live', market: source === 'ia' ? codeMarche() : '' });
+    for (let i = 0; i < nPass; i++) items.push({ texte: (i >= nPass / 2 ? '🇬🇧 ' : '🇫🇷 ') + plateforme(i >= nPass / 2 ? traductionEN : texte), bulle, g, en: i >= nPass / 2, anglaisTraduit, source: source || 'live', market: (source === 'ia' || source === 'marche') ? codeMarche() : '', voiceOnce: source === 'marche' && bulle && i === 0 });
+    if (source === 'marche' && bulle && anglaisTraduit) items[0].replayEN = items[nPass / 2];
     if (source === 'ia') {
       const commentaireEN = anglaisTraduit ? items[nPass / 2] : null;
       for (let i = 0; i < nPass / 2; i++) items[i].replayEN = commentaireEN;
@@ -531,7 +532,10 @@
     flash.innerHTML = '<span>' + esc(m.texte) + '</span>';   // le message défile vite (lisible sur téléphone, même si TikTok coupe les bords)
     flash.className = 'flash' + (m.g ? ' ' + m.g : m.bulle ? ' bulle' : '') + (m.en ? ' en' : '');
     bande.classList.add('on');
-    const voixDuree = 0; // La voix IA est déclenchée par afficherIA au moment de la petite bulle, jamais par la bande.
+    const voixDuree = m.voiceOnce ? parlerLive(m) : 0; // Les bulles de marché sont narrées une fois, à leur première apparition ; la bande reste muette.
+    if (voixDuree > 0 && m.replayEN && m.replayEN.anglaisTraduit) {
+      setTimeout(() => { if (voixActive && m.market === codeMarche()) parlerLive(m.replayEN, true); }, voixDuree);
+    }
     const sp = flash.firstChild, W = bande.clientWidth, w = sp.offsetWidth;
     const dur = Math.max(4000, (W + w) / 0.38, voixDuree);      // v5.4 : plus rapide (info en temps réel), toujours lisible
     animCur = sp.animate([{ transform: 'translateX(' + W + 'px)' }, { transform: 'translateX(' + (-w) + 'px)' }], { duration: dur, easing: 'linear' });
