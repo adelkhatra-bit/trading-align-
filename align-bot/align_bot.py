@@ -12185,7 +12185,7 @@ def agent(m, r, cle, ferme):
                 # journal seulement, jamais diffusée aux abonnés ni à la chaîne.
                 print(f"{m} : mode sans signal, bridge TradingView indisponible.")
             else:
-                out.append(f"⏳ {ICONE.get(m, '')} {m} : bridge Pine M15 en attente de confirmation multi-UT.")
+                out.append(f"⏳ {ICONE.get(m, '')} {m} : aucune direction multi-UT confirmée pour le moment. Aucun plan Entry/SL/TP émis.")
             return out
         pause_ = pause_entree_marche(m, r, _ETAT_COURANT.get("etat") or {}, time.time())
         if pause_:
