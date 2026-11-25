@@ -44,8 +44,10 @@ class ZeroMessageParDefaut(unittest.TestCase):
         self.assertIn("CLAVIER_VERSION = 5", SOURCE)
         self.assertIn("if vus.get(cid) == CLAVIER_VERSION:", SOURCE)
 
-    def test_regles_epinglees_en_prive_seulement_si_rallumees(self):
-        self.assertRegex(SOURCE, r"if str\(cid\) == canal_ or REGLES_PRIVEES_SPONTANEES:\n\s+epingler\(etat, cid\)")
+    def test_regles_epinglees_sur_les_chaines_publiques_et_prive_seulement_si_rallume(self):
+        self.assertIn("for cid in destinations_regles(etat, chats):", SOURCE)
+        self.assertIn('cibles.update(str(cid) for cid in (etat.get("canaux_marche") or {}).values() if cid)', SOURCE)
+        self.assertIn("if REGLES_PRIVEES_SPONTANEES:", SOURCE)
 
     def test_relance_vip_jamais_envoyee_par_defaut(self):
         bloc = SOURCE.split("if not RELANCE_VIP_SPONTANEE:", 1)
