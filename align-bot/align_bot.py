@@ -4146,8 +4146,10 @@ def ia(etat, consigne, donnees, cle_cache=None, duree=600, premium=False, recher
         etat.setdefault("ia_echecs", {}).pop(sain, None)
         etat["ia_preflight_marker"] = marque_saine
     if premium and prefer_paid and not recherche:
-        # Le commentateur live utilise le Claude API déjà configuré ; plafonds et repli restent inchangés.
-        ordre.sort(key=lambda f: 0 if f[0] == "Anthropic" else 1)
+        # Claude reste prioritaire pour les moments VIP ; le fournisseur réellement validé
+        # au préflight vient immédiatement après, avant les autres services susceptibles de ralentir le cycle.
+        ordre.sort(key=lambda f: 0 if f[0] == "Anthropic" else
+                   1 if sain and f[0] == sain else 2)
     elif recherche:                                       # la recherche Google gratuite n'existe que sur Gemini 3.8 : on l'essaie d'abord
         ordre.sort(key=lambda f: 0 if f[0] == "Gemini 3.8" else 1)
     elif sain and any(f[0] == sain for f in IA_FOURNISSEURS):
