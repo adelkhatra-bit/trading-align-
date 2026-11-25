@@ -60,6 +60,11 @@ if not tp1Ok
             "[dC, sC, rC] = f_etat()",
             1,
         )
+        without_tp_change = without_tp_change.replace(
+            "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig",
+            "if barstate.isconfirmed and (na(ent) or nouvelle15 or dirPlan != dirFig or strat != stratFig or slFranchi)",
+            1,
+        )
         without_settings = without_tp_change.replace(SETTINGS_BLOCK, "", 1)
         without_export = without_settings.split(EXPORT_MARKER, 1)[0]
         if without_export.endswith("\\n\\n"):
@@ -149,6 +154,18 @@ if not tp1Ok
         self.assertIn('f_align_v25_json_num(bridgePlanValid ? zBas : na)', export_block)
         self.assertIn('f_align_v25_json_num(bridgePlanValid ? zHaut : na)', export_block)
         self.assertIn('f_align_v25_json_num(bridgePlanValid ? (zBas + zHaut) / 2 : na)', export_block)
+
+    def test_plan_refreshes_on_direction_or_strategy_change_and_bridge_rejects_stale_plan(self):
+        self.assertIn(
+            "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig",
+            self.source,
+        )
+        self.assertIn(
+            "bridgePlanValid = dirPlan != 0 and dirPlan == dirFig and strat == stratFig and not na(ent)",
+            self.source,
+        )
+        self.assertIn("dirFig := dirPlan", self.source)
+        self.assertIn("stratFig := strat", self.source)
 
     def test_higher_chart_uses_last_closed_lower_timeframe_intrabar_for_entry_trigger(self):
         export_block = self.source.split(EXPORT_MARKER, 1)[1]
