@@ -2795,6 +2795,52 @@ TRAD.update({
     "⛔ SL cassé à la clôture :": "⛔ SL broken at the close:", "annulé ↩ RETOURNEMENT en cours (attendre la confirmation 15 min / 1h)": "cancelled ↩ REVERSAL in progress (wait for the 15 min / 1h confirmation)",
     "✅ RETOURNEMENT CONFIRMÉ :": "✅ REVERSAL CONFIRMED:", "petites unités contre le plan": "small timeframes against the plan", ": le retournement se prépare": ": a reversal is building",
 })
+
+# Les cartes du commentateur sont traduites explicitement : les libellés courts
+# ne doivent pas laisser des fragments français dans une conversation anglaise.
+TRAD.update({
+    "🎙 COACH COMMENTATEUR ACTIVÉ": "🎙 LIVE COMMENTATOR ACTIVATED",
+    "🎙 COACH COMMENTATEUR": "🎙 LIVE COMMENTATOR",
+    "👁 EN DIRECT": "👁 LIVE",
+    "📊 BILAN 15 MIN": "📊 15-MINUTE SUMMARY",
+    "ℹ️ Info, pas une entrée": "ℹ️ Information, not an entry",
+    "🟢 Bougie en hausse": "🟢 Candle rising",
+    "🔴 Bougie en baisse": "🔴 Candle falling",
+    "⚪ Bougie à plat": "⚪ Flat candle",
+    "👁 Mèche haute : rejet": "👁 Upper wick: rejection",
+    "👁 Mèche basse : rejet": "👁 Lower wick: rejection",
+    "👁 Mouvement franc 💪": "👁 Strong move 💪",
+    "👁 Le marché hésite 🤏": "👁 Market is hesitating 🤏",
+    "📉 Unités :": "📉 Timeframes:",
+    "📈 Unités :": "📈 Timeframes:",
+    "➖ Unités partagées": "➖ Mixed timeframes",
+    "📏 Écart :": "📏 Range:",
+    "🧭 Tendance :": "🧭 Trend:",
+    "🟢 hausse": "🟢 rising",
+    "🔴 baisse": "🔴 falling",
+    "➖ floue": "➖ unclear",
+    "⚡ Compression : ça charge": "⚡ Compression: pressure is building",
+    "📂 Bot : ": "📂 Bot: ",
+    " en cours": " ongoing",
+    "📂 Position :": "📂 Position:",
+    "✅ Entrée encore possible": "✅ Entry still possible",
+    "⛔ Trop tard pour entrer": "⛔ Too late to enter",
+    "🔵 TP1 : touché ✅": "🔵 TP1: hit ✅",
+    "🔵 TP1 :": "🔵 TP1:",
+    "🔵 TP2 :": "🔵 TP2:",
+    "🟡 Entrée :": "🟡 Entry:",
+    "🔴 SL :": "🔴 SL:",
+    "⚠️ Rebond possible": "⚠️ Possible bounce",
+    "👍 On laisse courir": "👍 Let it run",
+    "👀 Prix DANS la zone": "👀 Price IN the zone",
+    "👀 Zone à ": "👀 Zone at ",
+    "⏱ Prochaine :": "⏱ Next:",
+    "📂 POSITIONS DU BOT": "📂 BOT POSITIONS",
+    "🔎 Surveillance continue : je cherche une configuration d'entrée confirmée, sans inventer de signal.": "🔎 Continuous monitoring: I look for a confirmed entry setup and never invent a signal.",
+    "🕯 Commentaire aux clôtures 15 min utiles ; aucune Entry/SL/TP sans confirmation Pine.": "🕯 Commentary at relevant 15-minute closes; no Entry/SL/TP without Pine confirmation.",
+    "📍 Dès qu'une position est ouverte par ALIGN, je poursuis son suivi.": "📍 As soon as ALIGN opens a position, I continue tracking it.",
+    "⏹ Pour arrêter : le bouton sous mes messages.": "⏹ To stop: use the button below my messages."
+})
 _CLES = sorted(TRAD, key=len, reverse=True)
 BOUTONS_FR = ["🤖 Mon bot", "📸 Partager mon gain", "🟠 Analyse BTC", "🥇 Analyse Gold", "✅ Je suis rentré", "🚪 Je suis sorti", "📈 Mes résultats",
               "🧩 Indicateur TradingView", "💎 Devenir VIP", "📡 Mes marchés", "❌ Non", "🎙 Mes chaînes"]
