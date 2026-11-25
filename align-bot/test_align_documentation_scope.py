@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class AlignDocumentationScopeTests(unittest.TestCase):
     def test_source_of_truth_marks_legacy_platform_as_removed_from_main(self):
         source = (ROOT / "docs" / "ALIGN_SOURCE_DE_VERITE.md").read_text(encoding="utf-8")
-        self.assertIn("retrait effectué sur main", source.lower())
+        self.assertIn("ont été retirés de l'arbre actif", source.lower())
         self.assertIn("PR #960, fusionnée le 25/11/2026", source)
         self.assertNotIn("pas encore retirés de main tant que la PR n'est pas fusionnée", source)
         self.assertNotIn("retrait proposé, non encore appliqué à main", source)
