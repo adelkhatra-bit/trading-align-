@@ -12838,6 +12838,40 @@ def live_publier(texte):
     return True
 
 
+def _live_outbox_retry_policy(exc, tries, maintenant=None):
+    """Retourne (délai, statut HTTP, Retry-After) sans exposer le sujet ni le texte."""
+    maintenant = time.time() if maintenant is None else float(maintenant)
+    try:
+        status = int(getattr(exc, "code", 0) or 0)
+    except (TypeError, ValueError):
+        status = 0
+
+    headers = getattr(exc, "headers", None)
+    retry_after = None
+    try:
+        raw_retry_after = headers.get("Retry-After") if headers else None
+        if raw_retry_after is not None:
+            try:
+                retry_after = max(1, int(float(str(raw_retry_after).strip())))
+            except (TypeError, ValueError, OverflowError):
+                retry_date = email.utils.parsedate_to_datetime(str(raw_retry_after).strip())
+                if retry_date.tzinfo is None:
+                    retry_date = retry_date.replace(tzinfo=datetime.timezone.utc)
+                retry_after = max(1, int(retry_date.timestamp() - maintenant))
+    except (TypeError, ValueError, OverflowError, AttributeError):
+        retry_after = None
+
+    # Les 4xx permanentes ne doivent pas monopoliser la file ; 408 et 429 restent transitoires.
+    if 400 <= status < 500 and status not in (408, 429):
+        return None, status, retry_after
+
+    if retry_after is not None:
+        return min(86400, retry_after), status or None, retry_after
+
+    tentative = max(1, int(tries))
+    return min(300, 5 * (2 ** min(tentative, 6))), status or None, retry_after
+
+
 def traiter_file_live(etat, maintenant=None, limite=30):
     """Publie la file ntfy avec reprises bornées ; un échec réseau ne supprime plus le message immédiatement."""
     maintenant = time.time() if maintenant is None else float(maintenant)
@@ -12856,13 +12890,31 @@ def traiter_file_live(etat, maintenant=None, limite=30):
                 pass
         except Exception as ex:
             item["tries"] = int(item.get("tries", 0)) + 1
+            attente, http_status, retry_after = _live_outbox_retry_policy(ex, item["tries"], maintenant)
+            http_label = str(http_status) if http_status is not None else "NA"
+            retry_label = f"{retry_after}s" if retry_after is not None else "NA"
+            if attente is None:
+                file.remove(item)
+                print(
+                    f"LIVE_OUTBOX_DROP tries={item['tries']} http={http_label} "
+                    f"retry_after={retry_label} reason=permanent_http_error",
+                    flush=True,
+                )
+                continue
             if item["tries"] >= 8:
                 file.remove(item)
-                print(f"LIVE_OUTBOX_DROP tries={item['tries']} error={type(ex).__name__}", flush=True)
+                print(
+                    f"LIVE_OUTBOX_DROP tries={item['tries']} http={http_label} "
+                    f"retry_after={retry_label} error={type(ex).__name__}",
+                    flush=True,
+                )
                 continue
-            attente = min(300, 5 * (2 ** min(item["tries"], 6)))
             item["next_t"] = maintenant + attente
-            print(f"LIVE_OUTBOX_RETRY tries={item['tries']} in={attente}s error={type(ex).__name__}", flush=True)
+            print(
+                f"LIVE_OUTBOX_RETRY tries={item['tries']} in={attente}s "
+                f"http={http_label} retry_after={retry_label} error={type(ex).__name__}",
+                flush=True,
+            )
         else:
             file.remove(item)
             envoyes += 1
