@@ -22,7 +22,7 @@ Si l'**identité du projet** est ambiguë (autre dépôt, autre branche de produ
 | Marchés actifs | BTC, GOLD (`BTCUSD`, `XAUUSD`) uniquement | NASDAQ retiré de l'analyse, des entrées, de la surveillance et du suivi des positions ; toute ancienne mémoire NASDAQ est archivée pour audit et jamais rejouée |
 | Bot Telegram | `@align_mtf_adel_bot` | — |
 | Bande live | `docs/live/align-bande-live.user.js` (Tampermonkey) | Copies locales anciennes (12.2.3, 12.2.4…) |
-| Bridge TradingView canonique | Worker mailbox Cloudflare → `align_tv_mailbox_feeder.py` → `align-bot/align_tv_bridge.py` dans le runner GitHub (`127.0.0.1:4100`) | Ancien serveur Node/extension/MT5 : retrait proposé par la PR #960 ; pas encore retirés de `main` tant que la PR n'est pas fusionnée |
+| Bridge TradingView canonique | Worker mailbox Cloudflare → `align_tv_mailbox_feeder.py` → `align-bot/align_tv_bridge.py` dans le runner GitHub (`127.0.0.1:4100`) | Ancien serveur Node/extension/MT5 : retiré de `main` par la PR #960 fusionnée ; snapshot de référence conservé dans `archive/pre-align-scope-cleanup-20261125` |
 
 ### Périmètre strict de `live-data`
 
@@ -48,9 +48,9 @@ Le bridge Python est éphémère dans le runner du workflow : **4100 n'est pas u
 
 Le BOT peut aussi être configuré pour lire un bridge HTTPS externe via les secrets `ALIGN_TV_API_URL` et `ALIGN_TV_READ_TOKEN`. Cette voie remplace la voie mailbox dans le workflow ; elle ne doit être activée que si l'URL et le stockage visés ont été explicitement vérifiés. Ne jamais déduire l'identité du serveur à partir du seul chemin HTTP.
 
-### Ancien chemin local — retrait proposé, non encore appliqué à main
+### Ancien chemin local — retiré de main, archive historique conservée
 
-L'ancien serveur Node sur le port 4000, son cache MTF, l'extension `tradingview-analyzer`, les outils MT5 et l'interface locale ont été identifiés comme une plateforme indépendante de la chaîne ALIGN de production. La PR #960 propose leur retrait de la branche active `main` pour éviter les faux branchements et les mises à jour concurrentes. Leur état exact avant nettoyage est conservé dans `archive/pre-align-scope-cleanup-20261125`. Tant que la PR n'est pas fusionnée, ces composants restent présents sur `main` ; la branche de PR est la seule version nettoyée. Ils ne doivent pas être redémarrés, déployés ni utilisés comme source de données ou de validation ALIGN.
+Le serveur Node historique sur le port 4000, son cache MTF, l'extension `tradingview-analyzer`, les outils MT5 et l'ancienne interface locale ont été retirés de l'arbre actif `main` par la PR #960, fusionnée le 25/11/2026 (merge commit `f0d2d59a92a0512451e7b87bd9c733edad10688c`). Le snapshot intégral antérieur est conservé dans `archive/pre-align-scope-cleanup-20261125`, à partir du commit `d6c342ef3e779aa17aa2cab0b6fd4ea22d05e853`. Ces fichiers historiques ne sont ni des composants de production ni des sources autorisées pour le BOT ; ne pas les restaurer dans `main`.
 
 Le bridge exige les 12 UT du contrat Python. L'UT active du graphique peut être l'une des 9 UT acceptées par le BOT (M1, M5, M15, M30, H1, H2, H4, D1, W1) ; cela ne dispense jamais le payload de contenir M3, M10 et M45.
 
@@ -62,8 +62,15 @@ Règle : quand `ALIGN_REQUIRE_TV_BRIDGE=1`, **aucun repli** sur des niveaux calc
 - **Réception** : un seul thread `boucle_polling_telegram_tracee` appelle `getUpdates`, acquitte rapidement les callbacks et pousse les updates dans `TELEGRAM_UPDATES`; `recevoir_updates_telegram` dépile cette file sur le thread principal, puis `traiter` route les commandes et actions. La boucle principale ne lance pas un second `getUpdates`.
 - **Sortie** : les appels applicatifs passent par `telegram()` puis `_telegram_sortant_autorise`; un blocage `TELEGRAM_PULL_BLOCK` n'est pas une livraison et ne doit jamais être compté comme telle.
 - **Commandes de diagnostic** : `/statut` et `/audit` restent sur le chemin rapide; `/diag` est traité par `traiter`, uniquement en chat privé, avec expéditeur = chat = propriétaire. Il interroge en lecture la même route MTF que le bot pour BTC et GOLD, affiche l'UT active et le nombre d'UT fraîches, puis lit `RUNNER_TEMP/align_diag.json` pour les compteurs STALE. Aucune écriture, aucun payload ni secret n'est exposé.
-- **Périmètre applicatif** : le seul bot applicatif est `align-bot/align_bot.py`. L'ancien serveur Node, son bus d'agents et l'extension locale sont visés par la PR #960 et ne sont pas des composants du bot Telegram. Leur retrait de `main` n'est pas effectif tant que cette PR n'est pas fusionnée.
+- **Périmètre applicatif** : le seul bot applicatif est `align-bot/align_bot.py`. L'ancien serveur Node, son bus d'agents et l'extension locale ont été retirés de `main` par la PR #960 fusionnée. L'archive historique n'est pas un runtime et ne doit pas être rebranchée au bot Telegram.
 - Les contrôles `getMe` / `getWebhookInfo` des workflows sont des précontrôles d'identité et de réception; ils ne remplacent pas le chemin applicatif du bot ni un test de livraison.
+
+## 2 bis. Séparation entre IA de marché et agents de code
+
+- L'IA runtime du BOT sert uniquement aux commentaires de marché à partir des données ALIGN. Elle ne reçoit aucun rôle de maintenance GitHub et ne doit créer ni modifier de code, de branche, de PR, de workflow, de secret ou de publication.
+- Les workflows de watchdog et d'auto-réparation produisent des diagnostics destinés à un mainteneur humain. Ils ne délèguent pas de tâche à Copilot ou à un autre agent de code.
+- Aucun relais Copilot CLI/cloud-agent, profil d'agent personnalisé ou mécanisme d'assignation automatique d'agent de code n'est autorisé dans le runtime actif.
+- Un outil externe peut lire un dépôt public ; ces règles de dépôt ne remplacent pas les permissions GitHub. Toute modification de visibilité, de collaborateur ou d'accès d'application doit être contrôlée dans les paramètres GitHub.
 
 ## 3. Règles d'unité de temps (confusion connue)
 
