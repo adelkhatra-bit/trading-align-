@@ -50,6 +50,67 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
                 ab.TELEGRAM_PULL_CONTEXT.market_commentary_chat_id = old_chat
                 ab.TELEGRAM_PULL_CONTEXT.market_commentary_market = old_market
 
+    def test_private_live_coach_commentary_reaches_only_opted_in_subscriber(self):
+        state = {"coach_live": {"BTC": {"101": {"started_t": 1000}}}}
+        result = {"b15": [{"t": 1000}, {"t": 2000}]}
+
+        with patch.object(ab, "TOKEN", "test-token"), \
+             patch.object(ab, "TELEGRAM_PULL_MODE", True), \
+             patch.object(ab, "DERNIER_ETAT", state), \
+             patch.object(ab, "http_json", return_value={"ok": True, "result": {"message_id": 43}}) as request, \
+             patch.object(ab, "texte_coach_live", return_value="🎙 COACH COMMENTATEUR\nℹ️ Info, pas une entrée"), \
+             patch.object(ab, "markup_analyse", return_value=None):
+            ab.notifier_coach_live(state, "BTC", result, {})
+
+        self.assertEqual(request.call_count, 1)
+        self.assertIn("101", str(request.call_args))
+        self.assertEqual(state["coach_live"]["BTC"]["101"]["dernier_t"], 1000)
+
+    def test_private_coach_position_requires_exact_opt_in_and_confirmed_position_text(self):
+        state = {"coach_live": {"BTC": {"101": {"started_t": 1000}}}}
+        old_chat = getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_commentary_chat_id", None)
+        old_market = getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_commentary_market", None)
+        with patch.object(ab, "TELEGRAM_PULL_MODE", True), patch.object(ab, "DERNIER_ETAT", state):
+            ab.TELEGRAM_PULL_CONTEXT.coach_commentary_chat_id = "101"
+            ab.TELEGRAM_PULL_CONTEXT.coach_commentary_market = "BTC"
+            try:
+                position = "🎯 POSITION ALIGN DÉTECTÉE — BTC\nEntrée 100\nSL 95\nTP 110"
+                self.assertTrue(ab._telegram_sortant_autorise(
+                    "sendMessage", {"chat_id": "101", "text": position}
+                ))
+                self.assertFalse(ab._telegram_sortant_autorise(
+                    "sendMessage", {"chat_id": "202", "text": position}
+                ))
+                self.assertFalse(ab._telegram_sortant_autorise(
+                    "sendMessage", {"chat_id": "101", "text": "Entrée 100 / SL 95 / TP 110"}
+                ))
+                self.assertFalse(ab._telegram_sortant_autorise(
+                    "sendPhoto", {"chat_id": "101", "caption": "🎙 BILAN 15 MIN"}
+                ))
+                state["quiet"] = ["101"]
+                self.assertFalse(ab._telegram_sortant_autorise(
+                    "sendMessage", {"chat_id": "101", "text": "🎙 BILAN 15 MIN"}
+                ))
+            finally:
+                ab.TELEGRAM_PULL_CONTEXT.coach_commentary_chat_id = old_chat
+                ab.TELEGRAM_PULL_CONTEXT.coach_commentary_market = old_market
+
+    def test_private_coach_helper_restores_temporary_permission_after_send(self):
+        old_chat = getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_commentary_chat_id", None)
+        old_market = getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_commentary_market", None)
+        with patch.object(ab, "_envoi_sur", side_effect=lambda *a, **k: (
+            getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_commentary_chat_id", None),
+            getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_commentary_market", None),
+        )) as send:
+            result = ab._telegram_envoyer_commentaire_coach_prive(
+                {"coach_live": {"GOLD": {"101": {"started_t": 1000}}}},
+                "101", "GOLD", "Commentaire"
+            )
+        self.assertEqual(result, ("101", "GOLD"))
+        send.assert_called_once()
+        self.assertEqual(getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_commentary_chat_id", None), old_chat)
+        self.assertEqual(getattr(ab.TELEGRAM_PULL_CONTEXT, "coach_commentary_market", None), old_market)
+
     def test_commentary_helper_restores_temporary_permission_after_send(self):
         state = {"canaux_marche": {"GOLD": "-100gold"}}
         old_chat = getattr(ab.TELEGRAM_PULL_CONTEXT, "market_commentary_chat_id", None)
