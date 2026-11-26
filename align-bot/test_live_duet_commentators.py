@@ -34,7 +34,10 @@ class LiveDuetCommentators(unittest.TestCase):
         self.assertIn('id="b-l"', self.page)
         self.assertIn("function publierDialogueCoachPair(speaker1, text1, speaker2, text2, market)", self.page)
         self.assertIn('type: "ALIGN_SHOW", action: "PAIR"', self.page)
-        self.assertIn("publierDialogueCoachPair(premier, texte1, second, texte2, m.m)", self.page)
+        self.assertIn("var premier = dernierHoteCoach", self.page)
+        self.assertIn("var texte1 = changement.textes[0], texte2 = changement.textes[1];", self.page)
+        self.assertIn("publierDialogueCoachPair(premier, texte1, second, texte2, changement.market)", self.page)
+        self.assertIn("if (nom !== \"BTC\" && nom !== \"GOLD\") continue;", self.page)
         self.assertIn("parler(premier, texte1)", self.page)
         self.assertIn("parler(second, texte2)", self.page)
 
