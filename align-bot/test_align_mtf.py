@@ -64,7 +64,7 @@ class AlignMtfRulesTest(unittest.TestCase):
             def __exit__(self, *args):
                 return False
             def read(self):
-                return b'{"ok":true,"symbol":"XAUUSD","activeTimeframe":"M15","activeTimeframeFresh":true,"activeTimeframeAgeMs":1200,"snapshots":{"M5":{"fresh":true},"M15":{"fresh":true}},"receivedTimeframes":["M5","M15"]}'
+                return b'{"ok":true,"symbol":"XAUUSD","activeTimeframe":"M15","activeTimeframeFresh":true,"activeTimeframeAgeMs":1200,"canonicalPlanTimeframe":"M15","canonicalPlanFresh":true,"snapshots":{"M5":{"fresh":true},"M15":{"fresh":true,"robotFresh":true,"robotV12":{"signal":"LONG"}}},"receivedTimeframes":["M5","M15"]}'
 
         old_url, old_token = align_bot.ALIGN_TV_API_URL, align_bot.ALIGN_TV_READ_TOKEN
         align_bot.ALIGN_TV_API_URL, align_bot.ALIGN_TV_READ_TOKEN = "https://align.example", "test-token"
@@ -85,7 +85,7 @@ class AlignMtfRulesTest(unittest.TestCase):
             def __exit__(self, *args):
                 return False
             def read(self):
-                return b'{"ok":true,"symbol":"XAUUSD","activeTimeframe":"H4","activeTimeframeFresh":false,"snapshots":{"H4":{"fresh":true}}}'
+                return b'{"ok":true,"symbol":"XAUUSD","activeTimeframe":"H4","activeTimeframeFresh":false,"canonicalPlanTimeframe":"M15","canonicalPlanFresh":true,"snapshots":{"H4":{"fresh":true},"M15":{"fresh":true,"robotFresh":true,"robotV12":{"signal":"LONG"}}}}'
 
         old_url, old_token = align_bot.ALIGN_TV_API_URL, align_bot.ALIGN_TV_READ_TOKEN
         align_bot.ALIGN_TV_API_URL, align_bot.ALIGN_TV_READ_TOKEN = "https://align.example", "test-token"
