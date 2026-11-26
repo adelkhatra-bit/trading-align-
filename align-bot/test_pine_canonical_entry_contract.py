@@ -29,6 +29,18 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn('plan_tv["zone_high"]', agent)
         self.assertNotIn("plan_pine(", agent)
 
+    def test_confirmed_pine_strategy_direction_is_read_before_local_h1_h4_gate(self):
+        start = self.bot.index("def agent(m, r, cle, ferme):")
+        end = self.bot.index("\\n\\ndef ", start + 1)
+        agent = self.bot[start:end]
+        lookup = agent.index("plan_tv = plan_indicateur(r) if require_tv and not tr else None")
+        local_gate = agent.index("if not d:", lookup)
+        self.assertLess(lookup, local_gate)
+        self.assertIn('d = int(plan_tv["direction"])', agent)
+        self.assertIn('p = float(plan_tv["price"])', agent)
+        self.assertLess(agent.index('d = int(plan_tv["direction"])'), local_gate)
+        self.assertNotIn("plan_tv = plan_indicateur(r)", agent[local_gate:])
+
     def test_bridge_derived_trigger_requires_closed_candle_zone_and_decision(self):
         self.assertIn("entry_triggered", self.bridge)
         self.assertIn('"entryTriggered": entry_triggered', self.bridge)
