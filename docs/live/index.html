@@ -78,7 +78,7 @@ function arreterVoixOverlay() {
 function ecouterVoixOverlay() {
   if (voixPollTimer) return;
   async function poll() {
-    if (voixPollBusy) return;
+    if (voixPollBusy || document.visibilityState !== 'visible') return;
     voixPollBusy = true;
     try {
       var response = await fetch(WORKER_SHOW_URL + '/show/state', { cache: 'no-store' });
@@ -119,6 +119,13 @@ function ecouterVoixOverlay() {
   voixPollTimer = setInterval(poll, 3000);
 }
 ecouterVoixOverlay();
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'hidden') {
+    if (voixPollTimer) clearInterval(voixPollTimer);
+    voixPollTimer = null;
+    arreterVoixOverlay();
+  } else ecouterVoixOverlay();
+});
 
 function echelle() {
   var s = Math.min(window.innerWidth / 1080, window.innerHeight / 1920);
@@ -200,7 +207,7 @@ function publierDialogueCoachPair(speaker1, text1, speaker2, text2, market) {
   var duration2 = Math.max(4000, Math.min(12000, Math.ceil(String(text2).length * 75 + 500)));
   var payload = {
     type: "ALIGN_SHOW", action: "PAIR", id: "show-" + ts, ts: ts, startAt: ts + 4000,
-    market: market || "BTC", speaker1: speaker1, text1: String(text1 || ""),
+    market: market || "", speaker1: speaker1, text1: String(text1 || ""),
     speaker2: speaker2, text2: String(text2 || ""), duration1: duration1, duration2: duration2
   };
   fetch(WORKER_SHOW_URL + "/show/publish?message=" + encodeURIComponent(JSON.stringify(payload)), {
@@ -245,7 +252,7 @@ if (demo) {
   rendre();
 } else { charger(); setInterval(charger, 30000); }
 setInterval(rendre, 15000);
-setTimeout(echange, 800); setInterval(echange, 18000);
+setTimeout(echange, 800); setInterval(echange, 30000);
 </script>
 </body>
 </html>
