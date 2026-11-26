@@ -550,10 +550,18 @@ class BridgeStore:
             max_age = TIMEFRAME_MS.get(tf, 60_000) + MTF_BAR_GRACE_MS
             snap["fresh"] = -MAX_FUTURE_SKEW_MS <= age <= max_age
             snap["ageMs"] = max(0, age)
+            robot_updated_at = int(snap.get("robotUpdatedAt") or 0)
+            robot_age = now_ms - robot_updated_at if robot_updated_at else None
+            snap["robotFresh"] = robot_age is not None and 0 <= robot_age <= ACTIVE_MAX_AGE_MS
+            snap["robotAgeMs"] = max(0, robot_age) if robot_age is not None else None
         required_fresh = all(snapshots.get(tf, {}).get("fresh") is True for tf in REQUIRED_TIMEFRAMES)
         active_snapshot_fresh = snapshots.get(active_tf, {}).get("fresh") is True
+        canonical_snapshot = snapshots.get("M15") or {}
+        canonical_plan_fresh = canonical_snapshot.get("fresh") is True and canonical_snapshot.get("robotFresh") is True
         return 200, {
             "ok": active_fresh and active_snapshot_fresh and required_fresh,
+            "canonicalPlanTimeframe": "M15",
+            "canonicalPlanFresh": canonical_plan_fresh,
             "lastRejection": last_rejection,
             "symbol": symbol,
             "activeTimeframe": active_tf,
