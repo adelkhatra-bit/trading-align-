@@ -155,6 +155,18 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertNotIn('dirPlan != 0 ? "\\n\\nPLAN "', self.pine)
         self.assertIn("vbg0 = zoneBas or zoneHaut ? color.rgb(170, 130, 0) : planConfirmedUi and dirPlan == 1", self.pine)
 
+    def test_decision_line_illuminates_only_on_the_same_fresh_closed_trigger_as_bridge(self):
+        self.assertIn("bridgeEntryFreshUi", self.pine)
+        self.assertIn("bridgeEntryAgeMs <= 2 * bridgeEntryTfMs + 30000", self.pine)
+        self.assertIn("bridgeEntryOhlcValidUi", self.pine)
+        self.assertIn("bridgeEntryRetestedUi = bridgeEntryHigh >= zBas and bridgeEntryLow <= zHaut", self.pine)
+        self.assertIn("bridgeEntryDecisionUi", self.pine)
+        self.assertIn("bridgeEntryBeforeStopUi", self.pine)
+        self.assertIn("entryTriggeredUi = bridgeConfirmed and bridgeEntryFreshUi", self.pine)
+        self.assertIn("line.set_color(lZH, dirPlan == 1 ? color.lime : color.red)", self.pine)
+        self.assertIn("🟢 ENTRÉE LONG VALIDÉE", self.pine)
+        self.assertIn("🔴 ENTRÉE SHORT VALIDÉE", self.pine)
+
     def test_market_scope_remains_btc_and_gold_only_in_indicator(self):
         self.assertIn('bridgeMarket = isBtc ? "BTCUSD" : isGold ? "XAUUSD" : "UNSUPPORTED"', self.pine)
         self.assertNotIn('input.string("BTCUSD", "Marché ALIGN"', self.pine)
