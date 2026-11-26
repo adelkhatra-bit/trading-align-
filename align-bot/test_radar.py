@@ -172,7 +172,7 @@ class RadarPineV25SourceTest(unittest.TestCase):
              mock.patch.object(ab, "live_bande", lambda etat, texte, *a, **k: messages.append(texte)):
             ab.live_prepare_toi({}, {"BTC": {"require_tv_bridge": True}}, now=1_000_000.0)
         self.assertIn("prépare-toi", messages[0])
-        self.assertIn("clôture 5 min au-dessus de la ligne de décision", messages[0])
+        self.assertIn("retest de la zone puis la clôture 5 min au-dessus de la ligne de décision", messages[0])
         self.assertIn("niveaux exacts en privé", messages[0])
         self.assertNotIn("101.25", messages[0])
 
