@@ -148,6 +148,14 @@ class PageLive(unittest.TestCase):
         self.assertIn("@align_mtf_adel_bot", self.PAGE)
         self.assertIn("Position en préparation sur", self.PAGE)
 
+    def test_live_page_does_not_claim_levels_before_mtf_confirmation(self):
+        self.assertIn("les niveaux seront publiés sur le Telegram gratuit", self.PAGE)
+        self.assertIn("après confirmation MTF", self.PAGE)
+        self.assertIn("Les niveaux détaillés seront publiés sur le Telegram gratuit", self.PAGE)
+        self.assertIn("après confirmation du signal", self.PAGE)
+        self.assertNotIn("les niveaux sont sur le Telegram gratuit", self.PAGE)
+        self.assertNotIn("Les niveaux détaillés se trouvent sur le Telegram gratuit", self.PAGE)
+
     def test_favorite_loader_uses_canonical_align_pages_domain(self):
         favori = (RACINE / "docs" / "live" / "favori.html").read_text(encoding="utf-8")
         self.assertIn("https://adelkhatra-bit.github.io/trading-align-/live/align-bande-live.user.js", favori)
