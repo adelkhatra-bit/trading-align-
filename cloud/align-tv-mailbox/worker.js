@@ -18,6 +18,11 @@ const SOURCE = "ALIGN_MTF_PRO_V25";
 const SYMBOLS = new Set(["BTCUSD", "XAUUSD"]);
 const MAX_BODY = 32768;
 const MAX_AGE_MS = 10 * 60 * 1000; // au-delà de 10 min, le message n'est plus servi
+// Canal séparé pour la scène Thomas/Leïla. Il utilise un ID DO distinct de BTCUSD/XAUUSD.
+const SHOW_ORIGIN = "https://adelkhatra-bit.github.io";
+const SHOW_MAX_AGE_MS = 60 * 1000;
+const SHOW_MIN_INTERVAL_MS = 12 * 1000;
+const SHOW_MAX_MESSAGE = 2048;
 // IP d'envoi publiées par TradingView (support.tradingview.com, « About webhooks »).
 const TRADINGVIEW_IPS = new Set(["52.89.214.238", "34.212.75.30", "54.218.53.128", "52.32.178.7"]);
 
@@ -39,11 +44,43 @@ function depuisTradingView(request) {
   return TRADINGVIEW_IPS.has(String(request.headers.get("cf-connecting-ip") || "").trim());
 }
 
-function json(status, body) {
+function json(status, body, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json", "cache-control": "no-store" },
+    headers: { "content-type": "application/json", "cache-control": "no-store", ...extraHeaders },
   });
+}
+
+function showCors(request) {
+  const origin = String(request.headers.get("origin") || "");
+  return origin === SHOW_ORIGIN
+    ? { "access-control-allow-origin": origin, "access-control-allow-methods": "GET, OPTIONS",
+        "access-control-allow-headers": "content-type", "access-control-max-age": "600", "vary": "Origin" }
+    : {};
+}
+
+function showBox(env) {
+  // ID dédié : ne partage jamais les clés latest des boîtes BTCUSD et XAUUSD.
+  return env.ALIGN_TV_MAILBOX.get(env.ALIGN_TV_MAILBOX.idFromName("LIVE_SHOW"));
+}
+
+async function lireShow(env) {
+  const response = await showBox(env).fetch("https://box/");
+  if (response.status !== 200) return { show: null, voice: null, voiceEnabled: false, voiceUpdatedAt: 0 };
+  try { return JSON.parse(await response.text()); }
+  catch { return { show: null, voice: null, voiceEnabled: false, voiceUpdatedAt: 0 }; }
+}
+
+async function ecrireShow(env, state) {
+  await showBox(env).fetch("https://box/", { method: "PUT", body: JSON.stringify(state) });
+}
+
+function parseShowMessage(raw, type) {
+  if (typeof raw !== "string" || !raw || raw.length > SHOW_MAX_MESSAGE) return null;
+  try {
+    const payload = JSON.parse(raw);
+    return payload && payload.type === type ? payload : null;
+  } catch { return null; }
 }
 
 function sameSecret(a, b) {
@@ -73,6 +110,75 @@ function box(env, symbol) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (url.pathname.startsWith("/show/")) {
+      const cors = showCors(request);
+      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+
+      if (request.method === "GET" && url.pathname === "/show/state") {
+        const state = await lireShow(env);
+        const now = Date.now();
+        const show = state.show && now - Number(state.show.ts || 0) <= SHOW_MAX_AGE_MS ? state.show : null;
+        const voice = state.voice && now - Number(state.voice.ts || 0) <= 30000 ? state.voice : null;
+        return json(200, { ok: true, show, voice, voiceEnabled: state.voiceEnabled === true,
+          voiceUpdatedAt: Number(state.voiceUpdatedAt || 0) }, cors);
+      }
+
+      if (request.method === "GET" && url.pathname === "/show/publish") {
+        if (request.headers.get("origin") !== SHOW_ORIGIN) return json(403, { ok: false, error: "origin_forbidden" }, cors);
+        const payload = parseShowMessage(url.searchParams.get("message"), "ALIGN_SHOW");
+        const now = Date.now();
+        if (!payload || payload.action !== "PAIR" ||
+            !["t", "l"].includes(payload.speaker1) || !["t", "l"].includes(payload.speaker2) ||
+            payload.speaker1 === payload.speaker2 ||
+            !["BTC", "GOLD"].includes(payload.market) ||
+            typeof payload.text1 !== "string" || payload.text1.trim().length < 12 || payload.text1.length > 280 ||
+            typeof payload.text2 !== "string" || payload.text2.trim().length < 12 || payload.text2.length > 280 ||
+            !Number.isFinite(Number(payload.ts)) || now - Number(payload.ts) > 10000 || Number(payload.ts) > now + 5000 ||
+            !Number.isFinite(Number(payload.startAt)) || Number(payload.startAt) < now + 1000 || Number(payload.startAt) > now + 12000 ||
+            !Number.isFinite(Number(payload.duration1)) || Number(payload.duration1) < 2500 || Number(payload.duration1) > 12000 ||
+            !Number.isFinite(Number(payload.duration2)) || Number(payload.duration2) < 2500 || Number(payload.duration2) > 12000) {
+          return json(400, { ok: false, error: "invalid_show_payload" }, cors);
+        }
+        const state = await lireShow(env);
+        if (state.show && Number(payload.ts) <= Number(state.show.ts || 0)) return json(409, { ok: false, error: "stale_show" }, cors);
+        if (state.show && now - Number(state.show.ts || 0) < SHOW_MIN_INTERVAL_MS) return json(429, { ok: false, error: "show_rate_limited" }, cors);
+        state.show = payload;
+        state.updatedAt = now;
+        await ecrireShow(env, state);
+        return json(200, { ok: true, id: payload.id || payload.ts }, cors);
+      }
+
+      if (request.method === "GET" && url.pathname === "/show/voice") {
+        const payload = parseShowMessage(url.searchParams.get("message"), "ALIGN_VOICE");
+        const now = Date.now();
+        if (!payload || !["START", "STOP"].includes(payload.action) ||
+            !["t", "l"].includes(payload.speaker) || !["fr", "en"].includes(payload.lang) ||
+            !Number.isFinite(Number(payload.ts)) || now - Number(payload.ts) > 10000 || Number(payload.ts) > now + 5000 ||
+            typeof payload.text !== "string" || payload.text.length > 280 ||
+            !Number.isFinite(Number(payload.durationMs)) || Number(payload.durationMs) < 0 || Number(payload.durationMs) > 20000) {
+          return json(400, { ok: false, error: "invalid_voice_payload" }, cors);
+        }
+        const state = await lireShow(env);
+        if (state.voice && Number(payload.ts) <= Number(state.voice.ts || 0)) return json(409, { ok: false, error: "stale_voice" }, cors);
+        state.voice = payload;
+        state.updatedAt = now;
+        await ecrireShow(env, state);
+        return json(200, { ok: true, ts: payload.ts }, cors);
+      }
+
+      if (request.method === "GET" && url.pathname === "/show/coach") {
+        const enabled = url.searchParams.get("enabled");
+        if (enabled !== "1" && enabled !== "0") return json(400, { ok: false, error: "invalid_coach_state" }, cors);
+        const state = await lireShow(env);
+        state.voiceEnabled = enabled === "1";
+        state.voiceUpdatedAt = Date.now();
+        if (!state.voiceEnabled) state.voice = null;
+        state.updatedAt = Date.now();
+        await ecrireShow(env, state);
+        return json(200, { ok: true, voiceEnabled: state.voiceEnabled }, cors);
+      }
+    }
 
     if (request.method === "GET" && url.pathname === "/health") {
       return json(200, { ok: true, service: "align-tv-mailbox", source: SOURCE });
