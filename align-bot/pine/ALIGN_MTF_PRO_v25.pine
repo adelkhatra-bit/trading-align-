@@ -369,9 +369,6 @@ bridgePlanGeometryOk = dirPlan == 1 ? (
      tp1 < zBas and ent >= zBas and ent <= zHaut and sl > zHaut and tp2 < tp1
 ) : false
 
-// État de confirmation calculé pour l'affichage ; les champs d'export restent dans le bloc bridge canonique.
-planClosedMtfOkUi = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan)
-planConfirmedUi = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2) and etatS == "CONFIRMÉ" and scoreV >= 75 and planClosedMtfOkUi
 
 
 // ═════════ SIGNAUX ═════════
@@ -492,6 +489,9 @@ if barstate.islast
         tip = array.get(nomsL, i) + " — " + sensUT + "\n━━━━━━━━━━━━\nTendance : " + tendUT + "\nRSI : " + str.tostring(rv, "#") + " — " + rsiUT + "\nCompression : " + (sq ? "OUI ⚡ prêt à exploser (attendre la direction)" : "non") + "\nRôle : " + roleUT + (minUT > 0 ? "\nClôture dans : " + f_mmss(f_reste(minUT)) : "") + "\n━━━━━━━━━━━━\n" + planUT + (dirPlan != 0 and dv == -dirPlan and i <= 4 ? "\n↩ VOYANT RETOURNEMENT allumé : " + str.tostring(nVoy) + "/5 petites unités (1 à 15 min) ont tourné contre le plan\n3/5 = le retournement se prépare • confirmé quand le 15 min ET la 1h clôturent dans le nouveau sens" : "")
         table.cell(t, i, 0, array.get(noms, i), width=largCol, bgcolor=rv >= 70 ?  color.rgb(120, 20, 30) : rv <= 30 ?  color.rgb(0, 90, 50) :  color.rgb(30, 34, 45), text_color=rv >= 70 or rv <= 30 ?  color.white :  color.gray, text_size=size.small, tooltip=tip)
         table.cell(t, i, 1, sym, width=largCol, bgcolor=bg, text_color= color.white, text_size=size.normal, tooltip=tip)
+// État de confirmation calculé pour l'affichage ; les champs d'export restent dans le bloc bridge canonique.
+planClosedMtfOkUi = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan)
+planConfirmedUi = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2) and etatS == "CONFIRMÉ" and scoreV >= 75 and planClosedMtfOkUi
     titre = zoneBas ? "RETOURNEMENT ▼" : zoneHaut ? "REBOND ▲" : fortHaut ? "★ ACHAT FORT" : fortBas ? "★ VENTE FORTE" : retHaut ? "RETOURNEMENT ▲" : retBas ? "RETOURNEMENT ▼" : rsiOB >= 3 ? "RSI SURACHAT " + str.tostring(rsiOB) + "/11" : rsiOS >= 3 ? "RSI SURVENTE " + str.tostring(rsiOS) + "/11" : surcharge ? "⚡ SURCHARGE" : sens == 1 ? "HAUSSE" : sens == -1 ? "BAISSE" : "ATTENDRE"
     statutPlan = planConfirmedUi ? (dirPlan == 1 ? "▲ LONG CONFIRMÉ" : "▼ SHORT CONFIRMÉ") : strat != "" and dirPlan != 0 ? (dirPlan == 1 ? "⏳ BIAIS LONG — EN ATTENTE" : "⏳ BIAIS SHORT — EN ATTENTE") : "ATTENDRE • AUCUNE STRATÉGIE"
     ligne = (retDir != 0 and not retConf ? "↩ RETOURNEMENT  " : nVoy >= 3 ? "↩ " + str.tostring(nVoy) + "/5  " : "") + statutPlan + (planConfirmedUi ? " • " + (strat == "SCALPING" ? "SCALP" : strat) + " • TP " + px(tp1) + " • SL " + px(sl) : strat != "" and dirPlan != 0 ? " • " + strat + " • confirmation requise" : "   " + titre)
