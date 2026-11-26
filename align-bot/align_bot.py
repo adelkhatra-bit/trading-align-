@@ -12674,6 +12674,17 @@ def agent(m, r, cle, ferme):
             cle.pop("ordre", None)
             out.append(f"⏳ {ICONE.get(m, '')} {m} : sens Pine M15 différent de la lecture locale ; aucune entrée.")
             return out
+        # Ne jamais publier un plan directionnel ni ses niveaux avant la confirmation MTF de Pine.
+        if not plan_tv.get("confirmed"):
+            cle["prep"] = False
+            cle.pop("ordre", None)
+            cle.pop("pine_wait_bar", None)
+            wait_key = f"{plan_tv.get('entry_bar_time')}|{plan_tv.get('entry_timeframe')}|{plan_tv.get('direction')}"
+            if cle.get("pine_mtf_wait_key") != wait_key:
+                cle["pine_mtf_wait_key"] = wait_key
+                out.append(f"⏳ {ICONE.get(m, '')} {m} : configuration TradingView détectée, mais confirmation MTF non validée. Aucun sens de trade ni niveau Entry/SL/TP publié. Attente des clôtures nécessaires.")
+            return out
+        cle.pop("pine_mtf_wait_key", None)
         cle.pop("tv_bridge_wait_reason", None)
         # Les niveaux sont ceux du Pine, jamais recalculés ni ajustés par l'apprentissage SL.
         entry = float(plan_tv["entry"])
@@ -13692,12 +13703,24 @@ def detecter_chasse_liquidite(bars, atr_value, lookback=20):
 def contexte_technique_live(derniers):
     """Contexte factuel du commentateur IA, construit exclusivement depuis les analyses et bougies déjà chargées."""
     marches = {}
+    def direction_derniere_bougie(bars):
+        """Direction du corps de la dernière bougie clôturée fournie par l'adaptateur."""
+        if not isinstance(bars, (list, tuple)) or not bars:
+            return "indisponible"
+        try:
+            ouverture, cloture = float(bars[-1]["o"]), float(bars[-1]["c"])
+        except (KeyError, TypeError, ValueError):
+            return "indisponible"
+        return "haussière" if cloture > ouverture else "baissière" if cloture < ouverture else "neutre"
+
     for marche in MARCHES:
         r = (derniers or {}).get(marche)
         if not isinstance(r, dict):
             continue
         dirs = (r.get("dirs_cloturees") or r.get("dirs")) or []
-        sens = int(r.get("dirPlan") or r.get("sens") or 0)
+        # Le coach ne doit jamais présenter un biais de plan non confirmé comme une direction exploitable.
+        # BTC exige H1/H4 ; GOLD exige M5/M15/H1/H4 : ces règles sont déjà matérialisées dans confirme.
+        sens = int(r.get("confirme") or 0)
         biais = {1: "haussier", -1: "baissier", 0: "neutre"}[1 if sens > 0 else -1 if sens < 0 else 0]
         confirmation_complete = (
             len(dirs) > 9 and dirs[2] == dirs[4] == dirs[7] == dirs[9] == 1
@@ -13727,6 +13750,16 @@ def contexte_technique_live(derniers):
             "rsi_15m": round(float(r.get("rC")), 1) if isinstance(r.get("rC"), (int, float)) else None,
             "compression_unites": r.get("comp"),
         }
+        # Les adaptateurs retirent les bougies en formation : ces lectures décrivent les dernières clôtures M5/M15.
+        mouvement_court = {
+            "M5": direction_derniere_bougie(r.get("b5") or []),
+            "M15": direction_derniere_bougie(r.get("b15_long") or r.get("b15") or []),
+        }
+        contexte["mouvement_court_terme"] = mouvement_court
+        contexte["conflit_biais_court_terme"] = bool(
+            sens in (-1, 1) and any(v in ("haussière", "baissière") and (1 if v == "haussière" else -1) != sens
+                                    for v in mouvement_court.values())
+        )
         if marche == "GOLD":
             contexte["fibonacci"] = progression_fibonacci_live(r, marche)
         # Les fournisseurs Kraken/Yahoo et regrouper() retirent déjà les bougies en formation : la dernière M15 est clôturée.
@@ -13864,6 +13897,9 @@ def commentaires_live_de_secours(donnees):
         volume_note_en = f" and strong {volume_label_en}" if isinstance(volume_ratio, (int, float)) and volume_ratio >= 1.5 else ""
         timeframe_prefix = "Unité courte" if reversal.get("timeframe") == "M5" else "Clôture de référence"
         timeframe_prefix_en = "Short timeframe" if reversal.get("timeframe") == "M5" else "Reference close"
+        mouvement = c.get("mouvement_court_terme") or {}
+        court_haussier = any(mouvement.get(tf) == "haussière" for tf in ("M5", "M15"))
+        court_baissier = any(mouvement.get(tf) == "baissière" for tf in ("M5", "M15"))
         if reversal.get("conflit"):
             fr2, en2 = (
                 "Les unités courtes et de référence divergent : marché hésitant, attendons une clôture cohérente.",
@@ -13878,6 +13914,26 @@ def commentaires_live_de_secours(donnees):
             fr2, en2 = (
                 f"{timeframe_prefix} : balayage de la résistance{divergence_note}{volume_note}, rejet dessous ; retournement à confirmer.",
                 f"{timeframe_prefix_en} swept resistance{divergence_note_en}{volume_note_en}, then rejected below; reversal possible, not yet confirmed."
+            )
+        elif biais == "baissier" and court_haussier:
+            fr2, en2 = (
+                "Le biais de fond reste baissier, mais M5/M15 clôturent à la hausse : contre-mouvement en cours, aucun short avant confirmation.",
+                "The higher-timeframe bias remains bearish, but M5/M15 closed bullish: counter-move underway; no short before confirmation."
+            )
+        elif biais == "haussier" and court_baissier:
+            fr2, en2 = (
+                "Le biais de fond reste haussier, mais M5/M15 clôturent à la baisse : repli en cours, aucun long avant confirmation.",
+                "The higher-timeframe bias remains bullish, but M5/M15 closed bearish: pullback underway; no long before confirmation."
+            )
+        elif biais == "neutre" and court_haussier:
+            fr2, en2 = (
+                "M5/M15 clôturent à la hausse, mais aucune direction de trade n'est confirmée : pas de short anticipé, attendons le signal.",
+                "M5/M15 closed bullish, but no trade direction is confirmed: no anticipatory short; wait for the signal."
+            )
+        elif biais == "neutre" and court_baissier:
+            fr2, en2 = (
+                "M5/M15 clôturent à la baisse, mais aucune direction de trade n'est confirmée : pas de long anticipé, attendons le signal.",
+                "M5/M15 closed bearish, but no trade direction is confirmed: no anticipatory long; wait for the signal."
             )
         else:
             fr2, en2 = f"{momentum} et {flux} ; {suite}", f"{momentum_en} and {flux_en}; {suite_en}"
@@ -13907,6 +13963,9 @@ def live_phrases_ia(etat, maintenant, derniers=None):
         "ou fausses cassures confirmées par une bougie clôturée. Le M5 sert d'alerte précoce, le M15 de confirmation plus robuste. "
         "Distingue une baisse momentanée, un vrai breakdown et une reprise haussière après balayage des stops ; "
         "ne confonds jamais une mèche avec une cassure confirmée et signale les désaccords M5/M15. "
+        "Le champ biais_plan est exclusivement la direction déjà confirmée par le moteur ; neutre signifie qu'aucune direction de trade n'est confirmée. "
+        "Lis mouvement_court_terme M5/M15 : si une clôture courte contredit le biais de fond, annonce explicitement le contre-mouvement ou le retracement. "
+        "Ne présente jamais le biais de fond comme la direction immédiate du prix et ne prédis jamais une chute ou une hausse sans clôture de confirmation. "
         "Si le prix est dans la zone Fibonacci 61,8–78,6 %, explique naturellement qu'il teste une zone de retracement profonde "
         "ou une zone technique importante ; ne récite jamais les chiffres. Si le retracement est léger, intermédiaire, dépassé "
         "ou absent, adapte exactement le commentaire. Relie le Fibonacci à la tendance et aux autres confirmations, ne le présente "
