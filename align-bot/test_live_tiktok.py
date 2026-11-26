@@ -340,7 +340,7 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("montrer(txt, bulle, 2, '', false, bulle ? 'marche' : 'live')", source)  # BULLE de marché envoyée au vocal
         self.assertIn("const traductionEN = enAnglais(texte), anglaisTraduit = traductionEN !== texte", source)
         self.assertIn("item.source === 'marche' && !item.anglaisTraduit", source)  # évite la voix anglaise sur une bulle restée en français
-        self.assertIn("item.source !== 'ia' && item.source !== 'marche'", source)
+        self.assertIn("!['ia', 'marche', 'coach'].includes(item.source)", source)
         self.assertIn("voiceschanged", source)  # voix navigateur parfois disponibles après document-idle
         self.assertIn("removeEventListener('voiceschanged', voixSurVoixChangees)", source)  # listener nettoyé à la réinjection
         self.assertIn("voixEnAttente = item", source)  # commentaire FR retenté quand la liste de voix arrive
@@ -1209,6 +1209,7 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         self.assertIn("// @version      12.2.25", bande)
         self.assertIn("const VERSION = '12.2.25';", bande)
         self.assertIn('let voixUtterance = null', bande)
+        self.assertIn('const voixUtterances = new Set()', bande)
         self.assertIn('voixUtterance = utterance;', bande)
         self.assertIn("setInterval(pingEcran, 45000)", bande)
         self.assertIn("__ALIGN_LIVE_SCREEN_OWNER_V1__", bande)
@@ -1287,7 +1288,7 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
         self.assertIn("function parlerLive(item, forcer = false)", bande)
         self.assertIn("if (!voixActive || !item", bande)
-        self.assertIn("return dansLangue.find(v => VOIX_NATURELLES.test(v.name)) || null;", bande)
+        self.assertIn("return dansLangue.find(v => VOIX_NATURELLES.test(v.name) && filtreRole.test(v.name)) || null;", bande)
         self.assertIn("window.speechSynthesis.cancel()", bande)
 
     def test_pine_plus_de_point_entree_trace(self):
