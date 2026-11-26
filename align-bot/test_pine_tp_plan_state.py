@@ -73,7 +73,8 @@ class PineTpPlanStateTests(unittest.TestCase):
         rr_later = self.source.index("rr  =")
         self.assertLess(rr_s, risk_gate)
         self.assertLess(risk_gate, rr_later)
-        self.assertIn("rrS >= 2.0", self.source[risk_gate:self.source.index("\\n", risk_gate)])
+        risk_line = next(line for line in self.source.splitlines() if line.startswith("planRiskRewardOk ="))
+        self.assertIn("rrS >= 2.0", risk_line)
 
     def test_visual_plan_status_does_not_claim_entry_is_already_executable(self):
         self.assertIn("PLAN LONG VALIDÉ — ATTENTE ENTRÉE", self.source)
