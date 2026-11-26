@@ -141,9 +141,9 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn('bridgeEntryTf = strat == "SWING"', self.pine)
         self.assertIn('"UNSUPPORTED")', self.pine)
         self.assertIn('bridgeSignal = bridgeConfirmed ?', self.pine)
-        self.assertIn('statutPlan = bridgeConfirmed ?', self.pine)
+        self.assertIn('statutPlan = planConfirmedUi ?', self.pine)
         self.assertIn('AUCUNE ENTRÉE : attendre la confirmation MTF', self.pine)
-        self.assertIn('bridgeConfirmed ? "\\n\\nPLAN CONFIRMÉ "', self.pine)
+        self.assertIn('planConfirmedUi ? "\\n\\nPLAN CONFIRMÉ "', self.pine)
 
 
     def test_pine_does_not_show_long_or_entry_levels_as_executable_before_mtf_confirmation(self):
@@ -153,7 +153,7 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn('"ATTENDRE • AUCUNE STRATÉGIE"', self.pine)
         self.assertIn('bridgeConfirmed ? "\\n\\nPLAN CONFIRMÉ "', self.pine)
         self.assertNotIn('dirPlan != 0 ? "\\n\\nPLAN "', self.pine)
-        self.assertIn("vbg0 = zoneBas or zoneHaut ? color.rgb(170, 130, 0) : bridgeConfirmed and dirPlan == 1", self.pine)
+        self.assertIn("vbg0 = zoneBas or zoneHaut ? color.rgb(170, 130, 0) : planConfirmedUi and dirPlan == 1", self.pine)
 
     def test_market_scope_remains_btc_and_gold_only_in_indicator(self):
         self.assertIn('bridgeMarket = isBtc ? "BTCUSD" : isGold ? "XAUUSD" : "UNSUPPORTED"', self.pine)
