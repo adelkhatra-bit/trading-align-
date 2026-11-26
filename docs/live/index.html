@@ -226,8 +226,11 @@ function echange() {
   var age = donnees ? Date.now() / 1000 - donnees.maj : 1e9;
   var cat, m;
   if (!donnees || !donnees.marches || !donnees.marches.length || age > 600) { cat = "perime"; m = { m: "", ut: 0, seuil: 8, biais: "", profil: "" }; }
-  else if (tour % 5 === 0) { cat = "liens"; m = donnees.marches[0]; }
-  else { m = donnees.marches[Math.floor(Math.random() * donnees.marches.length)]; cat = ETATS[m.etat] ? m.etat : "calme"; }
+  else {
+    // Rotation déterministe : chaque marché reçoit son propre dialogue malgré le filtre strict du graphique.
+    m = donnees.marches[(tour - 1) % donnees.marches.length];
+    cat = tour % 5 === 0 ? "liens" : (ETATS[m.etat] ? m.etat : "calme");
+  }
   var paire = pick(DIALOGUES[cat].map(function (p, i) { return i; }).map(function (i) { return DIALOGUES[cat][i][0] + "§" + i; }));
   var i = parseInt(paire.split("§")[1], 10), dialogue = DIALOGUES[cat][i];
   // Duo fixe : Thomas annonce en français, Leïla reformule en anglais.
