@@ -325,7 +325,7 @@ jobs:
                       + "; last_rejection=" + rejection_text
                   )
               active = str(payload.get("activeTimeframe") or "").upper()
-              if payload.get("activeTimeframeFresh") is not True or active not in {"M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"}:
+              if payload.get("activeTimeframeFresh") is not True or active not in {"M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1"}:
                   raise RuntimeError("ÉCHEC: aucune unité TradingView active et fraîche pour " + symbol)
               snap = snapshots.get(active) or {}
               # Le prix affiché sur TradingView doit être présent, positif et reçu depuis moins de 90 secondes
@@ -582,7 +582,7 @@ jobs:
 
               active = str(payload.get("activeTimeframe") or "").upper()
               if payload.get("activeTimeframeFresh") is not True or active not in {
-                  "M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"
+                  "M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1"
               }:
                   raise SystemExit("ÉCHEC FINAL: UT active invalide pour " + symbol)
 
