@@ -67,7 +67,8 @@ var ICONES = { BTC: "🟠", GOLD: "🥇" };
 var BIAIS = { haussier: "haussier", baissier: "baissier", indecis: "indécis" };
 var ETATS = { calme: "Marché calme", preparation: "En préparation", entree: "Entrée en cours", ferme: "Marché fermé", perime: "Données en pause" };
 var donnees = null, vu = 0, recents = [], tour = 0;
-// Sync mouth movement with the TradingView browser voice, via a dedicated ntfy event channel.
+var SUJET = "align-live-2a4bccafd9548d93";
+// Sync each mouth to the explicit speaker role emitted by the TradingView userscript.
 var voixEventSource = null, voixHoteActif = 't', voixStopTimer = null;
 function arreterVoixOverlay() {
   if (voixStopTimer) { clearTimeout(voixStopTimer); voixStopTimer = null; }
@@ -76,7 +77,7 @@ function arreterVoixOverlay() {
 }
 function ecouterVoixOverlay() {
   try { if (voixEventSource) voixEventSource.close(); } catch (e) {}
-  voixEventSource = new EventSource('https://ntfy.sh/align-live-2a4bccafd9548d93-voix/sse');
+  voixEventSource = new EventSource('https://ntfy.sh/' + SUJET + '-voix/sse');
   voixEventSource.onmessage = function (e) {
     try {
       var data = JSON.parse(e.data);
@@ -85,7 +86,10 @@ function ecouterVoixOverlay() {
       if (parts.length < 4 || parts[0] !== 'ALIGN_VOICE') return;
       if (parts[1] === 'START') {
         arreterVoixOverlay();
-        voixHoteActif = voixHoteActif === 't' ? 'l' : 't';
+        // Nouveau protocole : le locuteur est transmis. Ancien protocole : alternance conservée.
+        var speaker = (parts[2] === 't' || parts[2] === 'l')
+          ? parts[2] : (voixHoteActif === 't' ? 'l' : 't');
+        voixHoteActif = speaker;
         document.getElementById('av-' + voixHoteActif).classList.add('parle');
         voixStopTimer = setTimeout(arreterVoixOverlay, 30000);
       } else if (parts[1] === 'STOP') arreterVoixOverlay();
@@ -169,11 +173,22 @@ var DIALOGUES = {
     ["Les niveaux détaillés seront publiés sur le Telegram gratuit " + BOT + " après confirmation du signal.", "Et le plan prime toujours sur l'impatience."]
   ]
 };
-function parler(qui, texte) {
-  var bulle = document.getElementById("b-" + qui), av = document.getElementById("av-" + qui);
+function envoyerDialogueCoach(qui, texte, market) {
+  var payload = {
+    type: "ALIGN_SHOW", action: "SAY", speaker: qui === "l" ? "l" : "t",
+    lang: "fr", market: market || "", text: String(texte || ""), ts: Date.now()
+  };
+  fetch("https://ntfy.sh/" + SUJET + "-show", {
+    method: "POST", headers: { "Content-Type": "text/plain;charset=UTF-8" },
+    body: JSON.stringify(payload), keepalive: true
+  }).catch(function () {});
+}
+function parler(qui, texte, market) {
+  var bulle = document.getElementById("b-" + qui);
   var autre = qui === "t" ? "l" : "t";
   document.getElementById("b-" + autre).classList.remove("visible");
   bulle.innerHTML = "<small>" + (qui === "t" ? "Thomas" : "Leïla") + "</small>" + texte; bulle.classList.add("visible");
+  envoyerDialogueCoach(qui, texte, market);
 }
 function echange() {
   tour++;
@@ -185,8 +200,8 @@ function echange() {
   var paire = pick(DIALOGUES[cat].map(function (p, i) { return i; }).map(function (i) { return DIALOGUES[cat][i][0] + "§" + i; }));
   var i = parseInt(paire.split("§")[1], 10), dialogue = DIALOGUES[cat][i];
   var premier = tour % 2 === 0 ? "t" : "l", second = premier === "t" ? "l" : "t";
-  parler(premier, remplir(dialogue[0], m));
-  setTimeout(function () { parler(second, remplir(dialogue[1], m)); }, 5200);
+  parler(premier, remplir(dialogue[0], m), m.m);
+  setTimeout(function () { parler(second, remplir(dialogue[1], m), m.m); }, 6500);
 }
 
 function charger() {
@@ -203,7 +218,7 @@ if (demo) {
   rendre();
 } else { charger(); setInterval(charger, 30000); }
 setInterval(rendre, 15000);
-setTimeout(echange, 800); setInterval(echange, 11000);
+setTimeout(echange, 800); setInterval(echange, 18000);
 </script>
 </body>
 </html>
