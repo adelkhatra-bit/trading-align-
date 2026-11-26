@@ -50,7 +50,7 @@ class PineTpPlanStateTests(unittest.TestCase):
 
     def test_strategy_and_bridge_confirmations_use_closed_timeframe_directions(self):
         for name in ("d1Fermee", "d5Fermee", "d15Fermee", "d60Fermee", "d240Fermee", "dDFermee", "dWFermee"):
-            self.assertIn(name + "   = request.security", self.source)
+            self.assertRegex(self.source, name + r"\\s*=\\s*request\\.security")
         self.assertIn("d5Strat = nz(d5Fermee)", self.source)
         self.assertIn("d1Strat = nz(d1Fermee)", self.source)
         self.assertIn("uD  = nz(dDFermee) == dP", self.source)
