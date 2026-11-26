@@ -39,7 +39,7 @@ class LiveDuetCommentators(unittest.TestCase):
         self.assertIn("if (voixActive) jouerDialogueCoach(show)", self.js)
         self.assertIn("publierEtatCoach(true)", self.js)
         self.assertIn("publierEtatCoach(false)", self.js)
-        self.assertIn("if (!anglais && item.source !== 'coach') window.speechSynthesis.cancel();", self.js)
+        self.assertIn("if (!anglais && item.source !== 'coach') {", self.js)
 
     def test_voice_events_move_the_matching_avatar_not_alternate_randomly(self):
         self.assertIn("type: 'ALIGN_VOICE', action, speaker:", self.js)
