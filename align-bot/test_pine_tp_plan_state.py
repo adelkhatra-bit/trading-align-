@@ -67,6 +67,14 @@ class PineTpPlanStateTests(unittest.TestCase):
         self.assertIn("AUCUNE ENTRÉE : risque ou gain/risque insuffisant", self.source)
         self.assertIn("PLAN VALIDÉ : attendre le déclencheur", self.source)
 
+    def test_risk_reward_ratio_is_declared_before_plan_confirmation_gate(self):
+        rr_s = self.source.index("rrS =")
+        risk_gate = self.source.index("planRiskRewardOk =")
+        rr_later = self.source.index("rr  =")
+        self.assertLess(rr_s, risk_gate)
+        self.assertLess(risk_gate, rr_later)
+        self.assertIn("rrS >= 2.0", self.source[risk_gate:self.source.index("\\n", risk_gate)])
+
     def test_visual_plan_status_does_not_claim_entry_is_already_executable(self):
         self.assertIn("PLAN LONG VALIDÉ — ATTENTE ENTRÉE", self.source)
         self.assertIn("PLAN SHORT VALIDÉ — ATTENTE ENTRÉE", self.source)
