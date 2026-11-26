@@ -5250,7 +5250,7 @@ def texte_timeframes(m, r, anglais=False):
         lignes.append(f"{label}: {sens} — RSI {rsi_txt}" if anglais else f"{label} : {sens} — RSI {rsi_txt}")
     active_tf = str(bridge.get("activeTimeframe") or "").upper()
     active_snap = snapshots.get(active_tf) or {}
-    robot = active_snap.get("robotV12") or {}
+    robot = (snapshots.get("M15") or {}).get("robotV12") or {}
     strategie = str(robot.get("strategy") or "").upper()
     if strategie:
         lignes.append("")
@@ -7873,6 +7873,8 @@ def capturer_snapshot_audit(etat, m, r, cle, messages=None):
               "reason": bridge.get("reason"),
               "activeTimeframe": bridge.get("activeTimeframe"),
               "activeTimeframeAgeMs": bridge.get("activeTimeframeAgeMs"),
+              "canonicalPlanTimeframe": bridge.get("canonicalPlanTimeframe") or "M15",
+              "canonicalPlanFresh": bridge.get("canonicalPlanFresh") is True,
               "receivedTimeframes": bridge.get("receivedTimeframes") or [],
               "snapshots": {}}
         champs_tv = ("fresh", "timestamp", "updatedAt", "time", "confirmed", "signal", "verdict",
@@ -7883,7 +7885,7 @@ def capturer_snapshot_audit(etat, m, r, cle, messages=None):
                 continue
             robot = snap_tv.get("robotV12") or {}
             tv["snapshots"][str(tf)] = {
-                k: snap_tv.get(k) for k in ("fresh", "timestamp", "updatedAt", "time", "confirmed", "ageMs")
+                k: snap_tv.get(k) for k in ("fresh", "timestamp", "updatedAt", "time", "confirmed", "ageMs", "robotFresh", "robotAgeMs", "robotUpdatedAt", "robotTimestamp")
                 if k in snap_tv
             }
             if isinstance(robot, dict):
@@ -10314,7 +10316,7 @@ def construire_live(etat, derniers, now=None):
                 baissieres = sum(1 for direction in directions if direction == -1)
                 active_tf = str(bridge.get("activeTimeframe") or "").upper()
                 active = snapshots.get(active_tf) or {}
-                robot = active.get("robotV12") or {}
+                robot = (snapshots.get("M15") or {}).get("robotV12") or {}
                 plan = plan_indicateur(r)
                 if plan and plan.get("available"):
                     sens = int(plan["direction"])
