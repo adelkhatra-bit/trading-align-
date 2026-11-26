@@ -12936,6 +12936,8 @@ def agent(m, r, cle, ferme):
             src="Pine v25 M15 / " + plan_tv["entry_timeframe"],
             tv_price=plan_tv["price"],
             strategie=plan_tv["strategy"],
+            strat=plan_tv["strategy"],
+            entry_timeframe=plan_tv["entry_timeframe"],
         )
         tr.update(strategie_trade(r, d))
         # La stratégie et l'UT d'exécution du trade suivent le plan Pine v25.
