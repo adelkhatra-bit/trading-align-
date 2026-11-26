@@ -56,6 +56,18 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn('"price": current_price', plan)
         self.assertIn('"price_in_zone": prix_tradingview_dans_zone(current_price, zone_low, zone_high)', plan)
 
+    def test_agent_does_not_publish_direction_or_levels_before_pine_mtf_confirmation(self):
+        start = self.bot.index("def agent(m, r, cle, ferme):")
+        end = self.bot.index("\n\ndef ", start + 1)
+        agent = self.bot[start:end]
+        gate = agent.index('if not plan_tv.get("confirmed"):')
+        self.assertIn("Aucun sens de trade ni niveau Entry/SL/TP publié.", agent)
+        self.assertLess(gate, agent.index('entry = float(plan_tv["entry"])'))
+        self.assertLess(gate, agent.index('if not plan_tv.get("triggered"):'))
+
+    def test_pine_bridge_zone_labels_match_actual_support_and_resistance(self):
+        self.assertIn('bridgeZone = zoneHaut ? "SUPPORT" : zoneBas ? "RESISTANCE" : "PLAN"', self.pine)
+
     def test_agent_blocks_entry_when_tradingview_price_left_pine_zone(self):
         start = self.bot.index("def agent(m, r, cle, ferme):")
         end = self.bot.index("\n\ndef ", start + 1)
