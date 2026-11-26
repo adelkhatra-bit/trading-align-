@@ -1657,12 +1657,15 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
     if "Prochaine entrée" not in raison and not tr:
         l.append(prochaine(r, cle))
     return "\n".join(l)
-# Unité regardée sur TradingView → fenêtre d'alignement et type de position (UT = 1,2,5,10,15,30,45,1h,2h,4h,D).
+# Unité regardée sur TradingView → fenêtre d'alignement et type de position (UT = 1,3,5,10,15,30,45,1h,2h,4h,D).
 FENETRES_UT = {
     "M1": ("SCALPING", [0, 2, 4], "1 min + 5 min + 15 min", "quelques minutes"),
+    "M3": ("SCALPING", [1, 2, 4], "3 min + 5 min + 15 min", "quelques minutes"),
     "M5": ("SCALPING / INTRADAY", [2, 4, 7], "5 min + 15 min + 1 h", "dans la séance"),
+    "M10": ("SCALPING / INTRADAY", [3, 4, 7], "10 min + 15 min + 1 h", "dans la séance"),
     "M15": ("INTRADAY", [4, 7, 9], "15 min + 1 h + 4 h", "dans la journée"),
     "M30": ("INTRADAY", [5, 7, 9], "30 min + 1 h + 4 h", "dans la journée"),
+    "M45": ("INTRADAY", [6, 7, 9], "45 min + 1 h + 4 h", "dans la journée"),
     "H1": ("SWING", [7, 9, 10], "1 h + 4 h + Daily", "plusieurs jours"),
     "H2": ("SWING", [8, 9, 10], "2 h + 4 h + Daily", "plusieurs jours"),
     "H4": ("SWING", [9, 10], "4 h + Daily", "plusieurs jours à semaines"),
