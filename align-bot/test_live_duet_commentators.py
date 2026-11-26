@@ -32,14 +32,16 @@ class LiveDuetCommentators(unittest.TestCase):
         self.assertIn('id="av-l"', self.page)
         self.assertIn('id="b-t"', self.page)
         self.assertIn('id="b-l"', self.page)
-        self.assertIn("function publierDialogueCoachPair(speaker1, text1, speaker2, text2, market)", self.page)
+        self.assertIn("function publierDialogueCoachPair(speaker1, text1, speaker2, text2, market, text1EN, text2EN)", self.page)
         self.assertIn('type: "ALIGN_SHOW", action: "PAIR"', self.page)
         self.assertIn("var premier = dernierHoteCoach", self.page)
-        self.assertIn("var texte1 = changement.textes[0], texte2 = changement.textes[1];", self.page)
-        self.assertIn("publierDialogueCoachPair(premier, texte1, second, texte2, changement.market)", self.page)
+        self.assertIn("var textes = changement.textes;", self.page)
+        self.assertIn("textes[0].en, textes[1].en", self.page)
         self.assertIn("if (nom !== \"BTC\" && nom !== \"GOLD\") continue;", self.page)
-        self.assertIn("parler(premier, texte1)", self.page)
-        self.assertIn("parler(second, texte2)", self.page)
+        self.assertIn("parler(premier, textes[0].fr)", self.page)
+        self.assertIn("parler(second, textes[1].fr)", self.page)
+        self.assertIn("parler(premier, textes[0].en)", self.page)
+        self.assertIn("parler(second, textes[1].en)", self.page)
 
     def test_tradingview_uses_explicit_male_and_female_voice_maps(self):
         self.assertIn("const VOIX_PAR_ROLE", self.js)
@@ -97,17 +99,24 @@ class LiveDuetCommentators(unittest.TestCase):
 
     def test_dialogue_pacing_waits_for_speech_completion_not_estimated_duration(self):
         self.assertIn("startAt: ts + 4000", self.page)
+        self.assertIn("duration1EN: duration1EN", self.page)
+        self.assertIn("duration2EN: duration2EN", self.page)
         self.assertIn("function parlerLive(item, forcer = false, apresLecture = null)", self.js)
         self.assertIn("utterance.onend = () => terminerLecture(true);", self.js)
         self.assertIn("if (continuer && typeof apresLecture === 'function') apresLecture();", self.js)
-        self.assertIn("}, 500));", self.js)
+        self.assertIn("{ texte: show.text1, speaker: show.speaker1, en: false }", self.js)
+        self.assertIn("{ texte: show.text2, speaker: show.speaker2, en: false }", self.js)
+        self.assertIn("{ texte: show.text1EN, speaker: show.speaker1EN || show.speaker1, en: true }", self.js)
+        self.assertIn("{ texte: show.text2EN, speaker: show.speaker2EN || show.speaker2, en: true }", self.js)
+        self.assertIn("jouer(index + 1)", self.js)
+        self.assertIn("coachPairTimers.push(setTimeout(() => jouer(index + 1), 500));", self.js)
         self.assertNotIn("pause + 500", self.js)
         self.assertIn("setInterval(echange, 30000)", self.page)
         self.assertIn('fetch(WORKER_SHOW_URL + "/show/publish?message="', self.page)
 
     def test_dialogue_is_only_spoken_on_the_chart_matching_its_market(self):
         self.assertIn("const marcheDialogue = String(show.market || '').toUpperCase();", self.js)
-        self.assertIn("if (!marcheDialogue || marcheDialogue !== codeMarche()) return;", self.js)
+        self.assertIn("if (!['BTC', 'GOLD'].includes(marcheDialogue) || marcheDialogue !== codeMarche()) return;", self.js)
         self.assertIn("codeMarche() !== marcheDialogue", self.js)
 
     def test_duet_continuation_survives_delayed_browser_voice_loading(self):
@@ -120,6 +129,30 @@ class LiveDuetCommentators(unittest.TestCase):
         self.assertIn("utterance.onerror = () => {", self.js)
         self.assertIn("terminerLecture(false);", self.js)
         self.assertIn("if (continuer && typeof apresLecture === 'function') apresLecture();", self.js)
+
+
+
+    def test_coach_duet_contains_separate_french_and_english_lines(self):
+        self.assertIn("var anglaisPremiere;", self.page)
+        self.assertIn("var secondeEN =", self.page)
+        self.assertIn("return [{ fr: premiere, en: anglaisPremiere }, { fr: seconde, en: secondeEN }]", self.page)
+        self.assertIn("function publierDialogueCoachPair(speaker1, text1, speaker2, text2, market, text1EN, text2EN)", self.page)
+        self.assertIn("speaker1EN: speaker1, text1EN: text1EN", self.page)
+        self.assertIn("speaker2EN: speaker2, text2EN: text2EN", self.page)
+        self.assertIn("textes[0].en, textes[1].en", self.page)
+
+    def test_coach_duet_translation_is_required_before_publishing(self):
+        self.assertIn('!["BTC", "GOLD"].includes(marche)', self.page)
+        self.assertIn('typeof text1EN !== "string"', self.page)
+        self.assertIn('typeof text2EN !== "string"', self.page)
+        worker = (ROOT.parent / "cloud" / "align-tv-mailbox" / "worker.js").read_text(encoding="utf-8")
+        self.assertIn('!["BTC", "GOLD"].includes(payload.market)', worker)
+        self.assertIn('typeof payload.text1EN !== "string"', worker)
+        self.assertIn('typeof payload.text2EN !== "string"', worker)
+
+    def test_voice_relay_rejects_empty_or_unknown_market_for_duet(self):
+        worker = (ROOT.parent / "cloud" / "align-tv-mailbox" / "worker.js").read_text(encoding="utf-8")
+        self.assertIn('![\"BTC\", \"GOLD\"].includes(payload.market)', worker)
 
 
 if __name__ == "__main__":

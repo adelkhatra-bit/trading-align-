@@ -182,9 +182,18 @@ class PageLive(unittest.TestCase):
             self.assertNotIn(interdit, self.PAGE)
 
     def test_enough_distinct_phrases_for_variety(self):
-        dialogues = re.findall(r'\["([^"]+)", "([^"]+)"\]', self.PAGE)
+        bank_start = self.PAGE.index("var DIALOGUES = {")
+        bank_end = self.PAGE.index("function publierDialogueCoachPair", bank_start)
+        banque = self.PAGE[bank_start:bank_end]
+        dialogues = re.findall(r'\["([^"]+)", "([^"]+)"\]', banque)
         self.assertGreaterEqual(len({a for a, _ in dialogues}), 20)
         self.assertEqual(len({a for a, _ in dialogues}), len(dialogues))
+        # The bilingual state coach is dynamic and tested separately from the phrase bank.
+        coach_start = self.PAGE.index("function construireCommentaireEtat(m) {")
+        coach_end = self.PAGE.index("function echange()", coach_start)
+        coach = self.PAGE[coach_start:coach_end]
+        self.assertIn("anglaisPremiere", coach)
+        self.assertIn("secondeEN", coach)
 
     def test_bot_workflow_may_write_only_for_live_branch(self):
         wf = (RACINE / ".github" / "workflows" / "align-bot.yml").read_text(encoding="utf-8")

@@ -131,13 +131,18 @@ export default {
         if (!payload || payload.action !== "PAIR" ||
             !["t", "l"].includes(payload.speaker1) || !["t", "l"].includes(payload.speaker2) ||
             payload.speaker1 === payload.speaker2 ||
-            !["BTC", "GOLD", ""].includes(payload.market) ||
+            !["BTC", "GOLD"].includes(payload.market) ||
             typeof payload.text1 !== "string" || payload.text1.trim().length < 12 || payload.text1.length > 280 ||
             typeof payload.text2 !== "string" || payload.text2.trim().length < 12 || payload.text2.length > 280 ||
+            !["t", "l"].includes(payload.speaker1EN) || !["t", "l"].includes(payload.speaker2EN) ||
+            typeof payload.text1EN !== "string" || payload.text1EN.trim().length < 12 || payload.text1EN.length > 280 ||
+            typeof payload.text2EN !== "string" || payload.text2EN.trim().length < 12 || payload.text2EN.length > 280 ||
             !Number.isFinite(Number(payload.ts)) || now - Number(payload.ts) > 10000 || Number(payload.ts) > now + 5000 ||
             !Number.isFinite(Number(payload.startAt)) || Number(payload.startAt) < now + 1000 || Number(payload.startAt) > now + 12000 ||
             !Number.isFinite(Number(payload.duration1)) || Number(payload.duration1) < 2500 || Number(payload.duration1) > 12000 ||
-            !Number.isFinite(Number(payload.duration2)) || Number(payload.duration2) < 2500 || Number(payload.duration2) > 12000) {
+            !Number.isFinite(Number(payload.duration2)) || Number(payload.duration2) < 2500 || Number(payload.duration2) > 12000 ||
+            !Number.isFinite(Number(payload.duration1EN)) || Number(payload.duration1EN) < 2500 || Number(payload.duration1EN) > 12000 ||
+            !Number.isFinite(Number(payload.duration2EN)) || Number(payload.duration2EN) < 2500 || Number(payload.duration2EN) > 12000) {
           return json(400, { ok: false, error: "invalid_show_payload" }, cors);
         }
         const state = await lireShow(env);
