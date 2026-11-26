@@ -8,7 +8,7 @@ Différences voulues par Adel (15/11) avec FundedNext :
 Sécurité (codée en dur) : 1 micro-contrat, perte max 75 $ par position, arrêt à -150 $ dans la journée,
 arrêt définitif si le solde passe sous le plancher du compte + 100 $. Exécution réelle désactivée ; TOPSTEP_REEL ne peut pas l'activer.
 """
-import json, os, time, datetime, urllib.request
+import json, os, time, datetime, math, urllib.request
 from zoneinfo import ZoneInfo
 
 BASE = "https://api.topstepx.com/api"
@@ -112,7 +112,30 @@ def contrat(jeton, m):
     return next((c for c in cs if c.get("activeContract", True)), cs[0] if cs else None)
 
 
+def niveaux_valides(signal):
+    """Refuse les niveaux incohérents avec le sens du trade avant toute connexion Topstep."""
+    try:
+        sens = str(signal.get("sens", "")).upper()
+        e, sl, tp = (float(signal[k]) for k in ("e", "sl", "tp"))
+        tp2 = float(signal["tp2"]) if signal.get("tp2") is not None else None
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return False, "niveaux Entry/SL/TP absents ou non numériques"
+    valeurs = (e, sl, tp) + ((tp2,) if tp2 is not None else ())
+    if not all(math.isfinite(v) and v > 0 for v in valeurs):
+        return False, "niveaux Entry/SL/TP non finis ou non positifs"
+    if sens == "LONG":
+        valide = sl < e < tp and (tp2 is None or tp2 >= tp)
+    elif sens == "SHORT":
+        valide = tp < e < sl and (tp2 is None or tp2 <= tp)
+    else:
+        return False, "sens du signal invalide"
+    return (True, "ok") if valide else (False, "niveaux inversés ou TP2 incohérent avec le sens")
+
+
 def executer(etat, signal, journal=print):
+    valide, raison = niveaux_valides(signal)
+    if not valide:
+        return {"ok": False, "raison": raison}
     """signal = {marche, sens, e, sl, tp}. Une position = 1 micro-contrat avec SL et TP posés tout de suite."""
     m = signal["marche"]
     if m not in SYMBOLES:
