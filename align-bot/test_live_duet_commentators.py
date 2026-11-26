@@ -29,6 +29,12 @@ class LiveDuetCommentators(unittest.TestCase):
         self.assertIn("speaker: show.speaker2, en: true", self.js)
         self.assertIn("utterance.lang = anglais ? 'en-US' : 'fr-FR';", self.js)
 
+    def test_live_dialogues_rotate_markets_instead_of_randomly_missing_the_active_chart(self):
+        exchange = self.page.split("function echange() {", 1)[1].split("\n}\n\nfunction charger()", 1)[0]
+        self.assertIn("donnees.marches[(tour - 1) % donnees.marches.length]", exchange)
+        self.assertIn('tour % 5 === 0 ? "liens"', exchange)
+        self.assertNotIn("Math.random()", exchange)
+
     def test_tradingview_uses_explicit_male_and_female_voice_maps(self):
         self.assertIn("const VOIX_PAR_ROLE", self.js)
         self.assertIn("t: { fr:", self.js)
