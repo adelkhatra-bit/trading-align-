@@ -43,9 +43,9 @@ class CarteCoach(unittest.TestCase):
             tm.time.return_value = T
             txt = ab.carte_coach("GOLD", self.r(), {}, "signal", tr=self.TR, validite="clôture 15 min (14:15)", signal="Rejet 5 min + 4h/1h", etat=self.etat())
         self.assertEqual(txt.split("\n"), [
-            "🔴 GOLD - SHORT", "", "📍 Entrée : 3995,20", "🛑 SL : 3999,99 · 48 pips", "💰 TP1 : 3985", "🏁 TP2 : 3895,54", "⚖️ R:R : 1:2,1", "⏱ Valide : clôture 15 min (14:15)", "",
+            "🔴 GOLD - SHORT", "🔴 PLAN D'ENTRÉE — COACH ALIGN", "🏷️ PROFIL : NON DÉFINI", "", "📍 Entrée : 3995,20", "🛑 SL : 3999,99 · 48 pips", "💰 TP1 : 3985", "🏁 TP2 : 3895,54", "⚖️ R:R : 1:2,1", "⏱ Valide : clôture 15 min (14:15)", "",
             "📊 Contexte :", "🔹 Signal : Rejet 5 min + 4h/1h", "🔹 DXY : Haussier ⚠️ +0,13 %/1h", "🔹 News : CPI USA 14:30 (dans 15 min)",
-            "🔹 Niveaux : R: 3995 | S: 3970", "", "🤖 Agent Auto-Trade : %%AGENT:signal%%", "🛡️ Action : ENTRER", "", "🔌 Sys: TV❌ News✅ DXY✅ Agent✅"])
+            "🔹 Niveaux : R: 3995 | S: 3970", "", "🤖 Agent Auto-Trade : %%AGENT:signal%%", "🛡️ Action : SIGNAL VALIDÉ — EN ATTENTE D’EXÉCUTION ROBOT V12", "", "🔌 Sys: TV❌ News✅ DXY✅ Agent✅"])
 
     def test_attente_raison_declencheur_zone_et_contexte(self):
         r = self.r(zone_pine={"za": 3994.0, "zb": 4012.0, "zmil": 4005.22})

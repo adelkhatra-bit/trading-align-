@@ -231,5 +231,47 @@ class CoachPineSourceTests(unittest.TestCase):
                 self.assertLess(tp1_at, tp2_at)
 
 
+    def test_telegram_signal_card_names_profile_and_confirms_coach_position_open(self):
+        with (
+            patch.object(ab, "niveaux_rs", return_value=(None, None)),
+            patch.object(ab, "pips_txt", return_value="5"),
+            patch.object(ab, "dxy_court", return_value="stable"),
+            patch.object(ab, "news_prochaine_courte", return_value="aucune"),
+            patch.object(ab, "statut_sys", return_value="Système OK"),
+            patch.object(ab, "coach_fvg", return_value=[]),
+        ):
+            message = ab.carte_coach(
+                "BTC",
+                {"macro_data": {}, "m1": [{"c": 100.0, "h": 101.0, "l": 99.0}]},
+                {},
+                "signal",
+                tr={"d": 1, "e": 100.0, "sl": 95.0, "tp1": 110.0, "tp2": 120.0,
+                    "strat": "DAY", "entry_timeframe": "M5"},
+                signal="Plan Pine v25",
+                etat={},
+            )
+        self.assertIn("🟢 PLAN D'ENTRÉE — COACH ALIGN", message)
+        self.assertIn("🏷️ PROFIL : INTRADAY • DÉCLENCHEMENT M5", message)
+        self.assertIn("SIGNAL VALIDÉ — EN ATTENTE D’EXÉCUTION ROBOT V12", message)
+        self.assertLess(message.index("📍 Entrée :"), message.index("🛑 SL :"))
+
+    def test_late_entry_guard_requires_price_inside_original_pine_zone(self):
+        long_trade = {"d": 1, "e": 100.0, "sl": 95.0, "tp1": 110.0, "za": 99.0, "zb": 101.0}
+        self.assertIn("ENTRÉE ENCORE POSSIBLE", ab.statut_position(long_trade, 100.0))
+        self.assertIn("TROP TARD POUR ENTRER", ab.statut_position(long_trade, 104.0))
+        self.assertIn("NE PAS ENTRER MAINTENANT", ab.statut_position(long_trade, 98.0))
+        self.assertNotIn("ENTRÉE ENCORE POSSIBLE", ab.statut_position(long_trade, 98.0))
+
+        short_trade = {"d": -1, "e": 100.0, "sl": 105.0, "tp1": 90.0, "za": 99.0, "zb": 101.0}
+        self.assertIn("ENTRÉE ENCORE POSSIBLE", ab.statut_position(short_trade, 100.0))
+        self.assertIn("TROP TARD POUR ENTRER", ab.statut_position(short_trade, 96.0))
+        self.assertIn("NE PAS ENTRER MAINTENANT", ab.statut_position(short_trade, 102.0))
+
+    def test_late_entry_guard_fails_closed_when_original_zone_is_missing(self):
+        trade = {"d": 1, "e": 100.0, "sl": 95.0, "tp1": 110.0}
+        message = ab.statut_position(trade, 100.0)
+        self.assertIn("NE PAS ENTRER", message)
+        self.assertNotIn("ENTRÉE ENCORE POSSIBLE", message)
+
 if __name__ == "__main__":
     unittest.main()
