@@ -251,16 +251,18 @@ def directions_tv_mtf(contexte):
 def fusionne_lectures_tradingview(r):
     """Conserve le snapshot ROBOT V12 séparé : il ne doit pas modifier une analyse ALIGN déjà calculée."""
     bridge = r.get("tv_indicator_mtf") or {}
-    snap = (bridge.get("snapshots") or {}).get(bridge.get("activeTimeframe")) or {}
+    # ROBOT V12 plan authority is always the M15 chart snapshot. The last
+    # timeframe to reach the bridge is not allowed to replace the trade decision.
+    snap = (bridge.get("snapshots") or {}).get("M15") or {}
     robot = snap.get("robotV12") or {}
-    if not robot or not snap.get("fresh"):
+    if not robot or not snap.get("fresh") or snap.get("robotFresh") is False:
         return r
     # Sécurité de cohérence : analyser() a déjà calculé dirs, RSI, dirPlan, stratégie et
     # niveaux depuis un même jeu de bougies. Remplacer seulement M1/M5/M15/H1 ici
     # fabriquait un mélange TradingView + flux local sans recalculer les champs dérivés.
     # Le plan ROBOT V12 reste consultable séparément via plan_indicateur().
     r["tv_robot_v12"] = robot
-    r["tv_robot_v12_timeframe"] = bridge.get("activeTimeframe")
+    r["tv_robot_v12_timeframe"] = "M15"
     r["tv_robot_v12_fresh"] = True
     return r
 
@@ -278,7 +280,8 @@ def plan_indicateur(r):
     """Plan Pine canonique M15 + bougie clôturée de déclenchement stratégie."""
     bridge = r.get("tv_indicator_mtf") or {}
     active_tf = str(bridge.get("activeTimeframe") or "").upper()
-    snap = (bridge.get("snapshots") or {}).get(active_tf) or {}
+    plan_tf = "M15"
+    snap = (bridge.get("snapshots") or {}).get(plan_tf) or {}
     robot = snap.get("robotV12") or {}
     try:
         entry, sl = float(robot.get("entry")), float(robot.get("sl"))
@@ -297,29 +300,31 @@ def plan_indicateur(r):
         entry_bar_low = float(robot.get("entryBarLow"))
         entry_bar_close = float(robot.get("entryBarClose"))
     except (TypeError, ValueError, KeyError):
-        return {"timeframe": active_tf or None, "available": False,
+        return {"timeframe": plan_tf or None, "available": False,
                 "reason": "plan M15 / zone / bougie de validation Pine incomplets"}
 
     if snap.get("fresh") is not True:
-        return {"timeframe": active_tf, "available": False, "reason": "snapshot TradingView actif périmé"}
+        return {"timeframe": plan_tf, "available": False, "reason": "snapshot TradingView canonique M15 périmé"}
+    if snap.get("robotFresh") is False:
+        return {"timeframe": plan_tf, "available": False, "reason": "plan ROBOT V12 M15 périmé"}
     try:
         current_price = float(snap.get("price"))
     except (TypeError, ValueError):
-        return {"timeframe": active_tf, "available": False, "reason": "prix TradingView actif absent"}
+        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView actif absent"}
     if not math.isfinite(current_price) or current_price <= 0:
-        return {"timeframe": active_tf, "available": False, "reason": "prix TradingView actif invalide"}
+        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView actif invalide"}
     if str(robot.get("planTimeframe") or "").upper() != "M15":
-        return {"timeframe": active_tf, "available": False, "reason": "référence du plan différente de M15"}
+        return {"timeframe": plan_tf, "available": False, "reason": "référence du plan différente de M15"}
     strategy = str(robot.get("strategy") or "").upper()
     expected_entry_tf = {"SCALPING": "M1", "DAY": "M5", "SWING": "H1"}.get(strategy)
     entry_tf = str(robot.get("entryTimeframe") or "").upper()
     if expected_entry_tf is None or entry_tf != expected_entry_tf:
-        return {"timeframe": active_tf, "available": False, "reason": "unité de validation incohérente avec la stratégie"}
+        return {"timeframe": plan_tf, "available": False, "reason": "unité de validation incohérente avec la stratégie"}
 
     signal = str(robot.get("signal") or robot.get("verdict") or "").upper()
     direction = _direction_tv(signal)
     if direction not in (-1, 1) or min(entry, sl, tp1, zone_low, zone_high, decision) <= 0 or (tp2 is not None and tp2 <= 0):
-        return {"timeframe": active_tf, "available": False, "reason": "direction ou niveaux M15 invalides"}
+        return {"timeframe": plan_tf, "available": False, "reason": "direction ou niveaux M15 invalides"}
     risk = abs(entry - sl)
     # Même tolérance d'arrondi que le bridge (align_tv_bridge.py) : le Pine pose le bord de zone
     # EXACTEMENT à 25 % du risque et le JSON arrondit à 2 décimales. Sans elle, un plan accepté
@@ -338,10 +343,10 @@ def plan_indicateur(r):
             and zone_high <= sl - 0.25 * risk + tol
         )
     if not geometrie_ok:
-        return {"timeframe": active_tf, "available": False, "reason": "géométrie zone / entrée / SL / TP incohérente"}
+        return {"timeframe": plan_tf, "available": False, "reason": "géométrie zone / entrée / SL / TP incohérente"}
     if not (entry_bar_low <= min(entry_bar_open, entry_bar_close)
             <= max(entry_bar_open, entry_bar_close) <= entry_bar_high):
-        return {"timeframe": active_tf, "available": False, "reason": "bougie de validation OHLC incohérente"}
+        return {"timeframe": plan_tf, "available": False, "reason": "bougie de validation OHLC incohérente"}
     retested_zone = entry_bar_high >= zone_low and entry_bar_low <= zone_high
     candle_trigger = entry_bar_close > decision if direction == 1 else entry_bar_close < decision
     candle_before_stop = entry_bar_close > sl if direction == 1 else entry_bar_close < sl
@@ -352,7 +357,7 @@ def plan_indicateur(r):
     )
 
     return {
-        "timeframe": active_tf, "plan_timeframe": "M15", "entry_timeframe": entry_tf,
+        "timeframe": plan_tf, "active_timeframe": active_tf, "plan_timeframe": "M15", "entry_timeframe": entry_tf,
         "strategy": strategy, "available": True, "direction": direction,
         "entry": entry, "sl": sl, "tp": tp1, "tp1": tp1, "tp2": tp2,
         "zone_low": zone_low, "zone_high": zone_high, "decision": decision,
@@ -363,7 +368,7 @@ def plan_indicateur(r):
         "confirmed": snap.get("confirmed") is True and robot.get("confirmed") is True,
         "verdict": robot.get("verdict"), "long_score": robot.get("long_score"),
         "short_score": robot.get("short_score"),
-        "timestamp": robot.get("receivedAt") or snap.get("timestamp"),
+        "timestamp": snap.get("robotTimestamp") or robot.get("receivedAt") or snap.get("timestamp"),
         "ageMs": robot.get("ageMs"),
     }
 
