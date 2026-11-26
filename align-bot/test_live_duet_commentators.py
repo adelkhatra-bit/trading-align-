@@ -67,6 +67,16 @@ class LiveDuetCommentators(unittest.TestCase):
         self.assertIn('if not complet:', bot)
         self.assertIn('etat_l = "ferme" if statut == "ferme" else "perime"', bot)
 
+    def test_voice_relay_is_separate_from_market_mailboxes_and_ntfy(self):
+        worker = (ROOT.parent / "cloud" / "align-tv-mailbox" / "worker.js").read_text(encoding="utf-8")
+        self.assertIn('idFromName("LIVE_SHOW")', worker)
+        self.assertIn('url.pathname === "/show/publish"', worker)
+        self.assertIn('url.pathname === "/show/state"', worker)
+        self.assertIn('url.pathname === "/show/voice"', worker)
+        self.assertIn('url.pathname === "/show/coach"', worker)
+        self.assertNotIn("'-voix'", self.js)
+        self.assertNotIn("ntfy.sh", self.page)
+
     def test_dialogue_pacing_leaves_time_for_both_voices(self):
         self.assertIn("startAt: ts + 4000", self.page)
         self.assertIn("duration1 + 500", self.page)
