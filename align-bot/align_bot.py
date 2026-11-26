@@ -9368,6 +9368,7 @@ def evenements_pine(etat, m, r, cle, now):
         sn_fresh = sn_bar_time > 0 and 0 <= now - sn_bar_time <= 120
         pine_trigger_valid = (
             plan_tv.get("available") is True and plan_tv.get("triggered") is True
+            and plan_tv.get("confirmed") is True
             and sn_direction in (-1, 1) and pine_direction == sn_direction
             and sn_fresh and pine_levels_valid
         )
