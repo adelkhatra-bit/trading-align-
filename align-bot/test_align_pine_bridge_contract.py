@@ -81,9 +81,9 @@ if not tp1Ok
         # The v25 decision gate now reads closed strategy timeframes. Normalize only
         # these explicitly reviewed additions before checking every other source byte.
         for line in (
-            'd1Fermee   = request.security(syminfo.tickerid, "1",   f_dir_confirme(), lookahead=barmerge.lookahead_on)\\n',
-            'dDFermee   = request.security(syminfo.tickerid, "D",   f_dir_confirme(), lookahead=barmerge.lookahead_on)\\n',
-            'dWFermee   = request.security(syminfo.tickerid, "W",   f_dir_confirme(), lookahead=barmerge.lookahead_on)\\n',
+            'd1Fermee   = request.security(syminfo.tickerid, "1",   f_dir_confirme(), lookahead=barmerge.lookahead_on)\n',
+            'dDFermee   = request.security(syminfo.tickerid, "D",   f_dir_confirme(), lookahead=barmerge.lookahead_on)\n',
+            'dWFermee   = request.security(syminfo.tickerid, "W",   f_dir_confirme(), lookahead=barmerge.lookahead_on)\n',
         ):
             without_tp_change = without_tp_change.replace(line, "", 1)
         strategy_start = without_tp_change.find("uW  = nz(dWFermee) == dP")
@@ -108,7 +108,7 @@ o4  = d4Strat == -dP
 o1h = d1hStrat == -dP"""
         without_tp_change = without_tp_change[:strategy_start] + baseline_strategy + without_tp_change[strategy_end:]
         risk_start = without_tp_change.find("planRisk = math.abs(ent - sl)")
-        decision_end = without_tp_change.find("\\n", risk_start)
+        decision_end = without_tp_change.find("\n", risk_start)
         self.assertGreaterEqual(risk_start, 0)
         self.assertGreater(decision_end, risk_start)
         baseline_decision = 'decisionS = strat == "" ? "AUCUNE ENTRÉE" : scoreV < 60 ? "AUCUNE ENTRÉE : configuration insuffisante" : etatS != "CONFIRMÉ" ? "À SURVEILLER : confirmation manquante" : scoreV >= 85 ? "ENTRÉE POSSIBLE : fortement aligné" : scoreV >= 75 ? "INTÉRESSANT : attendre les conditions finales" : "À SURVEILLER : confirmation manquante"'
@@ -136,7 +136,7 @@ o1h = d1hStrat == -dP"""
         self.assertGreater(titre_end, titre_start)
         baseline_titre = without_tp_change[titre_start:titre_end + 1]
         baseline_ui = baseline_titre + """    ligne = (retDir != 0 and not retConf ? "↩ RETOURNEMENT  " : nVoy >= 3 ? "↩ " + str.tostring(nVoy) + "/5  " : "") + (dirPlan == 1 ? "▲ LONG" : dirPlan == -1 ? "▼ SHORT" : "ATTENDRE") + (dirPlan != 0 ? (strat != "" ? " • " + (strat == "SCALPING" ? "SCALP" : strat) + (etatS == "CONFIRMÉ" and scoreV >= 75 ? " ✅ " : " ⏳ ") + str.tostring(scoreV) : "") + "  TP " + px(tp1) + "  SL " + px(sl) : "   " + titre)
-    plan = (retTxt != "" ? retTxt + "\\n\\n" : "") + (dirPlan != 0 ? "STRATÉGIE : " + (strat == "" ? "aucune" : strat + " — " + etatS) + "\\nScore : " + str.tostring(scoreV) + " / 100\\n• Alignement : " + str.tostring(ptsAlign) + " / 25\\n• Structure : " + str.tostring(ptsStruct) + " / 20\\n• Zone d'entrée : " + str.tostring(ptsZone) + " / 20\\n• Volume : " + str.tostring(ptsVol) + " / 15" + (volOk ? "" : " (indisponible)") + "\\n• Indicateurs : " + str.tostring(ptsInd) + " / 10\\n• Risque / rendement : " + str.tostring(ptsRR) + " / 10\\n⏱ Clôture de validation " + (strat == "SWING" ? "1h" : strat == "DAY" ? "5 min" : strat == "SCALPING" ? "1 min" : "15 min") + " dans " + f_mmss(f_reste((strat == "SWING" ? 60 : strat == "DAY" ? 5 : strat == "SCALPING" ? 1 : 15))) + "\\nDécision : " + decisionS + "\\nMotif : " + motifS + "\\nPlan : " + calePlan + "\\n\\n" : "") + "SENS PROBABLE : " + (sens == 1 ? "HAUSSE " : sens == -1 ? "BAISSE " : "INDÉCIS ") + str.tostring(pctH) + "% hausse / " + str.tostring(100 - pctH) + "% baisse\\n" + str.tostring(bull) + " UT en hausse • " + str.tostring(bear) + " en baisse • " + str.tostring(comp) + " comprimées\\nRSI : " + str.tostring(rsiOB) + " UT en surachat (>70) • " + str.tostring(rsiOS) + " en survente (<30)" + (rsiOB >= 3 ? "\\nSURCHARGE RSI HAUTE : éviter d'acheter, retournement baissier possible" : rsiOS >= 3 ? "\\nSURCHARGE RSI BASSE : éviter de vendre, rebond possible" : "") + (retHaut ? "\\nLes petites UT montent avant les grandes : retournement HAUSSIER en préparation" : retBas ? "\\nLes petites UT baissent avant les grandes : retournement BAISSIER en préparation" : "") + (zoneBas ? "\\nPrix sur une résistance " + tH1 + " : risque de retournement à la baisse" : zoneHaut ? "\\nPrix sur un support " + tB1 + " : rebond possible" : "") + (dirPlan != 0 ? "\\n\\nPLAN " + (dirPlan == 1 ? "ACHAT" : "VENTE") + "\\nEntrée " + px(ent) + " (" + tEnt + ")\\nTP1 " + px(tp1) + " (" + tTP1 + ")\\nTP2 " + px(tp2) + " (" + tTP2 + ")\\nStop " + px(sl) + "\\nGain/risque ≈ " + str.tostring(rr, "#.#") : "")
+    plan = (retTxt != "" ? retTxt + "\n\n" : "") + (dirPlan != 0 ? "STRATÉGIE : " + (strat == "" ? "aucune" : strat + " — " + etatS) + "\nScore : " + str.tostring(scoreV) + " / 100\n• Alignement : " + str.tostring(ptsAlign) + " / 25\n• Structure : " + str.tostring(ptsStruct) + " / 20\n• Zone d'entrée : " + str.tostring(ptsZone) + " / 20\n• Volume : " + str.tostring(ptsVol) + " / 15" + (volOk ? "" : " (indisponible)") + "\n• Indicateurs : " + str.tostring(ptsInd) + " / 10\n• Risque / rendement : " + str.tostring(ptsRR) + " / 10\n⏱ Clôture de validation " + (strat == "SWING" ? "1h" : strat == "DAY" ? "5 min" : strat == "SCALPING" ? "1 min" : "15 min") + " dans " + f_mmss(f_reste((strat == "SWING" ? 60 : strat == "DAY" ? 5 : strat == "SCALPING" ? 1 : 15))) + "\nDécision : " + decisionS + "\nMotif : " + motifS + "\nPlan : " + calePlan + "\n\n" : "") + "SENS PROBABLE : " + (sens == 1 ? "HAUSSE " : sens == -1 ? "BAISSE " : "INDÉCIS ") + str.tostring(pctH) + "% hausse / " + str.tostring(100 - pctH) + "% baisse\n" + str.tostring(bull) + " UT en hausse • " + str.tostring(bear) + " en baisse • " + str.tostring(comp) + " comprimées\nRSI : " + str.tostring(rsiOB) + " UT en surachat (>70) • " + str.tostring(rsiOS) + " en survente (<30)" + (rsiOB >= 3 ? "\nSURCHARGE RSI HAUTE : éviter d'acheter, retournement baissier possible" : rsiOS >= 3 ? "\nSURCHARGE RSI BASSE : éviter de vendre, rebond possible" : "") + (retHaut ? "\nLes petites UT montent avant les grandes : retournement HAUSSIER en préparation" : retBas ? "\nLes petites UT baissent avant les grandes : retournement BAISSIER en préparation" : "") + (zoneBas ? "\nPrix sur une résistance " + tH1 + " : risque de retournement à la baisse" : zoneHaut ? "\nPrix sur un support " + tB1 + " : rebond possible" : "") + (dirPlan != 0 ? "\n\nPLAN " + (dirPlan == 1 ? "ACHAT" : "VENTE") + "\nEntrée " + px(ent) + " (" + tEnt + ")\nTP1 " + px(tp1) + " (" + tTP1 + ")\nTP2 " + px(tp2) + " (" + tTP2 + ")\nStop " + px(sl) + "\nGain/risque ≈ " + str.tostring(rr, "#.#") : "")
     vbg0 = zoneBas or zoneHaut ?  color.rgb(170, 130, 0) : dirPlan == 1 ?  color.rgb(0, 140, 70) : dirPlan == -1 ?  color.rgb(190, 30, 45) :  color.rgb(60, 60, 60)
 """
         without_tp_change = without_tp_change[:ui_start] + baseline_ui + without_tp_change[ui_end:]
@@ -154,7 +154,7 @@ o1h = d1hStrat == -dP"""
                 without_tp_change = without_tp_change[:start] + without_tp_change[end:]
         without_settings = without_tp_change.replace(SETTINGS_BLOCK, "", 1)
         without_export = without_settings.split(EXPORT_MARKER, 1)[0]
-        if without_export.endswith("\\n\\n"):
+        if without_export.endswith("\n\n"):
             without_export = without_export[:-1]
         raw = without_export.encode("utf-8")
         git_blob = hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\\0" + raw).hexdigest()
