@@ -3081,7 +3081,7 @@ def carte_coach(m, r, cle, genre, tr=None, raison=None, declencheur=None, signal
         ut_entree = str(tr.get("entry_timeframe") or "").upper()
         l = [
             f"{'🟢' if d == 1 else '🔴'} {m} - {'LONG' if d == 1 else 'SHORT'}",
-            f"{'🟢' if d == 1 else '🔴'} ENTRÉE EN POSITION — COACH ALIGN",
+            f"{'🟢' if d == 1 else '🔴'} PLAN D'ENTRÉE — COACH ALIGN",
             f"🏷️ PROFIL : {profil}" + (f" • DÉCLENCHEMENT {ut_entree}" if ut_entree else ""),
             "",
         ]
@@ -3115,7 +3115,7 @@ def carte_coach(m, r, cle, genre, tr=None, raison=None, declencheur=None, signal
             l += [""] + co[:2] if co else []
         except Exception:
             pass
-        action = "POSITION OUVERTE — COACH ALIGN"
+        action = "SIGNAL VALIDÉ — EN ATTENTE D’EXÉCUTION ROBOT V12"
     else:
         l = [f"📍 {m} - ATTENTE", "", f"⏳ Raison : {raison}"]
         if declencheur:
