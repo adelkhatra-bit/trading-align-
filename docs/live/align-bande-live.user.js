@@ -348,7 +348,7 @@
     } catch (e) {}
   }
   function parlerLive(item, forcer = false) {
-    if (!voixActive || !item || (item.source !== 'ia' && item.source !== 'marche') ||!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return 0;
+    if (!vivant || !item || !voixActive || (item.source !== 'ia' && item.source !== 'marche') || !('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return 0;
     // v12.2.7 (règle d'Adel) : chaque info est dite en FRANÇAIS, puis la même en ANGLAIS, jamais mélangées.
     const anglais = !!item.en;
     if (anglais && item.source === 'marche' && !item.anglaisTraduit) return 0;  // une bulle non traduite reste silencieuse en EN
