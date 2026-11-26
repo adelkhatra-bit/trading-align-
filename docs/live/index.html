@@ -201,19 +201,34 @@ var DIALOGUES = {
     ["Les niveaux détaillés seront publiés sur le Telegram gratuit " + BOT + " après confirmation du signal.", "Et le plan prime toujours sur l'impatience."]
   ]
 };
-function publierDialogueCoachPair(speaker1, text1, speaker2, text2, market) {
+function publierDialogueCoachPair(speaker1, text1, speaker2, text2, market, text1EN, text2EN) {
+  var marche = String(market || "").toUpperCase();
+  if (!["BTC", "GOLD"].includes(marche) ||
+      !["t", "l"].includes(speaker1) || !["t", "l"].includes(speaker2) ||
+      speaker1 === speaker2 ||
+      typeof text1 !== "string" || text1.trim().length < 12 || text1.length > 280 ||
+      typeof text2 !== "string" || text2.trim().length < 12 || text2.length > 280 ||
+      typeof text1EN !== "string" || text1EN.trim().length < 12 || text1EN.length > 280 ||
+      typeof text2EN !== "string" || text2EN.trim().length < 12 || text2EN.length > 280) return null;
   var ts = Date.now();
   var duration1 = Math.max(4000, Math.min(12000, Math.ceil(String(text1).length * 75 + 500)));
   var duration2 = Math.max(4000, Math.min(12000, Math.ceil(String(text2).length * 75 + 500)));
+  var duration1EN = Math.max(4000, Math.min(12000, Math.ceil(String(text1EN).length * 75 + 500)));
+  var duration2EN = Math.max(4000, Math.min(12000, Math.ceil(String(text2EN).length * 75 + 500)));
   var payload = {
     type: "ALIGN_SHOW", action: "PAIR", id: "show-" + ts, ts: ts, startAt: ts + 4000,
-    market: market || "", speaker1: speaker1, text1: String(text1 || ""),
-    speaker2: speaker2, text2: String(text2 || ""), duration1: duration1, duration2: duration2
+    market: marche, speaker1: speaker1, text1: String(text1 || ""),
+    speaker2: speaker2, text2: String(text2 || ""),
+    speaker1EN: speaker1, text1EN: text1EN, speaker2EN: speaker2, text2EN: text2EN,
+    duration1: duration1, duration2: duration2, duration1EN: duration1EN, duration2EN: duration2EN
   };
   fetch(WORKER_SHOW_URL + "/show/publish?message=" + encodeURIComponent(JSON.stringify(payload)), {
     method: "GET", cache: "no-store"
-  }).catch(function () {});
-  return { startAt: payload.startAt, duration1: duration1, duration2: duration2 };
+  }).then(function (response) {
+    if (!response.ok) console.warn("ALIGN coach duet not published:", response.status);
+  }).catch(function (error) { console.warn("ALIGN coach duet relay failed:", error); });
+  return { startAt: payload.startAt, duration1: duration1, duration2: duration2,
+    duration1EN: duration1EN, duration2EN: duration2EN };
 }
 function parler(qui, texte) {
   var bulle = document.getElementById("b-" + qui);
@@ -244,10 +259,16 @@ function construireCommentaireEtat(m) {
   } else {
     return null;
   }
-  return [
-    premiere,
-    "Nous commentons uniquement l'état public reçu. Les points d'entrée, le stop et les objectifs restent ceux confirmés par l'indicateur et le robot."
-  ];
+  var seconde = "Nous commentons uniquement l'état public reçu. Les points d'entrée, le stop et les objectifs restent ceux confirmés par l'indicateur et le robot.";
+  var biaisEN = m.biais === "haussier" ? "bullish" : m.biais === "baissier" ? "bearish" : "neutral";
+  var anglaisPremiere;
+  if (etat === "calme") anglaisPremiere = nom + " is quiet. The published bias is " + biaisEN + ", with " + ut + " timeframes aligned out of " + seuil + ".";
+  else if (etat === "preparation") anglaisPremiere = nom + " is setting up. Bias " + biaisEN + ", " + ut + " timeframes aligned out of " + seuil + ", profile " + profil + ".";
+  else if (etat === "entree") anglaisPremiere = "The public feed reports an active entry state on " + nom + ". Check confirmation and levels on Telegram.";
+  else if (etat === "ferme") anglaisPremiere = nom + " is closed. No new market read is being announced.";
+  else return null;
+  var secondeEN = "We only comment on the public state received. Entry, stop and target levels remain those confirmed by the indicator and the robot.";
+  return [{ fr: premiere, en: anglaisPremiere }, { fr: seconde, en: secondeEN }];
 }
 function echange() {
   var age = donnees ? Date.now() / 1000 - Number(donnees.maj || 0) : 1e9;
@@ -266,11 +287,18 @@ function echange() {
   if (!changement) return;
   var premier = dernierHoteCoach, second = premier === "t" ? "l" : "t";
   dernierHoteCoach = second;
-  var texte1 = changement.textes[0], texte2 = changement.textes[1];
-  var timing = publierDialogueCoachPair(premier, texte1, second, texte2, changement.market);
+  var textes = changement.textes;
+  var timing = publierDialogueCoachPair(
+    premier, textes[0].fr, second, textes[1].fr, changement.market,
+    textes[0].en, textes[1].en
+  );
+  if (!timing) return;
   var debut = Math.max(0, timing.startAt - Date.now());
-  setTimeout(function () { parler(premier, texte1); }, debut);
-  setTimeout(function () { parler(second, texte2); }, debut + timing.duration1 + 500);
+  var debutEN = debut + timing.duration1 + 500 + timing.duration2 + 500;
+  setTimeout(function () { parler(premier, textes[0].fr); }, debut);
+  setTimeout(function () { parler(second, textes[1].fr); }, debut + timing.duration1 + 500);
+  setTimeout(function () { parler(premier, textes[0].en); }, debutEN);
+  setTimeout(function () { parler(second, textes[1].en); }, debutEN + timing.duration1EN + 500);
 }
 
 function charger() {

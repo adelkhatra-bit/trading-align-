@@ -47,17 +47,30 @@ const invalidShow = { type: "ALIGN_SHOW", action: "PAIR", ts: Date.now(), startA
 ok(s === 400 && b.error === "invalid_show_payload", "locuteur invalide refusé");
 const showNow = Date.now();
 const showPayload = {
-  type: "ALIGN_SHOW", action: "PAIR", id: "show-" + showNow,
-  ts: showNow, startAt: showNow + 5000, market: "BTC",
-  speaker1: "t", text1: "Le contexte BTC reste à confirmer.",
-  speaker2: "l", text2: "On attend la validation avant toute entrée.",
-  duration1: 4500, duration2: 4500,
+  ...invalidShow,
+  id: "show-" + showNow,
+  market: "BTC",
+  speaker1: "t", text1: "Le BTC reste calme pour l'instant.",
+  speaker2: "l", text2: "Nous attendons une clôture confirmée.",
+  speaker1EN: "t", text1EN: "BTC is quiet for now.",
+  speaker2EN: "l", text2EN: "We are waiting for a confirmed close.",
+  duration1: 4000, duration2: 4000, duration1EN: 4000, duration2EN: 4000
 };
+const missingEnglish = { ...showPayload, text2EN: "" };
+[s, b] = await call("GET", "/show/publish?message=" + encodeURIComponent(JSON.stringify(missingEnglish)), undefined,
+  { origin: "https://adelkhatra-bit.github.io" });
+ok(s === 400 && b.error === "invalid_show_payload", "duo incomplet sans traduction refusé");
+const missingMarket = { ...showPayload, market: "" };
+[s, b] = await call("GET", "/show/publish?message=" + encodeURIComponent(JSON.stringify(missingMarket)), undefined,
+  { origin: "https://adelkhatra-bit.github.io" });
+ok(s === 400 && b.error === "invalid_show_payload", "duo sans marché identifié refusé");
 const showUrl = "/show/publish?message=" + encodeURIComponent(JSON.stringify(showPayload));
 [s, b] = await call("GET", showUrl, undefined, { origin: "https://adelkhatra-bit.github.io" });
 ok(s === 200 && b.ok, "publication du duo autorisée depuis GitHub Pages");
 [s, b] = await call("GET", "/show/state", undefined, { origin: "https://adelkhatra-bit.github.io" });
-ok(s === 200 && b.show.id === showPayload.id && b.show.speaker1 === "t" && b.show.speaker2 === "l", "lecture du duo depuis le relais isolé");
+ok(s === 200 && b.show.id === showPayload.id && b.show.speaker1 === "t" && b.show.speaker2 === "l" &&
+  b.show.market === "BTC" && b.show.text1EN === showPayload.text1EN && b.show.text2EN === showPayload.text2EN &&
+  b.show.speaker1EN === "t" && b.show.speaker2EN === "l", "lecture du duo bilingue depuis le relais isolé");
 [s, b] = await call("GET", showUrl);
 ok(s === 403 && b.error === "origin_forbidden", "publication du duo refusée hors origine autorisée");
 const tooSoon = { ...showPayload, id: "show-too-soon", ts: showNow + 1000, startAt: Date.now() + 5000 };
