@@ -15,7 +15,7 @@ class PagesLiveEntrypointTests(unittest.TestCase):
     def test_coach_dialogue_is_triggered_by_market_state_changes_not_random_timer_phrases(self):
         page = (ROOT / "docs" / "live" / "index.html").read_text(encoding="utf-8")
         start = page.index("function echange() {")
-        end = page.index("\\nfunction charger()", start)
+        end = page.index("function charger()", start)
         exchange = page[start:end]
         self.assertIn("dernierEtatCoachParMarche", page)
         self.assertIn("var signature = [m.etat, m.biais, m.ut, m.seuil, m.profil].join", exchange)
@@ -26,7 +26,7 @@ class PagesLiveEntrypointTests(unittest.TestCase):
     def test_coach_market_commentary_does_not_invent_prices_or_levels(self):
         page = (ROOT / "docs" / "live" / "index.html").read_text(encoding="utf-8")
         start = page.index("function construireCommentaireEtat(m) {")
-        end = page.index("\\nfunction echange()", start)
+        end = page.index("function echange()", start)
         builder = page[start:end]
         self.assertIn("m.etat", builder)
         self.assertIn("m.biais", builder)
