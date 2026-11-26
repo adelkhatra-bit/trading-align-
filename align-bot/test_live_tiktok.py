@@ -865,6 +865,29 @@ class LiveAgendaMarketTimezoneTests(unittest.TestCase):
         self.assertIn("if (source === 'marche' && (bulle || g === 'danger') && anglaisTraduit)", bande)
 
 
+    def test_bande_cleans_sse_retries_view_timer_and_chart_listeners_on_stop(self):
+        bande = self._lire(["docs", "live", "align-bande-live.user.js"])
+        self.assertIn("let ecouteRetryTimer = null;", bande)
+        self.assertIn("function programmerReconnexionEcoute(delai)", bande)
+        self.assertIn("if (!vivant || document.visibilityState !== 'visible') return;", bande)
+        self.assertIn("const vueT = setInterval(", bande)
+        self.assertIn("clearInterval(vueT)", bande)
+        self.assertIn("clearTimeout(ecouteRetryTimer)", bande)
+        self.assertIn("document.removeEventListener('visibilitychange', gererVisibilite)", bande)
+        self.assertIn("document.removeEventListener('wheel', suivreGraphique, true)", bande)
+        self.assertIn("document.removeEventListener('pointermove', suivreGraphique, true)", bande)
+        self.assertIn("libererLeaseHeartbeat();", bande)
+
+    def test_bande_visual_animations_are_initialized_and_preserved(self):
+        bande = self._lire(["docs", "live", "align-bande-live.user.js"])
+        self.assertIn("// @version      12.2.25", bande)
+        self.assertIn("const VERSION = '12.2.25';", bande)
+        self.assertIn("document.head.appendChild(cssAnimationsToggle);\n  appliquerAnimations();", bande)
+        self.assertIn("function afficherIA(", bande)
+        self.assertIn("function parlerLive(item, forcer = false)", bande)
+        self.assertIn("function coeurs(", bande)
+
+
 if __name__ == "__main__":
     unittest.main()
 
