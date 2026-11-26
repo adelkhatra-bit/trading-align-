@@ -149,7 +149,7 @@ class MessagesEtRegles(unittest.TestCase):
         "available": True, "confirmed": True, "triggered": True, "direction": -1,
         "entry": 4000.5, "sl": 4020.0, "tp1": 3970.0, "tp2": 3895.54,
         "zone_low": 3993.28, "zone_high": 4012.79,
-        "entry_bar_time": 1_795_017_600_000, "entry_timeframe": "H1",
+        "entry_bar_time": 1_795_017_600_000, "entry_timeframe": "H1", "strategy": "SWING",
     }
 
     def evenement(self, etat=None, now=None, k=None, pine_plan=None):
@@ -171,13 +171,16 @@ class MessagesEtRegles(unittest.TestCase):
         self.assertEqual(len(ev), 1)
         fr = ab.texte_pine({}, ev[0]); en = ab.texte_pine({}, ev[0], True)
         self.assertLessEqual(len(fr), 3)
-        self.assertIn("🎯 Entrée sniper 🥇 GOLD : vente Pine 4000,5", fr[0])
+        self.assertIn("🎯 SNIPER VALIDÉ — SWING 🥇 GOLD : vente Pine 4000,5", fr[0])
         self.assertIn("zone 3993,28–4012,79", fr[0])
         self.assertIn("SL Pine 4020 • TP1 Pine 3970 • TP2 Pine 3895,54", fr[1])
-        self.assertIn("rejet M1/M3", fr[2])
+        self.assertIn("timing M1/M3 • plan H1", fr[2])
+        self.assertIn("validation ROBOT V12 avant position ouverte", fr[2])
+        self.assertNotIn("POSITION OUVERTE", " ".join(fr))
         self.assertEqual(ev[0]["entree"], "4000,50")
         self.assertEqual((ev[0]["sl"], ev[0]["tp1"], ev[0]["tp"]), ("4020", "3970", "3895,54"))
-        self.assertIn("Pine-confirmed sniper entry", en[0]); self.assertIn("sell", en[0]); self.assertNotIn("vente", " ".join(en))
+        self.assertIn("SNIPER CONFIRMED — SWING", en[0]); self.assertIn("sell", en[0]); self.assertNotIn("vente", " ".join(en))
+        self.assertIn("plan H1", en[2])
         self.assertEqual(len({" ".join(ab.texte_pine({"al_rot": {"p:sniper:GOLD": k}}, ev[0])) for k in (-1, 0, 1)}), 3)
         etat2, ev2, _ = self.evenement(etat, now=r["m1"][-1]["t"] + 60, k=None)
         self.assertEqual(ev2, [])                                                                 # une seule fois (même niveau, même UT)
