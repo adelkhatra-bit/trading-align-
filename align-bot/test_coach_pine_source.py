@@ -250,7 +250,7 @@ class CoachPineSourceTests(unittest.TestCase):
                 signal="Plan Pine v25",
                 etat={},
             )
-        self.assertIn("🟢 PLAN D’ENTRÉE — COACH ALIGN", message)
+        self.assertIn("🟢 PLAN D'ENTRÉE — COACH ALIGN", message)
         self.assertIn("🏷️ PROFIL : INTRADAY • DÉCLENCHEMENT M5", message)
         self.assertIn("SIGNAL VALIDÉ — EN ATTENTE D’EXÉCUTION ROBOT V12", message)
         self.assertLess(message.index("📍 Entrée :"), message.index("🛑 SL :"))
