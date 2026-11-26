@@ -483,7 +483,7 @@
           if (!vivant || !voixActive) return;
           coachPairTimers.push(setTimeout(() => {
             if (!vivant || !voixActive || codeMarche() !== marcheDialogue) return;
-            parlerLive({ texte: text2, source: 'coach', speaker: show.speaker2, en: false, market: show.market }, true);
+            parlerLive({ texte: text2, source: 'coach', speaker: show.speaker2, en: true, market: show.market }, true);
           }, 500));
         }
       );
