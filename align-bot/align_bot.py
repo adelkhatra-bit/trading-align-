@@ -163,6 +163,8 @@ def detail_bridge_invalide(payload):
         perimes = [tf for tf in requis if tf in snaps and (snaps[tf] or {}).get("fresh") is not True]
         if absents:
             morceaux.append("UT absentes " + ",".join(absents))
+        if payload.get("canonicalPlanFresh") is not True:
+            morceaux.append("plan ROBOT V12 M15 absent ou périmé")
         if perimes:
             ages = []
             for tf in perimes:
@@ -9914,13 +9916,15 @@ def texte_diag(cid=None):
             f" • {libelle('âge', 'age')} {max(0, age_ms) // 1000}s"
             if age_ms is not None else ""
         )
+        canonical_fresh = bridge.get("canonicalPlanFresh") is True
         state = (
             libelle("BRIDGE CONNECTÉ", "BRIDGE CONNECTED")
-            if len(fresh) == len(requis) and active != "—"
+            if len(fresh) == len(requis) and active != "—" and canonical_fresh
             else libelle("BRIDGE PARTIEL", "BRIDGE PARTIAL")
         )
         lignes.append(
             f"{label} : {state} • {libelle('UT active', 'active timeframe')} {active} • MTF {len(fresh)}/{len(requis)}"
+            + f" • M15 {'OK' if canonical_fresh else 'STALE'}"
             + age_text
         )
 
@@ -10067,7 +10071,8 @@ def texte_audit_telegram(etat, derniers, now=None):
             active = str(bridge.get("activeTimeframe") or "aucune")
             bridge_age = bridge.get("activeTimeframeAgeMs")
             bridge_age_txt = f"{int(bridge_age / 1000)}s" if isinstance(bridge_age, (int, float)) else "inconnue"
-            lines.append(f"  Bridge TradingView : {'disponible' if bridge.get('available') is True else 'indisponible'} • UT active {active} • âge {bridge_age_txt}")
+            plan_m15 = "frais" if bridge.get("canonicalPlanFresh") is True else "absent/périmé"
+            lines.append(f"  Bridge TradingView : {'disponible' if bridge.get('available') is True else 'indisponible'} • plan M15 {plan_m15} • UT active {active} • âge {bridge_age_txt}")
         else:
             lines.append("  Bridge TradingView : aucun snapshot attaché au dernier calcul")
 
