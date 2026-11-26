@@ -131,7 +131,7 @@ export default {
         if (!payload || payload.action !== "PAIR" ||
             !["t", "l"].includes(payload.speaker1) || !["t", "l"].includes(payload.speaker2) ||
             payload.speaker1 === payload.speaker2 ||
-            !["BTC", "GOLD"].includes(payload.market) ||
+            !["BTC", "GOLD", ""].includes(payload.market) ||
             typeof payload.text1 !== "string" || payload.text1.trim().length < 12 || payload.text1.length > 280 ||
             typeof payload.text2 !== "string" || payload.text2.trim().length < 12 || payload.text2.length > 280 ||
             !Number.isFinite(Number(payload.ts)) || now - Number(payload.ts) > 10000 || Number(payload.ts) > now + 5000 ||
