@@ -92,6 +92,17 @@ class LiveDuetCommentators(unittest.TestCase):
         self.assertIn("if (!marcheDialogue || marcheDialogue !== codeMarche()) return;", self.js)
         self.assertIn("codeMarche() !== marcheDialogue", self.js)
 
+    def test_duet_continuation_survives_delayed_browser_voice_loading(self):
+        self.assertIn("voixEnAttente = { item, apresLecture };", self.js)
+        self.assertIn("const item = attente.item;", self.js)
+        self.assertIn("parlerLive(item, true, attente.apresLecture)", self.js)
+        self.assertIn("if (!voixActive || !attente || !attente.item) return;", self.js)
+
+    def test_synthesis_error_never_starts_the_second_duet_speaker(self):
+        self.assertIn("utterance.onerror = () => {", self.js)
+        self.assertIn("terminerLecture(false);", self.js)
+        self.assertIn("if (continuer && typeof apresLecture === 'function') apresLecture();", self.js)
+
 
 if __name__ == "__main__":
     unittest.main()
