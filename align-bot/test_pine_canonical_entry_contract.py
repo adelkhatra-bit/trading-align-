@@ -118,6 +118,7 @@ class PineCanonicalEntryContract(unittest.TestCase):
         events = self.bot[start:end]
         self.assertIn("plan_tv = plan_indicateur(r)", events)
         self.assertIn('plan_tv.get("available") is True', events)
+        self.assertIn('plan_tv.get("confirmed") is True', events)
         self.assertIn('plan_tv.get("triggered") is True', events)
         self.assertIn("pine_direction == sn_direction", events)
         self.assertIn("entree=px(pine_entry)", events)
