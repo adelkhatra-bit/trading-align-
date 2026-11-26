@@ -113,7 +113,7 @@ export default {
 
     if (url.pathname.startsWith("/show/")) {
       const cors = showCors(request);
-      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+      if (request.method === "OPTIONS") return json(200, { ok: true }, cors);
 
       if (request.method === "GET" && url.pathname === "/show/state") {
         const state = await lireShow(env);
