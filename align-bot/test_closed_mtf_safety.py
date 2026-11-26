@@ -385,5 +385,23 @@ class ClosedMtfSafety(unittest.TestCase):
         self.assertIn("aucun short avant confirmation", fallback)
 
 
+    def test_live_coach_does_not_use_forming_m5_or_m15_bars_for_counter_move(self):
+        now = int(time.time())
+        r = {
+            "confirme": -1,
+            "dirs_cloturees": [-1] * 11,
+            "b5": [bar(now - 600, o=102, c=101), bar(now - 300, o=101, c=100),
+                   dict(bar(now, o=100, c=110), forming=True)],
+            "b15_long": [bar(now - 1800, o=102, c=101), bar(now - 900, o=101, c=100),
+                         dict(bar(now, o=100, c=110), forming=True)],
+            "b15": [],
+            "m1": [bar(now - 10, o=100, c=110)],
+            "niveaux": [], "atr": 1.0,
+        }
+        context = ab.contexte_technique_live({"BTC": r})["marches"]["BTC"]
+        self.assertEqual(context["mouvement_court_terme"], {"M5": "baissière", "M15": "baissière"})
+
+
+
 if __name__ == "__main__":
     unittest.main()
