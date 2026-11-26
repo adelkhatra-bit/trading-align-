@@ -1287,7 +1287,7 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         """La voix est portée par la bande live ; OFF coupe la parole et aucune voix robot n'est utilisée."""
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
         self.assertIn("function parlerLive(item, forcer = false)", bande)
-        self.assertIn("if (!voixActive || !item", bande)
+        self.assertIn("if (!vivant || !item || !voixActive", bande)
         self.assertIn("return dansLangue.find(v => VOIX_NATURELLES.test(v.name) && filtreRole.test(v.name)) || null;", bande)
         self.assertIn("window.speechSynthesis.cancel()", bande)
 
