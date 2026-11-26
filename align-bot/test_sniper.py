@@ -146,7 +146,7 @@ class MessagesEtRegles(unittest.TestCase):
     M1 = chemin_nuit()
 
     PINE_PLAN = {
-        "available": True, "triggered": True, "direction": -1,
+        "available": True, "confirmed": True, "triggered": True, "direction": -1,
         "entry": 4000.5, "sl": 4020.0, "tp1": 3970.0, "tp2": 3895.54,
         "zone_low": 3993.28, "zone_high": 4012.79,
         "entry_bar_time": 1_795_017_600_000, "entry_timeframe": "H1",
@@ -156,7 +156,9 @@ class MessagesEtRegles(unittest.TestCase):
         etat = {} if etat is None else etat
         k, sn = premiere_proposition(self.M1) if k is None else (k, None)
         r = dict(r_at(self.M1, k), comp=0, sqzs=[0] * 11, dirW=0, pctH=20, sniper=sn)
-        r["sniper"] = ab.entree_sniper(r)
+        # This test exercises only the Pine notification/rendering contract, not the local sniper detector.
+        # Keep a deterministic M1/M3/M5 timing proposal independent from changing market-data fixtures.
+        r["sniper"] = {"d": -1, "t": r["m1"][-1]["t"], "ut": "M1/M3", "rejets": ["M1", "M3"]}
         now = now or r["m1"][-1]["t"]
         plan = self.PINE_PLAN if pine_plan is None else pine_plan
         with patch.object(ab, "cme_ouvert", return_value=True), \

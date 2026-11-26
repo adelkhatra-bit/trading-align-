@@ -139,7 +139,7 @@ class LiveTikTok(unittest.TestCase):
 
     def test_reinjection_arrete_tous_les_animateurs_periodiques(self):
         bande = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")).read_text(encoding="utf-8")
-        stop = bande[bande.index("stop() { vivant = false;"):]
+        stop = bande[bande.index("    stop() {"): ]
         for timer in ("coachT", "iaT", "astuceT", "regardT", "chronoT", "coeurT", "posT", "masqueT", "etiqT", "heartbeatT"):
             self.assertIn(f"clearInterval({timer})", stop, f"timer non arrêté lors de la réinjection : {timer}")
 
@@ -865,6 +865,29 @@ class LiveAgendaMarketTimezoneTests(unittest.TestCase):
         self.assertIn("if (source === 'marche' && (bulle || g === 'danger') && anglaisTraduit)", bande)
 
 
+    def test_bande_cleans_sse_retries_view_timer_and_chart_listeners_on_stop(self):
+        bande = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")).read_text(encoding="utf-8")
+        self.assertIn("let ecouteRetryTimer = null;", bande)
+        self.assertIn("function programmerReconnexionEcoute(delai)", bande)
+        self.assertIn("if (!vivant || document.visibilityState !== 'visible') return;", bande)
+        self.assertIn("const vueT = setInterval(", bande)
+        self.assertIn("clearInterval(vueT)", bande)
+        self.assertIn("clearTimeout(ecouteRetryTimer)", bande)
+        self.assertIn("document.removeEventListener('visibilitychange', gererVisibilite)", bande)
+        self.assertIn("document.removeEventListener('wheel', suivreGraphique, true)", bande)
+        self.assertIn("document.removeEventListener('pointermove', suivreGraphique, true)", bande)
+        self.assertIn("libererLeaseHeartbeat();", bande)
+
+    def test_bande_visual_animations_are_initialized_and_preserved(self):
+        bande = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")).read_text(encoding="utf-8")
+        self.assertIn("// @version      12.2.25", bande)
+        self.assertIn("const VERSION = '12.2.25';", bande)
+        self.assertIn("document.head.appendChild(cssAnimationsToggle);\n  appliquerAnimations();", bande)
+        self.assertIn("function afficherIA(", bande)
+        self.assertIn("function parlerLive(item, forcer = false)", bande)
+        self.assertIn("function coeurs(", bande)
+
+
 if __name__ == "__main__":
     unittest.main()
 
@@ -1181,10 +1204,10 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", *rel)
         return Path(path).read_text(encoding="utf-8")
 
-    def test_bande_version_12_2_24_voice_recovery_and_sync(self):
+    def test_bande_version_12_2_25_voice_recovery_and_sync(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
-        self.assertIn("// @version      12.2.24", bande)
-        self.assertIn("const VERSION = '12.2.24';", bande)
+        self.assertIn("// @version      12.2.25", bande)
+        self.assertIn("const VERSION = '12.2.25';", bande)
         self.assertIn('let voixUtterance = null', bande)
         self.assertIn('voixUtterance = utterance;', bande)
         self.assertIn("setInterval(pingEcran, 45000)", bande)
@@ -1195,8 +1218,16 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         self.assertIn("alignLiveScreenTabId", bande)
         self.assertIn("document.visibilityState !== 'visible'", bande)
         self.assertIn("!prendreLeaseHeartbeat()", bande)
-        self.assertIn("setTimeout(ecouter, 30000)", bande)
-        self.assertIn("setTimeout(ecouter, 15000)", bande)
+        self.assertIn("programmerReconnexionEcoute(30000)", bande)
+        self.assertIn("programmerReconnexionEcoute(15000)", bande)
+        # SSE message handlers ignore stale EventSource callbacks after a reconnect or stop.
+        self.assertIn("if (!vivant || es !== source) return;", bande)
+        self.assertIn("if (!vivant || es !== source) return;", bande)
+        # IA commentaires use the on-chart animated bubble plus spoken French then English.
+        self.assertIn("coeurs(1, ['🧠', '📡'], undefined, phrase, anglais)", bande)
+        self.assertIn("const dureeFR = parlerLive(fr)", bande)
+        self.assertIn("if (dureeFR > 0 && en.anglaisTraduit) parlerLive(en)", bande)
+        self.assertIn("lueur(0)", bande)
         self.assertIn("Math.min(Number(retryAfterMs) || 0, 86400000)", bande)
         self.assertIn("retry-after:", bande)
         self.assertIn("'Content-Type': 'text/plain; charset=utf-8'", bande)

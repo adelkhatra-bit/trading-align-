@@ -317,7 +317,7 @@ class ClosedMtfSafety(unittest.TestCase):
 
     def test_live_ai_context_uses_four_closed_timeframes_for_gold_nasdaq(self):
         r = {
-            "dirPlan": -1, "dirs": [1] * 11, "dirs_cloturees": [-1] * 11,
+            "dirPlan": -1, "confirme": -1, "dirs": [1] * 11, "dirs_cloturees": [-1] * 11,
             "m1": [bar(int(time.time()) - 10, c=100.0)],
             "b15": [], "b15_long": [], "b1h": [], "b1h_long": [],
             "b4h": [], "b4h_long": [], "niveaux": [],
@@ -356,6 +356,51 @@ class ClosedMtfSafety(unittest.TestCase):
         # BTC deliberately retains its legacy timeframe selection.
         r["market"] = "BTC"
         self.assertEqual(ab.timeframe_attendu(r, {}), "4h")
+
+
+    def test_live_ai_bias_uses_only_confirmed_direction_and_reports_short_term_conflict(self):
+        now = int(time.time())
+        base = {
+            "dirPlan": -1, "sens": -1, "confirme": 0,
+            "dirs": [-1] * 11, "dirs_cloturees": [-1] * 11,
+            "m1": [bar(now - 30, o=99.0, c=103.0)],
+            "b5": [bar(now - 600, o=99.0, c=99.5), bar(now - 300, o=99.5, h=104.0, c=103.0)],
+            "b15": [bar(now - 1800, o=99.0, c=99.5), bar(now - 900, o=99.5, h=105.0, c=104.0)],
+            "b15_long": [], "niveaux": [], "atr": 1.0,
+        }
+        context = ab.contexte_technique_live({"BTC": base})["marches"]["BTC"]
+        self.assertEqual(context["biais_plan"], "neutre")
+        self.assertEqual(context["mouvement_court_terme"], {"M5": "haussière", "M15": "haussière"})
+        fallback = ab.commentaires_live_de_secours({"marches": {"BTC": context}})
+        self.assertIn("aucune direction de trade n'est confirmée", fallback)
+        self.assertIn("pas de short anticipé", fallback)
+
+        base["confirme"] = -1
+        context = ab.contexte_technique_live({"BTC": base})["marches"]["BTC"]
+        self.assertEqual(context["biais_plan"], "baissier")
+        self.assertTrue(context["conflit_biais_court_terme"])
+        fallback = ab.commentaires_live_de_secours({"marches": {"BTC": context}})
+        self.assertIn("biais de fond reste baissier", fallback)
+        self.assertIn("M5/M15 clôturent à la hausse", fallback)
+        self.assertIn("aucun short avant confirmation", fallback)
+
+
+    def test_live_coach_does_not_use_forming_m5_or_m15_bars_for_counter_move(self):
+        now = int(time.time())
+        r = {
+            "confirme": -1,
+            "dirs_cloturees": [-1] * 11,
+            "b5": [bar(now - 600, o=102, c=101), bar(now - 300, o=101, c=100),
+                   dict(bar(now, o=100, c=110), forming=True)],
+            "b15_long": [bar(now - 1800, o=102, c=101), bar(now - 900, o=101, c=100),
+                         dict(bar(now, o=100, c=110), forming=True)],
+            "b15": [],
+            "m1": [bar(now - 10, o=100, c=110)],
+            "niveaux": [], "atr": 1.0,
+        }
+        context = ab.contexte_technique_live({"BTC": r})["marches"]["BTC"]
+        self.assertEqual(context["mouvement_court_terme"], {"M5": "baissière", "M15": "baissière"})
+
 
 
 if __name__ == "__main__":
