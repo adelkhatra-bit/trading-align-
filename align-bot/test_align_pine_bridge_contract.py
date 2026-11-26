@@ -78,6 +78,41 @@ if not tp1Ok
             RSI_CROSSOVER_BASELINE_BLOCK,
             1,
         )
+        # The v25 decision gate now reads closed strategy timeframes. Normalize only
+        # these explicitly reviewed additions before checking every other source byte.
+        for line in (
+            'd1Fermee   = request.security(syminfo.tickerid, "1",   f_dir_confirme(), lookahead=barmerge.lookahead_on)\\n',
+            'dDFermee   = request.security(syminfo.tickerid, "D",   f_dir_confirme(), lookahead=barmerge.lookahead_on)\\n',
+            'dWFermee   = request.security(syminfo.tickerid, "W",   f_dir_confirme(), lookahead=barmerge.lookahead_on)\\n',
+        ):
+            without_tp_change = without_tp_change.replace(line, "", 1)
+        strategy_start = without_tp_change.find("uW  = nz(dWFermee) == dP")
+        strategy_end_marker = "o1h = d1hStrat == -dP"
+        strategy_end = without_tp_change.find(strategy_end_marker, strategy_start)
+        self.assertGreaterEqual(strategy_start, 0)
+        self.assertGreater(strategy_end, strategy_start)
+        strategy_end += len(strategy_end_marker)
+        baseline_strategy = """uW  = nz(dW) == dP
+uD  = nz(dD) == dP
+d4Strat = isGold ? nz(d240Fermee) : nz(d240)
+d1hStrat = isGold ? nz(d60Fermee) : nz(d60)
+d15Strat = isGold ? nz(d15Fermee) : nz(d15)
+d5Strat = isGold ? nz(d5Fermee) : nz(d5)
+u4  = d4Strat == dP
+u1h = d1hStrat == dP
+u15 = d15Strat == dP
+u5  = d5Strat == dP
+u1  = nz(d1) == dP
+oW  = nz(dW) == -dP
+o4  = d4Strat == -dP
+o1h = d1hStrat == -dP"""
+        without_tp_change = without_tp_change[:strategy_start] + baseline_strategy + without_tp_change[strategy_end:]
+        risk_start = without_tp_change.find("planRisk = math.abs(ent - sl)")
+        decision_end = without_tp_change.find("\\n", risk_start)
+        self.assertGreaterEqual(risk_start, 0)
+        self.assertGreater(decision_end, risk_start)
+        baseline_decision = 'decisionS = strat == "" ? "AUCUNE ENTRÉE" : scoreV < 60 ? "AUCUNE ENTRÉE : configuration insuffisante" : etatS != "CONFIRMÉ" ? "À SURVEILLER : confirmation manquante" : scoreV >= 85 ? "ENTRÉE POSSIBLE : fortement aligné" : scoreV >= 75 ? "INTÉRESSANT : attendre les conditions finales" : "À SURVEILLER : confirmation manquante"'
+        without_tp_change = without_tp_change[:risk_start] + baseline_decision + without_tp_change[decision_end:]
         without_tp_change = without_tp_change.replace(
             "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig or planGeometryMismatch",
             "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig",
@@ -188,11 +223,19 @@ if not tp1Ok
 
     def test_robot_v12_exports_closed_mtf_directions_for_entry_confirmation(self):
         self.assertIn(
-            "bridgeClosedMtfOk = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan)",
+            'bridgeClosedMtfOk = strat == "SWING" ? (nz(dDFermee) == dirPlan and nz(d60Fermee) == dirPlan',
             self.source,
         )
         self.assertIn(
-            'bridgeConfirmed = bridgePlanValid and etatS == "CONFIRMÉ" and scoreV >= 75 and bridgeClosedMtfOk',
+            'strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan',
+            self.source,
+        )
+        self.assertIn(
+            'strat == "SCALPING" ? (nz(d60Fermee) != -dirPlan and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan)',
+            self.source,
+        )
+        self.assertIn(
+            'bridgeConfirmed = bridgePlanValid and planRiskRewardOk and etatS == "CONFIRMÉ" and scoreV >= 75 and bridgeClosedMtfOk',
             self.source,
         )
         export_block = self.source.split(EXPORT_MARKER, 1)[1]
