@@ -324,6 +324,7 @@
     try { localStorage.setItem('alignVoixActive', voixActive ? '1' : '0'); } catch (e) {}
     if (voixActive) {
       window.speechSynthesis.cancel();
+      voixUtterances.clear(); voixUtterance = null;
       window.speechSynthesis.resume();
       voixBtn.textContent = '🔊 COACH VOCAL ON';
       voixBtn.setAttribute('aria-pressed', 'true');
@@ -400,7 +401,10 @@
       utterance.voice = v;
       utterance.rate = 1.04;     // ton d'animateur : un peu plus vif
       utterance.pitch = 1.08;
-      if (!anglais && item.source !== 'coach') window.speechSynthesis.cancel();   // le duo conserve les deux répliques dans la file
+      if (!anglais && item.source !== 'coach') {
+        window.speechSynthesis.cancel();
+        voixUtterances.clear(); voixUtterance = null;
+      }   // les répliques du duo restent en file, les commentaires prioritaires les remplacent
       // v12.2.10 : Chrome coupe la lecture (2-3 mots) si l'objet utterance est ramassé par le ramasse-miettes :
       // on garde une référence jusqu'à la fin de la phrase.
       voixUtterances.add(utterance);
@@ -421,6 +425,7 @@
   // La scène ALIGN LIVE envoie chaque réplique à la page TradingView ; le clic vocal reste l'autorisation audio.
   let coachShowES = null;
   function ecouterDialoguesCoach() {
+    if (!vivant || document.visibilityState !== 'visible') return;
     try {
       const source = new EventSource('https://ntfy.sh/' + SUJET + '-show/sse');
       coachShowES = source;
@@ -1122,10 +1127,12 @@
       if (ecouteRetryTimer) { clearTimeout(ecouteRetryTimer); ecouteRetryTimer = null; }
       try { es && es.close(); } catch (e) {}
       es = null;
+      try { coachShowES && coachShowES.close(); } catch (e) {}
+      coachShowES = null;
       libererLeaseHeartbeat();
-    } else if (!es) {
-      ecouter();
-      pingEcran();
+    } else {
+      if (!es) { ecouter(); pingEcran(); }
+      if (!coachShowES) ecouterDialoguesCoach();
     }
   }
   document.addEventListener('visibilitychange', gererVisibilite);
