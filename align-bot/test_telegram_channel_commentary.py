@@ -337,5 +337,84 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
 
 
 
+    def test_jauge_private_position_vip_channel_and_exact_message_scope(self):
+        position = {"fini": False, "sl": 95.0}
+        cle = {"jauge": {}, "trade": {"qui": {"101": position}}}
+        state = {"BTC": cle, "canal": "-100", "auto": {"BTC": ["101", "202"]}}
+        with patch.object(ab, "TOKEN", "test-token"), \
+             patch.object(ab, "TELEGRAM_PULL_MODE", True), \
+             patch.object(ab, "DERNIER_ETAT", state), \
+             patch.object(ab, "coach_actif", side_effect=lambda etat, cid, m: str(cid) in {"101", "202"} and m == "BTC"), \
+             patch.object(ab, "marche_autorise", side_effect=lambda etat, cid, m: str(cid) in {"101", "202"} and m == "BTC"), \
+             patch.object(ab, "autorise", return_value=False), \
+             patch.object(ab, "http_json", return_value={"ok": True, "result": {"message_id": 61}}) as request:
+            private_position = ab._telegram_envoyer_jauge(
+                state, "BTC", "101", cle, "sendMessage",
+                text="📊 BTC\n🎯 TP1 110\n🛑 Ton stop 95", disable_notification="true"
+            )
+            cle["jauge"]["101"] = 61
+            edited = ab._telegram_envoyer_jauge(
+                state, "BTC", "101", cle, "editMessageText", message_id=61,
+                text="📊 BTC\n🎯 TP1 110\n🛑 Ton stop 95"
+            )
+            wrong_id = ab._telegram_envoyer_jauge(
+                state, "BTC", "101", cle, "editMessageText", message_id=62, text="📊 BTC mise à jour"
+            )
+            non_vip_levels = ab._telegram_envoyer_jauge(
+                state, "BTC", "202", cle, "sendMessage", text="📊 BTC\n🎯 TP1 110\n🛑 SL 95"
+            )
+            vip_channel = ab._telegram_envoyer_jauge(
+                state, "BTC", "-100", cle, "sendMessage", text="📊 BTC\n🎯 TP1 110"
+            )
+            cleanup = ab._telegram_envoyer_jauge(
+                state, "BTC", "101", cle, "deleteMessage", nettoyage=True, message_id=61
+            )
+            other_chat = ab._telegram_envoyer_jauge(
+                state, "BTC", "303", cle, "sendMessage", text="📊 BTC prochaine position"
+            )
+        self.assertTrue(private_position.get("ok"))
+        self.assertTrue(edited.get("ok"))
+        self.assertTrue(wrong_id.get("blocked_by_pull_mode"))
+        self.assertTrue(non_vip_levels.get("blocked_by_pull_mode"))
+        self.assertTrue(vip_channel.get("ok"))
+        self.assertTrue(cleanup.get("ok"))
+        self.assertTrue(other_chat.get("blocked_by_pull_mode"))
+        self.assertEqual(request.call_count, 4)
+
+    def test_maj_jauge_uses_scoped_helper_and_does_not_mark_failed_edit_as_sent(self):
+        cle = {"jauge": {}, "jauge_txt": {}, "jauge_t": {}}
+        state = {"BTC": cle}
+        with patch.object(ab, "marche_autorise", return_value=True), \
+             patch.object(ab, "coach_actif", return_value=True), \
+             patch.object(ab, "en_position", return_value=False), \
+             patch.object(ab, "jauge", return_value="📊 BTC — zone en préparation"), \
+             patch.object(ab.time, "time", return_value=1000), \
+             patch.object(ab, "_telegram_envoyer_jauge", side_effect=[
+                 {"ok": True, "result": {"message_id": 71}},
+                 {"ok": False, "blocked_by_pull_mode": True},
+             ]) as send:
+            ab.maj_jauge(state, "BTC", {}, cle, {"101"})
+            self.assertEqual(cle["jauge"].get("101"), 71)
+            cle["jauge_txt"]["101"] = "ancienne jauge"
+            cle["jauge_t"]["101"] = 0
+            ab.maj_jauge(state, "BTC", {}, cle, {"101"})
+        self.assertEqual(send.call_count, 2)
+        self.assertEqual(send.call_args_list[0].args[:5], (state, "BTC", "101", cle, "sendMessage"))
+        self.assertEqual(send.call_args_list[1].args[:5], (state, "BTC", "101", cle, "editMessageText"))
+        self.assertEqual(cle["jauge_txt"]["101"], "ancienne jauge")
+        self.assertEqual(cle["jauge_t"]["101"], 0)
+
+    def test_jauge_operation_success_handles_telegram_noop_and_missing_message(self):
+        self.assertTrue(ab._telegram_jauge_operation_ok({"ok": True}, "editMessageText"))
+        self.assertTrue(ab._telegram_jauge_operation_ok({"ok": False, "description": "message is not modified"}, "editMessageText"))
+        self.assertTrue(ab._telegram_jauge_operation_ok({"ok": False, "description": "message to delete not found"}, "deleteMessage"))
+        self.assertFalse(ab._telegram_jauge_operation_ok({"ok": False, "blocked_by_pull_mode": True}, "editMessageText"))
+        import inspect
+        source = inspect.getsource(ab.maj_jauge)
+        self.assertIn("_telegram_envoyer_jauge", source)
+        self.assertNotIn("telegram(", source)
+
+
+
 if __name__ == "__main__":
     unittest.main()
