@@ -139,14 +139,20 @@ class ClosedMtfSafety(unittest.TestCase):
             "snapshots": {
                 "M15": {
                     "fresh": True,
+                    "robotFresh": True,
                     "robotV12": {
                         "lecture_5m": "LONG",
                         "lecture_15m": "LONG",
                         "lecture_60m": "LONG",
                     },
-                }
+                },
+                "M5": {"fresh": True, "robotV12": {
+                    "lecture_5m": "SHORT", "lecture_15m": "SHORT", "lecture_60m": "SHORT"
+                }},
             },
         }
+        # Even if the last chart to report is M5 and it disagrees, the decision
+        # reads the canonical M15 plan snapshot only.
         self.assertEqual(ab.direction_confirmee_marche("GOLD", [1] * 11, 1, ctx), 1)
         ctx["tv_indicator_mtf"]["snapshots"]["M15"]["robotV12"]["lecture_60m"] = "SHORT"
         self.assertEqual(ab.direction_confirmee_marche("GOLD", [1] * 11, 1, ctx), 0)
