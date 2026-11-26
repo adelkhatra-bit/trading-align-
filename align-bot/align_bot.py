@@ -3076,7 +3076,7 @@ def carte_coach(m, r, cle, genre, tr=None, raison=None, declencheur=None, signal
         rr = abs(tr["tp1"] - tr["e"]) / max(abs(tr["e"] - tr["sl"]), 1e-9)
         tps = px(tr["tp1"]) + (f" / {px(tr['tp2'])}" if tr.get("tp2") is not None and tp2_affichable(d, tr["tp1"], tr["tp2"]) else "")
         # Ordre Telegram prioritaire : ENTRY, SL, TP1, TP2 (lecture immédiate sans défilement).
-        vue_ = f" (validation {tr['sl_ut']})" if tr.get("sl_ut") else ""
+        vue_ = f" (vue {tr['sl_ut']})" if tr.get("sl_ut") else ""
         niv = [(f"📍 Entrée : {px(tr['e'])}{vue_}", tr["e"]),
                (f"🛑 SL : {px(tr['sl'])} · {pips_txt(m, tr['e'] - tr['sl'])}" + (" (mèche 5 min)" if tr.get("sl_ut") == "5 min" else "")
                 + (f" (+{pips_txt(m, tr['marge_sl'])} appris)" if tr.get("marge_sl") else ""), tr["sl"]),
