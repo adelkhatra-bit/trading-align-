@@ -25,7 +25,7 @@ class LiveVoiceLanguagePreference(unittest.TestCase):
         self.assertIn("\\brisques?\\b|\\brisks?\\b", source)
         self.assertIn("function choisirVoix(lang, speaker = 't')", source)
         self.assertIn("if (!v) {", source)
-        self.assertIn("if (!anglais && voixActive) voixEnAttente = item;", source)
+        self.assertIn("if (!anglais && voixActive) voixEnAttente = { item, apresLecture };", source)
         self.assertIn("return 0;   // aucune voix naturelle disponible : silence plutôt qu'une voix robot", source)   # v12.2.8 : sans voix naturelle, silence (plus de voix robot)
         self.assertIn("VOIX_PAR_ROLE", source)
         self.assertIn("utterance.voice = v;", source)
