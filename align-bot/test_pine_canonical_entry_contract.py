@@ -72,7 +72,10 @@ class PineCanonicalEntryContract(unittest.TestCase):
         start = self.bot.index("def plan_indicateur(r):")
         end = self.bot.index("\nTTL_KRAKEN", start)
         plan = self.bot[start:end]
-        self.assertIn('current_price = float(snap.get("price"))', plan)
+        self.assertIn('active_snap = snapshots.get(active_tf) if active_tf else None', plan)
+        self.assertIn('active_snap.get("fresh") is not True', plan)
+        self.assertIn('current_price = float(active_snap.get("price"))', plan)
+        self.assertNotIn('current_price = float(snap.get("price"))', plan)
         self.assertIn('"price": current_price', plan)
         self.assertIn('"price_in_zone": prix_tradingview_dans_zone(current_price, zone_low, zone_high)', plan)
 
