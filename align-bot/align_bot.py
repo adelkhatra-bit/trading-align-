@@ -11055,7 +11055,7 @@ def maj_jauge(etat, m, r, cle, chats, canal=None):
 def calendrier(etat, maintenant):
     """Calendrier gratuit (Forex Factory), rafraîchi toutes les heures. Annonces à fort impact USD (BTC et Gold y réagissent)."""
     cache = etat.setdefault("cal", {})
-    if maintenant - cache.get("t", 0) > 3600:
+    if maintenant - cache.get("t", 0) > 3600 and maintenant >= cache.get("retry_after", 0):
         try:
             brut = http_json("https://nfs.faireconomy.media/ff_calendar_thisweek.json", timeout=HTTP_NEWS_TIMEOUT_SEC, attempts=1)
             cache["ev"] = [dict(titre=x["title"], pays=x["country"], t=int(datetime.datetime.fromisoformat(x["date"]).timestamp()),
@@ -11068,7 +11068,11 @@ def calendrier(etat, maintenant):
                                   impact=x.get("impact", ""), prev=x.get("forecast", ""), avant=x.get("previous", ""))
                              for x in brut if x.get("country") == "USD" and x.get("impact") in ("High", "Medium", "Low")]
             cache["t"] = maintenant
+            cache.pop("retry_after", None)
+            cache.pop("erreur", None)
         except Exception as ex:
+            cache["retry_after"] = maintenant + 300
+            cache["erreur"] = {"t": int(maintenant), "type": type(ex).__name__}
             print("calendrier", ex)
     return cache.get("ev", [])
 
@@ -11099,61 +11103,66 @@ def annonces_et_sessions(etat, maintenant, derniers):
     jour = datetime.datetime.fromtimestamp(maintenant, PARIS)
     ev = calendrier(etat, maintenant)
     cle_j = jour.strftime("%Y-%m-%d")
-    # Programme du jour (une fois, après 7 h à Paris)
-    if jour.hour >= 7 and f"prog{cle_j}" not in vus:
-        vus.append(f"prog{cle_j}")
-        aujourdhui = [e for e in ev if datetime.datetime.fromtimestamp(e["t"], PARIS).date() == jour.date()]
-        if aujourdhui:
-            out.append("📅 Annonces importantes aujourd'hui (heure de Paris) :\n" + "\n".join(
-                f"• {heure(e['t'])} {e['titre']} (prévu {e['prev'] or '?'}, avant {e['avant'] or '?'})" for e in aujourdhui)
-                + "\n→ Pas de nouvelle entrée 15 min avant et après. Volatilité forte possible.")
-        elif jour.weekday() < 5:
-            out.append("📅 Aucune annonce majeure US aujourd'hui.")
-    # Rappel 30 min avant chaque annonce
-    for e in ev:
-        reste = e["t"] - maintenant
-        fin = heure(e["t"] + 15 * 60)
-        if 55 * 60 < reste <= 60 * 60 and f"ev60{e['t']}{e['titre']}" not in vus:
-            vus.append(f"ev60{e['t']}{e['titre']}")
-            out.append(f"📰 NEWS USA DANS 1 H — {heure(e['t'])}\n🗞 {e['titre']}\n🚦 ⏳ JE N'ENTRE PAS ENCORE\n"
-                       f"🛑 Pas de nouvelle position à partir de {heure(e['t'] - 15 * 60)}\n🔒 En position ? Vérifie ton SL ; ne le déplace pas sans validation du coach\n"
-                       f"📊 Prévu : {e.get('prev') or '?'} • avant : {e.get('avant') or '?'}")
-        if 35 * 60 < reste <= 40 * 60 and f"ev40{e['t']}{e['titre']}" not in vus:
-            vus.append(f"ev40{e['t']}{e['titre']}")
-            out.append(f"⚠️ NEWS USA DANS 40 MIN — {heure(e['t'])}\n📰 {e['titre']}\n🛡 Évite toute nouvelle entrée à l’approche de l’annonce. Vérifie ton SL si tu es déjà en position.")
-        if 5 * 60 <= -reste <= 8 * 60 and f"evr{e['t']}{e['titre']}" not in vus:
-            vus.append(f"evr{e['t']}{e['titre']}")
-            lr = []
-            for mk, rr in (derniers or {}).items():
-                apres = [x for x in rr.get("m1", []) if x["t"] >= e["t"]]
-                if apres:
-                    o0 = apres[0]["o"]; c1 = apres[-1]["c"]; hh = max(x["h"] for x in apres); ll = min(x["l"] for x in apres)
-                    lr.append(f"{ICONE.get(mk, '')} {mk} : {c1 - o0:+.1f} $ en {len(apres)} min {'⬆️' if c1 > o0 else '⬇️'} (écart haut-bas {hh - ll:.1f} $)")
-            if lr:
-                avis_apres = ia(
-                    etat,
-                    "Après cette annonce économique, interprète uniquement la réaction de prix observée sur BTC et Gold. Dis si le mouvement est net ou limité, rappelle que les deux sens restent possibles et indique d'attendre la clôture 15 min avant toute reprise. N'invente aucun chiffre et ne donne pas d'ordre d'entrée.",
-                    {"annonce": e["titre"], "réaction observée": lr, "consigne": "aucune entrée avant clôture 15 min"},
-                    cle_cache=f"newsreaction{e['t']}{e['titre']}", duree=3600, premium=True, recherche=True)
-                message = f"📰 RÉACTION À LA NEWS — {e['titre']}\n" + "\n".join(lr)
-                message += "\n⏳ J'attends la clôture de la bougie 15 min avant de reprendre"
-                if avis_apres:
-                    message += "\n\n🧠 L'analyse de l'IA ALIGN après l'annonce\n" + avis_apres + ligne_sources(etat, f"newsreaction{e['t']}{e['titre']}")
-                out.append(message)
-        if 6 * 60 < reste <= 15 * 60 and f"ev{e['t']}{e['titre']}" not in vus:        # préavis 15 min (VIP : le gratuit ne reçoit aucune news)
-            vus.append(f"ev{e['t']}{e['titre']}")
-            cle_news = f"news{e['t']}{e['titre']}"
-            avis = ia(etat, "Explique en 2 lignes très simples ce que cette annonce peut faire au Gold et au BTC (sans donner de sens à trader, juste le risque).",
-                      {"annonce": e["titre"], "prévu": e.get("prev"), "avant": e.get("avant")}, cle_cache=cle_news, duree=3600, premium=True, recherche=True)
-            out.append(f"⚠️⚠️ NEWS USA dans {round(reste / 60)} min ({heure(e['t'])})\n📰 {e['titre']}\n\n"
-                       f"🟥 N'ouvre AUCUN trade\n🛡 Déjà en position ? Vérifie que ton STOP est bien placé\n"
-                       f"💥 Le prix peut bouger très fort dans les 2 sens\n⏳ On reprend à {fin}" + (f"\n\n🧠 L'avis de l'IA ALIGN\n{avis}{ligne_sources(etat, cle_news)}" if avis else ""))
-        if 0 <= reste <= 6 * 60 and f"ev5{e['t']}{e['titre']}" not in vus:
-            vus.append(f"ev5{e['t']}{e['titre']}")
-            out.append(f"🚨🚨🚨 NEWS DANS {max(1, round(reste / 60))} MIN — {e['titre']}\n🟥 Ne touche à rien\n🛡 Stop en place ? OK, on attend")
-        if 15 * 60 <= -reste <= 25 * 60 and f"evfin{e['t']}{e['titre']}" not in vus:
-            vus.append(f"evfin{e['t']}{e['titre']}")
-            out.append(f"✅ News passée ({e['titre']}). 🟩 Le bot reprend la recherche d'entrées.")
+    if not calendrier_connu(etat, maintenant):
+        if f"calinconnu{cle_j}" not in vus:
+            vus.append(f"calinconnu{cle_j}")
+            out.append("⚠️ CALENDRIER ÉCONOMIQUE INDISPONIBLE — la source ne répond pas ou le dernier relevé est trop ancien. Aucune absence d’annonce n’est confirmée ; les nouvelles entrées restent bloquées.")
+    else:
+        # Programme du jour (une fois, après 7 h à Paris)
+        if jour.hour >= 7 and f"prog{cle_j}" not in vus:
+            vus.append(f"prog{cle_j}")
+            aujourdhui = [e for e in ev if datetime.datetime.fromtimestamp(e["t"], PARIS).date() == jour.date()]
+            if aujourdhui:
+                out.append("📅 Annonces importantes aujourd'hui (heure de Paris) :\n" + "\n".join(
+                    f"• {heure(e['t'])} {e['titre']} (prévu {e['prev'] or '?'}, avant {e['avant'] or '?'})" for e in aujourdhui)
+                    + "\n→ Pas de nouvelle entrée 15 min avant et après. Volatilité forte possible.")
+            elif jour.weekday() < 5:
+                out.append("📅 Aucune annonce majeure US aujourd'hui.")
+        # Rappel 30 min avant chaque annonce
+        for e in ev:
+            reste = e["t"] - maintenant
+            fin = heure(e["t"] + 15 * 60)
+            if 55 * 60 < reste <= 60 * 60 and f"ev60{e['t']}{e['titre']}" not in vus:
+                vus.append(f"ev60{e['t']}{e['titre']}")
+                out.append(f"📰 NEWS USA DANS 1 H — {heure(e['t'])}\n🗞 {e['titre']}\n🚦 ⏳ JE N'ENTRE PAS ENCORE\n"
+                           f"🛑 Pas de nouvelle position à partir de {heure(e['t'] - 15 * 60)}\n🔒 En position ? Vérifie ton SL ; ne le déplace pas sans validation du coach\n"
+                           f"📊 Prévu : {e.get('prev') or '?'} • avant : {e.get('avant') or '?'}")
+            if 35 * 60 < reste <= 40 * 60 and f"ev40{e['t']}{e['titre']}" not in vus:
+                vus.append(f"ev40{e['t']}{e['titre']}")
+                out.append(f"⚠️ NEWS USA DANS 40 MIN — {heure(e['t'])}\n📰 {e['titre']}\n🛡 Évite toute nouvelle entrée à l’approche de l’annonce. Vérifie ton SL si tu es déjà en position.")
+            if 5 * 60 <= -reste <= 8 * 60 and f"evr{e['t']}{e['titre']}" not in vus:
+                vus.append(f"evr{e['t']}{e['titre']}")
+                lr = []
+                for mk, rr in (derniers or {}).items():
+                    apres = [x for x in rr.get("m1", []) if x["t"] >= e["t"]]
+                    if apres:
+                        o0 = apres[0]["o"]; c1 = apres[-1]["c"]; hh = max(x["h"] for x in apres); ll = min(x["l"] for x in apres)
+                        lr.append(f"{ICONE.get(mk, '')} {mk} : {c1 - o0:+.1f} $ en {len(apres)} min {'⬆️' if c1 > o0 else '⬇️'} (écart haut-bas {hh - ll:.1f} $)")
+                if lr:
+                    avis_apres = ia(
+                        etat,
+                        "Après cette annonce économique, interprète uniquement la réaction de prix observée sur BTC et Gold. Dis si le mouvement est net ou limité, rappelle que les deux sens restent possibles et indique d'attendre la clôture 15 min avant toute reprise. N'invente aucun chiffre et ne donne pas d'ordre d'entrée.",
+                        {"annonce": e["titre"], "réaction observée": lr, "consigne": "aucune entrée avant clôture 15 min"},
+                        cle_cache=f"newsreaction{e['t']}{e['titre']}", duree=3600, premium=True, recherche=True)
+                    message = f"📰 RÉACTION À LA NEWS — {e['titre']}\n" + "\n".join(lr)
+                    message += "\n⏳ J'attends la clôture de la bougie 15 min avant de reprendre"
+                    if avis_apres:
+                        message += "\n\n🧠 L'analyse de l'IA ALIGN après l'annonce\n" + avis_apres + ligne_sources(etat, f"newsreaction{e['t']}{e['titre']}")
+                    out.append(message)
+            if 6 * 60 < reste <= 15 * 60 and f"ev{e['t']}{e['titre']}" not in vus:        # préavis 15 min (VIP : le gratuit ne reçoit aucune news)
+                vus.append(f"ev{e['t']}{e['titre']}")
+                cle_news = f"news{e['t']}{e['titre']}"
+                avis = ia(etat, "Explique en 2 lignes très simples ce que cette annonce peut faire au Gold et au BTC (sans donner de sens à trader, juste le risque).",
+                          {"annonce": e["titre"], "prévu": e.get("prev"), "avant": e.get("avant")}, cle_cache=cle_news, duree=3600, premium=True, recherche=True)
+                out.append(f"⚠️⚠️ NEWS USA dans {round(reste / 60)} min ({heure(e['t'])})\n📰 {e['titre']}\n\n"
+                           f"🟥 N'ouvre AUCUN trade\n🛡 Déjà en position ? Vérifie que ton STOP est bien placé\n"
+                           f"💥 Le prix peut bouger très fort dans les 2 sens\n⏳ On reprend à {fin}" + (f"\n\n🧠 L'avis de l'IA ALIGN\n{avis}{ligne_sources(etat, cle_news)}" if avis else ""))
+            if 0 <= reste <= 6 * 60 and f"ev5{e['t']}{e['titre']}" not in vus:
+                vus.append(f"ev5{e['t']}{e['titre']}")
+                out.append(f"🚨🚨🚨 NEWS DANS {max(1, round(reste / 60))} MIN — {e['titre']}\n🟥 Ne touche à rien\n🛡 Stop en place ? OK, on attend")
+            if 15 * 60 <= -reste <= 25 * 60 and f"evfin{e['t']}{e['titre']}" not in vus:
+                vus.append(f"evfin{e['t']}{e['titre']}")
+                out.append(f"✅ News passée ({e['titre']}). 🟩 Le bot reprend la recherche d'entrées.")
     # Fermeture du Gold : 1 h avant et 40 min avant (jours de semaine)
     if jour.weekday() < 5:
         f_ = minutes_avant_fermeture_gold(maintenant)
