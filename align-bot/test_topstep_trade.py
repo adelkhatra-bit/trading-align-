@@ -105,5 +105,24 @@ class TestGestion(unittest.TestCase):
         self.assertIn("SL touché", ts.gerer(etat, 89, journal=lambda *_: None)[0])
 
 
+class TestValidationNiveaux(unittest.TestCase):
+    def test_refuse_niveaux_inverses_sans_connexion(self):
+        invalides = [
+            {"marche": "BTC", "sens": "LONG", "e": 100, "sl": 110, "tp": 120},
+            {"marche": "BTC", "sens": "SHORT", "e": 100, "sl": 90, "tp": 80},
+            {"marche": "BTC", "sens": "LONG", "e": 100, "sl": 90, "tp": 120, "tp2": 115},
+        ]
+        with unittest.mock.patch.object(ts, "connexion") as connect:
+            for signal in invalides:
+                result = ts.executer({"auto_marches": {"BTC": True}}, signal)
+                self.assertFalse(result["ok"])
+                self.assertIn("niveaux", result["raison"])
+            connect.assert_not_called()
+
+    def test_accepte_niveaux_orientes_correctement(self):
+        self.assertTrue(ts.niveaux_valides({"sens": "LONG", "e": 100, "sl": 90, "tp": 120})[0])
+        self.assertTrue(ts.niveaux_valides({"sens": "SHORT", "e": 100, "sl": 110, "tp": 80})[0])
+
+
 if __name__ == "__main__":
     unittest.main()
