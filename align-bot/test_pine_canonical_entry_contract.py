@@ -31,7 +31,7 @@ class PineCanonicalEntryContract(unittest.TestCase):
 
     def test_confirmed_pine_strategy_direction_is_read_before_local_h1_h4_gate(self):
         start = self.bot.index("def agent(m, r, cle, ferme):")
-        end = self.bot.index("\\n\\ndef ", start + 1)
+        end = self.bot.index("\n\ndef ", start + 1)
         agent = self.bot[start:end]
         lookup = agent.index("plan_tv = plan_indicateur(r) if require_tv and not tr else None")
         local_gate = agent.index("if not d:", lookup)
