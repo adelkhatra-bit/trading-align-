@@ -13,7 +13,7 @@ class AlignBtcPineContract(unittest.TestCase):
         self.assertIn("isGold = false", source)
         self.assertIn("isSupportedMarket = isBtc", source)
         self.assertIn('bridgeMarket = isBtc ? "BTCUSD" : "UNSUPPORTED"', source)
-        self.assertIn('"source":"ALIGN_BTC_MTF_PRO_V25"', source)
+        self.assertIn('"source":"ALIGN_MTF_PRO_V25"', source)
         self.assertNotIn('bridgeMarket = isBtc ? "BTCUSD" : isGold ? "XAUUSD"', source)
 
     def test_btc_ui_and_bridge_require_the_same_closed_h1_h4_confirmation(self):
