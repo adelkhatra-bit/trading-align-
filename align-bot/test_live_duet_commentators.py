@@ -17,6 +17,9 @@ class LiveDuetCommentators(unittest.TestCase):
         poll = self.js.index("  ecouterDialoguesCoach();")
         self.assertLess(publish, poll)
 
+    def test_french_male_voice_map_accepts_supported_windows_david_voice(self):
+        self.assertIn("t: { fr: /\\b(?:paul|henri|pierre|david)\\b/i", self.js)
+
     def test_runtime_state_is_initialized_before_first_coach_poll(self):
         vivant = self.js.index("let vivant = true;")
         first_use = self.js.index("if (!vivant || !item || !voixActive")
