@@ -146,7 +146,7 @@ class MessagesEtRegles(unittest.TestCase):
     M1 = chemin_nuit()
 
     PINE_PLAN = {
-        "available": True, "triggered": True, "direction": -1,
+        "available": True, "confirmed": True, "triggered": True, "direction": -1,
         "entry": 4000.5, "sl": 4020.0, "tp1": 3970.0, "tp2": 3895.54,
         "zone_low": 3993.28, "zone_high": 4012.79,
         "entry_bar_time": 1_795_017_600_000, "entry_timeframe": "H1",
