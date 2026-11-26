@@ -222,7 +222,7 @@ function parler(qui, texte) {
   bulle.innerHTML = "<small>" + (qui === "t" ? "Thomas" : "Leïla") + "</small>" + texte; bulle.classList.add("visible");
 }
 // Commentaires factuels : une réplique uniquement lorsqu'un champ public de marché change.
-// Aucun prix, Entry, SL ou TP n'est calculé ou annoncé par cette scène.
+// Aucun prix ni niveau technique n'est calculé ou annoncé par cette scène.
 var dernierEtatCoachParMarche = {};
 var dernierHoteCoach = "t";
 function construireCommentaireEtat(m) {
