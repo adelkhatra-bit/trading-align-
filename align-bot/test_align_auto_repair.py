@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 from scripts import align_auto_repair as repair
 from scripts.align_auto_repair import (
-    event_target, find_issue_for_sha, has_run_marker, next_attempt, repair_issue_body,
+    all_issues, event_target, find_issue_for_sha, has_run_marker, next_attempt, repair_issue_body,
     summarize_failed_jobs,
 )
 
@@ -54,6 +54,17 @@ class RepairEventTests(unittest.TestCase):
 
 
 class RepairIssueTests(unittest.TestCase):
+
+    def test_issue_scan_uses_open_scope_and_stops_after_last_page(self):
+        first_page = [{"number": n, "body": ""} for n in range(100)]
+        second_page = [{"number": 101, "body": ""}]
+        with patch.object(repair, "request_json", side_effect=[first_page, second_page]) as request:
+            found = all_issues()
+        self.assertEqual(len(found), 101)
+        self.assertIn("state=open", request.call_args_list[0].args[0])
+        self.assertIn("page=2", request.call_args_list[1].args[0])
+        self.assertEqual(request.call_count, 2)
+
     def test_deduplicates_by_exact_sha_marker(self):
         issue = {"number": 9, "user": BOT, "body": f"report <!-- ALIGN_REPAIR_SHA={SHA} -->"}
         self.assertEqual(find_issue_for_sha([issue], SHA), issue)
