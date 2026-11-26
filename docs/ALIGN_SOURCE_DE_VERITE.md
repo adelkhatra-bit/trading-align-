@@ -46,6 +46,18 @@ Le script compagnon `ALIGN_MTF_PRO_v24.pine` peut rester chargé sur le graphiqu
 
 Le bridge Python est éphémère dans le runner du workflow : **4100 n'est pas un service permanent du PC** et ne doit pas être exposé par un tunnel public. Le Worker ne remplace pas le bridge : il transporte et conserve le JSON brut. Le feeder le transmet sans compléter ni réécrire ses champs ; `BridgeStore` dans `align_tv_bridge.py` est l'unique validateur MTF.
 
+### Canal de présentation ALIGN LIVE (séparé des décisions)
+
+La scène `docs/live/index.html` lit uniquement le résumé public `live-data/live.json`, publié par le BOT à partir du bridge TradingView/Pine v25. Le duo Thomas/Leïla ne lit aucun prix ni niveau Entry/SL/TP et ne décide d'aucun signal.
+
+Pour synchroniser les répliques et les voix sans dépendre du quota ntfy, le Worker expose un canal de présentation dans un Durable Object séparé nommé `LIVE_SHOW` :
+- la page ALIGN LIVE publie une paire de répliques via `GET /show/publish` ;
+- le userscript TradingView lit cette paire via `GET /show/state` et la prononce uniquement si **COACH VOCAL ON** ;
+- les événements vocaux (locuteur, langue, texte, durée) et l'état ON/OFF sont relayés vers la scène, qui anime la bouche de Thomas ou de Leïla ;
+- l'ID `LIVE_SHOW` est distinct des boîtes `BTCUSD` et `XAUUSD` ; aucune donnée de présentation n'entre dans `BridgeStore`, le calcul MTF ou le moteur de signaux.
+
+Ce canal ne remplace pas ntfy pour les autres usages du bot et ne change pas la chaîne de données Pine v25 → BridgeStore → ROBOT V12.
+
 Le BOT peut aussi être configuré pour lire un bridge HTTPS externe via les secrets `ALIGN_TV_API_URL` et `ALIGN_TV_READ_TOKEN`. Cette voie remplace la voie mailbox dans le workflow ; elle ne doit être activée que si l'URL et le stockage visés ont été explicitement vérifiés. Ne jamais déduire l'identité du serveur à partir du seul chemin HTTP.
 
 ### Ancien chemin local — retiré de main, archive historique conservée

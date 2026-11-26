@@ -88,6 +88,23 @@ if not tp1Ok
             "if barstate.isconfirmed and (na(ent) or nouvelle15 or dirPlan != dirFig or strat != stratFig or slFranchi)",
             1,
         )
+
+        # The pending/confirmed ribbon is the only additional permitted UI change:
+        # replace that exact block with the v25 baseline before checking the rest byte-for-byte.
+        ui_start = without_tp_change.find("// État de confirmation calculé pour l'affichage ; les champs d'export restent dans le bloc bridge canonique.")
+        ui_end = without_tp_change.find("    actif = zoneBas", ui_start)
+        self.assertGreaterEqual(ui_start, 0)
+        self.assertGreater(ui_end, ui_start)
+        titre_start = without_tp_change.find("    titre = ", ui_start)
+        titre_end = without_tp_change.find("\n", titre_start)
+        self.assertGreaterEqual(titre_start, ui_start)
+        self.assertGreater(titre_end, titre_start)
+        baseline_titre = without_tp_change[titre_start:titre_end + 1]
+        baseline_ui = baseline_titre + """    ligne = (retDir != 0 and not retConf ? "↩ RETOURNEMENT  " : nVoy >= 3 ? "↩ " + str.tostring(nVoy) + "/5  " : "") + (dirPlan == 1 ? "▲ LONG" : dirPlan == -1 ? "▼ SHORT" : "ATTENDRE") + (dirPlan != 0 ? (strat != "" ? " • " + (strat == "SCALPING" ? "SCALP" : strat) + (etatS == "CONFIRMÉ" and scoreV >= 75 ? " ✅ " : " ⏳ ") + str.tostring(scoreV) : "") + "  TP " + px(tp1) + "  SL " + px(sl) : "   " + titre)
+    plan = (retTxt != "" ? retTxt + "\\n\\n" : "") + (dirPlan != 0 ? "STRATÉGIE : " + (strat == "" ? "aucune" : strat + " — " + etatS) + "\\nScore : " + str.tostring(scoreV) + " / 100\\n• Alignement : " + str.tostring(ptsAlign) + " / 25\\n• Structure : " + str.tostring(ptsStruct) + " / 20\\n• Zone d'entrée : " + str.tostring(ptsZone) + " / 20\\n• Volume : " + str.tostring(ptsVol) + " / 15" + (volOk ? "" : " (indisponible)") + "\\n• Indicateurs : " + str.tostring(ptsInd) + " / 10\\n• Risque / rendement : " + str.tostring(ptsRR) + " / 10\\n⏱ Clôture de validation " + (strat == "SWING" ? "1h" : strat == "DAY" ? "5 min" : strat == "SCALPING" ? "1 min" : "15 min") + " dans " + f_mmss(f_reste((strat == "SWING" ? 60 : strat == "DAY" ? 5 : strat == "SCALPING" ? 1 : 15))) + "\\nDécision : " + decisionS + "\\nMotif : " + motifS + "\\nPlan : " + calePlan + "\\n\\n" : "") + "SENS PROBABLE : " + (sens == 1 ? "HAUSSE " : sens == -1 ? "BAISSE " : "INDÉCIS ") + str.tostring(pctH) + "% hausse / " + str.tostring(100 - pctH) + "% baisse\\n" + str.tostring(bull) + " UT en hausse • " + str.tostring(bear) + " en baisse • " + str.tostring(comp) + " comprimées\\nRSI : " + str.tostring(rsiOB) + " UT en surachat (>70) • " + str.tostring(rsiOS) + " en survente (<30)" + (rsiOB >= 3 ? "\\nSURCHARGE RSI HAUTE : éviter d'acheter, retournement baissier possible" : rsiOS >= 3 ? "\\nSURCHARGE RSI BASSE : éviter de vendre, rebond possible" : "") + (retHaut ? "\\nLes petites UT montent avant les grandes : retournement HAUSSIER en préparation" : retBas ? "\\nLes petites UT baissent avant les grandes : retournement BAISSIER en préparation" : "") + (zoneBas ? "\\nPrix sur une résistance " + tH1 + " : risque de retournement à la baisse" : zoneHaut ? "\\nPrix sur un support " + tB1 + " : rebond possible" : "") + (dirPlan != 0 ? "\\n\\nPLAN " + (dirPlan == 1 ? "ACHAT" : "VENTE") + "\\nEntrée " + px(ent) + " (" + tEnt + ")\\nTP1 " + px(tp1) + " (" + tTP1 + ")\\nTP2 " + px(tp2) + " (" + tTP2 + ")\\nStop " + px(sl) + "\\nGain/risque ≈ " + str.tostring(rr, "#.#") : "")
+    vbg0 = zoneBas or zoneHaut ?  color.rgb(170, 130, 0) : dirPlan == 1 ?  color.rgb(0, 140, 70) : dirPlan == -1 ?  color.rgb(190, 30, 45) :  color.rgb(60, 60, 60)
+"""
+        without_tp_change = without_tp_change[:ui_start] + baseline_ui + without_tp_change[ui_end:]
         for marker, terminator in (
             ("planGeometryMismatch = dirPlan != 0 and (", "\n)"),
             ("bridgePlanGeometryOk = dirPlan == 1 ? (", ": false"),
@@ -171,7 +188,7 @@ if not tp1Ok
 
     def test_robot_v12_exports_closed_mtf_directions_for_entry_confirmation(self):
         self.assertIn(
-            "bridgeClosedMtfOk = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan)",
+            "bridgeClosedMtfOk = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan)",
             self.source,
         )
         self.assertIn(
@@ -233,6 +250,22 @@ if not tp1Ok
         self.assertIn("request.security_lower_tf(syminfo.tickerid, bridgeEntryTf", export_block)
         self.assertIn("array.get(bridgeEntryTimeArray, bridgeEntryLast)", export_block)
         self.assertIn('bridgeEntryTimeSafe = bridgeEntryTf == "" ? na : bridgeEntryTime', export_block)
+
+    def test_bridge_reuses_mtf_time_requests_and_stays_below_tv_request_budget(self):
+        # The f_etat() MTF calls already return each timeframe's bar time.
+        # Duplicating bridgeTime requests later in the script pushes the live
+        # TradingView instance over its 40 unique request.*() budget.
+        for field in (
+            "bridgeTimeM1", "bridgeTimeM3", "bridgeTimeM5", "bridgeTimeM10",
+            "bridgeTimeM15", "bridgeTimeM30", "bridgeTimeM45", "bridgeTimeH1",
+            "bridgeTimeH2", "bridgeTimeH4", "bridgeTimeD1", "bridgeTimeW1",
+        ):
+            self.assertIn(field, self.source)
+            self.assertNotIn(field + " = request.security", self.source)
+        request_sites = self.source.count("request.security(") + self.source.count("request.security_lower_tf(")
+        self.assertLessEqual(request_sites, 40)
+        self.assertIn("[d1, s1, r1, bridgeTimeM1]", self.source)
+        self.assertIn("[dW, sW, rW, bridgeTimeW1]", self.source)
 
     def test_no_secret_is_embedded_in_pine(self):
         self.assertNotIn("ALIGN_TV_INGEST_TOKEN", self.source)

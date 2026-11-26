@@ -324,7 +324,7 @@ class TelegramAuditTests(unittest.TestCase):
                 now=2000,
             )
         self.assertIn(
-            "Bridge TradingView : indisponible • UT active aucune • âge inconnue",
+            "Bridge TradingView : indisponible • plan M15 absent/périmé • UT active aucune • âge inconnue",
             report,
         )
 

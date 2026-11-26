@@ -162,6 +162,7 @@ class MessagesEtRegles(unittest.TestCase):
         now = now or r["m1"][-1]["t"]
         plan = self.PINE_PLAN if pine_plan is None else pine_plan
         with patch.object(ab, "cme_ouvert", return_value=True), \
+             patch.object(ab, "etat_marche_hb", return_value=("ouvert", None)), \
              patch.object(ab, "plan_indicateur", return_value=plan):
             return etat, [e for e in ab.evenements_pine(etat, "GOLD", r, etat.setdefault("GOLD", {}), now) if e["kind"] == "sniper"], r
 
@@ -205,7 +206,7 @@ class MessagesEtRegles(unittest.TestCase):
         self.assertIn("diffuser_evenements(etat, chats", src)                                          # VIP : chaîne + privés
         envois = []
         etat, ev, _ = self.evenement()
-        with patch.object(ab, "TOKEN", "x"), patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append((str(c), k["text"]))), \
+        with patch.object(ab, "TOKEN", "x"), patch.object(ab, "cme_ouvert", return_value=True), patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append((str(c), k["text"]))), \
              patch.object(ab, "destinataires_message", return_value=["canal"]), patch.object(ab, "evenements_pine", return_value=ev):
             etat["prospects"] = ["900"]
             ab.alertes_courtes(etat, set(), {"GOLD": {}}, 1_000_000)

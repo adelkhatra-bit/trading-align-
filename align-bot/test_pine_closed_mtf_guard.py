@@ -26,6 +26,24 @@ class PineClosedMtfGuard(unittest.TestCase):
         self.assertIn("sigBas  = isSupportedMarket and sigBas0", source)
 
 
+    def test_btc_bridge_requires_both_closed_h1_and_h4(self):
+        source = PINE.read_text(encoding="utf-8")
+        self.assertIn(
+            'bridgeClosedMtfOk = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan)',
+            source,
+        )
+
+    def test_btc_ui_and_bridge_share_closed_h1_h4_confirmation_gate(self):
+        source = PINE.read_text(encoding="utf-8")
+        expected = "nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan"
+        self.assertIn("planClosedMtfOkUi = isGold ?", source)
+        ui_line = next(line for line in source.splitlines() if line.startswith("planClosedMtfOkUi = "))
+        bridge_line = next(line for line in source.splitlines() if line.startswith("bridgeClosedMtfOk = "))
+        self.assertIn(expected, ui_line)
+        self.assertIn(expected, bridge_line)
+        self.assertIn("isGold ?", ui_line)
+        self.assertIn("isGold ?", bridge_line)
+
     def test_direction_confirmation_uses_closed_htf_candles_not_live_ones(self):
         # Régression : la confirmation du sens ne doit jamais lire la bougie 15 min / 1 h en formation
         # (nz(d15) / nz(d60)), sinon le sens SHORT/LONG bascule à chaque tick.

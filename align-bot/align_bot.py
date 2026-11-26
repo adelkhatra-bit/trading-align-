@@ -163,6 +163,8 @@ def detail_bridge_invalide(payload):
         perimes = [tf for tf in requis if tf in snaps and (snaps[tf] or {}).get("fresh") is not True]
         if absents:
             morceaux.append("UT absentes " + ",".join(absents))
+        if payload.get("canonicalPlanFresh") is not True:
+            morceaux.append("plan ROBOT V12 M15 absent ou périmé")
         if perimes:
             ages = []
             for tf in perimes:
@@ -190,9 +192,13 @@ def fetch_tv_mtf(pair):
         if not payload.get("ok") or not isinstance(payload.get("snapshots"), dict):
             return {"available": False, "reason": "réponse bridge invalide",
                     "detail": detail_bridge_invalide(payload), "snapshots": {}}
+        if payload.get("canonicalPlanFresh") is not True:
+            return {"available": False, "reason": "plan ROBOT V12 canonique M15 absent ou périmé",
+                    "canonicalPlanTimeframe": "M15", "canonicalPlanFresh": False,
+                    "detail": detail_bridge_invalide(payload), "snapshots": payload["snapshots"]}
         active_tf = str(payload.get("activeTimeframe") or "").upper()
         active_fresh = payload.get("activeTimeframeFresh") is True
-        if active_tf not in {"M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"} or not active_fresh:
+        if active_tf not in {"M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1"} or not active_fresh:
             active_tf = None
         return {
             "available": True,
@@ -200,6 +206,8 @@ def fetch_tv_mtf(pair):
             "symbol": payload.get("symbol"),
             "activeTimeframe": active_tf,
             "activeTimeframeAgeMs": payload.get("activeTimeframeAgeMs"),
+            "canonicalPlanTimeframe": "M15",
+            "canonicalPlanFresh": True,
             "snapshots": payload["snapshots"],
             "receivedTimeframes": payload.get("receivedTimeframes", [])
         }
@@ -237,10 +245,9 @@ def directions_tv_mtf(contexte):
     bridge = (contexte or {}).get("tv_indicator_mtf") or {}
     if bridge.get("available") is not True:
         return None
-    active = bridge.get("activeTimeframe")
-    snap = (bridge.get("snapshots") or {}).get(active) or {}
+    snap = (bridge.get("snapshots") or {}).get("M15") or {}
     robot = snap.get("robotV12") or {}
-    if snap.get("fresh") is not True or not robot:
+    if snap.get("fresh") is not True or snap.get("robotFresh") is False or not robot:
         return None
     out = {tf: _direction_tv(robot.get(key)) for tf, key in (
         ("M5", "lecture_5m"), ("M15", "lecture_15m"), ("H1", "lecture_60m")
@@ -251,16 +258,18 @@ def directions_tv_mtf(contexte):
 def fusionne_lectures_tradingview(r):
     """Conserve le snapshot ROBOT V12 séparé : il ne doit pas modifier une analyse ALIGN déjà calculée."""
     bridge = r.get("tv_indicator_mtf") or {}
-    snap = (bridge.get("snapshots") or {}).get(bridge.get("activeTimeframe")) or {}
+    # ROBOT V12 plan authority is always the M15 chart snapshot. The last
+    # timeframe to reach the bridge is not allowed to replace the trade decision.
+    snap = (bridge.get("snapshots") or {}).get("M15") or {}
     robot = snap.get("robotV12") or {}
-    if not robot or not snap.get("fresh"):
+    if not robot or not snap.get("fresh") or snap.get("robotFresh") is False:
         return r
     # Sécurité de cohérence : analyser() a déjà calculé dirs, RSI, dirPlan, stratégie et
     # niveaux depuis un même jeu de bougies. Remplacer seulement M1/M5/M15/H1 ici
     # fabriquait un mélange TradingView + flux local sans recalculer les champs dérivés.
     # Le plan ROBOT V12 reste consultable séparément via plan_indicateur().
     r["tv_robot_v12"] = robot
-    r["tv_robot_v12_timeframe"] = bridge.get("activeTimeframe")
+    r["tv_robot_v12_timeframe"] = "M15"
     r["tv_robot_v12_fresh"] = True
     return r
 
@@ -278,7 +287,8 @@ def plan_indicateur(r):
     """Plan Pine canonique M15 + bougie clôturée de déclenchement stratégie."""
     bridge = r.get("tv_indicator_mtf") or {}
     active_tf = str(bridge.get("activeTimeframe") or "").upper()
-    snap = (bridge.get("snapshots") or {}).get(active_tf) or {}
+    plan_tf = "M15"
+    snap = (bridge.get("snapshots") or {}).get(plan_tf) or {}
     robot = snap.get("robotV12") or {}
     try:
         entry, sl = float(robot.get("entry")), float(robot.get("sl"))
@@ -297,29 +307,31 @@ def plan_indicateur(r):
         entry_bar_low = float(robot.get("entryBarLow"))
         entry_bar_close = float(robot.get("entryBarClose"))
     except (TypeError, ValueError, KeyError):
-        return {"timeframe": active_tf or None, "available": False,
+        return {"timeframe": plan_tf or None, "available": False,
                 "reason": "plan M15 / zone / bougie de validation Pine incomplets"}
 
     if snap.get("fresh") is not True:
-        return {"timeframe": active_tf, "available": False, "reason": "snapshot TradingView actif périmé"}
+        return {"timeframe": plan_tf, "available": False, "reason": "snapshot TradingView canonique M15 périmé"}
+    if snap.get("robotFresh") is False:
+        return {"timeframe": plan_tf, "available": False, "reason": "plan ROBOT V12 M15 périmé"}
     try:
         current_price = float(snap.get("price"))
     except (TypeError, ValueError):
-        return {"timeframe": active_tf, "available": False, "reason": "prix TradingView actif absent"}
+        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView canonique M15 absent"}
     if not math.isfinite(current_price) or current_price <= 0:
-        return {"timeframe": active_tf, "available": False, "reason": "prix TradingView actif invalide"}
+        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView canonique M15 invalide"}
     if str(robot.get("planTimeframe") or "").upper() != "M15":
-        return {"timeframe": active_tf, "available": False, "reason": "référence du plan différente de M15"}
+        return {"timeframe": plan_tf, "available": False, "reason": "référence du plan différente de M15"}
     strategy = str(robot.get("strategy") or "").upper()
     expected_entry_tf = {"SCALPING": "M1", "DAY": "M5", "SWING": "H1"}.get(strategy)
     entry_tf = str(robot.get("entryTimeframe") or "").upper()
     if expected_entry_tf is None or entry_tf != expected_entry_tf:
-        return {"timeframe": active_tf, "available": False, "reason": "unité de validation incohérente avec la stratégie"}
+        return {"timeframe": plan_tf, "available": False, "reason": "unité de validation incohérente avec la stratégie"}
 
     signal = str(robot.get("signal") or robot.get("verdict") or "").upper()
     direction = _direction_tv(signal)
     if direction not in (-1, 1) or min(entry, sl, tp1, zone_low, zone_high, decision) <= 0 or (tp2 is not None and tp2 <= 0):
-        return {"timeframe": active_tf, "available": False, "reason": "direction ou niveaux M15 invalides"}
+        return {"timeframe": plan_tf, "available": False, "reason": "direction ou niveaux M15 invalides"}
     risk = abs(entry - sl)
     # Même tolérance d'arrondi que le bridge (align_tv_bridge.py) : le Pine pose le bord de zone
     # EXACTEMENT à 25 % du risque et le JSON arrondit à 2 décimales. Sans elle, un plan accepté
@@ -338,10 +350,10 @@ def plan_indicateur(r):
             and zone_high <= sl - 0.25 * risk + tol
         )
     if not geometrie_ok:
-        return {"timeframe": active_tf, "available": False, "reason": "géométrie zone / entrée / SL / TP incohérente"}
+        return {"timeframe": plan_tf, "available": False, "reason": "géométrie zone / entrée / SL / TP incohérente"}
     if not (entry_bar_low <= min(entry_bar_open, entry_bar_close)
             <= max(entry_bar_open, entry_bar_close) <= entry_bar_high):
-        return {"timeframe": active_tf, "available": False, "reason": "bougie de validation OHLC incohérente"}
+        return {"timeframe": plan_tf, "available": False, "reason": "bougie de validation OHLC incohérente"}
     retested_zone = entry_bar_high >= zone_low and entry_bar_low <= zone_high
     candle_trigger = entry_bar_close > decision if direction == 1 else entry_bar_close < decision
     candle_before_stop = entry_bar_close > sl if direction == 1 else entry_bar_close < sl
@@ -352,7 +364,7 @@ def plan_indicateur(r):
     )
 
     return {
-        "timeframe": active_tf, "plan_timeframe": "M15", "entry_timeframe": entry_tf,
+        "timeframe": plan_tf, "active_timeframe": active_tf, "plan_timeframe": "M15", "entry_timeframe": entry_tf,
         "strategy": strategy, "available": True, "direction": direction,
         "entry": entry, "sl": sl, "tp": tp1, "tp1": tp1, "tp2": tp2,
         "zone_low": zone_low, "zone_high": zone_high, "decision": decision,
@@ -363,8 +375,8 @@ def plan_indicateur(r):
         "confirmed": snap.get("confirmed") is True and robot.get("confirmed") is True,
         "verdict": robot.get("verdict"), "long_score": robot.get("long_score"),
         "short_score": robot.get("short_score"),
-        "timestamp": robot.get("receivedAt") or snap.get("timestamp"),
-        "ageMs": robot.get("ageMs"),
+        "timestamp": snap.get("robotTimestamp") or robot.get("receivedAt") or snap.get("timestamp"),
+        "ageMs": snap.get("robotAgeMs") if snap.get("robotAgeMs") is not None else robot.get("ageMs"),
     }
 
 TTL_KRAKEN = {1: 5, 5: 10, 15: 30, 30: 60, 60: 120, 240: 300, 1440: 900, 10080: 1800}
@@ -681,10 +693,10 @@ def direction_confirmee_marche(m, dirs, d, contexte=None, now_ts=None):
     elif m == "BTC" and contexte is not None and contexte.get("require_tv_bridge"):
         # BTC garde sa règle locale H1/H4 clôturées, mais le H1 ROBOT V12 TradingView doit aussi confirmer.
         bridge = contexte.get("tv_indicator_mtf") or {}
-        active = bridge.get("activeTimeframe")
-        snap = (bridge.get("snapshots") or {}).get(active) or {}
+        snap = (bridge.get("snapshots") or {}).get("M15") or {}
         robot = snap.get("robotV12") or {}
-        if bridge.get("available") is not True or snap.get("fresh") is not True or not robot:
+        if (bridge.get("available") is not True or snap.get("fresh") is not True
+                or snap.get("robotFresh") is False or not robot):
             return 0
         if _direction_tv(robot.get("lecture_60m")) != d:
             return 0
@@ -1645,12 +1657,15 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
     if "Prochaine entrée" not in raison and not tr:
         l.append(prochaine(r, cle))
     return "\n".join(l)
-# Unité regardée sur TradingView → fenêtre d'alignement et type de position (UT = 1,2,5,10,15,30,45,1h,2h,4h,D).
+# Unité regardée sur TradingView → fenêtre d'alignement et type de position (UT = 1,3,5,10,15,30,45,1h,2h,4h,D).
 FENETRES_UT = {
     "M1": ("SCALPING", [0, 2, 4], "1 min + 5 min + 15 min", "quelques minutes"),
+    "M3": ("SCALPING", [1, 2, 4], "3 min + 5 min + 15 min", "quelques minutes"),
     "M5": ("SCALPING / INTRADAY", [2, 4, 7], "5 min + 15 min + 1 h", "dans la séance"),
+    "M10": ("SCALPING / INTRADAY", [3, 4, 7], "10 min + 15 min + 1 h", "dans la séance"),
     "M15": ("INTRADAY", [4, 7, 9], "15 min + 1 h + 4 h", "dans la journée"),
     "M30": ("INTRADAY", [5, 7, 9], "30 min + 1 h + 4 h", "dans la journée"),
+    "M45": ("INTRADAY", [6, 7, 9], "45 min + 1 h + 4 h", "dans la journée"),
     "H1": ("SWING", [7, 9, 10], "1 h + 4 h + Daily", "plusieurs jours"),
     "H2": ("SWING", [8, 9, 10], "2 h + 4 h + Daily", "plusieurs jours"),
     "H4": ("SWING", [9, 10], "4 h + Daily", "plusieurs jours à semaines"),
@@ -5240,7 +5255,7 @@ def texte_timeframes(m, r, anglais=False):
         lignes.append(f"{label}: {sens} — RSI {rsi_txt}" if anglais else f"{label} : {sens} — RSI {rsi_txt}")
     active_tf = str(bridge.get("activeTimeframe") or "").upper()
     active_snap = snapshots.get(active_tf) or {}
-    robot = active_snap.get("robotV12") or {}
+    robot = (snapshots.get("M15") or {}).get("robotV12") or {}
     strategie = str(robot.get("strategy") or "").upper()
     if strategie:
         lignes.append("")
@@ -7863,6 +7878,8 @@ def capturer_snapshot_audit(etat, m, r, cle, messages=None):
               "reason": bridge.get("reason"),
               "activeTimeframe": bridge.get("activeTimeframe"),
               "activeTimeframeAgeMs": bridge.get("activeTimeframeAgeMs"),
+              "canonicalPlanTimeframe": bridge.get("canonicalPlanTimeframe") or "M15",
+              "canonicalPlanFresh": bridge.get("canonicalPlanFresh") is True,
               "receivedTimeframes": bridge.get("receivedTimeframes") or [],
               "snapshots": {}}
         champs_tv = ("fresh", "timestamp", "updatedAt", "time", "confirmed", "signal", "verdict",
@@ -7873,7 +7890,7 @@ def capturer_snapshot_audit(etat, m, r, cle, messages=None):
                 continue
             robot = snap_tv.get("robotV12") or {}
             tv["snapshots"][str(tf)] = {
-                k: snap_tv.get(k) for k in ("fresh", "timestamp", "updatedAt", "time", "confirmed", "ageMs")
+                k: snap_tv.get(k) for k in ("fresh", "timestamp", "updatedAt", "time", "confirmed", "ageMs", "robotFresh", "robotAgeMs", "robotUpdatedAt", "robotTimestamp")
                 if k in snap_tv
             }
             if isinstance(robot, dict):
@@ -9902,13 +9919,15 @@ def texte_diag(cid=None):
             f" • {libelle('âge', 'age')} {max(0, age_ms) // 1000}s"
             if age_ms is not None else ""
         )
+        canonical_fresh = bridge.get("canonicalPlanFresh") is True
         state = (
             libelle("BRIDGE CONNECTÉ", "BRIDGE CONNECTED")
-            if len(fresh) == len(requis) and active != "—"
+            if len(fresh) == len(requis) and active != "—" and canonical_fresh
             else libelle("BRIDGE PARTIEL", "BRIDGE PARTIAL")
         )
         lignes.append(
             f"{label} : {state} • {libelle('UT active', 'active timeframe')} {active} • MTF {len(fresh)}/{len(requis)}"
+            + f" • M15 {'OK' if canonical_fresh else 'STALE'}"
             + age_text
         )
 
@@ -10055,7 +10074,8 @@ def texte_audit_telegram(etat, derniers, now=None):
             active = str(bridge.get("activeTimeframe") or "aucune")
             bridge_age = bridge.get("activeTimeframeAgeMs")
             bridge_age_txt = f"{int(bridge_age / 1000)}s" if isinstance(bridge_age, (int, float)) else "inconnue"
-            lines.append(f"  Bridge TradingView : {'disponible' if bridge.get('available') is True else 'indisponible'} • UT active {active} • âge {bridge_age_txt}")
+            plan_m15 = "frais" if bridge.get("canonicalPlanFresh") is True else "absent/périmé"
+            lines.append(f"  Bridge TradingView : {'disponible' if bridge.get('available') is True else 'indisponible'} • plan M15 {plan_m15} • UT active {active} • âge {bridge_age_txt}")
         else:
             lines.append("  Bridge TradingView : aucun snapshot attaché au dernier calcul")
 
@@ -10304,7 +10324,7 @@ def construire_live(etat, derniers, now=None):
                 baissieres = sum(1 for direction in directions if direction == -1)
                 active_tf = str(bridge.get("activeTimeframe") or "").upper()
                 active = snapshots.get(active_tf) or {}
-                robot = active.get("robotV12") or {}
+                robot = (snapshots.get("M15") or {}).get("robotV12") or {}
                 plan = plan_indicateur(r)
                 if plan and plan.get("available"):
                     sens = int(plan["direction"])
