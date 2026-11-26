@@ -317,9 +317,9 @@ def plan_indicateur(r):
     try:
         current_price = float(snap.get("price"))
     except (TypeError, ValueError):
-        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView actif absent"}
+        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView canonique M15 absent"}
     if not math.isfinite(current_price) or current_price <= 0:
-        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView actif invalide"}
+        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView canonique M15 invalide"}
     if str(robot.get("planTimeframe") or "").upper() != "M15":
         return {"timeframe": plan_tf, "available": False, "reason": "référence du plan différente de M15"}
     strategy = str(robot.get("strategy") or "").upper()
@@ -376,7 +376,7 @@ def plan_indicateur(r):
         "verdict": robot.get("verdict"), "long_score": robot.get("long_score"),
         "short_score": robot.get("short_score"),
         "timestamp": snap.get("robotTimestamp") or robot.get("receivedAt") or snap.get("timestamp"),
-        "ageMs": robot.get("ageMs"),
+        "ageMs": snap.get("robotAgeMs") if snap.get("robotAgeMs") is not None else robot.get("ageMs"),
     }
 
 TTL_KRAKEN = {1: 5, 5: 10, 15: 30, 30: 60, 60: 120, 240: 300, 1440: 900, 10080: 1800}
