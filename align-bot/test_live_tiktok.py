@@ -883,7 +883,7 @@ class LiveAgendaMarketTimezoneTests(unittest.TestCase):
         self.assertIn("// @version      12.2.26", bande)
         self.assertIn("const VERSION = '12.2.26';", bande)
         self.assertIn("function signalVoix(action, lang, speaker)", bande)
-        self.assertIn("function choisirVoix(lang, speaker)", bande)
+        self.assertIn("function choisirVoix(lang, speaker = 't')", bande)
         self.assertIn("const speaker = anglais ? 'l' : 't'", bande)
         self.assertIn("signalVoix('COACH_ON', 'fr')", bande)
         self.assertIn("signalVoix('COACH_OFF', 'fr')", bande)
@@ -1292,9 +1292,10 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         """La voix est portée par la bande live ; OFF coupe la parole et aucune voix robot n'est utilisée."""
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
         self.assertIn("function parlerLive(item, forcer = false)", bande)
-        self.assertIn("if (!voixActive || !item", bande)
-        self.assertIn("return dansLangue.find(v => VOIX_NATURELLES.test(v.name) && nom.test(String(v.name || ''))) || null;", bande)
-        self.assertIn("const nom = speaker === 't'", bande)
+        self.assertIn("if (!vivant || !item || !voixActive", bande)
+        self.assertIn("return dansLangue.find(v => VOIX_NATURELLES.test(v.name) && filtreRole.test(v.name)) || null;", bande)
+        self.assertIn("const role = speaker === 'l' ? 'l' : 't';", bande)
+        self.assertIn("const filtreRole = VOIX_PAR_ROLE[role][langue];", bande)
         self.assertIn("window.speechSynthesis.cancel()", bande)
 
     def test_pine_plus_de_point_entree_trace(self):

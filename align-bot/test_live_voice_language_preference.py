@@ -22,8 +22,9 @@ class LiveVoiceLanguagePreference(unittest.TestCase):
     def test_voice_never_says_risk_and_prefers_natural_voice(self):
         source = LIVE_JS.read_text(encoding="utf-8")
         self.assertIn("\\brisques?\\b|\\brisks?\\b", source)
-        self.assertIn("function choisirVoix(lang, speaker)", source)
-        self.assertIn("speaker === 't'", source)
+        self.assertIn("function choisirVoix(lang, speaker = 't')", source)
+        self.assertIn("const role = speaker === 'l' ? 'l' : 't';", source)
+        self.assertIn("const filtreRole = VOIX_PAR_ROLE[role][langue];", source)
         self.assertIn("signalVoix('COACH_ON', 'fr')", source)
         self.assertIn("signalVoix('COACH_OFF', 'fr')", source)
         self.assertIn("signalVoix('START', anglais ? 'en' : 'fr', speaker)", source)
