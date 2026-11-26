@@ -88,6 +88,18 @@ if not tp1Ok
             "if barstate.isconfirmed and (na(ent) or nouvelle15 or dirPlan != dirFig or strat != stratFig or slFranchi)",
             1,
         )
+
+        # The pending/confirmed ribbon is the only additional permitted UI change:
+        # replace that exact block with the v25 baseline before checking the rest byte-for-byte.
+        ui_start = without_tp_change.find("    statutPlan = bridgeConfirmed ?")
+        ui_end = without_tp_change.find("    actif = zoneBas", ui_start)
+        self.assertGreaterEqual(ui_start, 0)
+        self.assertGreater(ui_end, ui_start)
+        baseline_ui = """    ligne = (retDir != 0 and not retConf ? "↩ RETOURNEMENT  " : nVoy >= 3 ? "↩ " + str.tostring(nVoy) + "/5  " : "") + (dirPlan == 1 ? "▲ LONG" : dirPlan == -1 ? "▼ SHORT" : "ATTENDRE") + (dirPlan != 0 ? (strat != "" ? " • " + (strat == "SCALPING" ? "SCALP" : strat) + (etatS == "CONFIRMÉ" and scoreV >= 75 ? " ✅ " : " ⏳ ") + str.tostring(scoreV) : "") + "  TP " + px(tp1) + "  SL " + px(sl) : "   " + titre)
+    plan = (retTxt != "" ? retTxt + "\\n\\n" : "") + (dirPlan != 0 ? "STRATÉGIE : " + (strat == "" ? "aucune" : strat + " — " + etatS) + "\\nScore : " + str.tostring(scoreV) + " / 100\\n• Alignement : " + str.tostring(ptsAlign) + " / 25\\n• Structure : " + str.tostring(ptsStruct) + " / 20\\n• Zone d'entrée : " + str.tostring(ptsZone) + " / 20\\n• Volume : " + str.tostring(ptsVol) + " / 15" + (volOk ? "" : " (indisponible)") + "\\n• Indicateurs : " + str.tostring(ptsInd) + " / 10\\n• Risque / rendement : " + str.tostring(ptsRR) + " / 10\\n⏱ Clôture de validation " + (strat == "SWING" ? "1h" : strat == "DAY" ? "5 min" : strat == "SCALPING" ? "1 min" : "15 min") + " dans " + f_mmss(f_reste((strat == "SWING" ? 60 : strat == "DAY" ? 5 : strat == "SCALPING" ? 1 : 15))) + "\\nDécision : " + decisionS + "\\nMotif : " + motifS + "\\nPlan : " + calePlan + "\\n\\n" : "") + "SENS PROBABLE : " + (sens == 1 ? "HAUSSE " : sens == -1 ? "BAISSE " : "INDÉCIS ") + str.tostring(pctH) + "% hausse / " + str.tostring(100 - pctH) + "% baisse\\n" + str.tostring(bull) + " UT en hausse • " + str.tostring(bear) + " en baisse • " + str.tostring(comp) + " comprimées\\nRSI : " + str.tostring(rsiOB) + " UT en surachat (>70) • " + str.tostring(rsiOS) + " en survente (<30)" + (rsiOB >= 3 ? "\\nSURCHARGE RSI HAUTE : éviter d'acheter, retournement baissier possible" : rsiOS >= 3 ? "\\nSURCHARGE RSI BASSE : éviter de vendre, rebond possible" : "") + (retHaut ? "\\nLes petites UT montent avant les grandes : retournement HAUSSIER en préparation" : retBas ? "\\nLes petites UT baissent avant les grandes : retournement BAISSIER en préparation" : "") + (zoneBas ? "\\nPrix sur une résistance " + tH1 + " : risque de retournement à la baisse" : zoneHaut ? "\\nPrix sur un support " + tB1 + " : rebond possible" : "") + (dirPlan != 0 ? "\\n\\nPLAN " + (dirPlan == 1 ? "ACHAT" : "VENTE") + "\\nEntrée " + px(ent) + " (" + tEnt + ")\\nTP1 " + px(tp1) + " (" + tTP1 + ")\\nTP2 " + px(tp2) + " (" + tTP2 + ")\\nStop " + px(sl) + "\\nGain/risque ≈ " + str.tostring(rr, "#.#") : "")
+    vbg0 = zoneBas or zoneHaut ?  color.rgb(170, 130, 0) : dirPlan == 1 ?  color.rgb(0, 140, 70) : dirPlan == -1 ?  color.rgb(190, 30, 45) :  color.rgb(60, 60, 60)
+"""
+        without_tp_change = without_tp_change[:ui_start] + baseline_ui + without_tp_change[ui_end:]
         for marker, terminator in (
             ("planGeometryMismatch = dirPlan != 0 and (", "\n)"),
             ("bridgePlanGeometryOk = dirPlan == 1 ? (", ": false"),
