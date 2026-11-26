@@ -96,7 +96,7 @@ if not tp1Ok
         self.assertGreaterEqual(ui_start, 0)
         self.assertGreater(ui_end, ui_start)
         titre_start = without_tp_change.find("    titre = ", ui_start)
-        titre_end = without_tp_change.find("\\n", titre_start)
+        titre_end = without_tp_change.find("\n", titre_start)
         self.assertGreaterEqual(titre_start, ui_start)
         self.assertGreater(titre_end, titre_start)
         baseline_titre = without_tp_change[titre_start:titre_end + 1]
