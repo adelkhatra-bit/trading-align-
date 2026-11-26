@@ -288,7 +288,9 @@ def plan_indicateur(r):
     bridge = r.get("tv_indicator_mtf") or {}
     active_tf = str(bridge.get("activeTimeframe") or "").upper()
     plan_tf = "M15"
-    snap = (bridge.get("snapshots") or {}).get(plan_tf) or {}
+    snapshots = bridge.get("snapshots") or {}
+    snap = snapshots.get(plan_tf) or {}
+    active_snap = snapshots.get(active_tf) if active_tf else None
     robot = snap.get("robotV12") or {}
     try:
         entry, sl = float(robot.get("entry")), float(robot.get("sl"))
@@ -314,12 +316,14 @@ def plan_indicateur(r):
         return {"timeframe": plan_tf, "available": False, "reason": "snapshot TradingView canonique M15 périmé"}
     if snap.get("robotFresh") is False:
         return {"timeframe": plan_tf, "available": False, "reason": "plan ROBOT V12 M15 périmé"}
+    if not active_tf or not isinstance(active_snap, dict) or active_snap.get("fresh") is not True:
+        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView actif absent ou périmé"}
     try:
-        current_price = float(snap.get("price"))
+        current_price = float(active_snap.get("price"))
     except (TypeError, ValueError):
-        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView canonique M15 absent"}
+        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView actif absent"}
     if not math.isfinite(current_price) or current_price <= 0:
-        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView canonique M15 invalide"}
+        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView actif invalide"}
     if str(robot.get("planTimeframe") or "").upper() != "M15":
         return {"timeframe": plan_tf, "available": False, "reason": "référence du plan différente de M15"}
     strategy = str(robot.get("strategy") or "").upper()
