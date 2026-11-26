@@ -31,7 +31,7 @@ class PineCanonicalEntryContract(unittest.TestCase):
 
     def test_pine_confirmed_risk_is_not_rechecked_against_local_atr(self):
         start = self.bot.index("def agent(m, r, cle, ferme):")
-        end = self.bot.index("\\n\\ndef ", start + 1)
+        end = self.bot.index("\n\ndef ", start + 1)
         agent = self.bot[start:end]
         self.assertIn("if risk <= 0 or rr < RR_MIN_ENTREE:", agent)
         self.assertNotIn("risk > RISQUE_MAX * atr15", agent)
