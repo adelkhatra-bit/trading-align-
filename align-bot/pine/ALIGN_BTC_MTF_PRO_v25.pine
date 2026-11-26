@@ -22,7 +22,9 @@ pos = posTxt == "En bas à droite" ? position.bottom_right : posTxt == "En bas �
 
 // ═════════ BRIDGE ALIGN (optionnel, sans modification visuelle) ═════════
 grpBridge = "Bridge ALIGN (optionnel)"
-bridgeEnabled = input.bool(true, "Envoyer les snapshots au ROBOT V12", group=grpBridge)
+// Désactivé par défaut : éviter deux émetteurs BTC simultanés avec l’ancien ALIGN MTF v25.
+// Activer seulement après retrait/désactivation du bridge de l’ancien indicateur BTC.
+bridgeEnabled = input.bool(false, "Envoyer les snapshots au ROBOT V12", group=grpBridge)
 // Le marché du bridge est détecté depuis le ticker réel du graphique, jamais choisi manuellement.
 
 // ═════════ ÉTAT DE CHAQUE UNITÉ DE TEMPS ═════════
