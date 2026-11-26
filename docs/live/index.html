@@ -121,7 +121,7 @@ function rendre() {
       '<div class="barre">' + barre + "</div>";
     cartes.appendChild(c);
   });
-  if (prep.length) { ann.style.display = "block"; ann.textContent = "🔔 Position en préparation sur " + prep.join(" + ") + " → les niveaux sont sur le Telegram gratuit " + BOT; }
+  if (prep.length) { ann.style.display = "block"; ann.textContent = "🔔 Position en préparation sur " + prep.join(" + ") + " → les niveaux seront publiés sur le Telegram gratuit " + BOT + " après confirmation MTF."; }
 }
 
 /* ─────────── Les deux animateurs : phrases composées à partir des données, jamais deux fois la même de suite ─────────── */
@@ -166,7 +166,7 @@ var DIALOGUES = {
   liens: [
     ["Rappel : ce live explique la lecture du marché, rien de plus.", "Pas un conseil financier, chacun décide pour soi."],
     ["Le risque de perte existe toujours en trading.", "Un plan, un stop, et pas plus que ce qu'on peut perdre."],
-    ["Les niveaux détaillés se trouvent sur le Telegram gratuit " + BOT + ".", "Et le plan prime toujours sur l'impatience."]
+    ["Les niveaux détaillés seront publiés sur le Telegram gratuit " + BOT + " après confirmation du signal.", "Et le plan prime toujours sur l'impatience."]
   ]
 };
 function parler(qui, texte) {
