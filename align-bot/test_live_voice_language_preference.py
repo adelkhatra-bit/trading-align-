@@ -15,7 +15,8 @@ class LiveVoiceLanguagePreference(unittest.TestCase):
         self.assertIn("localStorage.setItem('alignVoixLangue'", source)
         # v12.2.7 (règle d'Adel) : plus de choix de langue, la voix dit le français PUIS l'anglais.
         self.assertIn("const suiteAnglaise = anglais && maintenant - voixDerniereFR < 60000;", source)
-        self.assertIn("if (!anglais && item.source !== 'coach') window.speechSynthesis.cancel();", source)
+        self.assertIn("if (!anglais && item.source !== 'coach') {", source)
+        self.assertIn("window.speechSynthesis.cancel();", source)
         self.assertIn("utterance.lang = anglais ? 'en-US' : 'fr-FR';", source)
         self.assertIn("🇫🇷 → 🇬🇧 Voix", source)
 
