@@ -12757,10 +12757,12 @@ def agent(m, r, cle, ferme):
                 cle["pine_wait_bar"] = plan_tv["entry_bar_time"]
                 out.append((
                     f"🟡 PLAN PINE M15 — {ICONE.get(m, '')} {m}\n{SENS[d]}\n"
-                    f"🎯 Entrée : {px(entry)} • SL : {px(stop)} • TP1 : {px(tp1)}"
-                    + (f" • TP2 : {px(tp2)}" if tp2 is not None else "")
-                    + f"\n🟨 Zone verte : {px(plan_tv['zone_low'])} → {px(plan_tv['zone_high'])}"
-                    + f"\n⚪ Décision : {px(plan_tv['decision'])}"
+                    f"📍 Entrée : {px(entry)}\n"
+                    f"🛑 SL : {px(stop)}\n"
+                    f"💰 TP1 : {px(tp1)}"
+                    + (f"\n🏁 TP2 : {px(tp2)}" if tp2 is not None else "")
+                    + f"\n🟩 Zone d'entrée : {px(plan_tv['zone_low'])} → {px(plan_tv['zone_high'])}"
+                    + f"\n⚪ Ligne de décision : {px(plan_tv['decision'])}"
                     + f"\n⏳ Attendre le retest puis la clôture {plan_tv['entry_timeframe']} validée par Pine.\n"
                     "Aucune entrée n'est autorisée par une simple mèche."
                     + ferme, bouton_auto(m)
