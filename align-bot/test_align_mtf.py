@@ -238,6 +238,21 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertEqual(r["tv_robot_v12_timeframe"], "M15")
         self.assertTrue(r["tv_robot_v12_fresh"])
 
+    def test_tradingview_context_uses_m15_robot_plan_not_last_chart_snapshot(self):
+        m15_robot = {"signal": "LONG", "strategy": "DAY", "entry": 101.0}
+        h4_robot = {"signal": "SHORT", "strategy": "SWING", "entry": 110.0}
+        r = {"dirs": [0] * 11, "rsis": [50.0] * 11, "confirme": 0, "dirPlan": 0,
+             "tv_indicator_mtf": {"activeTimeframe": "H4", "snapshots": {
+                 "M15": {"fresh": True, "robotFresh": True, "robotV12": m15_robot},
+                 "H4": {"fresh": True, "robotFresh": True, "robotV12": h4_robot},
+             }}}
+        align_bot.fusionne_lectures_tradingview(r)
+        self.assertIs(r["tv_robot_v12"], m15_robot)
+        self.assertEqual(r["tv_robot_v12_timeframe"], "M15")
+        self.assertTrue(r["tv_robot_v12_fresh"])
+        self.assertEqual(r["dirs"], [0] * 11)
+        self.assertEqual(r["dirPlan"], 0)
+
     def test_tradingview_links_select_market_and_requested_timeframe(self):
         btc = align_bot.url_tradingview("BTC", 5)
         gold = align_bot.url_tradingview("GOLD", 240)
