@@ -53,7 +53,7 @@ class TestAutoTrade(unittest.TestCase):
         with unittest.mock.patch.object(at, "TOKEN", "x"), unittest.mock.patch.object(at, "COMPTES", ["c1"]), \
              unittest.mock.patch.object(at, "_api", side_effect=lambda m, c, b=None: next(v for k, v in rep.items() if c.endswith(k))), \
              unittest.mock.patch.object(at.time, "sleep"), unittest.mock.patch.object(at, "assurer_deploye", return_value=True):
-            r = at.executer({"auto_marches": {"BTC": True}}, {"marche": "BTC", "sens": "SHORT", "e": 1, "sl": 2, "tp": 0},
+            r = at.executer({"auto_marches": {"BTC": True}}, {"marche": "BTC", "sens": "SHORT", "e": 2, "sl": 3, "tp": 1},
                             journal=lambda *_: None)
         self.assertEqual(r[0]["raison"], "position opposée interdite")
 
