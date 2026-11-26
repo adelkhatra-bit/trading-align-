@@ -22,7 +22,11 @@ class LiveVoiceLanguagePreference(unittest.TestCase):
     def test_voice_never_says_risk_and_prefers_natural_voice(self):
         source = LIVE_JS.read_text(encoding="utf-8")
         self.assertIn("\\brisques?\\b|\\brisks?\\b", source)
-        self.assertIn("function choisirVoix(lang)", source)
+        self.assertIn("function choisirVoix(lang, speaker)", source)
+        self.assertIn("speaker === 't'", source)
+        self.assertIn("signalVoix('COACH_ON', 'fr')", source)
+        self.assertIn("signalVoix('COACH_OFF', 'fr')", source)
+        self.assertIn("signalVoix('START', anglais ? 'en' : 'fr', speaker)", source)
         self.assertIn("if (!v) {", source)
         self.assertIn("if (!anglais && voixActive) voixEnAttente = item;", source)
         self.assertIn("return 0;   // aucune voix naturelle disponible : silence plutôt qu'une voix robot", source)   # v12.2.8 : sans voix naturelle, silence (plus de voix robot)
