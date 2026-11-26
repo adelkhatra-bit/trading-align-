@@ -36,3 +36,39 @@ ok(s === 400 && b.error === "symbol_tickerid_mismatch", "marché mélangé refus
 ok(s === 200 && b.payload.price === 64000, "boîte BTC non polluée");
 [s, b] = await call("POST", "/ingest/" + env.ALIGN_TV_INGEST_TOKEN, '{"source":"ALIGN_MTF_PRO_V25","symbol":"NAS100","price":27000}');
 ok(s === 400 && b.error === "unsupported_symbol", "symbole NASDAQ refusé explicitement");
+
+const showNow = Date.now();
+const showPayload = {
+  type: "ALIGN_SHOW", action: "PAIR", id: "show-" + showNow,
+  ts: showNow, startAt: showNow + 5000, market: "BTC",
+  speaker1: "t", text1: "Le contexte BTC reste à confirmer.",
+  speaker2: "l", text2: "On attend la validation avant toute entrée.",
+  duration1: 4500, duration2: 4500,
+};
+const showUrl = "/show/publish?message=" + encodeURIComponent(JSON.stringify(showPayload));
+[s, b] = await call("GET", showUrl, undefined, { origin: "https://adelkhatra-bit.github.io" });
+ok(s === 200 && b.ok, "publication du duo autorisée depuis GitHub Pages");
+[s, b] = await call("GET", "/show/state", undefined, { origin: "https://adelkhatra-bit.github.io" });
+ok(s === 200 && b.show.id === showPayload.id && b.show.speaker1 === "t" && b.show.speaker2 === "l", "lecture du duo depuis le relais isolé");
+[s, b] = await call("GET", showUrl);
+ok(s === 403 && b.error === "origin_forbidden", "publication du duo refusée hors origine autorisée");
+const tooSoon = { ...showPayload, id: "show-too-soon", ts: showNow + 1000, startAt: Date.now() + 5000 };
+[s, b] = await call("GET", "/show/publish?message=" + encodeURIComponent(JSON.stringify(tooSoon)), undefined, { origin: "https://adelkhatra-bit.github.io" });
+ok(s === 429 && b.error === "show_rate_limited", "publication du duo limitée en fréquence");
+
+const voicePayload = {
+  type: "ALIGN_VOICE", action: "START", speaker: "l", lang: "fr",
+  ts: Date.now(), text: "Leïla prend la parole sur le contexte du marché.", durationMs: 5000,
+};
+[s, b] = await call("GET", "/show/voice?message=" + encodeURIComponent(JSON.stringify(voicePayload)));
+ok(s === 200 && b.ok, "événement vocal Leïla accepté");
+[s, b] = await call("GET", "/show/coach?enabled=1");
+ok(s === 200 && b.voiceEnabled, "activation coach vocal propagée à la scène");
+[s, b] = await call("GET", "/show/state", undefined, { origin: "https://adelkhatra-bit.github.io" });
+ok(s === 200 && b.voiceEnabled && b.voice.speaker === "l", "état vocal et locuteur lisibles par la scène");
+[s, b] = await call("GET", "/show/coach?enabled=0");
+ok(s === 200 && !b.voiceEnabled, "désactivation coach vocal propagée à la scène");
+[s, b] = await call("GET", "/show/state", undefined, { origin: "https://adelkhatra-bit.github.io" });
+ok(s === 200 && !b.voiceEnabled && b.voice === null, "désactivation arrête aussi l'avatar");
+[s, b] = await call("GET", "/mailbox?symbol=BTCUSD", undefined, { authorization: "Bearer " + env.ALIGN_TV_MAILBOX_TOKEN });
+ok(s === 200 && b.payload.price === 64000, "relais du spectacle isolé de la boîte BTC");
