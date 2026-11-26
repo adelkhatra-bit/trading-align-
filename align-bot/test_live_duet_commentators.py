@@ -23,6 +23,12 @@ class LiveDuetCommentators(unittest.TestCase):
         self.assertIn("parler(premier, texte1)", self.page)
         self.assertIn("parler(second, texte2)", self.page)
 
+    def test_duet_is_french_then_english_with_fixed_male_female_hosts(self):
+        self.assertIn('var premier = "t", second = "l";', self.page)
+        self.assertIn('"A position is now active on {m}."', self.page)
+        self.assertIn("speaker: show.speaker2, en: true", self.js)
+        self.assertIn("utterance.lang = anglais ? 'en-US' : 'fr-FR';", self.js)
+
     def test_tradingview_uses_explicit_male_and_female_voice_maps(self):
         self.assertIn("const VOIX_PAR_ROLE", self.js)
         self.assertIn("t: { fr:", self.js)
