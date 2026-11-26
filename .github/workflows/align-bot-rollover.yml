@@ -1,9 +1,17 @@
 name: ALIGN worker rollover
 
 on:
-  # Rollover manuel uniquement : une validation de code ne doit pas
-  # lancer une attente du worker de production.
+  # Rollover uniquement sur demande explicite, jamais à la fin d'une validation.
   workflow_dispatch:
+    inputs:
+      validated_sha:
+        description: "SHA validé à utiliser pour contrôler les anciens workers"
+        required: true
+        type: string
+      validation_run_id:
+        description: "ID du run de validation associé"
+        required: true
+        type: string
 
 permissions:
   actions: write
@@ -12,8 +20,9 @@ permissions:
 jobs:
   retire_previous_worker:
     if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push'
+      github.repository == 'adelkhatra-bit/trading-align-' &&
+      inputs.validated_sha != '' &&
+      inputs.validation_run_id != ''
     runs-on: ubuntu-latest
     timeout-minutes: 18
     steps:
@@ -21,8 +30,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPOSITORY: ${{ github.repository }}
-          CURRENT_SHA: ${{ github.event.workflow_run.head_sha }}
-          VALIDATION_RUN_ID: ${{ github.event.workflow_run.id }}
+          CURRENT_SHA: ${{ inputs.validated_sha }}
+          VALIDATION_RUN_ID: ${{ inputs.validation_run_id }}
         run: |
           python3 - <<'PY'
           import json
