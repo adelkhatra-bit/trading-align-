@@ -13705,11 +13705,14 @@ def contexte_technique_live(derniers):
     """Contexte factuel du commentateur IA, construit exclusivement depuis les analyses et bougies déjà chargées."""
     marches = {}
     def direction_derniere_bougie(bars):
-        """Direction du corps de la dernière bougie clôturée fournie par l'adaptateur."""
+        """Direction de la dernière bougie clôturée ; ignore les barres explicitement en formation."""
         if not isinstance(bars, (list, tuple)) or not bars:
             return "indisponible"
+        cloturees = [b for b in bars if isinstance(b, dict) and b.get("forming") is not True]
+        if not cloturees:
+            return "indisponible"
         try:
-            ouverture, cloture = float(bars[-1]["o"]), float(bars[-1]["c"])
+            ouverture, cloture = float(cloturees[-1]["o"]), float(cloturees[-1]["c"])
         except (KeyError, TypeError, ValueError):
             return "indisponible"
         return "haussière" if cloture > ouverture else "baissière" if cloture < ouverture else "neutre"
