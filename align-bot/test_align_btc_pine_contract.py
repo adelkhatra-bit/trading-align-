@@ -12,6 +12,7 @@ class AlignBtcPineContract(unittest.TestCase):
         self.assertIn('isBtc = str.contains(tickerUpper, "BTC") or str.contains(tickerUpper, "XBT")', source)
         self.assertIn("isGold = false", source)
         self.assertIn("isSupportedMarket = isBtc", source)
+        self.assertIn('bridgeEnabled = input.bool(false, "Envoyer les snapshots au ROBOT V12", group=grpBridge)', source)
         self.assertIn('bridgeMarket = isBtc ? "BTCUSD" : "UNSUPPORTED"', source)
         self.assertIn('"source":"ALIGN_MTF_PRO_V25"', source)
         self.assertNotIn('bridgeMarket = isBtc ? "BTCUSD" : isGold ? "XAUUSD"', source)
