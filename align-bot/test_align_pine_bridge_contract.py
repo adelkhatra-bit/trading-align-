@@ -251,6 +251,22 @@ if not tp1Ok
         self.assertIn("array.get(bridgeEntryTimeArray, bridgeEntryLast)", export_block)
         self.assertIn('bridgeEntryTimeSafe = bridgeEntryTf == "" ? na : bridgeEntryTime', export_block)
 
+    def test_bridge_reuses_mtf_time_requests_and_stays_below_tv_request_budget(self):
+        # The f_etat() MTF calls already return each timeframe's bar time.
+        # Duplicating bridgeTime requests later in the script pushes the live
+        # TradingView instance over its 40 unique request.*() budget.
+        for field in (
+            "bridgeTimeM1", "bridgeTimeM3", "bridgeTimeM5", "bridgeTimeM10",
+            "bridgeTimeM15", "bridgeTimeM30", "bridgeTimeM45", "bridgeTimeH1",
+            "bridgeTimeH2", "bridgeTimeH4", "bridgeTimeD1", "bridgeTimeW1",
+        ):
+            self.assertIn(field, self.source)
+            self.assertNotIn(field + " = request.security", self.source)
+        request_sites = self.source.count("request.security(") + self.source.count("request.security_lower_tf(")
+        self.assertLessEqual(request_sites, 40)
+        self.assertIn("[d1, s1, r1, bridgeTimeM1]", self.source)
+        self.assertIn("[dW, sW, rW, bridgeTimeW1]", self.source)
+
     def test_no_secret_is_embedded_in_pine(self):
         self.assertNotIn("ALIGN_TV_INGEST_TOKEN", self.source)
         self.assertNotIn("ingest_token", self.source)
