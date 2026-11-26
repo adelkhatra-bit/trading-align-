@@ -40,9 +40,9 @@ class GardeFousWorkflows(unittest.TestCase):
             "align-bot-validation.yml": [r"(?m)^  pull_request:", r"(?m)^  push:"],
         }
         # Le worker de production ne doit plus être lancé par la fin d'une validation.
-        bot_header = (WF / "align-bot.yml").read_text(encoding="utf-8").split("\\njobs:", 1)[0]
+        bot_header = (WF / "align-bot.yml").read_text(encoding="utf-8").split("\njobs:", 1)[0]
         self.assertNotRegex(bot_header, r"(?m)^  workflow_run:")
-        rollover_header = (WF / "align-bot-rollover.yml").read_text(encoding="utf-8").split("\\njobs:", 1)[0]
+        rollover_header = (WF / "align-bot-rollover.yml").read_text(encoding="utf-8").split("\njobs:", 1)[0]
         self.assertRegex(rollover_header, r"(?m)^  workflow_dispatch:")
         self.assertNotRegex(rollover_header, r"(?m)^  workflow_run:")
         for fichier, motifs in attendus.items():
