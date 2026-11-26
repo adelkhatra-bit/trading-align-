@@ -37,6 +37,14 @@ ok(s === 200 && b.payload.price === 64000, "boîte BTC non polluée");
 [s, b] = await call("POST", "/ingest/" + env.ALIGN_TV_INGEST_TOKEN, '{"source":"ALIGN_MTF_PRO_V25","symbol":"NAS100","price":27000}');
 ok(s === 400 && b.error === "unsupported_symbol", "symbole NASDAQ refusé explicitement");
 
+[s, b] = await call("OPTIONS", "/show/state", undefined, { origin: "https://adelkhatra-bit.github.io" });
+ok(s === 200 && b.ok, "prévol CORS de la scène autorisé");
+const invalidShow = { type: "ALIGN_SHOW", action: "PAIR", ts: Date.now(), startAt: Date.now() + 5000,
+  market: "BTC", speaker1: "x", speaker2: "l", text1: "Texte de test assez long.", text2: "Autre texte assez long.",
+  duration1: 4000, duration2: 4000 };
+[s, b] = await call("GET", "/show/publish?message=" + encodeURIComponent(JSON.stringify(invalidShow)), undefined,
+  { origin: "https://adelkhatra-bit.github.io" });
+ok(s === 400 && b.error === "invalid_show_payload", "locuteur invalide refusé");
 const showNow = Date.now();
 const showPayload = {
   type: "ALIGN_SHOW", action: "PAIR", id: "show-" + showNow,
