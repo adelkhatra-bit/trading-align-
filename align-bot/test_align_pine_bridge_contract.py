@@ -91,7 +91,7 @@ if not tp1Ok
 
         # The pending/confirmed ribbon is the only additional permitted UI change:
         # replace that exact block with the v25 baseline before checking the rest byte-for-byte.
-        ui_start = without_tp_change.find("    statutPlan = bridgeConfirmed ?")
+        ui_start = without_tp_change.find("// État de confirmation calculé pour l'affichage ; les champs d'export restent dans le bloc bridge canonique.")
         ui_end = without_tp_change.find("    actif = zoneBas", ui_start)
         self.assertGreaterEqual(ui_start, 0)
         self.assertGreater(ui_end, ui_start)
