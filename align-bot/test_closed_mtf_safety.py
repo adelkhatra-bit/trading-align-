@@ -137,18 +137,24 @@ class ClosedMtfSafety(unittest.TestCase):
             "available": True,
             "activeTimeframe": "M5",
             "snapshots": {
-                "M5": {
+                "M15": {
                     "fresh": True,
+                    "robotFresh": True,
                     "robotV12": {
                         "lecture_5m": "LONG",
                         "lecture_15m": "LONG",
                         "lecture_60m": "LONG",
                     },
-                }
+                },
+                "M5": {"fresh": True, "robotV12": {
+                    "lecture_5m": "SHORT", "lecture_15m": "SHORT", "lecture_60m": "SHORT"
+                }},
             },
         }
+        # Even if the last chart to report is M5 and it disagrees, the decision
+        # reads the canonical M15 plan snapshot only.
         self.assertEqual(ab.direction_confirmee_marche("GOLD", [1] * 11, 1, ctx), 1)
-        ctx["tv_indicator_mtf"]["snapshots"]["M5"]["robotV12"]["lecture_60m"] = "SHORT"
+        ctx["tv_indicator_mtf"]["snapshots"]["M15"]["robotV12"]["lecture_60m"] = "SHORT"
         self.assertEqual(ab.direction_confirmee_marche("GOLD", [1] * 11, 1, ctx), 0)
 
     def test_gold_nasdaq_plan_direction_requires_all_four_fresh_closed_timeframes(self):
@@ -177,7 +183,7 @@ class ClosedMtfSafety(unittest.TestCase):
         }
         bridge = {
             "available": True, "activeTimeframe": "M5",
-            "snapshots": {"M5": {"fresh": True, "robotV12": {
+            "snapshots": {"M15": {"fresh": True, "robotFresh": True, "robotV12": {
                 "lecture_5m": "SHORT", "lecture_15m": "LONG", "lecture_60m": "LONG"
             }}}
         }
@@ -260,12 +266,12 @@ class ClosedMtfSafety(unittest.TestCase):
         ctx["tv_indicator_mtf"] = {
             "available": True,
             "activeTimeframe": "M5",
-            "snapshots": {"M5": {"fresh": True, "robotV12": {
+            "snapshots": {"M15": {"fresh": True, "robotFresh": True, "robotV12": {
                 "lecture_5m": "LONG", "lecture_15m": "LONG", "lecture_60m": "LONG"
             }}},
         }
         self.assertEqual(ab.direction_confirmee_marche("BTC", [1] * 11, 1, ctx), 1)
-        ctx["tv_indicator_mtf"]["snapshots"]["M5"]["robotV12"]["lecture_60m"] = "SHORT"
+        ctx["tv_indicator_mtf"]["snapshots"]["M15"]["robotV12"]["lecture_60m"] = "SHORT"
         self.assertEqual(ab.direction_confirmee_marche("BTC", [1] * 11, 1, ctx), 0)
         ctx["tv_indicator_mtf"] = {"available": False}
         self.assertEqual(ab.direction_confirmee_marche("BTC", [1] * 11, 1, ctx), 0)

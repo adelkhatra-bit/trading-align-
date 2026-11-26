@@ -30,6 +30,8 @@ class GoldClosedSessionDiagnostics(unittest.TestCase):
             "available": True,
             "activeTimeframe": "H4",
             "activeTimeframeAgeMs": 35000,
+            "canonicalPlanTimeframe": "M15",
+            "canonicalPlanFresh": True,
             "snapshots": snapshots,
         }
         with tempfile.TemporaryDirectory() as runner_temp,              patch.dict(os.environ, {"RUNNER_TEMP": runner_temp}),              patch.object(ab.time, "time", return_value=self.NOW),              patch.object(ab, "cme_ouvert", return_value=False),              patch.object(ab, "prochaine_ouverture_cme", return_value=self.NOW + 3600),              patch.object(ab, "fetch_tv_mtf", return_value=btc) as fetch:

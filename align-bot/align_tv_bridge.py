@@ -443,46 +443,72 @@ class BridgeStore:
             "entryTriggered": entry_triggered,
         })
         source_iso = _iso_utc(source_timestamp)
-        snapshots = {}
-        for tf in REQUIRED_TIMEFRAMES:
-            item = normalized_mtf[tf]
-            snapshots[tf] = {
-                "fresh": True,
-                "updatedAt": source_timestamp,
-                "timestamp": source_iso,
-                "barTime": item["barTime"],
-                "direction": item["direction"],
-                "rsi": item["rsi"],
-            }
-        active_item = normalized_mtf[timeframe]
-        active_snapshot = snapshots.get(timeframe, {})
-        active_snapshot.update({
-            "fresh": True,
-            "updatedAt": source_timestamp,
-            "timestamp": source_iso,
-            "barTime": active_item["barTime"],
-            "direction": active_item["direction"],
-            "rsi": active_item["rsi"],
-            "price": price,
-            "confirmed": robot["confirmed"],
-            "robotV12": robot,
-        })
-        snapshots[timeframe] = active_snapshot
-
-        state = {
-            "symbol": symbol,
-            "activeTimeframe": timeframe,
-            "receivedAtMs": now_ms,
-            "sourceTimestamp": source_timestamp,
-            "snapshots": snapshots,
-        }
+        # Keep one independent ROBOT V12 plan per chart timeframe. A payload from
+        # M1 must not erase the last M15 plan (or vice versa): the bot consumes
+        # the canonical M15 plan while all timeframe readings remain observable.
         with self._lock:
+            previous_state = self._symbols.get(symbol) or {}
+            previous_snapshots = previous_state.get("snapshots") or {}
+            snapshots = {}
+            for tf in REQUIRED_TIMEFRAMES:
+                item = normalized_mtf[tf]
+                previous = dict(previous_snapshots.get(tf) or {})
+                previous_update = int(previous.get("updatedAt") or 0)
+                # Order by alert source timestamp, not candle time: a recent alert
+                # carrying an old H1/D1/W1 candle must be accepted as stale and block
+                # signals; only an actually delayed alert may be ignored.
+                incoming_is_newer = not previous or source_timestamp >= previous_update
+                if incoming_is_newer:
+                    snapshot = {
+                        "fresh": True,
+                        "updatedAt": source_timestamp,
+                        "timestamp": source_iso,
+                        "barTime": item["barTime"],
+                        "direction": item["direction"],
+                        "rsi": item["rsi"],
+                    }
+                else:
+                    # An out-of-order alert may never roll a timeframe backwards.
+                    snapshot = previous
+                # Preserve the last plan/price emitted by this timeframe until
+                # that same timeframe supplies a newer plan.
+                for key in ("price", "confirmed", "robotV12", "robotUpdatedAt", "robotTimestamp"):
+                    if key in previous:
+                        snapshot[key] = previous[key]
+                snapshots[tf] = snapshot
+
+            active_snapshot = snapshots[timeframe]
+            previous_robot_update = int(active_snapshot.get("robotUpdatedAt") or 0)
+            if source_timestamp >= previous_robot_update:
+                active_snapshot.update({
+                    "price": price,
+                    "confirmed": robot["confirmed"],
+                    "robotV12": robot,
+                    "robotUpdatedAt": source_timestamp,
+                    "robotTimestamp": source_iso,
+                })
+
+            previous_source_timestamp = int(previous_state.get("sourceTimestamp") or 0)
+            if source_timestamp >= previous_source_timestamp:
+                active_timeframe = timeframe
+                active_source_timestamp = source_timestamp
+            else:
+                active_timeframe = previous_state.get("activeTimeframe") or timeframe
+                active_source_timestamp = previous_source_timestamp
+            state = {
+                "symbol": symbol,
+                "activeTimeframe": active_timeframe,
+                "receivedAtMs": max(now_ms, int(previous_state.get("receivedAtMs") or 0)),
+                "sourceTimestamp": active_source_timestamp,
+                "snapshots": snapshots,
+            }
             self._symbols[symbol] = state
         result = {
             "ok": True,
             "accepted": True,
             "symbol": symbol,
-            "activeTimeframe": timeframe,
+            "activeTimeframe": active_timeframe,
+            "receivedTimeframe": timeframe,
             "receivedTimeframes": list(snapshots.keys()),
         }
         if entry_trigger_rejection is not None:
@@ -522,10 +548,18 @@ class BridgeStore:
             max_age = TIMEFRAME_MS.get(tf, 60_000) + MTF_BAR_GRACE_MS
             snap["fresh"] = -MAX_FUTURE_SKEW_MS <= age <= max_age
             snap["ageMs"] = max(0, age)
+            robot_updated_at = int(snap.get("robotUpdatedAt") or 0)
+            robot_age = now_ms - robot_updated_at if robot_updated_at else None
+            snap["robotFresh"] = robot_age is not None and 0 <= robot_age <= ACTIVE_MAX_AGE_MS
+            snap["robotAgeMs"] = max(0, robot_age) if robot_age is not None else None
         required_fresh = all(snapshots.get(tf, {}).get("fresh") is True for tf in REQUIRED_TIMEFRAMES)
         active_snapshot_fresh = snapshots.get(active_tf, {}).get("fresh") is True
+        canonical_snapshot = snapshots.get("M15") or {}
+        canonical_plan_fresh = canonical_snapshot.get("fresh") is True and canonical_snapshot.get("robotFresh") is True
         return 200, {
             "ok": active_fresh and active_snapshot_fresh and required_fresh,
+            "canonicalPlanTimeframe": "M15",
+            "canonicalPlanFresh": canonical_plan_fresh,
             "lastRejection": last_rejection,
             "symbol": symbol,
             "activeTimeframe": active_tf,

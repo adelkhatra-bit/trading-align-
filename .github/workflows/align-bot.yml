@@ -325,7 +325,7 @@ jobs:
                       + "; last_rejection=" + rejection_text
                   )
               active = str(payload.get("activeTimeframe") or "").upper()
-              if payload.get("activeTimeframeFresh") is not True or active not in {"M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"}:
+              if payload.get("activeTimeframeFresh") is not True or active not in {"M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1"}:
                   raise RuntimeError("ÉCHEC: aucune unité TradingView active et fraîche pour " + symbol)
               snap = snapshots.get(active) or {}
               # Le prix affiché sur TradingView doit être présent, positif et reçu depuis moins de 90 secondes
@@ -343,12 +343,28 @@ jobs:
                   raise RuntimeError("ÉCHEC: prix TradingView ou horodatage absent pour " + symbol)
               if not math.isfinite(price) or price <= 0 or not math.isfinite(price_age_ms) or price_age_ms < 0 or price_age_ms > 90000:
                   raise RuntimeError("ÉCHEC: prix TradingView invalide ou périmé pour " + symbol)
-              robot = snap.get("robotV12") or {}
-              if snap.get("fresh") is not True or not isinstance(robot, dict) or not robot:
-                  raise RuntimeError("ÉCHEC: snapshot actif frais ou données ROBOT V12 absents pour " + symbol)
+              canonical = snapshots.get("M15") or {}
+              if (payload.get("canonicalPlanTimeframe") != "M15"
+                      or payload.get("canonicalPlanFresh") is not True
+                      or canonical.get("fresh") is not True
+                      or canonical.get("robotFresh") is not True):
+                  raise RuntimeError("ÉCHEC: plan ROBOT V12 canonique M15 absent ou périmé pour " + symbol)
+              try:
+                  plan_price = float(canonical.get("price"))
+                  plan_updated_ms = float(canonical.get("robotUpdatedAt"))
+                  if plan_updated_ms < 100000000000:
+                      plan_updated_ms *= 1000
+                  plan_age_ms = time.time() * 1000 - plan_updated_ms
+              except (TypeError, ValueError):
+                  raise RuntimeError("ÉCHEC: prix ou horodatage du plan M15 absent pour " + symbol)
+              if not math.isfinite(plan_price) or plan_price <= 0 or not math.isfinite(plan_age_ms) or not 0 <= plan_age_ms <= 90000:
+                  raise RuntimeError("ÉCHEC: prix du plan M15 périmé ou invalide pour " + symbol)
+              robot = canonical.get("robotV12") or {}
+              if not isinstance(robot, dict) or not robot:
+                  raise RuntimeError("ÉCHEC: données ROBOT V12 du plan M15 absentes pour " + symbol)
               directions = [robot.get(k) for k in ("lecture_1m", "lecture_5m", "lecture_15m", "lecture_60m")]
               if not any(v not in (None, "") for v in directions):
-                  raise RuntimeError("ÉCHEC: aucune lecture MTF ROBOT V12 exploitable pour " + symbol)
+                  raise RuntimeError("ÉCHEC: aucune lecture MTF ROBOT V12 exploitable dans le plan M15 pour " + symbol)
               # Les UT supérieures doivent être présentes et fraîches, sans assimiler une UT à une autre.
               if stale:
                   raise RuntimeError("ÉCHEC: snapshots TradingView absents/périmés pour " + symbol + " : " + ",".join(ages))
@@ -566,7 +582,7 @@ jobs:
 
               active = str(payload.get("activeTimeframe") or "").upper()
               if payload.get("activeTimeframeFresh") is not True or active not in {
-                  "M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"
+                  "M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1"
               }:
                   raise SystemExit("ÉCHEC FINAL: UT active invalide pour " + symbol)
 
@@ -582,13 +598,29 @@ jobs:
               if not math.isfinite(price) or price <= 0 or not math.isfinite(price_age_ms) or not 0 <= price_age_ms <= 90000:
                   raise SystemExit("ÉCHEC FINAL: prix TradingView périmé ou invalide pour " + symbol)
 
-              robot = snap.get("robotV12")
-              if snap.get("fresh") is not True or not isinstance(robot, dict) or not robot:
-                  raise SystemExit("ÉCHEC FINAL: lecture ROBOT V12 absente pour " + symbol)
+              canonical = get_tf("M15")
+              if (payload.get("canonicalPlanTimeframe") != "M15"
+                      or payload.get("canonicalPlanFresh") is not True
+                      or canonical.get("fresh") is not True
+                      or canonical.get("robotFresh") is not True):
+                  raise SystemExit("ÉCHEC FINAL: plan ROBOT V12 canonique M15 absent ou périmé pour " + symbol)
+              try:
+                  plan_price = float(canonical.get("price"))
+                  plan_updated_ms = float(canonical.get("robotUpdatedAt"))
+                  if plan_updated_ms < 100000000000:
+                      plan_updated_ms *= 1000
+                  plan_age_ms = time.time() * 1000 - plan_updated_ms
+              except (TypeError, ValueError):
+                  raise SystemExit("ÉCHEC FINAL: prix ou horodatage du plan M15 absent pour " + symbol)
+              if not math.isfinite(plan_price) or plan_price <= 0 or not math.isfinite(plan_age_ms) or not 0 <= plan_age_ms <= 90000:
+                  raise SystemExit("ÉCHEC FINAL: prix du plan M15 périmé ou invalide pour " + symbol)
+              robot = canonical.get("robotV12")
+              if not isinstance(robot, dict) or not robot:
+                  raise SystemExit("ÉCHEC FINAL: lecture ROBOT V12 M15 absente pour " + symbol)
               if not any(robot.get(key) not in (None, "") for key in (
                   "lecture_1m", "lecture_5m", "lecture_15m", "lecture_60m"
               )):
-                  raise SystemExit("ÉCHEC FINAL: aucune lecture ROBOT V12 exploitable pour " + symbol)
+                  raise SystemExit("ÉCHEC FINAL: aucune lecture ROBOT V12 exploitable dans le plan M15 pour " + symbol)
 
               print(
                   f"BRIDGE_FINAL_CONFIRMED symbol={symbol} active={active} "

@@ -34,6 +34,8 @@ class AlignTelegramDiagTests(unittest.TestCase):
             "reason": None,
             "activeTimeframe": active,
             "activeTimeframeAgeMs": age_ms,
+            "canonicalPlanTimeframe": "M15",
+            "canonicalPlanFresh": True,
             "snapshots": {tf: {"fresh": fresh, "ageMs": age_ms} for tf in required},
         }
 

@@ -140,6 +140,72 @@ class BridgeStoreTests(unittest.TestCase):
         for tf in REQUIRED_TIMEFRAMES:
             self.assertTrue(data["snapshots"][tf]["fresh"], tf)
 
+    def test_bridge_marks_canonical_plan_unready_until_m15_chart_reports(self):
+        status, _ = self.store.ingest(valid_payload(timeframe="M1"), INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+        _, before = self.store.read("BTCUSD", BASE_MS + 1_000)
+        self.assertTrue(before["ok"])  # MTF transport is alive
+        self.assertFalse(before["canonicalPlanFresh"])  # but no authoritative M15 plan yet
+
+        status, _ = self.store.ingest(valid_payload(timeframe="M15"), INGEST, BASE_MS + 2_000)
+        self.assertEqual(status, 200)
+        _, after = self.store.read("BTCUSD", BASE_MS + 3_000)
+        self.assertTrue(after["canonicalPlanFresh"])
+        self.assertTrue(after["snapshots"]["M15"]["robotFresh"])
+
+    def test_frequent_m1_alerts_cannot_keep_an_old_m15_plan_fresh(self):
+        status, _ = self.store.ingest(valid_payload(now_ms=BASE_MS, timeframe="M15"), INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+        status, _ = self.store.ingest(valid_payload(now_ms=BASE_MS + 100_000, timeframe="M1"),
+                                      INGEST, BASE_MS + 100_000)
+        self.assertEqual(status, 200)
+
+        _, data = self.store.read("BTCUSD", BASE_MS + 101_000)
+        self.assertTrue(data["activeTimeframeFresh"])
+        self.assertEqual(data["activeTimeframe"], "M1")
+        self.assertFalse(data["snapshots"]["M15"]["robotFresh"])
+        self.assertFalse(data["canonicalPlanFresh"])
+
+    def test_m15_plan_is_preserved_when_other_chart_timeframes_send_opposite_signals(self):
+        # The bridge receives every chart's alert stream. A later M1 payload must
+        # not erase or replace the canonical M15 ROBOT V12 decision.
+        m15 = valid_payload(now_ms=BASE_MS + 15_000, timeframe="M15")
+        status, result = self.store.ingest(m15, INGEST, BASE_MS + 15_000)
+        self.assertEqual(status, 200, result)
+
+        m1 = valid_payload(now_ms=BASE_MS + 20_000, timeframe="M1")
+        m1.update({
+            "signal": "SHORT", "entry": 100.0, "sl": 105.0,
+            "tp1": 90.0, "tp2": 85.0, "short_score": 86, "long_score": 0,
+            "entryZoneLow": 99.0, "entryZoneHigh": 101.0, "entryDecision": 100.0,
+            "entryBarOpen": 100.5, "entryBarHigh": 101.0,
+            "entryBarLow": 99.0, "entryBarClose": 99.5,
+        })
+        status, result = self.store.ingest(m1, INGEST, BASE_MS + 20_000)
+        self.assertEqual(status, 200, result)
+
+        # A delayed M15 alert older than the accepted M15 plan must not roll it back.
+        delayed_m15 = valid_payload(now_ms=BASE_MS + 10_000, timeframe="M15")
+        delayed_m15.update({
+            "signal": "SHORT", "entry": 100.0, "sl": 105.0,
+            "tp1": 90.0, "tp2": 85.0, "short_score": 86, "long_score": 0,
+            "entryZoneLow": 99.0, "entryZoneHigh": 101.0, "entryDecision": 100.0,
+            "entryBarOpen": 100.5, "entryBarHigh": 101.0,
+            "entryBarLow": 99.0, "entryBarClose": 99.5,
+        })
+        status, result = self.store.ingest(delayed_m15, INGEST, BASE_MS + 20_000)
+        self.assertEqual(status, 200, result)
+
+        _, data = self.store.read("BTCUSD", BASE_MS + 21_000)
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["activeTimeframe"], "M1")
+        self.assertTrue(data["canonicalPlanFresh"])
+        self.assertEqual(data["snapshots"]["M15"]["robotV12"]["signal"], "LONG")
+        self.assertEqual(data["snapshots"]["M15"]["robotV12"]["entry"], 100.0)
+        self.assertEqual(data["snapshots"]["M1"]["robotV12"]["signal"], "SHORT")
+        self.assertEqual(data["snapshots"]["M15"]["robotUpdatedAt"], BASE_MS + 15_000)
+        self.assertTrue(data["snapshots"]["M15"]["robotFresh"])
+
     def test_rejects_wrong_ingest_token(self):
         status, result = self.store.ingest(valid_payload(), "c" * 64, BASE_MS)
         self.assertEqual(status, 401)

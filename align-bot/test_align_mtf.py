@@ -57,6 +57,15 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertEqual(profile["mode"], "ATTENTE")
         self.assertEqual(profile["direction"], 0)
 
+    def test_supported_short_chart_timeframes_have_explicit_context_labels(self):
+        for timeframe in ("M3", "M10", "M45"):
+            with self.subTest(timeframe=timeframe):
+                self.assertIn(timeframe, align_bot.FENETRES_UT)
+                self.assertIsNotNone(align_bot.lecture_unite_active({
+                    "tv_indicator_mtf": {"activeTimeframe": timeframe},
+                    "dirs": [1] * 11,
+                }))
+
     def test_fetch_tv_mtf_preserves_the_server_selected_timeframe(self):
         class FakeResponse:
             def __enter__(self):
@@ -64,7 +73,7 @@ class AlignMtfRulesTest(unittest.TestCase):
             def __exit__(self, *args):
                 return False
             def read(self):
-                return b'{"ok":true,"symbol":"XAUUSD","activeTimeframe":"M15","activeTimeframeFresh":true,"activeTimeframeAgeMs":1200,"snapshots":{"M5":{"fresh":true},"M15":{"fresh":true}},"receivedTimeframes":["M5","M15"]}'
+                return b'{"ok":true,"symbol":"XAUUSD","activeTimeframe":"M15","activeTimeframeFresh":true,"activeTimeframeAgeMs":1200,"canonicalPlanTimeframe":"M15","canonicalPlanFresh":true,"snapshots":{"M5":{"fresh":true},"M15":{"fresh":true,"robotFresh":true,"robotV12":{"signal":"LONG"}}},"receivedTimeframes":["M5","M15"]}'
 
         old_url, old_token = align_bot.ALIGN_TV_API_URL, align_bot.ALIGN_TV_READ_TOKEN
         align_bot.ALIGN_TV_API_URL, align_bot.ALIGN_TV_READ_TOKEN = "https://align.example", "test-token"
@@ -78,6 +87,59 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertEqual(result["activeTimeframeAgeMs"], 1200)
         self.assertEqual(result["receivedTimeframes"], ["M5", "M15"])
 
+    def test_fetch_tv_mtf_accepts_all_supported_short_chart_timeframes(self):
+        class FakeResponse:
+            def __init__(self, active):
+                self.active = active
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self):
+                payload = {
+                    "ok": True, "symbol": "XAUUSD", "activeTimeframe": self.active,
+                    "activeTimeframeFresh": True, "canonicalPlanTimeframe": "M15",
+                    "canonicalPlanFresh": True, "snapshots": {
+                        self.active: {"fresh": True},
+                        "M15": {"fresh": True, "robotFresh": True, "robotV12": {"signal": "LONG"}},
+                    },
+                }
+                return json.dumps(payload).encode()
+
+        old_url, old_token = align_bot.ALIGN_TV_API_URL, align_bot.ALIGN_TV_READ_TOKEN
+        align_bot.ALIGN_TV_API_URL, align_bot.ALIGN_TV_READ_TOKEN = "https://align.example", "test-token"
+        try:
+            for timeframe in ("M3", "M10", "M45"):
+                with self.subTest(timeframe=timeframe), unittest.mock.patch(
+                    "align_bot.urllib.request.urlopen", return_value=FakeResponse(timeframe)
+                ):
+                    result = align_bot.fetch_tv_mtf("XAUUSD")
+                    self.assertTrue(result["available"])
+                    self.assertEqual(result["activeTimeframe"], timeframe)
+        finally:
+            align_bot.ALIGN_TV_API_URL, align_bot.ALIGN_TV_READ_TOKEN = old_url, old_token
+
+    def test_fetch_tv_mtf_fails_closed_without_fresh_canonical_m15_plan(self):
+        class FakeResponse:
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self):
+                return b'{"ok":true,"symbol":"XAUUSD","activeTimeframe":"M1","activeTimeframeFresh":true,"canonicalPlanTimeframe":"M15","canonicalPlanFresh":false,"snapshots":{"M1":{"fresh":true}}}'
+
+        old_url, old_token = align_bot.ALIGN_TV_API_URL, align_bot.ALIGN_TV_READ_TOKEN
+        align_bot.ALIGN_TV_API_URL, align_bot.ALIGN_TV_READ_TOKEN = "https://align.example", "test-token"
+        try:
+            with unittest.mock.patch("align_bot.urllib.request.urlopen", return_value=FakeResponse()):
+                result = align_bot.fetch_tv_mtf("XAUUSD")
+        finally:
+            align_bot.ALIGN_TV_API_URL, align_bot.ALIGN_TV_READ_TOKEN = old_url, old_token
+        self.assertFalse(result["available"])
+        self.assertEqual(result["canonicalPlanTimeframe"], "M15")
+        self.assertFalse(result["canonicalPlanFresh"])
+        self.assertIn("M15", result["reason"])
+
     def test_fetch_tv_mtf_rejects_stale_active_timeframe(self):
         class FakeResponse:
             def __enter__(self):
@@ -85,7 +147,7 @@ class AlignMtfRulesTest(unittest.TestCase):
             def __exit__(self, *args):
                 return False
             def read(self):
-                return b'{"ok":true,"symbol":"XAUUSD","activeTimeframe":"H4","activeTimeframeFresh":false,"snapshots":{"H4":{"fresh":true}}}'
+                return b'{"ok":true,"symbol":"XAUUSD","activeTimeframe":"H4","activeTimeframeFresh":false,"canonicalPlanTimeframe":"M15","canonicalPlanFresh":true,"snapshots":{"H4":{"fresh":true},"M15":{"fresh":true,"robotFresh":true,"robotV12":{"signal":"LONG"}}}}'
 
         old_url, old_token = align_bot.ALIGN_TV_API_URL, align_bot.ALIGN_TV_READ_TOKEN
         align_bot.ALIGN_TV_API_URL, align_bot.ALIGN_TV_READ_TOKEN = "https://align.example", "test-token"
@@ -97,7 +159,7 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertTrue(result["available"])
         self.assertIsNone(result["activeTimeframe"])
 
-    def test_indicator_plan_uses_fixed_m15_levels_when_chart_timeframe_changes(self):
+    def test_indicator_plan_uses_canonical_m15_plan_when_chart_timeframe_changes(self):
         robot = {
             "signal": "LONG", "entry": 101, "sl": 99, "tp1": 105, "tp2": 108,
             "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
@@ -106,20 +168,35 @@ class AlignMtfRulesTest(unittest.TestCase):
             "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
             "confirmed": True,
         }
+        other_robot = {
+            "signal": "SHORT", "entry": 110, "sl": 112, "tp1": 106, "tp2": 104,
+            "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+            "entryZoneLow": 109.5, "entryZoneHigh": 110.5, "entryDecision": 110,
+            "entryBarTime": 900_000, "entryBarOpen": 110.0, "entryBarHigh": 111.0,
+            "entryBarLow": 109.0, "entryBarClose": 109.5, "entryTriggered": False,
+            "confirmed": True,
+        }
         for active_tf in ("M1", "M5", "M15", "H4"):
             with self.subTest(active_timeframe=active_tf):
-                r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": active_tf, "snapshots": {
-                    active_tf: {"fresh": True, "price": 101.0, "confirmed": True, "robotV12": dict(robot)}
-                }}}
+                snapshots = {
+                    "M15": {"fresh": True, "robotFresh": True, "price": 101.0,
+                            "confirmed": True, "robotV12": dict(robot)}
+                }
+                if active_tf != "M15":
+                    snapshots[active_tf] = {"fresh": True, "price": 110.0,
+                                            "confirmed": True, "robotV12": dict(other_robot)}
+                r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": active_tf,
+                                          "snapshots": snapshots}}
                 plan = align_bot.plan_indicateur(r)
                 self.assertTrue(plan["available"], plan.get("reason"))
-                self.assertEqual(plan["timeframe"], active_tf)
+                self.assertEqual(plan["timeframe"], "M15")
+                self.assertEqual(plan["active_timeframe"], active_tf)
                 self.assertEqual(plan["plan_timeframe"], "M15")
                 self.assertEqual(plan["entry_timeframe"], "M5")
                 self.assertEqual((plan["entry"], plan["sl"], plan["tp1"], plan["tp2"]), (101, 99, 105, 108))
                 self.assertEqual((plan["zone_low"], plan["decision"], plan["zone_high"]), (100, 101, 102))
+                self.assertEqual(plan["direction"], 1)
                 self.assertTrue(plan["confirmed"])
-
     def test_indicator_plan_enforces_strategy_trigger_timeframe(self):
         cases = (("SCALPING", "M1"), ("DAY", "M5"), ("SWING", "H1"))
         for strategy, trigger_tf in cases:
@@ -133,10 +210,12 @@ class AlignMtfRulesTest(unittest.TestCase):
                     "confirmed": True,
                 }
                 r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "H4", "snapshots": {
-                    "H4": {"fresh": True, "price": 110.0, "confirmed": True, "robotV12": robot}
+                    "M15": {"fresh": True, "robotFresh": True, "price": 101.0,
+                            "confirmed": True, "robotV12": robot},
+                    "H4": {"fresh": True, "price": 110.0, "confirmed": True,
+                           "robotV12": {"signal": "SHORT"}},
                 }}}
                 self.assertTrue(align_bot.plan_indicateur(r)["available"])
-
     def test_indicator_plan_rejects_inconsistent_plan_or_trigger_timeframe(self):
         valid_robot = {
             "signal": "LONG", "entry": 101, "sl": 99, "tp1": 105, "tp2": 108,
@@ -155,45 +234,56 @@ class AlignMtfRulesTest(unittest.TestCase):
                 }}}
                 self.assertFalse(align_bot.plan_indicateur(r)["available"])
 
-    def test_indicator_plan_changes_when_active_timeframe_changes(self):
+    def test_indicator_plan_does_not_change_when_another_chart_timeframe_reports_opposite_signal(self):
+        m15_robot = {
+            "signal": "LONG", "entry": 101, "sl": 99, "tp": 105,
+            "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+            "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
+            "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
+            "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
+        }
+        h4_robot = {
+            "signal": "SHORT", "entry": 110, "sl": 112, "tp": 106,
+            "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+            "entryZoneLow": 109.5, "entryZoneHigh": 110.5, "entryDecision": 110,
+            "entryBarTime": 900_000, "entryBarOpen": 110.0, "entryBarHigh": 111.0,
+            "entryBarLow": 109.0, "entryBarClose": 109.5, "entryTriggered": False,
+        }
         r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "H4", "snapshots": {
-            "M15": {"fresh": True, "price": 101.0, "robotV12": {
-                "signal": "LONG", "entry": 101, "sl": 99, "tp": 105,
-                "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
-                "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
-                "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
-                "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
-            }},
-            "H4": {"fresh": True, "price": 110.0, "confirmed": True, "robotV12": {
-                "signal": "SHORT", "entry": 110, "sl": 112, "tp": 106,
-                "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
-                "entryZoneLow": 109.5, "entryZoneHigh": 110.5, "entryDecision": 110,
-                "entryBarTime": 900_000, "entryBarOpen": 110.0, "entryBarHigh": 111.0,
-                "entryBarLow": 109.0, "entryBarClose": 109.5, "entryTriggered": False,
-            }}
+            "M15": {"fresh": True, "robotFresh": True, "price": 101.0, "confirmed": True,
+                    "robotV12": m15_robot},
+            "H4": {"fresh": True, "price": 110.0, "confirmed": True, "robotV12": h4_robot},
         }}}
         plan = align_bot.plan_indicateur(r)
         self.assertTrue(plan["available"], plan.get("reason"))
-        self.assertEqual(plan["timeframe"], "H4")
-        self.assertEqual(plan["plan_timeframe"], "M15")
-        self.assertEqual((plan["entry"], plan["sl"], plan["tp"]), (110, 112, 106))
-
-    def test_indicator_plan_rejects_stale_or_missing_active_snapshot(self):
-        stale = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "M15", "snapshots": {
-            "M15": {"fresh": False, "robotV12": {"signal": "LONG", "entry": 100, "sl": 98, "tp": 104}}
+        self.assertEqual(plan["timeframe"], "M15")
+        self.assertEqual(plan["active_timeframe"], "H4")
+        self.assertEqual(plan["direction"], 1)
+        self.assertEqual((plan["entry"], plan["sl"], plan["tp"]), (101, 99, 105))
+    def test_indicator_plan_rejects_stale_or_missing_canonical_m15_snapshot(self):
+        stale = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "M1", "snapshots": {
+            "M15": {"fresh": False, "robotFresh": False, "robotV12": {"signal": "LONG", "entry": 100, "sl": 98, "tp": 104}},
+            "M1": {"fresh": True, "price": 100.0, "confirmed": True,
+                   "robotV12": {"signal": "SHORT", "entry": 100, "sl": 102, "tp": 96}},
         }}}
         missing = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "H1", "snapshots": {
-            "M15": {"fresh": True, "robotV12": {"signal": "LONG", "entry": 100, "sl": 98, "tp": 104}}
+            "H1": {"fresh": True, "price": 100.0, "confirmed": True,
+                   "robotV12": {"signal": "LONG", "entry": 100, "sl": 98, "tp": 104}}
         }}}
         self.assertFalse(align_bot.plan_indicateur(stale)["available"])
         self.assertFalse(align_bot.plan_indicateur(missing)["available"])
-
     def test_indicator_plan_rejects_incoherent_levels(self):
         r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "M5", "snapshots": {
-            "M5": {"fresh": True, "price": 100.0, "robotV12": {"signal": "LONG", "entry": 100, "sl": 102, "tp": 104}}
+            "M15": {"fresh": True, "robotFresh": True, "price": 100.0, "robotV12": {
+                "signal": "LONG", "entry": 100, "sl": 102, "tp": 104,
+                "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+                "entryZoneLow": 99.0, "entryZoneHigh": 101.0, "entryDecision": 100.0,
+                "entryBarTime": 900_000, "entryBarOpen": 99.0, "entryBarHigh": 101.0,
+                "entryBarLow": 99.0, "entryBarClose": 100.5,
+            }},
+            "M5": {"fresh": True, "price": 100.0, "robotV12": {"signal": "SHORT"}},
         }}}
         self.assertFalse(align_bot.plan_indicateur(r)["available"])
-
     def test_tradingview_mtf_snapshot_does_not_mutate_align_context(self):
         dirs, rsis = [0] * 11, [50.0] * 11
         r = {"dirs": list(dirs), "rsis": list(rsis), "confirme": 0, "dirPlan": 0,
@@ -209,6 +299,21 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertEqual(r["tv_robot_v12"]["lecture_5m"], "SHORT")
         self.assertEqual(r["tv_robot_v12_timeframe"], "M15")
         self.assertTrue(r["tv_robot_v12_fresh"])
+
+    def test_tradingview_context_uses_m15_robot_plan_not_last_chart_snapshot(self):
+        m15_robot = {"signal": "LONG", "strategy": "DAY", "entry": 101.0}
+        h4_robot = {"signal": "SHORT", "strategy": "SWING", "entry": 110.0}
+        r = {"dirs": [0] * 11, "rsis": [50.0] * 11, "confirme": 0, "dirPlan": 0,
+             "tv_indicator_mtf": {"activeTimeframe": "H4", "snapshots": {
+                 "M15": {"fresh": True, "robotFresh": True, "robotV12": m15_robot},
+                 "H4": {"fresh": True, "robotFresh": True, "robotV12": h4_robot},
+             }}}
+        align_bot.fusionne_lectures_tradingview(r)
+        self.assertIs(r["tv_robot_v12"], m15_robot)
+        self.assertEqual(r["tv_robot_v12_timeframe"], "M15")
+        self.assertTrue(r["tv_robot_v12_fresh"])
+        self.assertEqual(r["dirs"], [0] * 11)
+        self.assertEqual(r["dirPlan"], 0)
 
     def test_tradingview_links_select_market_and_requested_timeframe(self):
         btc = align_bot.url_tradingview("BTC", 5)
@@ -3676,7 +3781,7 @@ class PineOnlyEntryGateTests(unittest.TestCase):
                 "available": True,
                 "activeTimeframe": "M5",
                 "snapshots": {
-                    "M5": {
+                    "M15": {
                         "fresh": True,
                         "price": 100.0,
                         "confirmed": True,
@@ -3838,7 +3943,7 @@ class PineOnlyEntryGateTests(unittest.TestCase):
         from unittest.mock import patch
         r = self._market()
         r["require_tv_bridge"] = True
-        r["tv_indicator_mtf"]["snapshots"]["M5"]["robotV12"]["entryTriggered"] = True
+        r["tv_indicator_mtf"]["snapshots"]["M15"]["robotV12"]["entryTriggered"] = True
         state = {"t1m": 0}
         with patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), \
              patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")), \
@@ -3866,8 +3971,8 @@ class PineOnlyEntryGateTests(unittest.TestCase):
         from unittest.mock import patch
         r = self._market()
         r["require_tv_bridge"] = True
-        r["tv_indicator_mtf"]["snapshots"]["M5"]["price"] = 102.0
-        r["tv_indicator_mtf"]["snapshots"]["M5"]["robotV12"]["entryTriggered"] = True
+        r["tv_indicator_mtf"]["snapshots"]["M15"]["price"] = 102.0
+        r["tv_indicator_mtf"]["snapshots"]["M15"]["robotV12"]["entryTriggered"] = True
         state = {"t1m": 0}
         with patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")), patch.object(align_bot, "pause_entree_marche", return_value=None), patch.object(align_bot, "bloque_dw", return_value=False), patch.object(align_bot, "profil_trade", return_value={"mode": "DAY"}), patch.object(align_bot, "memoire_refuse", return_value=(False, 0, 0)), patch.object(align_bot, "strategie_trade", return_value={"strat": "DAY"}):
             out = align_bot.agent("BTC", r, state, "")
