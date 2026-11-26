@@ -15,17 +15,18 @@ class LiveVoiceLanguagePreference(unittest.TestCase):
         self.assertIn("localStorage.setItem('alignVoixLangue'", source)
         # v12.2.7 (règle d'Adel) : plus de choix de langue, la voix dit le français PUIS l'anglais.
         self.assertIn("const suiteAnglaise = anglais && maintenant - voixDerniereFR < 60000;", source)
-        self.assertIn("if (!anglais) window.speechSynthesis.cancel();", source)
+        self.assertIn("if (!anglais && item.source !== 'coach') window.speechSynthesis.cancel();", source)
         self.assertIn("utterance.lang = anglais ? 'en-US' : 'fr-FR';", source)
         self.assertIn("🇫🇷 → 🇬🇧 Voix", source)
 
     def test_voice_never_says_risk_and_prefers_natural_voice(self):
         source = LIVE_JS.read_text(encoding="utf-8")
         self.assertIn("\\brisques?\\b|\\brisks?\\b", source)
-        self.assertIn("function choisirVoix(lang)", source)
+        self.assertIn("function choisirVoix(lang, speaker = 't')", source)
         self.assertIn("if (!v) {", source)
         self.assertIn("if (!anglais && voixActive) voixEnAttente = item;", source)
         self.assertIn("return 0;   // aucune voix naturelle disponible : silence plutôt qu'une voix robot", source)   # v12.2.8 : sans voix naturelle, silence (plus de voix robot)
+        self.assertIn("VOIX_PAR_ROLE", source)
         self.assertIn("utterance.voice = v;", source)
 
     def test_animation_toggle_remains_independent_and_persisted(self):
