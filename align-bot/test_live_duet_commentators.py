@@ -77,6 +77,15 @@ class LiveDuetCommentators(unittest.TestCase):
         self.assertNotIn("'-voix'", self.js)
         self.assertNotIn("ntfy.sh", self.page)
 
+    def test_second_host_waits_for_actual_speech_end_not_estimated_duration(self):
+        self.assertIn("function parlerLive(item, forcer = false, apresLecture = null)", self.js)
+        self.assertIn("utterance.onend = terminerLecture;", self.js)
+        self.assertIn("utterance.onerror = terminerLecture;", self.js)
+        self.assertIn("if (typeof apresLecture === 'function') apresLecture();", self.js)
+        self.assertIn("La deuxième voix attend la fin réelle de la première synthèse vocale.", self.js)
+        self.assertIn("}, 500));", self.js)
+        self.assertNotIn("}, pause + 500));", self.js)
+
     def test_dialogue_pacing_leaves_time_for_both_voices(self):
         self.assertIn("startAt: ts + 4000", self.page)
         self.assertIn("duration1 + 500", self.page)
