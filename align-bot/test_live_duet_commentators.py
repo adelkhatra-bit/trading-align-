@@ -122,6 +122,7 @@ class LiveDuetCommentators(unittest.TestCase):
         self.assertIn("if (continuer && typeof apresLecture === 'function') apresLecture();", self.js)
 
 
+
     def test_coach_duet_contains_separate_french_and_english_lines(self):
         self.assertIn("function traduireDialogueCoach(text, market)", self.page)
         self.assertIn("text1EN:", self.page)
@@ -133,11 +134,12 @@ class LiveDuetCommentators(unittest.TestCase):
 
     def test_coach_duet_translation_is_required_before_publishing(self):
         self.assertIn("if (!traduction || !traduction[0] || !traduction[1]) return;", self.page)
-        self.assertIn("if (!market || ![\"BTC\", \"GOLD\"].includes(market)) return;", self.page)
+        self.assertIn('if (!market || !["BTC", "GOLD"].includes(market)) return;', self.page)
 
     def test_voice_relay_rejects_empty_or_unknown_market_for_duet(self):
         worker = (ROOT.parent / "cloud" / "align-tv-mailbox" / "worker.js").read_text(encoding="utf-8")
         self.assertIn('![\"BTC\", \"GOLD\"].includes(payload.market)', worker)
+
 
 if __name__ == "__main__":
     unittest.main()
