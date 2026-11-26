@@ -370,7 +370,6 @@ bridgePlanGeometryOk = dirPlan == 1 ? (
 ) : false
 
 
-
 // ═════════ SIGNAUX ═════════
 fortHaut = rsiAchat and rsiOB < 3 and bull > bear and bull >= minAlign - 2 and (surcharge or surcharge[1] or alignHaut)
 fortBas  = rsiVente and rsiOS < 3 and bear > bull and bear >= minAlign - 2 and (surcharge or surcharge[1] or alignBas)
