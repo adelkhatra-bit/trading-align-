@@ -291,7 +291,7 @@
   // Voix système naturelles disponibles : Thomas (Paul/David), Leïla (Hortense/Zira).
   const VOIX_NATURELLES = /natural|neural|online|premium|enhanced|google|denise|vivienne|henri|eloise|remy|amélie|amelie|hortense|audrey|julie|charlotte|pierre|paul|thomas|jenny|aria|guy|samantha|ava|david|mark|hazel|zira/i;
   const VOIX_PAR_ROLE = {
-    t: { fr: /\b(?:paul|henri|pierre)\b/i, en: /\b(?:david|mark|guy)\b/i },
+    t: { fr: /\b(?:paul|henri|pierre|david)\b/i, en: /\b(?:david|mark|guy)\b/i },
     l: { fr: /\b(?:hortense|julie|audrey|charlotte|amelie|amélie)\b/i, en: /\b(?:zira|samantha|ava|jenny|aria|hazel)\b/i }
   };
   let voixEnAttente = null;  // commentaire FR gardé si les voix du navigateur arrivent après le premier message
