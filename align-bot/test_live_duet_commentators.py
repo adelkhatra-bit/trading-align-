@@ -48,6 +48,8 @@ class LiveDuetCommentators(unittest.TestCase):
         self.assertIn("function ecouterDialoguesCoach()", self.js)
         self.assertIn("new EventSource('https://ntfy.sh/' + SUJET + '-show/sse')", self.js)
         self.assertIn("coachShowES && coachShowES.close()", self.js)
+        self.assertIn("document.visibilityState !== 'visible'", self.js)
+        self.assertIn("ts <= dernierDialogueCoachTs", self.js)
 
     def test_dialogue_pacing_leaves_time_for_both_voices(self):
         self.assertIn("}, 6500);", self.page)
