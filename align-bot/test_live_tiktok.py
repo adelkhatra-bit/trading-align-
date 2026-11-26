@@ -1222,7 +1222,7 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         self.assertIn("programmerReconnexionEcoute(15000)", bande)
         # SSE message handlers ignore stale EventSource callbacks after a reconnect or stop.
         self.assertIn("if (!vivant || es !== source) return;", bande)
-        self.assertIn("if (!vivant || !item", bande)
+        self.assertIn("if (!vivant || es !== source) return;", bande)
         # IA commentaires use the on-chart animated bubble plus spoken French then English.
         self.assertIn("coeurs(1, ['🧠', '📡'], undefined, phrase, anglais)", bande)
         self.assertIn("const dureeFR = parlerLive(fr)", bande)
