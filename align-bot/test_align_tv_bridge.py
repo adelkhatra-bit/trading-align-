@@ -140,6 +140,19 @@ class BridgeStoreTests(unittest.TestCase):
         for tf in REQUIRED_TIMEFRAMES:
             self.assertTrue(data["snapshots"][tf]["fresh"], tf)
 
+    def test_bridge_marks_canonical_plan_unready_until_m15_chart_reports(self):
+        status, _ = self.store.ingest(valid_payload(timeframe="M1"), INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+        _, before = self.store.read("BTCUSD", BASE_MS + 1_000)
+        self.assertTrue(before["ok"])  # MTF transport is alive
+        self.assertFalse(before["canonicalPlanFresh"])  # but no authoritative M15 plan yet
+
+        status, _ = self.store.ingest(valid_payload(timeframe="M15"), INGEST, BASE_MS + 2_000)
+        self.assertEqual(status, 200)
+        _, after = self.store.read("BTCUSD", BASE_MS + 3_000)
+        self.assertTrue(after["canonicalPlanFresh"])
+        self.assertTrue(after["snapshots"]["M15"]["robotFresh"])
+
     def test_m15_plan_is_preserved_when_other_chart_timeframes_send_opposite_signals(self):
         # The bridge receives every chart's alert stream. A later M1 payload must
         # not erase or replace the canonical M15 ROBOT V12 decision.
