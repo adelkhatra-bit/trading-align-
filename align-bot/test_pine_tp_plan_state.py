@@ -48,6 +48,40 @@ class PineTpPlanStateTests(unittest.TestCase):
         self.assertIn('strat == "DAY" ? "M5"', self.source)
         self.assertIn('strat == "SCALPING" ? "M1"', self.source)
 
+    def test_strategy_and_bridge_confirmations_use_closed_timeframe_directions(self):
+        for name in ("d1Fermee", "d5Fermee", "d15Fermee", "d60Fermee", "d240Fermee", "dDFermee", "dWFermee"):
+            declaration = next(line for line in self.source.splitlines() if line.startswith(name))
+            self.assertIn("request.security(", declaration)
+        self.assertIn("d5Strat = nz(d5Fermee)", self.source)
+        self.assertIn("d1Strat = nz(d1Fermee)", self.source)
+        self.assertIn("uD  = nz(dDFermee) == dP", self.source)
+        self.assertIn("uW  = nz(dWFermee) == dP", self.source)
+        self.assertIn('strat == "SWING" ? (nz(dDFermee) == dirPlan', self.source)
+        self.assertIn('strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan', self.source)
+        self.assertIn('strat == "SCALPING" ? (nz(d60Fermee) != -dirPlan and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan)', self.source)
+
+    def test_visual_and_bridge_share_the_coach_risk_reward_and_atr_gate(self):
+        self.assertIn("planRiskRewardOk = not na(atr15) and atr15 > 0 and rrS >= 2.0 and planRisk <= 1.5 * atr15", self.source)
+        self.assertIn("and bridgePlanGeometryOk and planRiskRewardOk and not na(ent)", self.source)
+        self.assertIn("bridgeConfirmed = bridgePlanValid and planRiskRewardOk", self.source)
+        self.assertIn("AUCUNE ENTRÉE : risque ou gain/risque insuffisant", self.source)
+        self.assertIn("PLAN VALIDÉ : attendre le déclencheur", self.source)
+
+    def test_risk_reward_ratio_is_declared_before_plan_confirmation_gate(self):
+        rr_s = self.source.index("rrS =")
+        risk_gate = self.source.index("planRiskRewardOk =")
+        rr_later = self.source.index("rr  =")
+        self.assertLess(rr_s, risk_gate)
+        self.assertLess(risk_gate, rr_later)
+        risk_line = next(line for line in self.source.splitlines() if line.startswith("planRiskRewardOk ="))
+        self.assertIn("rrS >= 2.0", risk_line)
+
+    def test_visual_plan_status_does_not_claim_entry_is_already_executable(self):
+        self.assertIn("PLAN LONG VALIDÉ — ATTENTE ENTRÉE", self.source)
+        self.assertIn("PLAN SHORT VALIDÉ — ATTENTE ENTRÉE", self.source)
+        self.assertNotIn("▲ LONG CONFIRMÉ", self.source)
+        self.assertNotIn("▼ SHORT CONFIRMÉ", self.source)
+
     def test_entry_sl_tp_geometry_is_guarded_before_bridge_publication(self):
         self.assertIn("bridgePlanValid =", self.source)
         self.assertRegex(self.source, r"bridgePlanValid\s*=\s*dirPlan != 0")

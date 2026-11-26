@@ -58,10 +58,13 @@ f_dir_confirme() =>
 [d240, s240, r240, bridgeTimeH4] = request.security(syminfo.tickerid, "240", f_etat())
 [dD, sD, rD, bridgeTimeD1]       = request.security(syminfo.tickerid, "D",   f_etat())
 [dW, sW, rW, bridgeTimeW1]       = request.security(syminfo.tickerid, "W",   f_etat())
+d1Fermee   = request.security(syminfo.tickerid, "1",   f_dir_confirme(), lookahead=barmerge.lookahead_on)
 d5Fermee   = request.security(syminfo.tickerid, "5",   f_dir_confirme(), lookahead=barmerge.lookahead_on)
 d15Fermee  = request.security(syminfo.tickerid, "15",  f_dir_confirme(), lookahead=barmerge.lookahead_on)
 d60Fermee  = request.security(syminfo.tickerid, "60",  f_dir_confirme(), lookahead=barmerge.lookahead_on)
 d240Fermee = request.security(syminfo.tickerid, "240", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+dDFermee   = request.security(syminfo.tickerid, "D",   f_dir_confirme(), lookahead=barmerge.lookahead_on)
+dWFermee   = request.security(syminfo.tickerid, "W",   f_dir_confirme(), lookahead=barmerge.lookahead_on)
 
 noms  = array.from("1", "3", "5", "10", "15", "30", "45", "1h", "2h", "4h", "D")
 nomsL = array.from("1 min", "3 min", "5 min", "10 min", "15 min", "30 min", "45 min", "1 heure", "2 heures", "4 heures", "Daily")
@@ -260,18 +263,19 @@ dirPlan = not isSupportedMarket or (isGold and not goldConfluence) ? 0 : dirStab
 // DAY : H4 contexte • H1 direction • M15 retracement • M5 déclenchement
 // SCALPING : H1 contexte • M15 direction • M5 structure • M1 déclenchement
 dP  = dirPlan
-uW  = nz(dW) == dP
-uD  = nz(dD) == dP
-d4Strat = isGold ? nz(d240Fermee) : nz(d240)
-d1hStrat = isGold ? nz(d60Fermee) : nz(d60)
-d15Strat = isGold ? nz(d15Fermee) : nz(d15)
-d5Strat = isGold ? nz(d5Fermee) : nz(d5)
+uW  = nz(dWFermee) == dP
+uD  = nz(dDFermee) == dP
+d4Strat = nz(d240Fermee)
+d1hStrat = nz(d60Fermee)
+d15Strat = nz(d15Fermee)
+d5Strat = nz(d5Fermee)
+d1Strat = nz(d1Fermee)
 u4  = d4Strat == dP
 u1h = d1hStrat == dP
 u15 = d15Strat == dP
 u5  = d5Strat == dP
-u1  = nz(d1) == dP
-oW  = nz(dW) == -dP
+u1  = d1Strat == dP
+oW  = nz(dWFermee) == -dP
 o4  = d4Strat == -dP
 o1h = d1hStrat == -dP
 swOk  = dP != 0 and uD and not oW and u1h and not o4
@@ -349,7 +353,9 @@ ptsInd = strat == "" ? 0 : rsiSain ? (sens == dP ? 10 : 5) : 0
 rrS = math.abs(tp1 - ent) / math.max(math.abs(ent - sl), syminfo.mintick)
 ptsRR = strat == "" ? 0 : rrS >= 2.0 ? 10 : rrS >= 1.5 ? 7 : 0
 scoreV = ptsAlign + ptsStruct + ptsZone + ptsVol + ptsInd + ptsRR
-decisionS = strat == "" ? "AUCUNE ENTRÉE" : scoreV < 60 ? "AUCUNE ENTRÉE : configuration insuffisante" : etatS != "CONFIRMÉ" ? "À SURVEILLER : confirmation manquante" : scoreV >= 85 ? "ENTRÉE POSSIBLE : fortement aligné" : scoreV >= 75 ? "INTÉRESSANT : attendre les conditions finales" : "À SURVEILLER : confirmation manquante"
+planRisk = math.abs(ent - sl)
+planRiskRewardOk = not na(atr15) and atr15 > 0 and rrS >= 2.0 and planRisk <= 1.5 * atr15
+decisionS = strat == "" ? "AUCUNE ENTRÉE" : not planRiskRewardOk ? "AUCUNE ENTRÉE : risque ou gain/risque insuffisant" : scoreV < 60 ? "AUCUNE ENTRÉE : configuration insuffisante" : etatS != "CONFIRMÉ" ? "À SURVEILLER : confirmation manquante" : scoreV >= 85 ? "PLAN VALIDÉ : attendre le déclencheur" : scoreV >= 75 ? "INTÉRESSANT : attendre les conditions finales" : "À SURVEILLER : confirmation manquante"
 rr  = math.abs(tp1 - ent) / math.max(math.abs(ent - sl), syminfo.mintick)
 tEnt = ent == close ? "au marché" : "ordre limite"
 // Fibonacci du dernier mouvement 15 min (24 bougies clôturées) : même calcul que le robot Telegram
@@ -489,10 +495,10 @@ if barstate.islast
         table.cell(t, i, 0, array.get(noms, i), width=largCol, bgcolor=rv >= 70 ?  color.rgb(120, 20, 30) : rv <= 30 ?  color.rgb(0, 90, 50) :  color.rgb(30, 34, 45), text_color=rv >= 70 or rv <= 30 ?  color.white :  color.gray, text_size=size.small, tooltip=tip)
         table.cell(t, i, 1, sym, width=largCol, bgcolor=bg, text_color= color.white, text_size=size.normal, tooltip=tip)
 // État de confirmation calculé pour l'affichage ; les champs d'export restent dans le bloc bridge canonique.
-planClosedMtfOkUi = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan)
-planConfirmedUi = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2) and etatS == "CONFIRMÉ" and scoreV >= 75 and planClosedMtfOkUi
+planClosedMtfOkUi = strat == "SWING" ? (nz(dDFermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) != -dirPlan and nz(dWFermee) != -dirPlan) : strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d240Fermee) != -dirPlan) : strat == "SCALPING" ? (nz(d60Fermee) != -dirPlan and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan) : false
+planConfirmedUi = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and planRiskRewardOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2) and etatS == "CONFIRMÉ" and scoreV >= 75 and planClosedMtfOkUi
     titre = zoneBas ? "RETOURNEMENT ▼" : zoneHaut ? "REBOND ▲" : fortHaut ? "★ ACHAT FORT" : fortBas ? "★ VENTE FORTE" : retHaut ? "RETOURNEMENT ▲" : retBas ? "RETOURNEMENT ▼" : rsiOB >= 3 ? "RSI SURACHAT " + str.tostring(rsiOB) + "/11" : rsiOS >= 3 ? "RSI SURVENTE " + str.tostring(rsiOS) + "/11" : surcharge ? "⚡ SURCHARGE" : sens == 1 ? "HAUSSE" : sens == -1 ? "BAISSE" : "ATTENDRE"
-    statutPlan = planConfirmedUi ? (dirPlan == 1 ? "▲ LONG CONFIRMÉ" : "▼ SHORT CONFIRMÉ") : strat != "" and dirPlan != 0 ? (dirPlan == 1 ? "⏳ BIAIS LONG — EN ATTENTE" : "⏳ BIAIS SHORT — EN ATTENTE") : "ATTENDRE • AUCUNE STRATÉGIE"
+    statutPlan = planConfirmedUi ? (dirPlan == 1 ? "▲ PLAN LONG VALIDÉ — ATTENTE ENTRÉE" : "▼ PLAN SHORT VALIDÉ — ATTENTE ENTRÉE") : strat != "" and dirPlan != 0 ? (dirPlan == 1 ? "⏳ BIAIS LONG — EN ATTENTE" : "⏳ BIAIS SHORT — EN ATTENTE") : "ATTENDRE • AUCUNE STRATÉGIE"
     ligne = (retDir != 0 and not retConf ? "↩ RETOURNEMENT  " : nVoy >= 3 ? "↩ " + str.tostring(nVoy) + "/5  " : "") + statutPlan + (planConfirmedUi ? " • " + (strat == "SCALPING" ? "SCALP" : strat) + " • TP " + px(tp1) + " • SL " + px(sl) : strat != "" and dirPlan != 0 ? " • " + strat + " • confirmation requise" : "   " + titre)
     plan = (retTxt != "" ? retTxt + "\n\n" : "") + (dirPlan != 0 ? "STRATÉGIE : " + (strat == "" ? "aucune — aucun plan exécutable" : strat + " — " + etatS) + "\nScore : " + str.tostring(scoreV) + " / 100\n• Alignement : " + str.tostring(ptsAlign) + " / 25\n• Structure : " + str.tostring(ptsStruct) + " / 20\n• Zone d'entrée : " + str.tostring(ptsZone) + " / 20\n• Volume : " + str.tostring(ptsVol) + " / 15" + (volOk ? "" : " (indisponible)") + "\n• Indicateurs : " + str.tostring(ptsInd) + " / 10\n• Risque / rendement : " + str.tostring(ptsRR) + " / 10\n⏱ Clôture de validation " + (strat == "SWING" ? "1h" : strat == "DAY" ? "5 min" : strat == "SCALPING" ? "1 min" : "15 min") + " dans " + f_mmss(f_reste((strat == "SWING" ? 60 : strat == "DAY" ? 5 : strat == "SCALPING" ? 1 : 15))) + "\nDécision : " + decisionS + "\nMotif : " + motifS + (planConfirmedUi ? "\nPlan confirmé : " + calePlan + "\n\n" : "\n\nAUCUNE ENTRÉE : attendre la confirmation MTF et la clôture de validation. Aucun niveau Entry/TP/SL à suivre.\n\n") : "") + "SENS PROBABLE : " + (sens == 1 ? "HAUSSE " : sens == -1 ? "BAISSE " : "INDÉCIS ") + str.tostring(pctH) + "% hausse / " + str.tostring(100 - pctH) + "% baisse\n" + str.tostring(bull) + " UT en hausse • " + str.tostring(bear) + " en baisse • " + str.tostring(comp) + " comprimées\nRSI : " + str.tostring(rsiOB) + " UT en surachat (>70) • " + str.tostring(rsiOS) + " en survente (<30)" + (rsiOB >= 3 ? "\nSURCHARGE RSI HAUTE : éviter d'acheter, retournement baissier possible" : rsiOS >= 3 ? "\nSURCHARGE RSI BASSE : éviter de vendre, rebond possible" : "") + (retHaut ? "\nLes petites UT montent avant les grandes : retournement HAUSSIER en préparation" : retBas ? "\nLes petites UT baissent avant les grandes : retournement BAISSIER en préparation" : "") + (zoneBas ? "\nPrix sur une résistance " + tH1 + " : risque de retournement à la baisse" : zoneHaut ? "\nPrix sur un support " + tB1 + " : rebond possible" : "") + (planConfirmedUi ? "\n\nPLAN CONFIRMÉ " + (dirPlan == 1 ? "ACHAT" : "VENTE") + "\nEntrée " + px(ent) + " (" + tEnt + ")\nTP1 " + px(tp1) + " (" + tTP1 + ")\nTP2 " + px(tp2) + " (" + tTP2 + ")\nStop " + px(sl) + "\nGain/risque ≈ " + str.tostring(rr, "#.#") : "")
     vbg0 = zoneBas or zoneHaut ? color.rgb(170, 130, 0) : planConfirmedUi and dirPlan == 1 ? color.rgb(0, 140, 70) : planConfirmedUi and dirPlan == -1 ? color.rgb(190, 30, 45) : color.rgb(60, 60, 60)
@@ -628,8 +634,8 @@ if barstate.islast
 // ═════════ BRIDGE ALIGN — export structuré du Pine v25 (sans toucher aux signaux/visuels) ═════════
 // Le bridge ne publie LONG/SHORT que si le plan complet est confirmé.
 bridgePlanValid = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2)
-bridgeClosedMtfOk = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan)
-bridgeConfirmed = bridgePlanValid and etatS == "CONFIRMÉ" and scoreV >= 75 and bridgeClosedMtfOk
+bridgeClosedMtfOk = strat == "SWING" ? (nz(dDFermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) != -dirPlan and nz(dWFermee) != -dirPlan) : strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d240Fermee) != -dirPlan) : strat == "SCALPING" ? (nz(d60Fermee) != -dirPlan and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan) : false
+bridgeConfirmed = bridgePlanValid and planRiskRewardOk and etatS == "CONFIRMÉ" and scoreV >= 75 and bridgeClosedMtfOk
 bridgeSignal = bridgeConfirmed ? (dirPlan == 1 ? "LONG" : "SHORT") : "WAIT"
 bridgeZone = zoneHaut ? "SUPPORT" : zoneBas ? "RESISTANCE" : "PLAN"
 // Routage canonique : un graphique BTC ne peut publier que BTCUSD, un graphique Gold que XAUUSD.
@@ -674,6 +680,36 @@ if bridgeEntryTf != ""
         bridgeEntryClose := bridgeEntryCloseRequested
         bridgeEntryTime := bridgeEntryTimeRequested
 bridgeEntryTimeSafe = bridgeEntryTf == "" ? na : bridgeEntryTime
+// Même déclencheur clôturé que align_tv_bridge.py : la ligne blanche de décision s'allume
+// uniquement si la bougie de validation fraîche reteste la zone, clôture au-delà du milieu
+// dans le sens du plan et reste du bon côté du stop.
+bridgeEntryTfMs = bridgeEntryTf == "60" ? 3600000 : bridgeEntryTf == "5" ? 300000 : bridgeEntryTf == "1" ? 60000 : 0
+bridgeEntryAgeMs = not na(bridgeEntryTimeSafe) ? timenow - bridgeEntryTimeSafe : na
+bridgeEntryFreshUi = bridgeEntryTfMs > 0 and not na(bridgeEntryAgeMs) and bridgeEntryAgeMs >= -5000 and bridgeEntryAgeMs <= 2 * bridgeEntryTfMs + 30000
+bridgeEntryOhlcValidUi = not na(bridgeEntryOpen) and not na(bridgeEntryHigh) and not na(bridgeEntryLow) and not na(bridgeEntryClose) and bridgeEntryLow <= math.min(bridgeEntryOpen, bridgeEntryClose) and math.max(bridgeEntryOpen, bridgeEntryClose) <= bridgeEntryHigh
+bridgeEntryRetestedUi = bridgeEntryHigh >= zBas and bridgeEntryLow <= zHaut
+bridgeEntryDecisionUi = dirPlan == 1 ? bridgeEntryClose > (zBas + zHaut) / 2 : dirPlan == -1 ? bridgeEntryClose < (zBas + zHaut) / 2 : false
+bridgeEntryBeforeStopUi = dirPlan == 1 ? bridgeEntryClose > sl : dirPlan == -1 ? bridgeEntryClose < sl : false
+entryTriggeredUi = bridgeConfirmed and bridgeEntryFreshUi and bridgeEntryOhlcValidUi and bridgeEntryRetestedUi and bridgeEntryDecisionUi and bridgeEntryBeforeStopUi
+entryReadyUi = entryTriggeredUi and close >= zBas and close <= zHaut
+if barstate.islast and entryTriggeredUi
+    if not na(lZH)
+        line.set_color(lZH, dirPlan == 1 ? color.lime : color.red)
+        line.set_width(lZH, 4)
+        line.set_style(lZH, line.style_solid)
+    if not na(eZH)
+        label.set_text(eZH, (dirPlan == 1 ? "🟢 DÉCLENCHEUR LONG VALIDÉ" : "🔴 DÉCLENCHEUR SHORT VALIDÉ") + " • " + px(ent))
+        label.set_color(eZH, dirPlan == 1 ? color.new(color.lime, 0) : color.new(color.red, 0))
+        label.set_textcolor(eZH, color.white)
+if barstate.islast and entryReadyUi
+    if not na(lConf)
+        line.set_color(lConf, dirPlan == 1 ? color.lime : color.red)
+        line.set_width(lConf, 4)
+        line.set_style(lConf, line.style_solid)
+    if not na(eConf)
+        label.set_text(eConf, (dirPlan == 1 ? "🟢 ZONE ATTEINTE — LONG PRÊT" : "🔴 ZONE ATTEINTE — SHORT PRÊT") + " • " + px(ent))
+        label.set_color(eConf, dirPlan == 1 ? color.new(color.lime, 0) : color.new(color.red, 0))
+        label.set_textcolor(eConf, color.white)
 
 bridgePayload = '{"source":"ALIGN_MTF_PRO_V25","symbol":"' + bridgeMarket + '","tickerid":"' + syminfo.tickerid + '","timeframe":"' + bridgeTf + '","planTimeframe":"M15","entryTimeframe":"' + (strat == "SWING" ? "H1" : strat == "DAY" ? "M5" : strat == "SCALPING" ? "M1" : "UNSUPPORTED") + '","entryZoneLow":' + f_align_v25_json_num(bridgePlanValid ? zBas : na) + ',"entryZoneHigh":' + f_align_v25_json_num(bridgePlanValid ? zHaut : na) + ',"entryDecision":' + f_align_v25_json_num(bridgePlanValid ? (zBas + zHaut) / 2 : na) + ',"entryBarTime":' + f_align_v25_json_int(bridgeEntryTimeSafe) + ',"entryBarOpen":' + f_align_v25_json_num(bridgeEntryOpen) + ',"entryBarHigh":' + f_align_v25_json_num(bridgeEntryHigh) + ',"entryBarLow":' + f_align_v25_json_num(bridgeEntryLow) + ',"entryBarClose":' + f_align_v25_json_num(bridgeEntryClose) + ',"price":' + f_align_v25_json_num(close) + ',"timestamp":' + str.tostring(timenow) + ',"candle_time":' + str.tostring(time) + ',"confirmed":' + str.tostring(bridgeConfirmed) + ',"candle_confirmed":' + str.tostring(barstate.isconfirmed) + ',"bar_confirmed":' + str.tostring(barstate.isconfirmed) + ',"signal":"' + bridgeSignal + '","verdict":"' + decisionS + '","entry":' + f_align_v25_json_num(bridgePlanValid ? ent : na) + ',"sl":' + f_align_v25_json_num(bridgePlanValid ? sl : na) + ',"tp1":' + f_align_v25_json_num(bridgePlanValid ? tp1 : na) + ',"tp2":' + f_align_v25_json_num(bridgePlanValid ? tp2 : na) + ',"rrRatio":' + f_align_v25_json_num(rr) + ',"macro_bull":' + str.tostring(bull) + ',"macro_bear":' + str.tostring(bear) + ',"long_score":' + str.tostring(dirPlan == 1 ? scoreV : 0) + ',"short_score":' + str.tostring(dirPlan == -1 ? scoreV : 0) + ',"scalp_inverse":false,"strategy":"' + strat + '","anticipation":"' + (retHaut ? "HAUSSIER" : retBas ? "BAISSIER" : "AUCUNE") + '","zone_proche":"' + bridgeZone + '","volume":"' + (volOk ? "OK" : "INDISPONIBLE") + '","rsi_etat":"' + (rsiOB >= 3 ? "SURACHAT" : rsiOS >= 3 ? "SURVENTE" : "NORMAL") + '","rsi_1m":' + f_align_v25_json_num(r1) + ',"rsi_5m":' + f_align_v25_json_num(r5) + ',"rsi_15m":' + f_align_v25_json_num(r15) + ',"rsi_60m":' + f_align_v25_json_num(r60) + ',"lecture_1m":' + f_align_v25_json_dir(d1) + ',"lecture_5m":' + f_align_v25_json_dir(nz(d5Fermee)) + ',"lecture_15m":' + f_align_v25_json_dir(nz(d15Fermee)) + ',"lecture_60m":' + f_align_v25_json_dir(nz(d60Fermee)) + ',"mtf":{"M1":{"direction":' + f_align_v25_json_int(d1) + ',"rsi":' + f_align_v25_json_num(r1) + ',"bar_time":' + str.tostring(nz(bridgeTimeM1, 0)) + '},"M3":{"direction":' + f_align_v25_json_int(d2) + ',"rsi":' + f_align_v25_json_num(r2) + ',"bar_time":' + str.tostring(nz(bridgeTimeM3, 0)) + '},"M5":{"direction":' + f_align_v25_json_int(d5Strat) + ',"rsi":' + f_align_v25_json_num(r5) + ',"bar_time":' + str.tostring(nz(bridgeTimeM5, 0)) + '},"M10":{"direction":' + f_align_v25_json_int(d10) + ',"rsi":' + f_align_v25_json_num(r10) + ',"bar_time":' + str.tostring(nz(bridgeTimeM10, 0)) + '},"M15":{"direction":' + f_align_v25_json_int(d15Strat) + ',"rsi":' + f_align_v25_json_num(r15) + ',"bar_time":' + str.tostring(nz(bridgeTimeM15, 0)) + '},"M30":{"direction":' + f_align_v25_json_int(d30) + ',"rsi":' + f_align_v25_json_num(r30) + ',"bar_time":' + str.tostring(nz(bridgeTimeM30, 0)) + '},"M45":{"direction":' + f_align_v25_json_int(d45) + ',"rsi":' + f_align_v25_json_num(r45) + ',"bar_time":' + str.tostring(nz(bridgeTimeM45, 0)) + '},"H1":{"direction":' + f_align_v25_json_int(d1hStrat) + ',"rsi":' + f_align_v25_json_num(r60) + ',"bar_time":' + str.tostring(nz(bridgeTimeH1, 0)) + '},"H2":{"direction":' + f_align_v25_json_int(d120) + ',"rsi":' + f_align_v25_json_num(r120) + ',"bar_time":' + str.tostring(nz(bridgeTimeH2, 0)) + '},"H4":{"direction":' + f_align_v25_json_int(d4Strat) + ',"rsi":' + f_align_v25_json_num(r240) + ',"bar_time":' + str.tostring(nz(bridgeTimeH4, 0)) + '},"D1":{"direction":' + f_align_v25_json_int(dD) + ',"rsi":' + f_align_v25_json_num(rD) + ',"bar_time":' + str.tostring(nz(bridgeTimeD1, 0)) + '},"W1":{"direction":' + f_align_v25_json_int(dW) + ',"rsi":' + f_align_v25_json_num(rW) + ',"bar_time":' + str.tostring(nz(bridgeTimeW1, 0)) + '}}}'
 

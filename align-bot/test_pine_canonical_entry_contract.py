@@ -29,6 +29,26 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn('plan_tv["zone_high"]', agent)
         self.assertNotIn("plan_pine(", agent)
 
+    def test_pine_confirmed_risk_is_not_rechecked_against_local_atr(self):
+        start = self.bot.index("def agent(m, r, cle, ferme):")
+        end = self.bot.index("\n\ndef ", start + 1)
+        agent = self.bot[start:end]
+        self.assertIn("if risk <= 0 or rr < RR_MIN_ENTREE:", agent)
+        self.assertNotIn("risk > RISQUE_MAX * atr15", agent)
+        self.assertIn("bridgeConfirmed = bridgePlanValid and planRiskRewardOk", self.pine)
+
+    def test_confirmed_pine_strategy_direction_is_read_before_local_h1_h4_gate(self):
+        start = self.bot.index("def agent(m, r, cle, ferme):")
+        end = self.bot.index("\n\ndef ", start + 1)
+        agent = self.bot[start:end]
+        lookup = agent.index("plan_tv = plan_indicateur(r) if require_tv and not tr else None")
+        local_gate = agent.index("if not d:", lookup)
+        self.assertLess(lookup, local_gate)
+        self.assertIn('d = int(plan_tv["direction"])', agent)
+        self.assertIn('p = float(plan_tv["price"])', agent)
+        self.assertLess(agent.index('d = int(plan_tv["direction"])'), local_gate)
+        self.assertNotIn("plan_tv = plan_indicateur(r)", agent[local_gate:])
+
     def test_bridge_derived_trigger_requires_closed_candle_zone_and_decision(self):
         self.assertIn("entry_triggered", self.bridge)
         self.assertIn('"entryTriggered": entry_triggered', self.bridge)
@@ -52,7 +72,10 @@ class PineCanonicalEntryContract(unittest.TestCase):
         start = self.bot.index("def plan_indicateur(r):")
         end = self.bot.index("\nTTL_KRAKEN", start)
         plan = self.bot[start:end]
-        self.assertIn('current_price = float(snap.get("price"))', plan)
+        self.assertIn('active_snap = snapshots.get(active_tf) if active_tf else None', plan)
+        self.assertIn('active_snap.get("fresh") is not True', plan)
+        self.assertIn('current_price = float(active_snap.get("price"))', plan)
+        self.assertNotIn('current_price = float(snap.get("price"))', plan)
         self.assertIn('"price": current_price', plan)
         self.assertIn('"price_in_zone": prix_tradingview_dans_zone(current_price, zone_low, zone_high)', plan)
 
@@ -154,6 +177,22 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn('planConfirmedUi ? "\\n\\nPLAN CONFIRMÉ "', self.pine)
         self.assertNotIn('dirPlan != 0 ? "\\n\\nPLAN "', self.pine)
         self.assertIn("vbg0 = zoneBas or zoneHaut ? color.rgb(170, 130, 0) : planConfirmedUi and dirPlan == 1", self.pine)
+
+    def test_decision_line_illuminates_only_on_the_same_fresh_closed_trigger_as_bridge(self):
+        self.assertIn("bridgeEntryFreshUi", self.pine)
+        self.assertIn("bridgeEntryAgeMs <= 2 * bridgeEntryTfMs + 30000", self.pine)
+        self.assertIn("bridgeEntryOhlcValidUi", self.pine)
+        self.assertIn("bridgeEntryRetestedUi = bridgeEntryHigh >= zBas and bridgeEntryLow <= zHaut", self.pine)
+        self.assertIn("bridgeEntryDecisionUi", self.pine)
+        self.assertIn("bridgeEntryBeforeStopUi", self.pine)
+        self.assertIn("entryTriggeredUi = bridgeConfirmed and bridgeEntryFreshUi", self.pine)
+        self.assertIn("line.set_color(lZH, dirPlan == 1 ? color.lime : color.red)", self.pine)
+        self.assertIn("🟢 DÉCLENCHEUR LONG VALIDÉ", self.pine)
+        self.assertIn("🔴 DÉCLENCHEUR SHORT VALIDÉ", self.pine)
+        self.assertIn("entryReadyUi = entryTriggeredUi and close >= zBas and close <= zHaut", self.pine)
+        self.assertIn("line.set_color(lConf, dirPlan == 1 ? color.lime : color.red)", self.pine)
+        self.assertIn("🟢 ZONE ATTEINTE — LONG PRÊT", self.pine)
+        self.assertIn("🔴 ZONE ATTEINTE — SHORT PRÊT", self.pine)
 
     def test_market_scope_remains_btc_and_gold_only_in_indicator(self):
         self.assertIn('bridgeMarket = isBtc ? "BTCUSD" : isGold ? "XAUUSD" : "UNSUPPORTED"', self.pine)

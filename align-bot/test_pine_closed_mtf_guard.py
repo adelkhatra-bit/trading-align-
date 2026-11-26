@@ -26,23 +26,38 @@ class PineClosedMtfGuard(unittest.TestCase):
         self.assertIn("sigBas  = isSupportedMarket and sigBas0", source)
 
 
-    def test_btc_bridge_requires_both_closed_h1_and_h4(self):
+    def test_strategy_specific_bridge_gates_use_closed_timeframes(self):
         source = PINE.read_text(encoding="utf-8")
+        self.assertIn("d1Fermee", source)
+        self.assertIn("dDFermee", source)
+        self.assertIn("dWFermee", source)
         self.assertIn(
-            'bridgeClosedMtfOk = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan)',
+            'strat == "SWING" ? (nz(dDFermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) != -dirPlan and nz(dWFermee) != -dirPlan)',
+            source,
+        )
+        self.assertIn(
+            'strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d240Fermee) != -dirPlan)',
+            source,
+        )
+        self.assertIn(
+            'strat == "SCALPING" ? (nz(d60Fermee) != -dirPlan and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan)',
             source,
         )
 
-    def test_btc_ui_and_bridge_share_closed_h1_h4_confirmation_gate(self):
+    def test_visual_and_bridge_share_the_same_strategy_confirmation_gate(self):
         source = PINE.read_text(encoding="utf-8")
-        expected = "nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan"
-        self.assertIn("planClosedMtfOkUi = isGold ?", source)
         ui_line = next(line for line in source.splitlines() if line.startswith("planClosedMtfOkUi = "))
         bridge_line = next(line for line in source.splitlines() if line.startswith("bridgeClosedMtfOk = "))
-        self.assertIn(expected, ui_line)
-        self.assertIn(expected, bridge_line)
-        self.assertIn("isGold ?", ui_line)
-        self.assertIn("isGold ?", bridge_line)
+        for gate in (
+            'strat == "SWING" ?',
+            'strat == "DAY" ?',
+            'strat == "SCALPING" ?',
+            'nz(dDFermee) == dirPlan',
+            'nz(d5Fermee) == dirPlan',
+            'nz(d1Fermee) == dirPlan',
+        ):
+            self.assertIn(gate, ui_line)
+            self.assertIn(gate, bridge_line)
 
     def test_direction_confirmation_uses_closed_htf_candles_not_live_ones(self):
         # Régression : la confirmation du sens ne doit jamais lire la bougie 15 min / 1 h en formation

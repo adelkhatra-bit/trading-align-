@@ -197,6 +197,8 @@ class AlignMtfRulesTest(unittest.TestCase):
                 self.assertEqual((plan["zone_low"], plan["decision"], plan["zone_high"]), (100, 101, 102))
                 self.assertEqual(plan["direction"], 1)
                 self.assertTrue(plan["confirmed"])
+                self.assertEqual(plan["price"], 101.0 if active_tf == "M15" else 110.0)
+                self.assertEqual(plan["price_in_zone"], active_tf == "M15")
     def test_indicator_plan_enforces_strategy_trigger_timeframe(self):
         cases = (("SCALPING", "M1"), ("DAY", "M5"), ("SWING", "H1"))
         for strategy, trigger_tf in cases:
@@ -3797,12 +3799,13 @@ class PineOnlyEntryGateTests(unittest.TestCase):
                             "entryTriggered": False,
                             "confirmed": True,
                         }
-                    }
+                    },
+                    "M5": {"fresh": True, "price": current_price}
                 }
             }
         }
 
-    def test_healthy_bridge_without_direction_reports_mtf_wait_not_bridge_failure(self):
+    def test_healthy_bridge_without_local_direction_uses_pine_plan_and_waits_for_trigger(self):
         from unittest.mock import patch
         r = self._market()
         r["confirme"] = 0
@@ -3811,11 +3814,26 @@ class PineOnlyEntryGateTests(unittest.TestCase):
         with patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")):
             out = align_bot.agent("BTC", r, state, "")
         message = " ".join(str(item[0] if isinstance(item, tuple) else item) for item in out)
-        self.assertIn("aucune direction multi-UT confirmée", message)
-        self.assertIn("Aucun plan Entry/SL/TP émis", message)
+        self.assertIn("PLAN PINE M15", message)
+        self.assertIn("Entrée : 100", message)
+        self.assertIn("SL : 95", message)
+        self.assertIn("TP1 : 110", message)
+        self.assertIn("TP2 : 120", message)
+        self.assertIn("Zone d'entrée : 99 → 101", message)
+        self.assertIn("Ligne de décision : 100", message)
+        entry_at = message.index("📍 Entrée :")
+        sl_at = message.index("🛑 SL :")
+        tp1_at = message.index("💰 TP1 :")
+        tp2_at = message.index("🏁 TP2 :")
+        self.assertLess(entry_at, sl_at)
+        self.assertLess(sl_at, tp1_at)
+        self.assertLess(tp1_at, tp2_at)
+        self.assertIn("Attendre le retest", message)
         self.assertNotIn("bridge Pine", message)
         self.assertFalse(state.get("trade"))
-        self.assertFalse(state.get("ordre"))
+        self.assertEqual(state["ordre"]["e"], 100.0)
+        self.assertEqual(state["ordre"]["sl"], 95.0)
+        self.assertEqual(state["ordre"]["tp1"], 110.0)
 
     def test_required_bridge_missing_never_falls_back_to_local_entry(self):
         from unittest.mock import patch
@@ -3972,6 +3990,7 @@ class PineOnlyEntryGateTests(unittest.TestCase):
         r = self._market()
         r["require_tv_bridge"] = True
         r["tv_indicator_mtf"]["snapshots"]["M15"]["price"] = 102.0
+        r["tv_indicator_mtf"]["snapshots"]["M5"]["price"] = 102.0
         r["tv_indicator_mtf"]["snapshots"]["M15"]["robotV12"]["entryTriggered"] = True
         state = {"t1m": 0}
         with patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")), patch.object(align_bot, "pause_entree_marche", return_value=None), patch.object(align_bot, "bloque_dw", return_value=False), patch.object(align_bot, "profil_trade", return_value={"mode": "DAY"}), patch.object(align_bot, "memoire_refuse", return_value=(False, 0, 0)), patch.object(align_bot, "strategie_trade", return_value={"strat": "DAY"}):

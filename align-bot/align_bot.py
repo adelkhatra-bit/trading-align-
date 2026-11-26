@@ -288,7 +288,9 @@ def plan_indicateur(r):
     bridge = r.get("tv_indicator_mtf") or {}
     active_tf = str(bridge.get("activeTimeframe") or "").upper()
     plan_tf = "M15"
-    snap = (bridge.get("snapshots") or {}).get(plan_tf) or {}
+    snapshots = bridge.get("snapshots") or {}
+    snap = snapshots.get(plan_tf) or {}
+    active_snap = snapshots.get(active_tf) if active_tf else None
     robot = snap.get("robotV12") or {}
     try:
         entry, sl = float(robot.get("entry")), float(robot.get("sl"))
@@ -314,12 +316,14 @@ def plan_indicateur(r):
         return {"timeframe": plan_tf, "available": False, "reason": "snapshot TradingView canonique M15 périmé"}
     if snap.get("robotFresh") is False:
         return {"timeframe": plan_tf, "available": False, "reason": "plan ROBOT V12 M15 périmé"}
+    if not active_tf or not isinstance(active_snap, dict) or active_snap.get("fresh") is not True:
+        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView actif absent ou périmé"}
     try:
-        current_price = float(snap.get("price"))
+        current_price = float(active_snap.get("price"))
     except (TypeError, ValueError):
-        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView canonique M15 absent"}
+        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView actif absent"}
     if not math.isfinite(current_price) or current_price <= 0:
-        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView canonique M15 invalide"}
+        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView actif invalide"}
     if str(robot.get("planTimeframe") or "").upper() != "M15":
         return {"timeframe": plan_tf, "available": False, "reason": "référence du plan différente de M15"}
     strategy = str(robot.get("strategy") or "").upper()
@@ -12607,6 +12611,13 @@ def agent(m, r, cle, ferme):
     # Une position déjà ouverte reste suivie jusqu'à sa clôture ; aucune nouvelle info de marché.
     require_tv = bool(r.get("require_tv_bridge"))
     sans_signal = mode_sans_signal(r)
+    # En mode bridge obligatoire, le plan Pine v25 est la source de direction ET de prix.
+    # Ne pas imposer en amont le filtre local H1/H4 : il bloquait DAY/SCALPING pourtant
+    # confirmés par leurs propres clôtures MTF Pine.
+    plan_tv = plan_indicateur(r) if require_tv and not tr else None
+    if require_tv and not tr and plan_tv and plan_tv.get("available") is True:
+        d = int(plan_tv["direction"])
+        p = float(plan_tv["price"])
     if sans_signal and not tr:
         cause = (r.get("tv_indicator_mtf") or {}).get("detail") or (r.get("tv_indicator_mtf") or {}).get("reason") or "inconnue"
         print(f"{m} : mode sans signal, bridge TradingView indisponible — aucune alerte locale. Cause : {cause}")
@@ -12679,7 +12690,6 @@ def agent(m, r, cle, ferme):
             cle["aligne"] = d
             return out
 
-        plan_tv = plan_indicateur(r)
         if not plan_tv.get("available"):
             cle["prep"] = False
             cle.pop("ordre", None)
@@ -12716,7 +12726,9 @@ def agent(m, r, cle, ferme):
         risk = abs(entry - stop)
         atr15 = float(r.get("atr") or 0)
         rr = abs(tp1 - entry) / max(risk, 1e-9)
-        if risk <= 0 or atr15 <= 0 or risk > RISQUE_MAX * atr15 or rr < RR_MIN_ENTREE:
+        # Pine v25 / bridge a déjà validé RR >= 2 et le risque <= 1,5 ATR M15.
+        # Ne pas re-filtrer avec l'ATR Kraken/local : cela peut rejeter un plan TV valide.
+        if risk <= 0 or rr < RR_MIN_ENTREE:
             cle["prep"] = False
             cle.pop("ordre", None)
             out.append(f"⛔ {ICONE.get(m, '')} {m} : plan Pine M15 refusé par le filtre risque / rendement ALIGN.")
@@ -12745,10 +12757,12 @@ def agent(m, r, cle, ferme):
                 cle["pine_wait_bar"] = plan_tv["entry_bar_time"]
                 out.append((
                     f"🟡 PLAN PINE M15 — {ICONE.get(m, '')} {m}\n{SENS[d]}\n"
-                    f"🎯 Entrée : {px(entry)} • SL : {px(stop)} • TP1 : {px(tp1)}"
-                    + (f" • TP2 : {px(tp2)}" if tp2 is not None else "")
-                    + f"\n🟨 Zone verte : {px(plan_tv['zone_low'])} → {px(plan_tv['zone_high'])}"
-                    + f"\n⚪ Décision : {px(plan_tv['decision'])}"
+                    f"📍 Entrée : {px(entry)}\n"
+                    f"🛑 SL : {px(stop)}\n"
+                    f"💰 TP1 : {px(tp1)}"
+                    + (f"\n🏁 TP2 : {px(tp2)}" if tp2 is not None else "")
+                    + f"\n🟩 Zone d'entrée : {px(plan_tv['zone_low'])} → {px(plan_tv['zone_high'])}"
+                    + f"\n⚪ Ligne de décision : {px(plan_tv['decision'])}"
                     + f"\n⏳ Attendre le retest puis la clôture {plan_tv['entry_timeframe']} validée par Pine.\n"
                     "Aucune entrée n'est autorisée par une simple mèche."
                     + ferme, bouton_auto(m)
