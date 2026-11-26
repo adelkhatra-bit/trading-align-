@@ -165,40 +165,40 @@ function pick(liste) {
 function remplir(t, m) { return t.replace(/\{m\}/g, m.m).replace(/\{ut\}/g, m.ut).replace(/\{seuil\}/g, m.seuil).replace(/\{biais\}/g, BIAIS[m.biais] || m.biais).replace(/\{profil\}/g, m.profil); }
 var DIALOGUES = {
   calme: [
-    ["{m} est calme pour l'instant : {ut} unités alignées sur 11, il en faut {seuil}.", "On laisse le marché venir, rien à forcer."],
-    ["Sur {m}, ça respire. Le biais reste {biais}, mais rien n'est validé.", "Et on attend la clôture, pas une mèche."],
-    ["{ut}/11 sur {m} : le seuil de {seuil} n'est pas atteint.", "Donc aucune entrée proposée, on reste patients."],
-    ["Petit point {m} : peu de mouvement, profil visé {profil}.", "Le calme, c'est aussi une information."],
-    ["Côté {m}, les unités ne sont pas d'accord entre elles.", "Quand elles ne s'alignent pas, on ne force rien."],
-    ["{m} traîne un peu, {ut} unités sur 11 dans le même sens.", "On regarde, on note, on ne devance pas."]
+    ["{m} est calme pour l'instant : {ut} unités alignées sur 11, il en faut {seuil}.", "{m} is quiet for now: {ut} timeframes aligned out of 11; we need {seuil}."],
+    ["Sur {m}, ça respire. Le biais reste {biais}, mais rien n'est validé.", "On {m}, things are calm. The bias remains {biais}, but nothing is confirmed."],
+    ["{ut}/11 sur {m} : le seuil de {seuil} n'est pas atteint.", "{ut} out of 11 timeframes on {m}: the {seuil} threshold has not been reached."],
+    ["Petit point {m} : peu de mouvement, profil visé {profil}.", "A quick {m} update: low activity, target profile {profil}."],
+    ["Côté {m}, les unités ne sont pas d'accord entre elles.", "On {m}, the timeframes are not aligned with each other."],
+    ["{m} traîne un peu, {ut} unités sur 11 dans le même sens.", "{m} is moving slowly, with {ut} out of 11 timeframes pointing in the same direction."]
   ],
   preparation: [
-    ["{m} se prépare : {ut}/11 alignées, biais {biais}.", "Attention, préparer ne veut pas dire entrer. On attend la validation."],
-    ["Ça bouge sur {m}, le profil {profil} se dessine.", "Les niveaux précis sont sur Telegram, ici on reste sur la lecture."],
-    ["{m} s'approche d'une zone de décision.", "Une bougie doit d'abord clôturer au bon endroit, sinon rien."],
-    ["Sur {m}, {ut} unités vont dans le même sens.", "C'est encourageant, mais le seuil et la clôture décident."],
-    ["{m} : mise en place en cours, biais {biais}.", "On garde la tête froide, le plan passe avant l'envie."],
-    ["Le scénario {profil} prend forme sur {m}.", "Et il peut s'annuler à la prochaine clôture, comme toujours."]
+    ["{m} se prépare : {ut}/11 alignées, biais {biais}.", "{m} is setting up: {ut} out of 11 timeframes aligned, with a {biais} bias."],
+    ["Ça bouge sur {m}, le profil {profil} se dessine.", "Things are moving on {m}; the {profil} setup is taking shape."],
+    ["{m} s'approche d'une zone de décision.", "{m} is approaching a decision zone."],
+    ["Sur {m}, {ut} unités vont dans le même sens.", "On {m}, {ut} timeframes are pointing in the same direction."],
+    ["{m} : mise en place en cours, biais {biais}.", "{m}: the setup is developing, with a {biais} bias."],
+    ["Le scénario {profil} prend forme sur {m}.", "The {profil} scenario is taking shape on {m}."]
   ],
   entree: [
-    ["Une position est en cours sur {m}.", "Les niveaux sont dans Telegram, le suivi aussi. Ici on commente seulement."],
-    ["{m} : l'entrée a été validée par l'indicateur.", "Chacun reste responsable de sa gestion du risque."],
-    ["Sur {m}, le plan {profil} est actif.", "On surveille les clôtures, pas les émotions."],
-    ["{m} est en mouvement, biais {biais}.", "Le stop existe pour protéger le capital, on le respecte."]
+    ["Une position est en cours sur {m}.", "A position is now active on {m}."],
+    ["{m} : l'entrée a été validée par l'indicateur.", "{m}: the indicator has confirmed the entry."],
+    ["Sur {m}, le plan {profil} est actif.", "On {m}, the {profil} plan is now active."],
+    ["{m} est en mouvement, biais {biais}.", "{m} is moving, with a {biais} bias."]
   ],
   ferme: [
-    ["{m} est fermé pour le moment.", "On profite pour préparer la reprise, sans rien inventer."],
-    ["Pause sur {m} : le marché dort.", "Rendez-vous à la réouverture."],
-    ["Pas de cotation sur {m} en ce moment.", "Donc pas d'analyse, juste de la patience."]
+    ["{m} est fermé pour le moment.", "{m} is currently closed."],
+    ["Pause sur {m} : le marché dort.", "A pause on {m}: the market is quiet."],
+    ["Pas de cotation sur {m} en ce moment.", "There are no current quotes for {m}."]
   ],
   perime: [
-    ["Les données sont en pause pour l'instant.", "On ne commente pas ce qu'on ne peut pas vérifier."],
-    ["Petit trou dans la mise à jour.", "Dès que le flux revient, on reprend."]
+    ["Les données sont en pause pour l'instant.", "The market data feed is temporarily paused."],
+    ["Petit trou dans la mise à jour.", "There is a brief gap in the data feed."]
   ],
   liens: [
-    ["Rappel : ce live explique la lecture du marché, rien de plus.", "Pas un conseil financier, chacun décide pour soi."],
-    ["Le risque de perte existe toujours en trading.", "Un plan, un stop, et pas plus que ce qu'on peut perdre."],
-    ["Les niveaux détaillés seront publiés sur le Telegram gratuit " + BOT + " après confirmation du signal.", "Et le plan prime toujours sur l'impatience."]
+    ["Rappel : ce live explique la lecture du marché, rien de plus.", "A reminder: this live stream explains our market reading, nothing more."],
+    ["Le risque de perte existe toujours en trading.", "Trading always involves the risk of loss."],
+    ["Les niveaux détaillés seront publiés sur le Telegram gratuit " + BOT + " après confirmation du signal.", "Detailed levels are posted on the free Telegram channel after the signal is confirmed."]
   ]
 };
 function publierDialogueCoachPair(speaker1, text1, speaker2, text2, market) {
@@ -230,7 +230,8 @@ function echange() {
   else { m = donnees.marches[Math.floor(Math.random() * donnees.marches.length)]; cat = ETATS[m.etat] ? m.etat : "calme"; }
   var paire = pick(DIALOGUES[cat].map(function (p, i) { return i; }).map(function (i) { return DIALOGUES[cat][i][0] + "§" + i; }));
   var i = parseInt(paire.split("§")[1], 10), dialogue = DIALOGUES[cat][i];
-  var premier = tour % 2 === 0 ? "t" : "l", second = premier === "t" ? "l" : "t";
+  // Duo fixe : Thomas annonce en français, Leïla reformule en anglais.
+  var premier = "t", second = "l";
   var texte1 = remplir(dialogue[0], m), texte2 = remplir(dialogue[1], m);
   var timing = publierDialogueCoachPair(premier, texte1, second, texte2, m.m);
   var debut = Math.max(0, timing.startAt - Date.now());
