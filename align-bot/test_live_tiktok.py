@@ -340,7 +340,7 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("montrer(txt, bulle, 2, '', false, bulle ? 'marche' : 'live')", source)  # BULLE de marché envoyée au vocal
         self.assertIn("const traductionEN = enAnglais(texte), anglaisTraduit = traductionEN !== texte", source)
         self.assertIn("item.source === 'marche' && !item.anglaisTraduit", source)  # évite la voix anglaise sur une bulle restée en français
-        self.assertIn("item.source !== 'ia' && item.source !== 'marche'", source)
+        self.assertIn("!['ia', 'marche', 'coach'].includes(item.source)", source)
         self.assertIn("voiceschanged", source)  # voix navigateur parfois disponibles après document-idle
         self.assertIn("removeEventListener('voiceschanged', voixSurVoixChangees)", source)  # listener nettoyé à la réinjection
         self.assertIn("voixEnAttente = item", source)  # commentaire FR retenté quand la liste de voix arrive
@@ -859,7 +859,7 @@ class LiveAgendaMarketTimezoneTests(unittest.TestCase):
         handler = bande[bande.index("if (txt.startsWith('NEWS:'))"):bande.index("if (txt.startsWith('CMD:pnl:'))")]
         self.assertIn("montrer(t, false, 2, 'danger', true, 'marche')", handler)
         vocal = bande[bande.index("function parlerLive("):bande.index("function recuIA(")]
-        self.assertIn("item.source !== 'ia' && item.source !== 'marche'", vocal)
+        self.assertIn("!['ia', 'marche', 'coach'].includes(item.source)", vocal)
         # Les breaking news restent visuellement une alerte, mais déclenchent aussi la narration FR puis EN.
         self.assertIn("voiceOnce: source === 'marche' && (bulle || g === 'danger') && i === 0", bande)
         self.assertIn("if (source === 'marche' && (bulle || g === 'danger') && anglaisTraduit)", bande)
@@ -880,17 +880,11 @@ class LiveAgendaMarketTimezoneTests(unittest.TestCase):
 
     def test_bande_visual_animations_are_initialized_and_preserved(self):
         bande = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")).read_text(encoding="utf-8")
-        self.assertIn("// @version      12.2.26", bande)
-        self.assertIn("const VERSION = '12.2.26';", bande)
-        self.assertIn("function signalVoix(action, lang, speaker)", bande)
-        self.assertIn("function choisirVoix(lang, speaker = 't')", bande)
-        self.assertIn("const speaker = anglais ? 'l' : 't'", bande)
-        self.assertIn("signalVoix('COACH_ON', 'fr')", bande)
-        self.assertIn("signalVoix('COACH_OFF', 'fr')", bande)
-        self.assertIn("signalVoix('START', anglais ? 'en' : 'fr', speaker)", bande)
+        self.assertIn("// @version      12.2.25", bande)
+        self.assertIn("const VERSION = '12.2.25';", bande)
         self.assertIn("document.head.appendChild(cssAnimationsToggle);\n  appliquerAnimations();", bande)
         self.assertIn("function afficherIA(", bande)
-        self.assertIn("function parlerLive(item, forcer = false)", bande)
+        self.assertIn("function parlerLive(item, forcer = false, apresLecture = null)", bande)
         self.assertIn("function coeurs(", bande)
 
 
@@ -1210,11 +1204,12 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", *rel)
         return Path(path).read_text(encoding="utf-8")
 
-    def test_bande_version_12_2_26_two_host_voice_recovery_and_sync(self):
+    def test_bande_version_12_2_25_voice_recovery_and_sync(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
-        self.assertIn("// @version      12.2.26", bande)
-        self.assertIn("const VERSION = '12.2.26';", bande)
+        self.assertIn("// @version      12.2.25", bande)
+        self.assertIn("const VERSION = '12.2.25';", bande)
         self.assertIn('let voixUtterance = null', bande)
+        self.assertIn('const voixUtterances = new Set()', bande)
         self.assertIn('voixUtterance = utterance;', bande)
         self.assertIn("setInterval(pingEcran, 45000)", bande)
         self.assertIn("__ALIGN_LIVE_SCREEN_OWNER_V1__", bande)
@@ -1253,7 +1248,7 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         self.assertIn("dernierCommentaireIA = { fr: m, en: m.replayEN || null, market: m.market || '' }", bande)
         self.assertIn("const dureeFR = dernier.fr ? parlerLive(dernier.fr, true) : 0", bande)
         self.assertIn("if (dureeFR > 0 && dernier.en && dernier.en.anglaisTraduit) parlerLive(dernier.en, true)", bande)
-        self.assertIn("function parlerLive(item, forcer = false)", bande)
+        self.assertIn("function parlerLive(item, forcer = false, apresLecture = null)", bande)
         self.assertNotIn("Le coach ALIGN est en direct", bande)
         self.assertNotIn("I am now commenting on market action", bande)
 
@@ -1291,11 +1286,9 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
     def test_extension_popup_ne_parle_plus(self):
         """La voix est portée par la bande live ; OFF coupe la parole et aucune voix robot n'est utilisée."""
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
-        self.assertIn("function parlerLive(item, forcer = false)", bande)
+        self.assertIn("function parlerLive(item, forcer = false, apresLecture = null)", bande)
         self.assertIn("if (!vivant || !item || !voixActive", bande)
         self.assertIn("return dansLangue.find(v => VOIX_NATURELLES.test(v.name) && filtreRole.test(v.name)) || null;", bande)
-        self.assertIn("const role = speaker === 'l' ? 'l' : 't';", bande)
-        self.assertIn("const filtreRole = VOIX_PAR_ROLE[role][langue];", bande)
         self.assertIn("window.speechSynthesis.cancel()", bande)
 
     def test_pine_plus_de_point_entree_trace(self):
