@@ -130,7 +130,7 @@ class FibonacciCommentateurLive(unittest.TestCase):
         self.assertIn("const pool = Object.keys(iaPools).length ? (iaPools[m] || []) : iaPool", self.js)
         self.assertIn("afficherIA(pool[iaN++ % pool.length])", self.js)
         self.assertIn("voixBtn.addEventListener", self.js)
-        self.assertIn("if (!voixActive", self.js)
+        self.assertIn("if (!vivant || !item || !voixActive", self.js)
         self.assertIn("speechSynthesis.speak(utterance)", self.js)
         self.assertNotIn("voirFiboProgression", self.js)
         self.assertIn("@updateURL    https://raw.githubusercontent.com/adelkhatra-bit/trading-align-/main/docs/live/align-bande-live.user.js", self.js)
