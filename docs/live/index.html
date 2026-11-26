@@ -221,18 +221,53 @@ function parler(qui, texte) {
   document.getElementById("b-" + autre).classList.remove("visible");
   bulle.innerHTML = "<small>" + (qui === "t" ? "Thomas" : "Leïla") + "</small>" + texte; bulle.classList.add("visible");
 }
+// Commentaires factuels : une réplique uniquement lorsqu'un champ public de marché change.
+// Aucun prix ni niveau technique n'est calculé ou annoncé par cette scène.
+var dernierEtatCoachParMarche = {};
+var dernierHoteCoach = "t";
+function construireCommentaireEtat(m) {
+  var nom = String(m.m || "").toUpperCase();
+  var etat = String(m.etat || "");
+  var biais = BIAIS[m.biais] || "indécis";
+  var ut = Math.max(0, Number(m.ut) || 0);
+  var seuil = Math.max(1, Number(m.seuil) || 8);
+  var profil = String(m.profil || "non défini");
+  var premiere;
+  if (etat === "calme") {
+    premiere = nom + " reste calme. Le biais publié est " + biais + ", avec " + ut + " unités alignées sur " + seuil + ".";
+  } else if (etat === "preparation") {
+    premiere = nom + " passe en préparation. Biais " + biais + ", " + ut + " unités alignées sur " + seuil + ", profil " + profil + ".";
+  } else if (etat === "entree") {
+    premiere = "Le flux public indique l'état entrée sur " + nom + ". Vérifie la confirmation et les niveaux sur Telegram.";
+  } else if (etat === "ferme") {
+    premiere = nom + " est fermé. Aucune nouvelle lecture de marché n'est annoncée.";
+  } else {
+    return null;
+  }
+  return [
+    premiere,
+    "Nous commentons uniquement l'état public reçu. Les points d'entrée, le stop et les objectifs restent ceux confirmés par l'indicateur et le robot."
+  ];
+}
 function echange() {
-  tour++;
-  var age = donnees ? Date.now() / 1000 - donnees.maj : 1e9;
-  var cat, m;
-  if (!donnees || !donnees.marches || !donnees.marches.length || age > 600) { cat = "perime"; m = { m: "", ut: 0, seuil: 8, biais: "", profil: "" }; }
-  else if (tour % 5 === 0) { cat = "liens"; m = donnees.marches[0]; }
-  else { m = donnees.marches[Math.floor(Math.random() * donnees.marches.length)]; cat = ETATS[m.etat] ? m.etat : "calme"; }
-  var paire = pick(DIALOGUES[cat].map(function (p, i) { return i; }).map(function (i) { return DIALOGUES[cat][i][0] + "§" + i; }));
-  var i = parseInt(paire.split("§")[1], 10), dialogue = DIALOGUES[cat][i];
-  var premier = tour % 2 === 0 ? "t" : "l", second = premier === "t" ? "l" : "t";
-  var texte1 = remplir(dialogue[0], m), texte2 = remplir(dialogue[1], m);
-  var timing = publierDialogueCoachPair(premier, texte1, second, texte2, m.m);
+  var age = donnees ? Date.now() / 1000 - Number(donnees.maj || 0) : 1e9;
+  if (!donnees || !Array.isArray(donnees.marches) || age > 600) return;
+  var changement = null;
+  for (var i = 0; i < donnees.marches.length; i++) {
+    var m = donnees.marches[i];
+    var nom = String(m.m || "").toUpperCase();
+    if (nom !== "BTC" && nom !== "GOLD") continue;
+    var signature = [m.etat, m.biais, m.ut, m.seuil, m.profil].join("|");
+    if (dernierEtatCoachParMarche[nom] === signature) continue;
+    dernierEtatCoachParMarche[nom] = signature;
+    var textes = construireCommentaireEtat(m);
+    if (textes) { changement = { market: nom, textes: textes }; break; }
+  }
+  if (!changement) return;
+  var premier = dernierHoteCoach, second = premier === "t" ? "l" : "t";
+  dernierHoteCoach = second;
+  var texte1 = changement.textes[0], texte2 = changement.textes[1];
+  var timing = publierDialogueCoachPair(premier, texte1, second, texte2, changement.market);
   var debut = Math.max(0, timing.startAt - Date.now());
   setTimeout(function () { parler(premier, texte1); }, debut);
   setTimeout(function () { parler(second, texte2); }, debut + timing.duration1 + 500);
