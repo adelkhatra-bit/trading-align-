@@ -343,7 +343,7 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("!['ia', 'marche', 'coach'].includes(item.source)", source)
         self.assertIn("voiceschanged", source)  # voix navigateur parfois disponibles après document-idle
         self.assertIn("removeEventListener('voiceschanged', voixSurVoixChangees)", source)  # listener nettoyé à la réinjection
-        self.assertIn("voixEnAttente = item", source)  # commentaire FR retenté quand la liste de voix arrive
+        self.assertIn("voixEnAttente = { item, apresLecture };", source)  # commentaire et callback conservés jusqu’au chargement des voix
         self.assertIn("hortense|audrey|julie|charlotte", source)  # noms courants de voix FR, sans repli robot
         self.assertIn("localStorage.removeItem('alignVoixActive')", source)  # ON persisted ne contourne pas la gesture audio
         self.assertNotIn("Le coach ALIGN est en direct", source)  # v12.2.8 : plus de phrase d'accueil
@@ -1233,7 +1233,7 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         self.assertIn("retry-after:", bande)
         self.assertIn("'Content-Type': 'text/plain; charset=utf-8'", bande)
         self.assertIn("voiceschanged", bande)
-        self.assertIn("voixEnAttente = item", bande)
+        self.assertIn("voixEnAttente = { item, apresLecture };", bande)
         self.assertIn("bulle ? 'marche' : 'live'", bande)
 
     def test_voice_button_replays_last_visible_ai_comment_in_french_then_english(self):
@@ -1242,7 +1242,8 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         self.assertIn("market: (source === 'ia' || source === 'marche') ? codeMarche() : ''", bande)
         self.assertIn("voiceOnce: source === 'marche' && (bulle || g === 'danger') && i === 0", bande)
         self.assertIn("if (dernier && dernier.market && dernier.market === codeMarche())", bande)
-        self.assertIn("attente.source !== 'ia' || (attente.market && attente.market === codeMarche())", bande)
+        self.assertIn("const item = attente.item;", bande)
+        self.assertIn("if (item.source === 'ia' && (!item.market || item.market !== codeMarche())) return;", bande)
         self.assertIn("items[i].replayEN = commentaireEN", bande)
         self.assertIn("if (dureeFR > 0 && attente.replayEN && attente.replayEN.anglaisTraduit) parlerLive(attente.replayEN, true)", bande)
         self.assertIn("dernierCommentaireIA = { fr: m, en: m.replayEN || null, market: m.market || '' }", bande)
@@ -1275,7 +1276,7 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         self.assertNotIn("utterance.voice = dansLangue[0]", bande)
         self.assertNotIn("dansLangue[0]", bande)
         self.assertIn("if (!v) {", bande)
-        self.assertIn("if (!anglais && voixActive) voixEnAttente = item;", bande)
+        self.assertIn("if (!anglais && voixActive) voixEnAttente = { item, apresLecture };", bande)
         self.assertIn("return 0;   // aucune voix naturelle disponible : silence plutôt qu'une voix robot", bande)
         self.assertIn("utterance.voice = v;", bande)
 
