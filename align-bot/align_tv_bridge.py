@@ -453,13 +453,11 @@ class BridgeStore:
             for tf in REQUIRED_TIMEFRAMES:
                 item = normalized_mtf[tf]
                 previous = dict(previous_snapshots.get(tf) or {})
-                previous_bar = int(previous.get("barTime") or 0)
                 previous_update = int(previous.get("updatedAt") or 0)
-                incoming_is_newer = (
-                    not previous
-                    or item["barTime"] > previous_bar
-                    or (item["barTime"] == previous_bar and source_timestamp >= previous_update)
-                )
+                # Order by alert source timestamp, not candle time: a recent alert
+                # carrying an old H1/D1/W1 candle must be accepted as stale and block
+                # signals; only an actually delayed alert may be ignored.
+                incoming_is_newer = not previous or source_timestamp >= previous_update
                 if incoming_is_newer:
                     snapshot = {
                         "fresh": True,
