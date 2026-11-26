@@ -85,6 +85,17 @@ This procedure applies to the repository owner and explicitly authorized human m
 9. **Evidence-based handoff.** Report exact branch and SHA, files, diff, tests and workflow URLs, runtime checks not performed, residual risks, and rollback path. Never claim a change or external process ran without evidence.
 10. No human or automated process may place a real broker order through this maintenance workflow. Production trading remains subject to the separate explicit trading safety constraints above.
 
+
+## Terminologie obligatoire — animations sur TradingView
+
+- Quand le propriétaire dit « animations », « animations ALIGN », « bulles », « bande live » ou « coach vocal sur TradingView », la cible par défaut est **l'overlay Tampermonkey `docs/live/align-bande-live.user.js` exécuté directement sur les graphiques `https://*.tradingview.com/chart/*`**. C'est la surface visuelle principale : bande animée, bulles, effets, commandes, commentaires IA et lecture vocale navigateur.
+- Ne jamais interpréter une demande d'« animations sur TradingView » comme une demande d'ouvrir, modifier ou rétablir l'interface de la page GitHub Pages `/live/`. Ne jamais présenter cette page comme l'interface quotidienne du propriétaire.
+- `docs/live/index.html` est une **scène auxiliaire de diffusion**, transparente et conçue pour TikTok LIVE Studio. Elle lit le résumé public `live-data/live.json`, publie les dialogues du duo Thomas/Leïla dans le canal `LIVE_SHOW` et anime leurs avatars/bouches à partir des événements vocaux du userscript. Elle n'est ni l'overlay TradingView ni le panneau de commande Tampermonkey.
+- Le Worker Cloudflare `align-tv-mailbox` et son Durable Object `LIVE_SHOW` sont des dépendances de synchronisation entre la scène et l'overlay. Ne pas les débrancher au motif que le propriétaire n'utilise pas la page `/live/`. Toute suppression ou migration doit d'abord prouver que le producteur de dialogues est repris ailleurs et que le coach vocal sur TradingView reste autonome et testé.
+- La voix entendue sur TradingView est prononcée par `window.speechSynthesis` dans le navigateur, uniquement après activation explicite de « COACH VOCAL ON ». Les événements START/STOP synchronisent seulement l'animation des avatars de la scène ; ils ne transportent pas l'audio vers TradingView. Distinguer impérativement « état vocal activé », « voix système compatible trouvée », « synthèse démarrée » et « son réellement entendu ».
+- À chaque tâche liée aux animations, vérifier séparément : script Tampermonkey réellement installé et version, exécution sur un graphique TradingView, contrôles visibles, animations activées, commentaires IA reçus, voix navigateur disponibles par langue/locuteur, état `LIVE_SHOW`, et synchronisation START/STOP. Une page `/live/` HTTP 200 ou un Worker sain ne prouve pas que l'overlay ni l'audio fonctionnent.
+- Ne jamais remplacer les animations TradingView par la scène `/live/`, ni modifier leur design, leur placement, leurs effets ou leur comportement sans demande explicite. Préserver toutes les fonctions Claude-era v12.2.
+
 ## External code-agent access is disabled
 
 - ALIGN does not use GitHub Copilot CLI relays, Copilot cloud-agent assignment, repository custom-agent profiles, or automated code-agent handoffs.
