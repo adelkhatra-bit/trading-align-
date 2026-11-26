@@ -78,6 +78,38 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertEqual(result["activeTimeframeAgeMs"], 1200)
         self.assertEqual(result["receivedTimeframes"], ["M5", "M15"])
 
+    def test_fetch_tv_mtf_accepts_all_supported_short_chart_timeframes(self):
+        class FakeResponse:
+            def __init__(self, active):
+                self.active = active
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self):
+                payload = {
+                    "ok": True, "symbol": "XAUUSD", "activeTimeframe": self.active,
+                    "activeTimeframeFresh": True, "canonicalPlanTimeframe": "M15",
+                    "canonicalPlanFresh": True, "snapshots": {
+                        self.active: {"fresh": True},
+                        "M15": {"fresh": True, "robotFresh": True, "robotV12": {"signal": "LONG"}},
+                    },
+                }
+                return json.dumps(payload).encode()
+
+        old_url, old_token = align_bot.ALIGN_TV_API_URL, align_bot.ALIGN_TV_READ_TOKEN
+        align_bot.ALIGN_TV_API_URL, align_bot.ALIGN_TV_READ_TOKEN = "https://align.example", "test-token"
+        try:
+            for timeframe in ("M3", "M10", "M45"):
+                with self.subTest(timeframe=timeframe), unittest.mock.patch(
+                    "align_bot.urllib.request.urlopen", return_value=FakeResponse(timeframe)
+                ):
+                    result = align_bot.fetch_tv_mtf("XAUUSD")
+                    self.assertTrue(result["available"])
+                    self.assertEqual(result["activeTimeframe"], timeframe)
+        finally:
+            align_bot.ALIGN_TV_API_URL, align_bot.ALIGN_TV_READ_TOKEN = old_url, old_token
+
     def test_fetch_tv_mtf_fails_closed_without_fresh_canonical_m15_plan(self):
         class FakeResponse:
             def __enter__(self):
