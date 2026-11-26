@@ -69,14 +69,14 @@ var ETATS = { calme: "Marché calme", preparation: "En préparation", entree: "E
 var donnees = null, vu = 0, recents = [], tour = 0;
 // Sync the two hosts with the TradingView coach and give each host its own French voice.
 var voixEventSource = null, voixHoteActif = 't', voixStopTimer = null;
-var coachActif = false, voixSourceChartActive = false, voixOverlayUtterance = null, voixOverlayAttente = null;
+var coachActif = false, voixSourceChartActive = false, voixOverlayUtterance = null, voixOverlayAttentes = [];
 function arreterVoixOverlay() {
   if (voixStopTimer) { clearTimeout(voixStopTimer); voixStopTimer = null; }
   document.getElementById('av-t').classList.remove('parle');
   document.getElementById('av-l').classList.remove('parle');
 }
 function annulerVoixDialogue() {
-  voixOverlayAttente = null;
+  voixOverlayAttentes = [];
   try { window.speechSynthesis.cancel(); } catch (e) {}
   voixOverlayUtterance = null;
   arreterVoixOverlay();
@@ -95,7 +95,7 @@ function direDialogue(qui, texte) {
   if (!coachActif || voixSourceChartActive || !('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return;
   var voix = choisirVoixHote(qui);
   if (!voix) {
-    if (!(window.speechSynthesis.getVoices() || []).length) voixOverlayAttente = { qui: qui, texte: texte };
+    if (!(window.speechSynthesis.getVoices() || []).length) { if (voixOverlayAttentes.length >= 4) voixOverlayAttentes.shift(); voixOverlayAttentes.push({ qui: qui, texte: texte }); }
     return;
   }
   try {
@@ -113,8 +113,8 @@ function direDialogue(qui, texte) {
 if ('speechSynthesis' in window) {
   try {
     window.speechSynthesis.addEventListener('voiceschanged', function () {
-      var attente = voixOverlayAttente; voixOverlayAttente = null;
-      if (attente && coachActif && !voixSourceChartActive) direDialogue(attente.qui, attente.texte);
+      var attentes = voixOverlayAttentes.splice(0);
+      if (coachActif && !voixSourceChartActive) attentes.forEach(function (attente) { direDialogue(attente.qui, attente.texte); });
     });
   } catch (e) {}
 }
