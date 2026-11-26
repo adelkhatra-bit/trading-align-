@@ -1220,6 +1220,14 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         self.assertIn("!prendreLeaseHeartbeat()", bande)
         self.assertIn("programmerReconnexionEcoute(30000)", bande)
         self.assertIn("programmerReconnexionEcoute(15000)", bande)
+        # SSE message handlers ignore stale EventSource callbacks after a reconnect or stop.
+        self.assertIn("if (!vivant || es !== source) return;", bande)
+        self.assertIn("if (!vivant || !item", bande)
+        # IA commentaires use the on-chart animated bubble plus spoken French then English.
+        self.assertIn("coeurs(1, ['🧠', '📡'], undefined, phrase, anglais)", bande)
+        self.assertIn("const dureeFR = parlerLive(fr)", bande)
+        self.assertIn("if (dureeFR > 0 && en.anglaisTraduit) parlerLive(en)", bande)
+        self.assertIn("lueur(0)", bande)
         self.assertIn("Math.min(Number(retryAfterMs) || 0, 86400000)", bande)
         self.assertIn("retry-after:", bande)
         self.assertIn("'Content-Type': 'text/plain; charset=utf-8'", bande)
