@@ -187,8 +187,8 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn("bridgeEntryBeforeStopUi", self.pine)
         self.assertIn("entryTriggeredUi = bridgeConfirmed and bridgeEntryFreshUi", self.pine)
         self.assertIn("line.set_color(lZH, dirPlan == 1 ? color.lime : color.red)", self.pine)
-        self.assertIn("🟢 ENTRÉE LONG VALIDÉE", self.pine)
-        self.assertIn("🔴 ENTRÉE SHORT VALIDÉE", self.pine)
+        self.assertIn("🟢 DÉCLENCHEUR LONG VALIDÉ", self.pine)
+        self.assertIn("🔴 DÉCLENCHEUR SHORT VALIDÉ", self.pine)
 
     def test_market_scope_remains_btc_and_gold_only_in_indicator(self):
         self.assertIn('bridgeMarket = isBtc ? "BTCUSD" : isGold ? "XAUUSD" : "UNSUPPORTED"', self.pine)
