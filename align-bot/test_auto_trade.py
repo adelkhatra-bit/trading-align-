@@ -171,5 +171,24 @@ class TestContreTendance(unittest.TestCase):
         self.assertLess(c, n)
 
 
+class TestValidationNiveaux(unittest.TestCase):
+    def test_refuse_niveaux_inverses_sans_appel_api(self):
+        invalides = [
+            {"marche": "BTC", "sens": "LONG", "e": 100, "sl": 110, "tp": 120},
+            {"marche": "BTC", "sens": "SHORT", "e": 100, "sl": 90, "tp": 80},
+            {"marche": "BTC", "sens": "LONG", "e": 100, "sl": 90, "tp": 120, "tp2": 115},
+        ]
+        with unittest.mock.patch.object(at, "_api") as api:
+            for signal in invalides:
+                result = at.executer({"auto_marches": {"BTC": True}}, signal)
+                self.assertFalse(result[0]["ok"])
+                self.assertIn("niveaux", result[0]["raison"])
+            api.assert_not_called()
+
+    def test_accepte_niveaux_orientes_correctement(self):
+        self.assertTrue(at.niveaux_valides({"sens": "LONG", "e": 100, "sl": 90, "tp": 120})[0])
+        self.assertTrue(at.niveaux_valides({"sens": "SHORT", "e": 100, "sl": 110, "tp": 80})[0])
+
+
 if __name__ == "__main__":
     unittest.main()
