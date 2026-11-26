@@ -299,10 +299,11 @@
   function voixSurVoixChangees() {
     rafraichirVoix();
     const attente = voixEnAttente; voixEnAttente = null;
-    if (voixActive && attente && (attente.source !== 'ia' || (attente.market && attente.market === codeMarche()))) {
-      const dureeFR = parlerLive(attente, true);
-      if (dureeFR > 0 && attente.replayEN && attente.replayEN.anglaisTraduit) parlerLive(attente.replayEN, true);
-    }
+    if (!voixActive || !attente || !attente.item) return;
+    const item = attente.item;
+    if (item.source === 'ia' && (!item.market || item.market !== codeMarche())) return;
+    const dureeFR = parlerLive(item, true, attente.apresLecture);
+    if (dureeFR > 0 && item.replayEN && item.replayEN.anglaisTraduit) parlerLive(item.replayEN, true);
   }
   if ('speechSynthesis' in window) {
     try { window.speechSynthesis.addEventListener('voiceschanged', voixSurVoixChangees); } catch (e) {}
@@ -418,8 +419,8 @@
       const v = choisirVoix(anglais ? 'en' : 'fr', speaker);
       if (!v) {
         // Les voix sont souvent chargées après document-idle : retenter le commentaire FR quand voiceschanged arrive.
-        if (!anglais && voixActive) voixEnAttente = item;
-        return 0;   // aucune voix naturelle disponible : silence plutôt qu'une voix robot
+        if (!anglais && voixActive) voixEnAttente = { item, apresLecture };
+        return 0;   // reprise à voiceschanged, callback conservé pour ne pas perdre la deuxième voix
       }
       utterance.voice = v;
       utterance.rate = 1.04;     // ton d'animateur : un peu plus vif
@@ -444,9 +445,9 @@
         if (continuer && typeof apresLecture === 'function') apresLecture();
       };
       utterance.onend = () => terminerLecture(true);
-      utterance.onerror = event => {
-        const error = String(event && event.error || '').toLowerCase();
-        terminerLecture(!['canceled', 'interrupted'].includes(error));
+      utterance.onerror = () => {
+        // Une erreur n'est pas une fin de lecture réussie : ne jamais lancer le second locuteur.
+        terminerLecture(false);
       };
       window.speechSynthesis.speak(utterance);
       if (anglais) { voixTexteEN = phrase; voixDerniereFR = 0; }
