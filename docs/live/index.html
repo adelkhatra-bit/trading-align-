@@ -67,35 +67,56 @@ var ICONES = { BTC: "🟠", GOLD: "🥇" };
 var BIAIS = { haussier: "haussier", baissier: "baissier", indecis: "indécis" };
 var ETATS = { calme: "Marché calme", preparation: "En préparation", entree: "Entrée en cours", ferme: "Marché fermé", perime: "Données en pause" };
 var donnees = null, vu = 0, recents = [], tour = 0;
-var SUJET = "align-live-2a4bccafd9548d93";
-// Sync each mouth to the explicit speaker role emitted by the TradingView userscript.
-var voixEventSource = null, voixHoteActif = 't', voixStopTimer = null;
+var WORKER_SHOW_URL = "https://align-tv-mailbox.adel-khatra.workers.dev";
+var voixHoteActif = 't', voixStopTimer = null, voixPollTimer = null, voixPollBusy = false;
+var voixEnabled = false, dernierVoiceTs = 0;
 function arreterVoixOverlay() {
   if (voixStopTimer) { clearTimeout(voixStopTimer); voixStopTimer = null; }
   document.getElementById('av-t').classList.remove('parle');
   document.getElementById('av-l').classList.remove('parle');
 }
 function ecouterVoixOverlay() {
-  try { if (voixEventSource) voixEventSource.close(); } catch (e) {}
-  voixEventSource = new EventSource('https://ntfy.sh/' + SUJET + '-voix/sse');
-  voixEventSource.onmessage = function (e) {
+  if (voixPollTimer) return;
+  async function poll() {
+    if (voixPollBusy) return;
+    voixPollBusy = true;
     try {
-      var data = JSON.parse(e.data);
-      if (data.event !== 'message' || typeof data.message !== 'string') return;
-      var parts = data.message.split('|');
-      if (parts.length < 4 || parts[0] !== 'ALIGN_VOICE') return;
-      if (parts[1] === 'START') {
-        arreterVoixOverlay();
-        // Nouveau protocole : le locuteur est transmis. Ancien protocole : alternance conservée.
-        var speaker = (parts[2] === 't' || parts[2] === 'l')
-          ? parts[2] : (voixHoteActif === 't' ? 'l' : 't');
-        voixHoteActif = speaker;
-        document.getElementById('av-' + voixHoteActif).classList.add('parle');
-        voixStopTimer = setTimeout(arreterVoixOverlay, 30000);
-      } else if (parts[1] === 'STOP') arreterVoixOverlay();
-    } catch (err) { arreterVoixOverlay(); }
-  };
-  voixEventSource.onerror = function () { arreterVoixOverlay(); };
+      var response = await fetch(WORKER_SHOW_URL + '/show/state', { cache: 'no-store' });
+      if (!response.ok) return;
+      var state = await response.json();
+      var enabled = state.voiceEnabled === true;
+      if (!enabled) {
+        if (voixEnabled) arreterVoixOverlay();
+        voixEnabled = false;
+        dernierVoiceTs = Math.max(dernierVoiceTs, Number(state.voiceUpdatedAt || 0));
+        return;
+      }
+      if (!voixEnabled) {
+        voixEnabled = true;
+        dernierVoiceTs = Math.max(dernierVoiceTs, Number(state.voiceUpdatedAt || 0));
+      }
+      var voice = state.voice;
+      var ts = Number(voice && voice.ts || 0);
+      if (!voice || !ts || ts <= dernierVoiceTs) return;
+      dernierVoiceTs = ts;
+      if (voice.action === 'STOP') { arreterVoixOverlay(); return; }
+      if (voice.action !== 'START') return;
+      var elapsed = Math.max(0, Date.now() - ts);
+      var remaining = Number(voice.durationMs || 0) - elapsed;
+      if (remaining <= 0) return;
+      var speaker = voice.speaker === 'l' ? 'l' : 't';
+      arreterVoixOverlay();
+      voixHoteActif = speaker;
+      if (voice.text) parler(speaker, String(voice.text));
+      document.getElementById('av-' + speaker).classList.add('parle');
+      voixStopTimer = setTimeout(arreterVoixOverlay, remaining);
+    } catch (err) {
+    } finally {
+      voixPollBusy = false;
+    }
+  }
+  poll();
+  voixPollTimer = setInterval(poll, 3000);
 }
 ecouterVoixOverlay();
 
@@ -173,22 +194,25 @@ var DIALOGUES = {
     ["Les niveaux détaillés seront publiés sur le Telegram gratuit " + BOT + " après confirmation du signal.", "Et le plan prime toujours sur l'impatience."]
   ]
 };
-function envoyerDialogueCoach(qui, texte, market) {
+function publierDialogueCoachPair(speaker1, text1, speaker2, text2, market) {
+  var ts = Date.now();
+  var duration1 = Math.max(4000, Math.min(12000, Math.ceil(String(text1).length * 75 + 500)));
+  var duration2 = Math.max(4000, Math.min(12000, Math.ceil(String(text2).length * 75 + 500)));
   var payload = {
-    type: "ALIGN_SHOW", action: "SAY", speaker: qui === "l" ? "l" : "t",
-    lang: "fr", market: market || "", text: String(texte || ""), ts: Date.now()
+    type: "ALIGN_SHOW", action: "PAIR", id: "show-" + ts, ts: ts, startAt: ts + 4000,
+    market: market || "BTC", speaker1: speaker1, text1: String(text1 || ""),
+    speaker2: speaker2, text2: String(text2 || ""), duration1: duration1, duration2: duration2
   };
-  fetch("https://ntfy.sh/" + SUJET + "-show", {
-    method: "POST", headers: { "Content-Type": "text/plain;charset=UTF-8" },
-    body: JSON.stringify(payload), keepalive: true
+  fetch(WORKER_SHOW_URL + "/show/publish?message=" + encodeURIComponent(JSON.stringify(payload)), {
+    method: "GET", cache: "no-store"
   }).catch(function () {});
+  return { startAt: payload.startAt, duration1: duration1, duration2: duration2 };
 }
-function parler(qui, texte, market) {
+function parler(qui, texte) {
   var bulle = document.getElementById("b-" + qui);
   var autre = qui === "t" ? "l" : "t";
   document.getElementById("b-" + autre).classList.remove("visible");
   bulle.innerHTML = "<small>" + (qui === "t" ? "Thomas" : "Leïla") + "</small>" + texte; bulle.classList.add("visible");
-  envoyerDialogueCoach(qui, texte, market);
 }
 function echange() {
   tour++;
@@ -200,8 +224,11 @@ function echange() {
   var paire = pick(DIALOGUES[cat].map(function (p, i) { return i; }).map(function (i) { return DIALOGUES[cat][i][0] + "§" + i; }));
   var i = parseInt(paire.split("§")[1], 10), dialogue = DIALOGUES[cat][i];
   var premier = tour % 2 === 0 ? "t" : "l", second = premier === "t" ? "l" : "t";
-  parler(premier, remplir(dialogue[0], m), m.m);
-  setTimeout(function () { parler(second, remplir(dialogue[1], m), m.m); }, 6500);
+  var texte1 = remplir(dialogue[0], m), texte2 = remplir(dialogue[1], m);
+  var timing = publierDialogueCoachPair(premier, texte1, second, texte2, m.m);
+  var debut = Math.max(0, timing.startAt - Date.now());
+  setTimeout(function () { parler(premier, texte1); }, debut);
+  setTimeout(function () { parler(second, texte2); }, debut + timing.duration1 + 500);
 }
 
 function charger() {
