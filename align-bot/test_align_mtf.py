@@ -197,6 +197,8 @@ class AlignMtfRulesTest(unittest.TestCase):
                 self.assertEqual((plan["zone_low"], plan["decision"], plan["zone_high"]), (100, 101, 102))
                 self.assertEqual(plan["direction"], 1)
                 self.assertTrue(plan["confirmed"])
+                self.assertEqual(plan["price"], 101.0 if active_tf == "M15" else 110.0)
+                self.assertEqual(plan["price_in_zone"], active_tf == "M15")
     def test_indicator_plan_enforces_strategy_trigger_timeframe(self):
         cases = (("SCALPING", "M1"), ("DAY", "M5"), ("SWING", "H1"))
         for strategy, trigger_tf in cases:
@@ -3797,7 +3799,8 @@ class PineOnlyEntryGateTests(unittest.TestCase):
                             "entryTriggered": False,
                             "confirmed": True,
                         }
-                    }
+                    },
+                    "M5": {"fresh": True, "price": current_price}
                 }
             }
         }
