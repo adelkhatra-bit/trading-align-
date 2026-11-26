@@ -3802,7 +3802,7 @@ class PineOnlyEntryGateTests(unittest.TestCase):
             }
         }
 
-    def test_healthy_bridge_without_direction_reports_mtf_wait_not_bridge_failure(self):
+    def test_healthy_bridge_without_local_direction_uses_pine_plan_and_waits_for_trigger(self):
         from unittest.mock import patch
         r = self._market()
         r["confirme"] = 0
@@ -3811,11 +3811,16 @@ class PineOnlyEntryGateTests(unittest.TestCase):
         with patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")):
             out = align_bot.agent("BTC", r, state, "")
         message = " ".join(str(item[0] if isinstance(item, tuple) else item) for item in out)
-        self.assertIn("aucune direction multi-UT confirmée", message)
-        self.assertIn("Aucun plan Entry/SL/TP émis", message)
+        self.assertIn("PLAN PINE M15", message)
+        self.assertIn("Entrée : 100", message)
+        self.assertIn("SL : 95", message)
+        self.assertIn("TP1 : 110", message)
+        self.assertIn("Attendre le retest", message)
         self.assertNotIn("bridge Pine", message)
         self.assertFalse(state.get("trade"))
-        self.assertFalse(state.get("ordre"))
+        self.assertEqual(state["ordre"]["e"], 100.0)
+        self.assertEqual(state["ordre"]["sl"], 95.0)
+        self.assertEqual(state["ordre"]["tp1"], 110.0)
 
     def test_required_bridge_missing_never_falls_back_to_local_entry(self):
         from unittest.mock import patch
