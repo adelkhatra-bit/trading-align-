@@ -9581,7 +9581,7 @@ def proximite_marche(m, r, cle, now=None):
         elif triggered and price_in_zone:
             action = "zone atteinte · contrôle final du bot"
         else:
-            action = f"clôture {unite} {'sous' if d == -1 else 'au-dessus de'} {px(decision)}"
+            action = f"retest de la zone puis clôture {unite} {'sous' if d == -1 else 'au-dessus de'} la ligne de décision {px(decision)}"
         return dict(base, classe=classe, rang=rang, d=d, za=za, zb=zb, dist=dist, atr_n=atr_n,
                     action=action, au_dessus=prix < za, decision=decision, strategy=strategy,
                     entry_timeframe=entry_tf, pine_confirmed=pine_confirmed,
@@ -9821,7 +9821,7 @@ def live_prepare_toi(etat, derniers, now=None):
                 detail = "zone atteinte : le bot contrôle le point d'entrée"
             else:
                 cote = "en dessous" if p["d"] == -1 else "au-dessus"
-                detail = f"surveille la clôture {unite} {cote} de la ligne de décision"
+                detail = f"attends le retest de la zone puis la clôture {unite} {cote} de la ligne de décision"
             message = (f"BULLE:⚠️ {ic} {p['m']} : prépare-toi, {sens} • {detail} • "
                        f"prochaine mise à jour du plan M15 dans {min_avant_cloture15(now)} min • niveaux exacts en privé")
         else:
