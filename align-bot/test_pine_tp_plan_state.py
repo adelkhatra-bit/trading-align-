@@ -59,6 +59,13 @@ class PineTpPlanStateTests(unittest.TestCase):
         self.assertIn('strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan', self.source)
         self.assertIn('strat == "SCALPING" ? (nz(d60Fermee) != -dirPlan and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan)', self.source)
 
+    def test_visual_and_bridge_share_the_coach_risk_reward_and_atr_gate(self):
+        self.assertIn("planRiskRewardOk = not na(atr15) and atr15 > 0 and rr >= 2.0 and planRisk <= 1.5 * atr15", self.source)
+        self.assertIn("and bridgePlanGeometryOk and planRiskRewardOk and not na(ent)", self.source)
+        self.assertIn("bridgeConfirmed = bridgePlanValid and planRiskRewardOk", self.source)
+        self.assertIn("AUCUNE ENTRÉE : risque ou gain/risque insuffisant", self.source)
+        self.assertIn("PLAN VALIDÉ : attendre le déclencheur", self.source)
+
     def test_visual_plan_status_does_not_claim_entry_is_already_executable(self):
         self.assertIn("PLAN LONG VALIDÉ — ATTENTE ENTRÉE", self.source)
         self.assertIn("PLAN SHORT VALIDÉ — ATTENTE ENTRÉE", self.source)
