@@ -697,7 +697,7 @@ if barstate.islast and entryTriggeredUi
         line.set_width(lZH, 4)
         line.set_style(lZH, line.style_solid)
     if not na(eZH)
-        label.set_text(eZH, (dirPlan == 1 ? "🟢 ENTRÉE LONG VALIDÉE" : "🔴 ENTRÉE SHORT VALIDÉE") + " • " + px(ent))
+        label.set_text(eZH, (dirPlan == 1 ? "🟢 DÉCLENCHEUR LONG VALIDÉ" : "🔴 DÉCLENCHEUR SHORT VALIDÉ") + " • " + px(ent))
         label.set_color(eZH, dirPlan == 1 ? color.new(color.lime, 0) : color.new(color.red, 0))
         label.set_textcolor(eZH, color.white)
 
