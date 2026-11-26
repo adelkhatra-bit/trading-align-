@@ -153,6 +153,7 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn('"ATTENDRE • AUCUNE STRATÉGIE"', self.pine)
         self.assertIn('bridgeConfirmed ? "\\n\\nPLAN CONFIRMÉ "', self.pine)
         self.assertNotIn('dirPlan != 0 ? "\\n\\nPLAN "', self.pine)
+        self.assertIn("vbg0 = zoneBas or zoneHaut ? color.rgb(170, 130, 0) : bridgeConfirmed and dirPlan == 1", self.pine)
 
     def test_market_scope_remains_btc_and_gold_only_in_indicator(self):
         self.assertIn('bridgeMarket = isBtc ? "BTCUSD" : isGold ? "XAUUSD" : "UNSUPPORTED"', self.pine)
