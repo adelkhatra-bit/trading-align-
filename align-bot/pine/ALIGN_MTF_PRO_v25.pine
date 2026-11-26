@@ -628,7 +628,7 @@ if barstate.islast
 // ═════════ BRIDGE ALIGN — export structuré du Pine v25 (sans toucher aux signaux/visuels) ═════════
 // Le bridge ne publie LONG/SHORT que si le plan complet est confirmé.
 bridgePlanValid = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2)
-bridgeClosedMtfOk = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan)
+bridgeClosedMtfOk = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan)
 bridgeConfirmed = bridgePlanValid and etatS == "CONFIRMÉ" and scoreV >= 75 and bridgeClosedMtfOk
 bridgeSignal = bridgeConfirmed ? (dirPlan == 1 ? "LONG" : "SHORT") : "WAIT"
 bridgeZone = zoneHaut ? "SUPPORT" : zoneBas ? "RESISTANCE" : "PLAN"
