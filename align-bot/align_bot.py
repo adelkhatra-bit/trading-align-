@@ -190,6 +190,10 @@ def fetch_tv_mtf(pair):
         if not payload.get("ok") or not isinstance(payload.get("snapshots"), dict):
             return {"available": False, "reason": "réponse bridge invalide",
                     "detail": detail_bridge_invalide(payload), "snapshots": {}}
+        if payload.get("canonicalPlanFresh") is not True:
+            return {"available": False, "reason": "plan ROBOT V12 canonique M15 absent ou périmé",
+                    "canonicalPlanTimeframe": "M15", "canonicalPlanFresh": False,
+                    "detail": detail_bridge_invalide(payload), "snapshots": payload["snapshots"]}
         active_tf = str(payload.get("activeTimeframe") or "").upper()
         active_fresh = payload.get("activeTimeframeFresh") is True
         if active_tf not in {"M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"} or not active_fresh:
@@ -200,6 +204,8 @@ def fetch_tv_mtf(pair):
             "symbol": payload.get("symbol"),
             "activeTimeframe": active_tf,
             "activeTimeframeAgeMs": payload.get("activeTimeframeAgeMs"),
+            "canonicalPlanTimeframe": "M15",
+            "canonicalPlanFresh": True,
             "snapshots": payload["snapshots"],
             "receivedTimeframes": payload.get("receivedTimeframes", [])
         }
@@ -237,10 +243,9 @@ def directions_tv_mtf(contexte):
     bridge = (contexte or {}).get("tv_indicator_mtf") or {}
     if bridge.get("available") is not True:
         return None
-    active = bridge.get("activeTimeframe")
-    snap = (bridge.get("snapshots") or {}).get(active) or {}
+    snap = (bridge.get("snapshots") or {}).get("M15") or {}
     robot = snap.get("robotV12") or {}
-    if snap.get("fresh") is not True or not robot:
+    if snap.get("fresh") is not True or snap.get("robotFresh") is False or not robot:
         return None
     out = {tf: _direction_tv(robot.get(key)) for tf, key in (
         ("M5", "lecture_5m"), ("M15", "lecture_15m"), ("H1", "lecture_60m")
@@ -686,10 +691,10 @@ def direction_confirmee_marche(m, dirs, d, contexte=None, now_ts=None):
     elif m == "BTC" and contexte is not None and contexte.get("require_tv_bridge"):
         # BTC garde sa règle locale H1/H4 clôturées, mais le H1 ROBOT V12 TradingView doit aussi confirmer.
         bridge = contexte.get("tv_indicator_mtf") or {}
-        active = bridge.get("activeTimeframe")
-        snap = (bridge.get("snapshots") or {}).get(active) or {}
+        snap = (bridge.get("snapshots") or {}).get("M15") or {}
         robot = snap.get("robotV12") or {}
-        if bridge.get("available") is not True or snap.get("fresh") is not True or not robot:
+        if (bridge.get("available") is not True or snap.get("fresh") is not True
+                or snap.get("robotFresh") is False or not robot):
             return 0
         if _direction_tv(robot.get("lecture_60m")) != d:
             return 0
