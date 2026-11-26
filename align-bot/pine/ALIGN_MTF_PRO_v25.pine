@@ -638,7 +638,7 @@ bridgePlanValid = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat =
 bridgeSignal = bridgePlanValid ? (dirPlan == 1 ? "LONG" : "SHORT") : "WAIT"
 bridgeClosedMtfOk = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan)
 bridgeConfirmed = bridgePlanValid and etatS == "CONFIRMÉ" and scoreV >= 75 and bridgeClosedMtfOk
-bridgeZone = zoneBas ? "SUPPORT" : zoneHaut ? "RESISTANCE" : "PLAN"
+bridgeZone = zoneHaut ? "SUPPORT" : zoneBas ? "RESISTANCE" : "PLAN"
 
 // Chaque timeframe transporte l'heure d'ouverture de SA propre bougie.
 // Sur un chart supérieur, request.security() ne restitue qu'un intrabar ;
