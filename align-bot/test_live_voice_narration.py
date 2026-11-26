@@ -11,7 +11,7 @@ class LiveVoiceNarration(unittest.TestCase):
         self.source = LIVE_JS.read_text(encoding="utf-8")
 
     def test_voice_accepts_market_narration_source(self):
-        self.assertIn("item.source !== 'ia' && item.source !== 'marche'", self.source)
+        self.assertIn("!['ia', 'marche', 'coach'].includes(item.source)", self.source)
 
     def test_bandeshow_forwards_source_to_montrer(self):
         self.assertIn("function bandeShow(txt, source)", self.source)
