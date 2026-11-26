@@ -2,9 +2,9 @@
 
 ## Rôle
 
-Le Worker `align-tv-mailbox` est un **transport**, pas un second bridge de validation. Il reçoit l'alerte TradingView et conserve, dans un Durable Object distinct par marché, le dernier JSON brut reçu.
+Le Worker `align-tv-mailbox` est un **transport**, pas un second bridge de validation. Il reçoit l'alerte TradingView et conserve, dans un Durable Object distinct par marché, le dernier JSON brut reçu. Il héberge aussi un canal de présentation séparé pour la scène ALIGN LIVE (Thomas/Leïla), isolé dans l'ID Durable Object `LIVE_SHOW`.
 
-La seule validation MTF du BOT est dans `align-bot/align_tv_bridge.py` (`BridgeStore`). Le Worker ne calcule pas, ne complète pas, ne convertit pas et ne valide pas les timeframes.
+La seule validation MTF du BOT est dans `align-bot/align_tv_bridge.py` (`BridgeStore`). Le Worker ne calcule pas, ne complète pas, ne convertit pas et ne valide pas les timeframes. Le canal `LIVE_SHOW` ne participe jamais aux décisions, aux signaux, aux niveaux ou à la mémoire du BOT.
 
 ## Chaîne runtime
 
@@ -28,6 +28,10 @@ Le bridge sur 4100 démarre dans le même runner GitHub que le BOT. Il est éph�
 | `POST /ingest/<ALIGN_TV_INGEST_TOKEN>` | Envoi manuel ou tests autorisés | Route à jeton, pas l'URL webhook de production TradingView |
 | `GET /mailbox?symbol=BTCUSD` | Feeder GitHub Actions, Bearer `ALIGN_TV_MAILBOX_TOKEN` | Lit le dernier payload brut du symbole ; idem pour `XAUUSD` |
 | `GET /health` | Contrôle technique | Retourne l'identité et l'état du Worker, sans exposer de secret |
+| `GET /show/publish?message=<JSON>` | Page ALIGN LIVE, origine GitHub Pages autorisée | Publie une paire de répliques Thomas/Leïla ; validation stricte et cadence minimale |
+| `GET /show/state` | Page ALIGN LIVE et userscript TradingView | Lit la dernière paire, l'état du bouton vocal et le dernier événement de voix |
+| `GET /show/voice?message=<JSON>` | Userscript Tampermonkey | Publie le locuteur, la langue, le texte prononcé et la durée pour synchroniser la bouche |
+| `GET /show/coach?enabled=1|0` | Userscript Tampermonkey | Propage l'état ON/OFF du coach vocal à la scène |
 
 Webhook TradingView configuré dans les alertes v25 :
 
@@ -38,7 +42,8 @@ Les seuls symboles acceptés sont `BTCUSD` et `XAUUSD`. Le Worker rejette un sym
 ## Stockage et fraîcheur
 
 - Durable Object : un espace de stockage isolé par symbole, clé `latest`.
-- Le JSON est conservé brut avec `receivedAt`.
+- La scène utilise un ID distinct `LIVE_SHOW` dans le même namespace ; son objet `show/voice/voiceEnabled` ne touche jamais les boîtes `BTCUSD` ou `XAUUSD`.
+- Le JSON marché est conservé brut avec `receivedAt`.
 - Le Worker ne sert pas un message de plus de **10 minutes** : il retourne `ok:false, error:"empty"`.
 - La fraîcheur de 10 minutes est uniquement la durée de conservation mailbox. Le bridge Python applique ses propres exigences de fraîcheur, plus strictes, à chaque UT et au prix actif.
 - KV n'est pas utilisé pour le dernier snapshot ; le namespace historique `align-tv-mailbox-kv` n'est pas la source du BOT.
@@ -82,7 +87,7 @@ Ce chemin n'est pas le Worker mailbox et son cache n'est pas le `BridgeStore` Py
 
 ## Tests
 
-- `node cloud/align-tv-mailbox/test_worker.mjs` : routes, authentification, isolement des marchés et fraîcheur mailbox.
+- `node cloud/align-tv-mailbox/test_worker.mjs` : routes, authentification, isolement des marchés, fraîcheur mailbox, CORS GitHub Pages et relais isolé de la scène vocale.
 - `python -m unittest discover -s align-bot -p "test_align_tv_mailbox_feeder.py" -v` : lecture, transfert inchangé et réponse BridgeStore.
 - `python -m unittest discover -s align-bot -p "test_align_tv_bridge.py" -v` : contrat de validation unique, dont le rejet des UT manquantes.
 
