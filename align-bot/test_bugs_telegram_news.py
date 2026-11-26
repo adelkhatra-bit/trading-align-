@@ -279,7 +279,9 @@ class PlanArrondi(unittest.TestCase):
                  "entryBarTime": 900_000, "entryBarOpen": low, "entryBarHigh": high, "entryBarLow": low,
                  "entryBarClose": (low + high) / 2, "confirmed": True}
         r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "M5",
-                                  "snapshots": {"M5": {"fresh": True, "price": entry, "confirmed": True, "robotV12": robot}}}}
+                                  "snapshots": {"M15": {"fresh": True, "robotFresh": True, "price": entry,
+                                                        "confirmed": True, "robotV12": robot},
+                                                "M5": {"fresh": True, "price": entry}}}}
         return ab.plan_indicateur(r)
 
     def test_bord_de_zone_arrondi_accepte_comme_par_le_bridge(self):
