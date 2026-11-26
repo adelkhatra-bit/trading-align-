@@ -517,6 +517,8 @@
     coachPollEnCours = false;
     annulerDialogueCoach();
   }
+  // Publish the visible chart's real toggle state before polling shared LIVE_SHOW state.
+  if (document.visibilityState === 'visible') publierEtatCoach(voixActive);
   ecouterDialoguesCoach();
 
   let extra = [];
