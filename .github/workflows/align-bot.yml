@@ -29,8 +29,7 @@ jobs:
     needs: validate
     if: >-
       github.repository == 'adelkhatra-bit/trading-align-' &&
-      (github.event_name == 'schedule' ||
-       (github.event_name == 'workflow_dispatch' && needs.validate.result == 'success'))
+      needs.validate.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 355
     defaults:
