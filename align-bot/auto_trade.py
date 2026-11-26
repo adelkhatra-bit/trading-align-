@@ -9,7 +9,7 @@ Limites de risque conservées pour les simulations :
   • risque         : 75 $ par position (calcul du SL derrière la mèche)
   • positions      : 2 max ouvertes par compte en modèle de simulation
 """
-import json, os, re, time, datetime, urllib.request, urllib.error
+import json, os, re, time, datetime, math, urllib.request, urllib.error
 
 SOLDE_DEPART = 10000.0
 PERTE_JOUR_MAX = 350.0        # marge de 50 $ sous la règle des 400 $
@@ -138,7 +138,30 @@ def niveaux_mt5(signal, prix):
     return round(prix + d_sl, 2), round(prix - d_tp, 2)
 
 
+def niveaux_valides(signal):
+    """Refuse les niveaux incohérents avec le sens du trade avant tout appel broker."""
+    try:
+        sens = str(signal.get("sens", "")).upper()
+        e, sl, tp = (float(signal[k]) for k in ("e", "sl", "tp"))
+        tp2 = float(signal["tp2"]) if signal.get("tp2") is not None else None
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return False, "niveaux Entry/SL/TP absents ou non numériques"
+    valeurs = (e, sl, tp) + ((tp2,) if tp2 is not None else ())
+    if not all(math.isfinite(v) and v > 0 for v in valeurs):
+        return False, "niveaux Entry/SL/TP non finis ou non positifs"
+    if sens == "LONG":
+        valide = sl < e < tp and (tp2 is None or tp2 >= tp)
+    elif sens == "SHORT":
+        valide = tp < e < sl and (tp2 is None or tp2 <= tp)
+    else:
+        return False, "sens du signal invalide"
+    return (True, "ok") if valide else (False, "niveaux inversés ou TP2 incohérent avec le sens")
+
+
 def executer(etat, signal, journal=print):
+    valide, raison = niveaux_valides(signal)
+    if not valide:
+        return [{"compte": None, "ok": False, "raison": raison}]
     """signal = {marche, sens: 'LONG'|'SHORT', e, sl, tp}. Renvoie la liste des résultats par compte."""
     m = signal["marche"]
     if m not in SYMBOLES:
