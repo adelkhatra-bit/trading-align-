@@ -154,6 +154,28 @@ class ParcoursLiveEtBudget(unittest.TestCase):
             ab.question_quotidienne(etat, {"11", "22"}, jour_ts, creneau="new-york")
         self.assertEqual(envois, ["11"])            # 22 a déjà répondu ; 11 une seule fois sur ce créneau
 
+    def test_question_quotidienne_lance_le_coach_en_un_clic(self):
+        now = ab.datetime.datetime(2026, 11, 18, 9, 0, tzinfo=ab.PARIS).timestamp()
+        etat = {}
+        envois = []
+        with mock.patch.object(ab, "_envoi_sur", side_effect=lambda c, **k: envois.append((str(c), k)) or {"ok": True}), \
+             mock.patch.object(ab, "en_position", return_value=[]), \
+             mock.patch.object(ab, "coach_actif", return_value=False):
+            ab.question_quotidienne(etat, {"11"}, now, creneau="londres")
+        self.assertEqual(len(envois), 1)
+        texte = envois[0][1]["text"]
+        clavier = json.loads(envois[0][1]["reply_markup"])["inline_keyboard"]
+        self.assertIn("Tu es là ?", texte)
+        self.assertEqual(clavier[0][0]["callback_data"], "searchpos:BOTH")
+        self.assertIn("Rechercher le coach", clavier[0][0]["text"])
+        self.assertEqual(clavier[1][0]["callback_data"], "trade:no")
+
+    def test_recherche_du_coach_compte_comme_reponse_quotidienne(self):
+        bloc = SOURCE.split('if choix == "searchpos" and mk == "BOTH":', 1)[1].split(
+            'if choix == "analysechoice"', 1
+        )[0]
+        self.assertIn('etat.setdefault("reponse_jour", {})[qui]', bloc)
+
     def test_chaines_silencieuses_sauf_entree_validee(self):
         etat = {"canal": "-1001", "canaux_marche": {"BTC": "-1002"}}
         self.assertTrue(ab.chaine_silencieuse(etat, "-1002", "📐 Fibonacci 61,8 % touché"))
