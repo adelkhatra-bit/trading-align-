@@ -1293,7 +1293,8 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
         self.assertIn("function parlerLive(item, forcer = false)", bande)
         self.assertIn("if (!voixActive || !item", bande)
-        self.assertIn("return dansLangue.find(v => VOIX_NATURELLES.test(v.name)) || null;", bande)
+        self.assertIn("return dansLangue.find(v => VOIX_NATURELLES.test(v.name) && nom.test(String(v.name || ''))) || null;", bande)
+        self.assertIn("const nom = speaker === 't'", bande)
         self.assertIn("window.speechSynthesis.cancel()", bande)
 
     def test_pine_plus_de_point_entree_trace(self):
