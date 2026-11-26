@@ -88,6 +88,95 @@ class PlanIndicateurSurTest(unittest.TestCase):
         self.assertEqual(ab.signature_cloture(a), ab.signature_cloture(b))
 
 
+
+class RadarPineV25SourceTest(unittest.TestCase):
+    def plan(self, confirmed=True, triggered=False, price_in_zone=True):
+        return {
+            "available": True, "confirmed": confirmed, "direction": 1,
+            "entry": 101.0, "sl": 99.0, "tp1": 104.0, "tp2": 106.0,
+            "zone_low": 100.0, "zone_high": 102.0, "decision": 101.0,
+            "price": 101.25, "price_in_zone": price_in_zone, "triggered": triggered,
+            "strategy": "DAY", "entry_timeframe": "M5",
+        }
+
+    def market(self):
+        snapshots = {
+            tf: {"fresh": True, "direction": 1, "price": 101.25}
+            for tf, _ in ab.TELEGRAM_TF_VIEWS
+        }
+        return {
+            "require_tv_bridge": True,
+            "tv_indicator_mtf": {"available": True, "activeTimeframe": "M15", "snapshots": snapshots},
+            "m1": [{"c": 999.0}], "atr": 1.0,
+            "dirPlan": -1, "zone_pine": {"za": 200.0, "zb": 210.0, "zmil": 205.0},
+            "strat": "SWING", "bull": 0, "bear": 11,
+        }
+
+    def test_proximite_uses_tv_price_and_pine_zone_not_local_fallback(self):
+        r = self.market()
+        with mock.patch.object(ab, "plan_indicateur", return_value=self.plan()):
+            p = ab.proximite_marche("BTC", r, {}, now=1_000_000.0)
+        self.assertEqual((p["prix"], p["d"], p["za"], p["zb"]), (101.25, 1, 100.0, 102.0))
+        self.assertEqual(p["strategy"], "DAY")
+        self.assertEqual(p["entry_timeframe"], "M5")
+        self.assertTrue(p["pine_confirmed"])
+        self.assertIn("5 min", p["action"])
+        self.assertIn("101", p["action"])
+
+    def test_un_plan_pine_non_confirme_ne_declenche_pas_prepare_toi(self):
+        r = self.market()
+        with mock.patch.object(ab, "plan_indicateur", return_value=self.plan(confirmed=False)):
+            p = ab.proximite_marche("BTC", r, {}, now=1_000_000.0)
+            es = ab.radar_entree_sl(r, 1, 200.0, 210.0)
+        self.assertEqual((p["classe"], p["rang"]), ("sans_plan", 5))
+        self.assertIsNone(es)
+        self.assertFalse(ab._radar_pret({"m": "BTC", "rang": 1, "pine_confirmed": False, "d": 1}, {"BTC": r}))
+
+    def test_radar_entree_sl_uses_exact_pine_values_and_never_calls_local_calculation(self):
+        r = self.market()
+        with mock.patch.object(ab, "plan_indicateur", return_value=self.plan()), \
+             mock.patch.object(ab, "pine_entree", side_effect=AssertionError("local plan must not be used")):
+            es = ab.radar_entree_sl(r, 1, 200.0, 210.0)
+        self.assertEqual((es["e"], es["sl"], es["tp1"], es["tp2"]), (101.0, 99.0, 104.0, 106.0))
+        self.assertEqual((es["za"], es["zb"], es["ut"]), (100.0, 102.0, "M5"))
+        self.assertEqual(es["src"], "Pine v25 / ROBOT V12")
+
+    def test_bridge_prepare_gate_uses_pine_confirmation_not_local_bull_bear(self):
+        r = self.market()
+        self.assertTrue(ab._radar_pret({"m": "BTC", "rang": 1, "pine_confirmed": True, "d": 1}, {"BTC": r}))
+        self.assertFalse(ab._radar_pret({"m": "BTC", "rang": 1, "pine_confirmed": False, "d": 1}, {"BTC": {**r, "bull": 11}}))
+
+    def test_alignment_count_comes_from_tradingview_snapshots(self):
+        r = self.market()
+        snapshots = r["tv_indicator_mtf"]["snapshots"]
+        for i, (tf, _) in enumerate(ab.TELEGRAM_TF_VIEWS):
+            snapshots[tf]["direction"] = 1 if i < 8 else -1
+        self.assertEqual(ab._radar_n_ut(r, 1), 8)
+        self.assertEqual(ab._radar_n_ut(r, -1), len(ab.TELEGRAM_TF_VIEWS) - 8)
+
+    def test_vip_radar_displays_pine_entry_sl_tp1_tp2_and_strategy(self):
+        r = self.market()
+        p = dict(m="BTC", prix=101.25, atr_n=0.5, classe="proche", rang=1, d=1,
+                 za=100.0, zb=102.0, dist=0.5, action="clôture 5 min au-dessus de 101",
+                 au_dessus=False, strategy="DAY", entry_timeframe="M5", pine_confirmed=True)
+        with mock.patch.object(ab, "plan_indicateur", return_value=self.plan()):
+            t = ab.texte_radar([p], {"BTC": r}, vip=True, now=1_000_000.0)
+        for morceau in ("Pine v25 / ROBOT V12", "INTRADAY", "TP1", "TP2", "déclencheur M5"):
+            self.assertIn(morceau, t)
+
+    def test_live_coach_names_the_real_strategy_line_without_publishing_price(self):
+        p = dict(m="BTC", d=1, rang=1, pine_confirmed=True, pine_triggered=False,
+                 price_in_zone=False, entry_timeframe="M5", strategy="DAY")
+        messages = []
+        with mock.patch.object(ab, "classer_marches", return_value=[p]), \
+             mock.patch.object(ab, "live_bande", lambda etat, texte, *a, **k: messages.append(texte)):
+            ab.live_prepare_toi({}, {"BTC": {"require_tv_bridge": True}}, now=1_000_000.0)
+        self.assertIn("prépare-toi", messages[0])
+        self.assertIn("retest de la zone puis la clôture 5 min au-dessus de la ligne de décision", messages[0])
+        self.assertIn("niveaux exacts en privé", messages[0])
+        self.assertNotIn("101.25", messages[0])
+
+
 class RadarIaTest(unittest.TestCase):
     """L'IA rédige l'annonce « prépare-toi » (phrases variées) ; les niveaux restent ceux du bot ; jamais d'IA hors alerte."""
     def test_ia_seulement_a_l_alerte_et_texte_garde_pendant_les_editions(self):

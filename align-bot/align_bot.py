@@ -9478,49 +9478,120 @@ def adapter_marches_session(lignes, mk, choisis, anglais=False):
 FOCUS_NOMS = {"dans_zone": "dans la zone d'entrée", "proche": "proche de la zone", "en_approche": "en approche", "loin": "loin de la zone",
               "bloque": "bloqué (zone extrême Daily/Weekly)", "sans_plan": "pas de plan fixé", "ferme": "marché fermé", "position": "déjà en position"}
 
+
+def _prix_tv_actif(r):
+    """Prix actif du graphique TradingView v25 ; aucun repli sur Kraken en mode bridge obligatoire."""
+    bridge = r.get("tv_indicator_mtf") or {}
+    active_tf = str(bridge.get("activeTimeframe") or "").upper()
+    snapshots = bridge.get("snapshots") if isinstance(bridge.get("snapshots"), dict) else {}
+    snap = snapshots.get(active_tf) or {}
+    if snap.get("fresh") is not True:
+        return None
+    try:
+        prix = float(snap.get("price"))
+    except (TypeError, ValueError):
+        return None
+    return prix if math.isfinite(prix) and prix > 0 else None
+
+
 def proximite_marche(m, r, cle, now=None):
-    """Distance à l'entrée d'un marché, en ATR 15 min. rang : 0 dans la zone • 1 proche (≤ 1,5 ATR) • 2 en approche (≤ 4) • 3 loin
-    • 4 bloqué par le Daily/Weekly • 5 pas de plan • 6 marché fermé • -1 déjà en position. Rien n'est inventé : zone du plan ou ordre surveillé."""
+    """Proximité RADAR : Pine v25 + prix TradingView en bridge obligatoire ; repli local historique sinon."""
     now = time.time() if now is None else now
     cle = cle or {}
-    prix = r["m1"][-1]["c"]
+    bridge_required = r.get("require_tv_bridge") is True
+    if m != "BTC" and not cme_ouvert(int(now)):
+        return dict(m=m, prix=None, atr_n=99.0, classe="ferme", rang=6)
+
+    if bridge_required:
+        prix = _prix_tv_actif(r)
+        if prix is None:
+            classe = "position" if cle.get("trade") else "sans_plan"
+            rang = -1 if cle.get("trade") else 5
+            return dict(m=m, prix=None, atr_n=99.0, classe=classe, rang=rang,
+                        d=(cle.get("trade") or {}).get("d"), source="Pine v25",
+                        reason="prix TradingView actif absent ou périmé")
+    else:
+        try:
+            prix = float(r["m1"][-1]["c"])
+        except (KeyError, IndexError, TypeError, ValueError):
+            return dict(m=m, prix=None, atr_n=99.0, classe="sans_plan", rang=5)
+
     base = dict(m=m, prix=prix, atr_n=99.0)
-    if m != "BTC" and not cme_ouvert(int(now)):          # marché fermé d'abord : jamais « déjà en position » quand rien ne bouge
-        return dict(base, classe="ferme", rang=6)
     if cle.get("trade"):
         return dict(base, classe="position", rang=-1, d=cle["trade"].get("d"))
-    o, d = cle.get("ordre"), r.get("dirPlan") or 0
-    zp = r.get("zone_pine") if d else None
-    if o:
-        za, zb = min(o.get("za", o["e"]), o.get("zb", o["e"])), max(o.get("za", o["e"]), o.get("zb", o["e"]))
-        d = o.get("d") or d
-    elif zp:
-        za, zb = min(zp["za"], zp["zb"]), max(zp["za"], zp["zb"])
+
+    if bridge_required:
+        plan = plan_indicateur(r)
+        if not isinstance(plan, dict) or plan.get("available") is not True or plan.get("confirmed") is not True:
+            return dict(base, classe="sans_plan", rang=5, source="Pine v25",
+                        reason=(plan or {}).get("reason", "plan Pine v25 non confirmé"))
+        d = plan.get("direction")
+        za, zb = sorted((float(plan["zone_low"]), float(plan["zone_high"])))
+        decision = float(plan["decision"])
+        strategy = str(plan.get("strategy") or "").upper()
+        entry_tf = str(plan.get("entry_timeframe") or "").upper()
+        triggered = plan.get("triggered") is True
+        price_in_zone = plan.get("price_in_zone") is True
+        pine_confirmed = True
+        pe = None
+        zp = None
+        o = None
     else:
-        return dict(base, classe="sans_plan", rang=5)
-    pe = None
-    if not o and d in (1, -1):
-        try:
-            pe = pine_entree(r, d) if r.get("b15") and "planH" in r else None
-        except Exception:
-            pe = None
-        if pe and pe.get("fvg_ut"):                           # v24.3 : même zone que l'indicateur sur la vue 5 min (bande verte)
-            za, zb = min(pe["za"], pe["zb"]), max(pe["za"], pe["zb"])
+        o, d = cle.get("ordre"), r.get("dirPlan") or 0
+        zp = r.get("zone_pine") if d else None
+        if o:
+            za, zb = min(o.get("za", o["e"]), o.get("zb", o["e"])), max(o.get("za", o["e"]), o.get("zb", o["e"]))
+            d = o.get("d") or d
+        elif zp:
+            za, zb = min(zp["za"], zp["zb"]), max(zp["za"], zp["zb"])
         else:
-            pe = None
+            return dict(base, classe="sans_plan", rang=5)
+        pe = None
+        if not o and d in (1, -1):
+            try:
+                pe = pine_entree(r, d) if r.get("b15") and "planH" in r else None
+            except Exception:
+                pe = None
+            if pe and pe.get("fvg_ut"):
+                za, zb = min(pe["za"], pe["zb"]), max(pe["za"], pe["zb"])
+            else:
+                pe = None
+        decision = (pe or {}).get("zmil") if pe else (zp or {}).get("zmil")
+        strategy = str(r.get("strat") or "").upper()
+        entry_tf = ""
+        triggered = False
+        price_in_zone = za <= prix <= zb
+        pine_confirmed = False
+
     if d not in (1, -1):
         return dict(base, classe="sans_plan", rang=5)
-    if bloque_dw(r, d, prix):
+    # En mode v25, les filtres MTF clôturés sont déjà appliqués par bridgeConfirmed dans Pine.
+    if not bridge_required and bloque_dw(r, d, prix):
         return dict(base, classe="bloque", rang=4, d=d, za=za, zb=zb)
+
     a = float(r.get("atr") or 0)
     dist = 0.0 if za <= prix <= zb else min(abs(prix - za), abs(prix - zb))
     atr_n = dist / a if a > 0 else 99.0
     classe, rang = (("dans_zone", 0) if dist == 0 else ("proche", 1) if atr_n <= 1.5 else ("en_approche", 2) if atr_n <= 4 else ("loin", 3))
-    unite = pe["sl_ut"] if pe else HB_UNITE_VALIDATION.get(r.get("strat") or "", "15 min")
-    mil = pe["zmil"] if pe else (zp or {}).get("zmil")
-    action = (f"clôture {unite} {'sous' if d == -1 else 'au-dessus de'} {px(mil)}" if mil else f"rejet + clôture {unite} dans la zone")
-    return dict(base, classe=classe, rang=rang, d=d, za=za, zb=zb, dist=dist, atr_n=atr_n, action=action, au_dessus=prix < za)
 
+    if bridge_required:
+        unite = {"M1": "1 min", "M5": "5 min", "H1": "1h"}.get(entry_tf, entry_tf or "unité de stratégie")
+        if triggered and not price_in_zone:
+            action = f"déclencheur validé · retour attendu dans la zone {px(za)}–{px(zb)}"
+        elif triggered and price_in_zone:
+            action = "zone atteinte · contrôle final du bot"
+        else:
+            action = f"retest de la zone puis clôture {unite} {'sous' if d == -1 else 'au-dessus de'} la ligne de décision {px(decision)}"
+        return dict(base, classe=classe, rang=rang, d=d, za=za, zb=zb, dist=dist, atr_n=atr_n,
+                    action=action, au_dessus=prix < za, decision=decision, strategy=strategy,
+                    entry_timeframe=entry_tf, pine_confirmed=pine_confirmed,
+                    pine_triggered=triggered, price_in_zone=price_in_zone, source="Pine v25")
+
+    unite = pe["sl_ut"] if pe else HB_UNITE_VALIDATION.get(r.get("strat") or "", "15 min")
+    action = (f"clôture {unite} {'sous' if d == -1 else 'au-dessus de'} {px(decision)}"
+              if decision else f"rejet + clôture {unite} dans la zone")
+    return dict(base, classe=classe, rang=rang, d=d, za=za, zb=zb, dist=dist, atr_n=atr_n,
+                action=action, au_dessus=prix < za)
 def classer_marches(derniers, etat, choisis, now=None):
     """Marchés suivis par la personne, du plus proche d'une entrée au plus loin."""
     props = [proximite_marche(m, r, etat.get(m, {}), now) for m, r in (derniers or {}).items() if m in choisis and r.get("m1")]
@@ -9547,20 +9618,45 @@ def ligne_vers_zone(d, anglais=False):
                 else "⬇️ Le prix redescend vers la zone : c'est normal → 🟢 LONG seulement au rebond dans la zone")
     return ""
 
+
 def _radar_n_ut(r, d):
+    if r.get("require_tv_bridge"):
+        bridge = r.get("tv_indicator_mtf") or {}
+        snapshots = bridge.get("snapshots") if isinstance(bridge.get("snapshots"), dict) else {}
+        return sum(
+            1 for tf, _ in TELEGRAM_TF_VIEWS
+            if isinstance(snapshots.get(tf), dict)
+            and snapshots[tf].get("fresh") is True
+            and snapshots[tf].get("direction") == d
+        )
     return r.get("bull", 0) if d == 1 else r.get("bear", 0) if d == -1 else max(r.get("bull", 0), r.get("bear", 0))
 
-def _radar_pret(p, derniers):
-    """« Prépare-toi » seulement si le prix est proche (rang ≤ 1) ET que l'alignement a atteint le seuil (8/11) : sinon c'est juste « proche »."""
-    return 0 <= p["rang"] <= RADAR_ALERTE_RANG and _radar_n_ut((derniers or {}).get(p["m"]) or {}, p.get("d")) >= MIN_ALIGN
 
+def _radar_pret(p, derniers):
+    """Pré-alerte seulement sur plan Pine v25 confirmé et proximité du prix TradingView."""
+    if not 0 <= p.get("rang", 9) <= RADAR_ALERTE_RANG:
+        return False
+    r = (derniers or {}).get(p.get("m")) or {}
+    if r.get("require_tv_bridge"):
+        return p.get("pine_confirmed") is True
+    return _radar_n_ut(r, p.get("d")) >= MIN_ALIGN
 def _radar_ordre(props, derniers):
     """Marchés prêts (proches + alignés) d'abord, puis l'ordre de proximité habituel."""
     return sorted(props, key=lambda p: 0 if _radar_pret(p, derniers) else 1)
 
+
 def radar_entree_sl(r, d, za=None, zb=None):
-    """Entrée / SL / TP1 du RADAR = plan de l'indicateur (même plan que l'ordre Telegram : pine_entree), jamais un mini-SL M5 (trop dangereux).
-    L'entrée et le SL visent le même sommet / creux de structure du plan ; la zone affichée est réduite à sa partie rentable."""
+    """Niveaux RADAR : plan Pine v25 exact en bridge obligatoire ; ancien calcul conservé hors bridge."""
+    if r.get("require_tv_bridge"):
+        plan = plan_indicateur(r)
+        if (not isinstance(plan, dict) or plan.get("available") is not True
+                or plan.get("confirmed") is not True or plan.get("direction") != d):
+            return None
+        return dict(e=plan["entry"], sl=plan["sl"], tp1=plan["tp1"], tp2=plan.get("tp2"),
+                    za=plan["zone_low"], zb=plan["zone_high"], src="Pine v25 / ROBOT V12",
+                    ut=plan["entry_timeframe"], fvg=False, d=d, decision=plan["decision"],
+                    triggered=plan.get("triggered") is True)
+
     pe = pine_entree(r, d) if r.get("b15") and "planH" in r else None
     if pe:
         return dict(e=pe["e"], sl=pe["sl"], tp1=pe["tp1"], za=pe["za"], zb=pe["zb"],
@@ -9571,7 +9667,6 @@ def radar_entree_sl(r, d, za=None, zb=None):
         a_, b_ = zone_rentable(d, za, zb, plan["sl"], plan["tp1"]) if za is not None else (None, None)
         return dict(e=plan["e"], sl=plan["sl"], tp1=plan["tp1"], za=a_, zb=b_, src="plan de l'indicateur")
     return None
-
 def texte_radar(props, derniers, vip=True, anglais=False, now=None, intro=None):
     """Texte du RADAR, construit uniquement à partir des vraies données (classer_marches + plan figé de l'indicateur).
     Gratuit : marché favori, sens et état — jamais l'entrée, le SL ni le TP (réservés aux VIP)."""
@@ -9597,7 +9692,7 @@ def texte_radar(props, derniers, vip=True, anglais=False, now=None, intro=None):
             l += [x for x in str(intro).split("\n") if x.strip()][:3]      # phrases de l'IA (jamais les mêmes), niveaux toujours calculés par le bot
         r = (derniers or {}).get(t["m"]) or {}
         d = t.get("d")
-        prof = {"SWING": "SWING", "DAY": "INTRADAY", "SCALPING": "SCALP"}.get(r.get("strat") or "", "")
+        prof = {"SWING": "SWING", "DAY": "INTRADAY", "SCALPING": "SCALP"}.get(t.get("strategy") or r.get("strat") or "", "")
         l.append(("📉 " if d == -1 else "📈 ") + (f"Direction : {SENS_COURT.get(d, '?')}" if anglais else f"Sens : {SENS_COURT.get(d, '?')}") + (f" · {prof}" if prof else ""))
         if vip:
             es = radar_entree_sl(r, d, t["za"], t["zb"])
@@ -9612,14 +9707,19 @@ def texte_radar(props, derniers, vip=True, anglais=False, now=None, intro=None):
                              f"{'SHORT' if d == -1 else 'LONG'} seulement au retrace dans la zone 🟨")
                 else:
                     l.append(f"🧭 It can {'drop' if d == -1 else 'rise'} to TP1 (blue line) · {'SHORT' if d == -1 else 'LONG'} only on the retrace into the zone 🟨")
-                if es.get("fvg") and tp2_affichable(d, es["tp1"], es.get("tp2")):
-                    l.append(f"🏁 TP2 : {px(es['tp2'])}" + (" (if TP1 breaks, it keeps going)" if anglais else " (si le TP1 casse, ça continue)"))
-                if es.get("fvg"):
-                    l.append((f"👀 TradingView : {es['ut']} view = same levels" if anglais else f"👀 TradingView : vue {es['ut']} = mêmes niveaux"))
-                    if anglais:
-                        l.append("🧘 It's an FVG: it can sting a bit before turning, don't panic while the SL holds")
-                    else:
-                        l += [x for x in coach_fvg(r, d, r["m1"][-1]["c"]) if not x.startswith("📍")] if r.get("m1") else []
+                if es.get("src") == "Pine v25 / ROBOT V12":
+                    if es.get("tp2") is not None and tp2_affichable(d, es["tp1"], es.get("tp2")):
+                        l.append(f"🏁 TP2 : {px(es['tp2'])}" + (" (if TP1 breaks, it keeps going)" if anglais else " (si le TP1 casse, ça continue)"))
+                    l.append((f"👀 TradingView v25 : same levels · trigger {es['ut']}" if anglais else f"👀 TradingView v25 : mêmes niveaux · déclencheur {es['ut']}"))
+                else:
+                    if es.get("fvg") and tp2_affichable(d, es["tp1"], es.get("tp2")):
+                        l.append(f"🏁 TP2 : {px(es['tp2'])}" + (" (if TP1 breaks, it keeps going)" if anglais else " (si le TP1 casse, ça continue)"))
+                    if es.get("fvg"):
+                        l.append((f"👀 TradingView : {es['ut']} view = same levels" if anglais else f"👀 TradingView : vue {es['ut']} = mêmes niveaux"))
+                        if anglais:
+                            l.append("🧘 It's an FVG: it can sting a bit before turning, don't panic while the SL holds")
+                        else:
+                            l += [x for x in coach_fvg(r, d, r["m1"][-1]["c"]) if not x.startswith("📍")] if r.get("m1") else []
             if t["rang"] == 0:
                 l.append("🟨 Price is IN the zone" if anglais else "🟨 Le prix est DANS la zone")
             else:
@@ -9672,17 +9772,22 @@ def _radar_supprimer(cid, mid, etat=None):
 IA_RADAR = os.environ.get("IA_RADAR", "1") == "1"   # coupe-circuit : 0 = RADAR sans IA
 RADAR_IA_CACHE_SEC = 900      # une seule rédaction IA par marché et par niveau visé (partagée entre abonnés) : coût minimal
 
+
 def intro_ia_radar(etat, m, r, cle, p, es):
-    """L'IA rédige l'annonce « prépare-toi » (3 lignes, formulation toujours différente) UNIQUEMENT au moment où un marché devient prêt.
-    Les chiffres viennent du bot (ia() refuse tout prix absent des données) ; sens contraire à l'indicateur = commentaire jeté."""
-    # Incomplete radar summaries have no verified M1 price; do not request numeric AI commentary.
+    """L'IA rédige l'annonce « prépare-toi » à partir du plan canonique et de l'unité réelle de déclenchement."""
     if not isinstance(r, dict) or not (r.get("m1") or []):
         return None
+    if r.get("require_tv_bridge") and (not es or es.get("src") != "Pine v25 / ROBOT V12"):
+        return None
     try:
-        unite = HB_UNITE_VALIDATION.get(r.get("strat") or "", "15 min")
+        unite = (es or {}).get("ut") or HB_UNITE_VALIDATION.get(r.get("strat") or "", "15 min")
+        strategie = p.get("strategy") or r.get("strat") or ""
         data = dict(donnees_ia(m, r, cle), radar={
-            "sens": "LONG" if p.get("d") == 1 else "SHORT", "entrée visée": round(es["e"], 2) if es else None,
+            "sens": "LONG" if p.get("d") == 1 else "SHORT", "profil": strategie,
+            "prix TradingView": round(p["prix"], 2) if r.get("require_tv_bridge") and p.get("prix") is not None else None,
+            "entrée visée": round(es["e"], 2) if es else None,
             "SL": round(es["sl"], 2) if es else None, "TP1": round(es["tp1"], 2) if es else None,
+            "TP2": round(es["tp2"], 2) if es and es.get("tp2") is not None else None,
             "niveau": (es or {}).get("src"), "unité à regarder": unite, "ce que j'attends": p.get("action")})
         cle_c = f"radar:{m}:{round((es or {}).get('e') or p.get('za') or 0, 1)}"
         avis = ia(etat, "Un marché approche de son point d'entrée. Écris EXACTEMENT 3 lignes courtes, chacune commence par un emoji, 12 mots max : "
@@ -9697,27 +9802,36 @@ def intro_ia_radar(etat, m, r, cle, p, es):
     if not avis or sens_ia_contradictoire(avis, p.get("d")):
         return None
     if p.get("rang", 0) != 0 and re.search(r"imminent|maintenant|\bgo\b", avis, re.I):
-        return None                               # le prix n'est pas encore dans la zone : jamais « imminent »
+        return None
     return compacter_ia(avis)
 
 def live_prepare_toi(etat, derniers, now=None):
-    """Live : quand un marché devient « prépare-toi » (prix proche de la zone ET unités alignées), petite fenêtre sur l'écran :
-    le sens (ça peut couler / décoller) + compte à rebours, jamais de niveau ; les niveaux (retrace, cible) restent en privé."""
+    """Bande coach : pré-alerte alignée sur le plan Pine confirmé, sans publier les niveaux privés."""
     now = time.time() if now is None else now
     for p in classer_marches(derniers, etat, list(MARCHES), now) or []:
         if p.get("d") not in (1, -1) or not (0 <= p.get("rang", 9) <= RADAR_ALERTE_RANG) or not _radar_pret(p, derniers):
             continue
         ic = ICONE.get(p["m"], "")
         sens = "ça peut couler 📉" if p["d"] == -1 else "ça peut décoller 📈"
-        live_bande(etat, f"BULLE:⚠️ {ic} {p['m']} : prépare-toi, {sens} • ⏱ verdict dans {min_avant_cloture15(now)} min • "
-                         "les niveaux en privé : lien en bio 🎁 gratuit", f"prep{p['m']}{p['d']}", 1800, toujours=True)
-        # v8.5 (demande d'Adel) : chrono « une position arrive, dépêche-toi » jusqu'à la clôture 15 min (jamais de prix)
+        if p.get("pine_confirmed"):
+            unite = {"M1": "1 min", "M5": "5 min", "H1": "1h"}.get(p.get("entry_timeframe"), p.get("entry_timeframe") or "unité de stratégie")
+            if p.get("pine_triggered") and not p.get("price_in_zone"):
+                detail = "déclencheur validé : j'attends le retour du prix dans la zone d'entrée"
+            elif p.get("pine_triggered") and p.get("price_in_zone"):
+                detail = "zone atteinte : le bot contrôle le point d'entrée"
+            else:
+                cote = "en dessous" if p["d"] == -1 else "au-dessus"
+                detail = f"attends le retest de la zone puis la clôture {unite} {cote} de la ligne de décision"
+            message = (f"BULLE:⚠️ {ic} {p['m']} : prépare-toi, {sens} • {detail} • "
+                       f"prochaine mise à jour du plan M15 dans {min_avant_cloture15(now)} min • niveaux exacts en privé")
+        else:
+            message = (f"BULLE:⚠️ {ic} {p['m']} : prépare-toi, {sens} • ⏱ verdict dans {min_avant_cloture15(now)} min • "
+                       "les niveaux en privé : lien en bio 🎁 gratuit")
+        live_bande(etat, message, f"prep{p['m']}{p['d']}", 1800, toujours=True)
         live_bande(etat, f"CMD:chrono:{900 - int(now) % 900}:{p['m']}", f"chrono{p['m']}{p['d']}", 1800, toujours=True)
-        # Jeu du live (idée d'Adel) : les spectateurs tapotent l'écran pour parier sur la suite ; le coach l'a déjà annoncé en privé
         live_bande(etat, f"BULLE:👆 JEU : tapote l'écran si tu penses que {ic} {p['m']} va {'couler 📉' if p['d'] == -1 else 'monter 📈'} ! "
                          f"• réponse dans {min_avant_cloture15(now)} min • le coach l'a déjà annoncé : lien en bio 🎁",
                    f"jeu{p['m']}{p['d']}", 1800, toujours=True)
-
 def radar_tick(etat, chats, derniers, now=None):
     """Un RADAR par personne : édité sur place ; nouveau message (son) seulement quand un marché devient « prépare-toi »
     ou quand le marché en tête change (l'ancien radar est alors supprimé : jamais deux radars dans la conversation)."""
