@@ -380,7 +380,7 @@
       .replace(/\s+/g, ' ').trim();
     // v12.2.6 : on retire SEULEMENT les morceaux « disclaimer » et « appel au public » (séparés par •),
     // jamais le commentaire de marché lui-même ; s'il ne reste rien de réel, on ne dit rien.
-    const NON_MARCHE = /lien (en|dans la) bio|link in (the )?bio|spectacle|tapote|tap the screen|tap on the screen|partage|share (the|this) (live|stream|video)|share it|DYOR|do your own research|fais tes propres recherches|conseil en investissement|financial advice|investment advice|risque (élevé |eleve )?de perte|high risk of (capital )?loss|risk of loss|\brisques?\b|\brisks?\b|perte en capital|capital loss/i;
+    const NON_MARCHE = /lien (en|dans la) bio|link in (the )?bio|spectacle|tapote|tap the screen|tap on the screen|partage|share (the|this) (live|stream|video)|share it|DYOR|do your own research|fais tes propres recherches|conseil en investissement|conseil financier|not financial advice|not investment advice|financial advice|investment advice|risque (élevé |eleve )?de perte|high risk of (capital )?loss|risk of loss|\brisques?\b|\brisks?\b|perte en capital|capital loss/i;
     phrase = phrase.split(/\s*•\s*/).filter(m => m && !NON_MARCHE.test(m)).join(' • ').trim();
     if (phrase.length < 12 || (!forcer && phrase === (anglais ? voixTexteEN : voixTexte))) return 0;
     // v12.2.6 : jamais de phrase coupée au milieu : on ne lit qu'une phrase complète
