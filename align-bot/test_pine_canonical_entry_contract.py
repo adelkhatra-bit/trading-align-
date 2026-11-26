@@ -151,7 +151,7 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn('"⏳ BIAIS LONG — EN ATTENTE"', self.pine)
         self.assertIn('"⏳ BIAIS SHORT — EN ATTENTE"', self.pine)
         self.assertIn('"ATTENDRE • AUCUNE STRATÉGIE"', self.pine)
-        self.assertIn('bridgeConfirmed ? "\\n\\nPLAN CONFIRMÉ "', self.pine)
+        self.assertIn('planConfirmedUi ? "\\n\\nPLAN CONFIRMÉ "', self.pine)
         self.assertNotIn('dirPlan != 0 ? "\\n\\nPLAN "', self.pine)
         self.assertIn("vbg0 = zoneBas or zoneHaut ? color.rgb(170, 130, 0) : planConfirmedUi and dirPlan == 1", self.pine)
 
