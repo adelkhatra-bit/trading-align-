@@ -47,7 +47,7 @@ class EconomicCalendarFailureGuardTest(unittest.TestCase):
         with mock.patch.object(ab, "calendrier", return_value=[stale_event]):
             messages = ab.annonces_et_sessions(state, now, {})
 
-        joined = "\\n".join(messages)
+        joined = "\n".join(messages)
         self.assertIn("CALENDRIER ÉCONOMIQUE INDISPONIBLE", joined)
         self.assertNotIn("Aucune annonce majeure US aujourd'hui", joined)
         self.assertNotIn("Old FOMC announcement", joined)
