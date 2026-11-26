@@ -77,11 +77,20 @@ class LiveDuetCommentators(unittest.TestCase):
         self.assertNotIn("'-voix'", self.js)
         self.assertNotIn("ntfy.sh", self.page)
 
-    def test_dialogue_pacing_leaves_time_for_both_voices(self):
+    def test_dialogue_pacing_waits_for_speech_completion_not_estimated_duration(self):
         self.assertIn("startAt: ts + 4000", self.page)
-        self.assertIn("duration1 + 500", self.page)
+        self.assertIn("function parlerLive(item, forcer = false, apresLecture = null)", self.js)
+        self.assertIn("utterance.onend = () => terminerLecture(true);", self.js)
+        self.assertIn("if (continuer && typeof apresLecture === 'function') apresLecture();", self.js)
+        self.assertIn("}, 500));", self.js)
+        self.assertNotIn("pause + 500", self.js)
         self.assertIn("setInterval(echange, 30000)", self.page)
         self.assertIn('fetch(WORKER_SHOW_URL + "/show/publish?message="', self.page)
+
+    def test_dialogue_is_only_spoken_on_the_chart_matching_its_market(self):
+        self.assertIn("const marcheDialogue = String(show.market || '').toUpperCase();", self.js)
+        self.assertIn("if (!marcheDialogue || marcheDialogue !== codeMarche()) return;", self.js)
+        self.assertIn("codeMarche() !== marcheDialogue", self.js)
 
 
 if __name__ == "__main__":

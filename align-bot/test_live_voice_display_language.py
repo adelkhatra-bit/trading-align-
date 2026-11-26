@@ -45,7 +45,7 @@ class LiveVoiceDisplayLanguage(unittest.TestCase):
 
     def test_voice_is_optional_and_reads_french_live_comments(self):
         source = LIVE_JS.read_text(encoding="utf-8")
-        self.assertIn("function parlerLive(item, forcer = false)", source)
+        self.assertIn("function parlerLive(item, forcer = false, apresLecture = null)", source)
         self.assertIn("if (!vivant || !item || !voixActive", source)
         self.assertIn("const voixDuree = m.voiceOnce ? parlerLive(m) : 0", source)
         self.assertIn("!['ia', 'marche', 'coach'].includes(item.source)", source)
