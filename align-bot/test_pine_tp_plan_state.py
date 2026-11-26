@@ -48,6 +48,23 @@ class PineTpPlanStateTests(unittest.TestCase):
         self.assertIn('strat == "DAY" ? "M5"', self.source)
         self.assertIn('strat == "SCALPING" ? "M1"', self.source)
 
+    def test_strategy_and_bridge_confirmations_use_closed_timeframe_directions(self):
+        for name in ("d1Fermee", "d5Fermee", "d15Fermee", "d60Fermee", "d240Fermee", "dDFermee", "dWFermee"):
+            self.assertIn(name + "   = request.security", self.source)
+        self.assertIn("d5Strat = nz(d5Fermee)", self.source)
+        self.assertIn("d1Strat = nz(d1Fermee)", self.source)
+        self.assertIn("uD  = nz(dDFermee) == dP", self.source)
+        self.assertIn("uW  = nz(dWFermee) == dP", self.source)
+        self.assertIn('strat == "SWING" ? (nz(dDFermee) == dirPlan', self.source)
+        self.assertIn('strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan', self.source)
+        self.assertIn('strat == "SCALPING" ? (nz(d60Fermee) != -dirPlan and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan)', self.source)
+
+    def test_visual_plan_status_does_not_claim_entry_is_already_executable(self):
+        self.assertIn("PLAN LONG VALIDÉ — ATTENTE ENTRÉE", self.source)
+        self.assertIn("PLAN SHORT VALIDÉ — ATTENTE ENTRÉE", self.source)
+        self.assertNotIn("▲ LONG CONFIRMÉ", self.source)
+        self.assertNotIn("▼ SHORT CONFIRMÉ", self.source)
+
     def test_entry_sl_tp_geometry_is_guarded_before_bridge_publication(self):
         self.assertIn("bridgePlanValid =", self.source)
         self.assertRegex(self.source, r"bridgePlanValid\s*=\s*dirPlan != 0")
