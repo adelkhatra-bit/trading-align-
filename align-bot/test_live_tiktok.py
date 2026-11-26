@@ -880,8 +880,14 @@ class LiveAgendaMarketTimezoneTests(unittest.TestCase):
 
     def test_bande_visual_animations_are_initialized_and_preserved(self):
         bande = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")).read_text(encoding="utf-8")
-        self.assertIn("// @version      12.2.25", bande)
-        self.assertIn("const VERSION = '12.2.25';", bande)
+        self.assertIn("// @version      12.2.26", bande)
+        self.assertIn("const VERSION = '12.2.26';", bande)
+        self.assertIn("function signalVoix(action, lang, speaker)", bande)
+        self.assertIn("function choisirVoix(lang, speaker)", bande)
+        self.assertIn("const speaker = anglais ? 'l' : 't'", bande)
+        self.assertIn("signalVoix('COACH_ON', 'fr')", bande)
+        self.assertIn("signalVoix('COACH_OFF', 'fr')", bande)
+        self.assertIn("signalVoix('START', anglais ? 'en' : 'fr', speaker)", bande)
         self.assertIn("document.head.appendChild(cssAnimationsToggle);\n  appliquerAnimations();", bande)
         self.assertIn("function afficherIA(", bande)
         self.assertIn("function parlerLive(item, forcer = false)", bande)
@@ -1204,7 +1210,7 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", *rel)
         return Path(path).read_text(encoding="utf-8")
 
-    def test_bande_version_12_2_25_voice_recovery_and_sync(self):
+    def test_bande_version_12_2_26_two_host_voice_recovery_and_sync(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
         self.assertIn("// @version      12.2.25", bande)
         self.assertIn("const VERSION = '12.2.25';", bande)
