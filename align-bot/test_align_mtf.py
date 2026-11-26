@@ -3673,7 +3673,7 @@ class TelegramExplicitCoachOptInTest(unittest.TestCase):
             align_bot.question_quotidienne(state, {"11", "22"}, now + 300)
             align_bot.question_quotidienne(state, {"11", "22"}, now + 86400)
         self.assertEqual([x[0] for x in sent], ["11", "22", "11", "22"])
-        self.assertIn("trade:yes", sent[0][1]["reply_markup"])
+        self.assertIn("searchpos:BOTH", sent[0][1]["reply_markup"])
         self.assertIn("trade:no", sent[0][1]["reply_markup"])
 
     def test_free_position_push_and_delayed_queue_are_disabled(self):
