@@ -1,10 +1,9 @@
 name: ALIGN worker rollover
 
 on:
-  workflow_run:
-    workflows: ["ALIGN MTF validation"]
-    types: [completed]
-    branches: [main]
+  # Rollover manuel uniquement : une validation de code ne doit pas
+  # lancer une attente du worker de production.
+  workflow_dispatch:
 
 permissions:
   actions: write
