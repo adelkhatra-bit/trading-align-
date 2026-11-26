@@ -11981,7 +11981,7 @@ def gerer_stop(etat, m, r, tr, c):
         pos["sl_conseil"] = nouveau
         if pourquoi == "be" or abs(nouveau - e) < 0.2 * a:
             texte = (f"🔒 METS-TOI À BE — {ICONE.get(m, '')} {m}\n🚦 🟢 ON RESTE EN POSITION\n{SENS[d]}\n"
-                     f"🛑 Nouveau SL : BE ≈ {px(e)} (ton prix d'entrée)\n"
+                     f"🛑 Nouveau SL : {px(nouveau)} (entrée {px(e)} • BE sécurisé)\n"
                      f"🕯 Pourquoi : la bougie 15 min de {heure(r['b15'][-1]['t'])} a CLÔTURÉ bien {'au-dessus' if d == 1 else 'en dessous'} de ton entrée\n"
                      "🛡 Résultat : plus aucune perte possible\n"
                      f"💰 TP visé ≈ {px(pos.get('tp1', tr['tp1']))}")
@@ -13294,7 +13294,7 @@ def agent(m, r, cle, ferme):
         risque_ = abs(e - sl)
         if not tr.get("be_dit") and risque_ > 0 and d * (p - e) >= 1.2 * risque_ and d * (r["b15"][-1]["c"] - e) >= r["atr"]:
             tr["be_dit"] = True; tr["sl"] = e + d * 0.05 * r["atr"]
-            out.append(cs_(m, "METS-TOI À BE", [f"🛑 SL → BE : {px(e)} (entrée)", f"🕯 Clôture 15 min {heure(r['b15'][-1]['t'])} {'au-dessus' if d == 1 else 'sous'} l'entrée",
+            out.append(cs_(m, "METS-TOI À BE", [f"🛑 SL sécurisé : {px(tr['sl'])} (entrée {px(e)} • 0,05 ATR en gain)", f"🕯 Clôture 15 min {heure(r['b15'][-1]['t'])} {'au-dessus' if d == 1 else 'sous'} l'entrée",
                                                           f"💰 TP : {px(t1)}", "🙅 Le prix ne doit plus revenir à ton entrée : on encaisse 💰"], "SL à BE (plus de perte possible)", r))
             return out
         fr_ = frole_tp(m, r, tr, d, e, t1, "TP1", p)
