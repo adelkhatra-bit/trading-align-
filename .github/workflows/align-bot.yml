@@ -2,12 +2,8 @@ name: ALIGN MTF BOT (signaux BTC + Gold Telegram)
 # Release trigger after verified cleanup of the previous production worker.
 
 on:
-  # Les pushes sont validés par align-bot-validation.yml. Le worker ne redémarre
-  # qu'après la réussite de cette validation, via workflow_run.
-  workflow_run:
-    workflows: ["ALIGN MTF validation"]
-    types: [completed]
-    branches: [main]
+  # Le bot de production tourne sur le calendrier et sur demande uniquement.
+  # Une validation de code ne doit jamais relancer un worker de plusieurs heures.
   schedule:
     - cron: "0 */6 * * *"
   workflow_dispatch:
@@ -32,16 +28,8 @@ jobs:
   signaux:
     needs: validate
     if: >-
-      always() &&
       github.repository == 'adelkhatra-bit/trading-align-' &&
-      (
-        (github.event_name == 'workflow_run' &&
-         github.event.workflow_run.conclusion == 'success' &&
-         github.event.workflow_run.event == 'push' &&
-         github.event.workflow_run.head_branch == 'main') ||
-        ((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
-         needs.validate.result == 'success')
-      )
+      needs.validate.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 355
     defaults:
@@ -50,14 +38,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Un événement workflow_run ne doit jamais exécuter le HEAD main non validé :
-          # il doit exécuter exactement le commit dont la validation vient de réussir.
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # Le worker est lancé par planification ou demande manuelle après validation.
+          ref: ${{ github.sha }}
           sparse-checkout: align-bot
 
       - name: Vérifier le commit validé réellement exécuté
         env:
-          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          EXPECTED_SHA: ${{ github.sha }}
         run: |
           ACTUAL_SHA="$(git rev-parse HEAD)"
           if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then

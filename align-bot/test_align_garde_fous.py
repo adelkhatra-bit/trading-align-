@@ -36,9 +36,15 @@ class GardeFousWorkflows(unittest.TestCase):
         attendus = {
             "align-auto-repair.yml": [r"(?m)^  workflow_run:", r"types:\s*\[completed\]"],
             "align-workflow-watchdog.yml": [r"(?m)^  workflow_run:", r"(?m)^  workflow_dispatch:"],
-            "align-bot.yml": [r"(?m)^  workflow_run:", r'workflows:\s*\["ALIGN MTF validation"\]', r"(?m)^  schedule:"],
+            "align-bot.yml": [r"(?m)^  workflow_dispatch:", r"(?m)^  schedule:"],
             "align-bot-validation.yml": [r"(?m)^  pull_request:", r"(?m)^  push:"],
         }
+        # Le worker de production ne doit plus être lancé par la fin d'une validation.
+        bot_header = (WF / "align-bot.yml").read_text(encoding="utf-8").split("\njobs:", 1)[0]
+        self.assertNotRegex(bot_header, r"(?m)^  workflow_run:")
+        rollover_header = (WF / "align-bot-rollover.yml").read_text(encoding="utf-8").split("\njobs:", 1)[0]
+        self.assertRegex(rollover_header, r"(?m)^  workflow_dispatch:")
+        self.assertNotRegex(rollover_header, r"(?m)^  workflow_run:")
         for fichier, motifs in attendus.items():
             texte = (WF / fichier).read_text(encoding="utf-8")
             entete = texte.split("\njobs:", 1)[0]

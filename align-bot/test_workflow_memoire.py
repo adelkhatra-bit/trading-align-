@@ -43,7 +43,8 @@ class MemoireDuBot(unittest.TestCase):
 
     def test_worker_checkout_exactement_le_commit_valide(self):
         checkout = self.t[self.t.index("uses: actions/checkout@v4"):self.t.index("name: Attendre la fin de l'ancien worker")]
-        self.assertIn("ref: ${{ github.event.workflow_run.head_sha || github.sha }}", checkout)
+        self.assertIn("ref: ${{ github.sha }}", checkout)
+        self.assertNotIn("github.event.workflow_run", checkout)
         self.assertIn("WORKER_CHECKOUT_SHA=$ACTUAL_SHA", checkout)
         self.assertIn("EXPECTED_SHA", checkout)
 
