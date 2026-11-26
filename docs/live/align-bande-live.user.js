@@ -423,7 +423,7 @@
     } catch (e) { return 0; }
   }
   // La scène ALIGN LIVE envoie chaque réplique à la page TradingView ; le clic vocal reste l'autorisation audio.
-  let coachShowES = null;
+  let coachShowES = null, dernierDialogueCoachTs = 0;
   function ecouterDialoguesCoach() {
     if (!vivant || document.visibilityState !== 'visible') return;
     try {
@@ -437,7 +437,8 @@
           const d = JSON.parse(envelope.message);
           if (d.type !== 'ALIGN_SHOW' || d.action !== 'SAY' || !['t', 'l'].includes(d.speaker)) return;
           const ts = Number(d.ts) || 0;
-          if (!ts || Date.now() - ts > 30000 || ts > Date.now() + 5000) return;
+          if (!ts || ts <= dernierDialogueCoachTs || Date.now() - ts > 30000 || ts > Date.now() + 5000) return;
+          dernierDialogueCoachTs = ts;
           const texte = String(d.text || '').trim();
           if (texte.length < 12) return;
           const market = String(d.market || '').toUpperCase();
