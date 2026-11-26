@@ -195,5 +195,41 @@ class CoachPineSourceTests(unittest.TestCase):
         self.assertNotIn("900", message)
 
 
+    def test_telegram_signal_card_always_lists_entry_then_sl_then_targets(self):
+        with (
+            patch.object(ab, "niveaux_rs", return_value=(None, None)),
+            patch.object(ab, "pips_txt", return_value="5"),
+            patch.object(ab, "dxy_court", return_value="stable"),
+            patch.object(ab, "news_prochaine_courte", return_value="aucune"),
+            patch.object(ab, "statut_sys", return_value="Système OK"),
+            patch.object(ab, "coach_fvg", return_value=[]),
+        ):
+            for direction in (1, -1):
+                entry = 100.0
+                trade = {
+                    "d": direction,
+                    "e": entry,
+                    "sl": 95.0 if direction == 1 else 105.0,
+                    "tp1": 110.0 if direction == 1 else 90.0,
+                    "tp2": 120.0 if direction == 1 else 80.0,
+                }
+                message = ab.carte_coach(
+                    "BTC",
+                    {"macro_data": {}, "m1": [{"c": 100.0, "h": 101.0, "l": 99.0}]},
+                    {},
+                    "signal",
+                    tr=trade,
+                    signal="Plan Pine v25",
+                    etat={},
+                )
+                entry_at = message.index("📍 Entrée :")
+                sl_at = message.index("🛑 SL :")
+                tp1_at = message.index("💰 TP1 :")
+                tp2_at = message.index("🏁 TP2 :")
+                self.assertLess(entry_at, sl_at)
+                self.assertLess(sl_at, tp1_at)
+                self.assertLess(tp1_at, tp2_at)
+
+
 if __name__ == "__main__":
     unittest.main()

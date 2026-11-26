@@ -3075,14 +3075,15 @@ def carte_coach(m, r, cle, genre, tr=None, raison=None, declencheur=None, signal
         l = [f"{'🟢' if d == 1 else '🔴'} {m} - {'LONG' if d == 1 else 'SHORT'}", ""]      # sens en PREMIER, en couleur (vert LONG / rouge SHORT)
         rr = abs(tr["tp1"] - tr["e"]) / max(abs(tr["e"] - tr["sl"]), 1e-9)
         tps = px(tr["tp1"]) + (f" / {px(tr['tp2'])}" if tr.get("tp2") is not None and tp2_affichable(d, tr["tp1"], tr["tp2"]) else "")
-        # Ordre du GRAPHIQUE (du plus haut au plus bas) : SHORT = SL, entrée, TP1, TP2 ; LONG = TP2, TP1, entrée, SL
+        # Ordre Telegram prioritaire : ENTRY, SL, TP1, TP2 (lecture immédiate sans défilement).
         vue_ = f" (vue {tr['sl_ut']})" if tr.get("sl_ut") else ""
-        niv = [(f"🛑 SL : {px(tr['sl'])} · {pips_txt(m, tr['e'] - tr['sl'])}" + (" (mèche 5 min)" if tr.get("sl_ut") == "5 min" else "")
+        niv = [(f"📍 Entrée : {px(tr['e'])}{vue_}", tr["e"]),
+               (f"🛑 SL : {px(tr['sl'])} · {pips_txt(m, tr['e'] - tr['sl'])}" + (" (mèche 5 min)" if tr.get("sl_ut") == "5 min" else "")
                 + (f" (+{pips_txt(m, tr['marge_sl'])} appris)" if tr.get("marge_sl") else ""), tr["sl"]),
-               (f"🎯 Entrée : {px(tr['e'])}{vue_}", tr["e"]), (f"💰 TP1 : {px(tr['tp1'])}", tr["tp1"])]
+               (f"💰 TP1 : {px(tr['tp1'])}", tr["tp1"])]
         if tr.get("tp2") is not None and tp2_affichable(d, tr["tp1"], tr["tp2"]):
             niv.append((f"🏁 TP2 : {px(tr['tp2'])}", tr["tp2"]))
-        l += [x for x, _ in sorted(niv, key=lambda z: -z[1])] + [f"⚖️ R:R : 1:{rr:.1f}".replace(".", ",")]
+        l += [x for x, _ in niv] + [f"⚖️ R:R : 1:{rr:.1f}".replace(".", ",")]
         # v8.7 (demande d'Adel) : durée estimée de la position + « le prix peut revenir vers l'entrée », pour ne pas paniquer
         try:
             bg = [x for x in (r.get("m1") or [])[-120:] if isinstance(x, dict) and x.get("h") is not None and x.get("l") is not None]
