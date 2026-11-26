@@ -12,6 +12,13 @@ class LiveDuetCommentators(unittest.TestCase):
         self.js = LIVE_JS.read_text(encoding="utf-8")
         self.page = LIVE_PAGE.read_text(encoding="utf-8")
 
+    def test_runtime_state_is_initialized_before_first_coach_poll(self):
+        vivant = self.js.index("let vivant = true;")
+        first_use = self.js.index("if (!vivant || !item || !voixActive")
+        first_poll = self.js.index("  ecouterDialoguesCoach();")
+        self.assertLess(vivant, first_use)
+        self.assertLess(vivant, first_poll)
+
     def test_two_hosts_are_present_and_dialogue_is_sent_to_the_voice_engine(self):
         self.assertIn('id="av-t"', self.page)
         self.assertIn('id="av-l"', self.page)
