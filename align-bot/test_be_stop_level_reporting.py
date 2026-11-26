@@ -83,13 +83,13 @@ class BreakEvenStopLevelReportingTest(unittest.TestCase):
              mock.patch.object(
                  align_bot,
                  "carte_suivi",
-                 side_effect=lambda market, title, lines, *args, **kwargs: "\\n".join([title] + lines),
+                 side_effect=lambda market, title, lines, *args, **kwargs: "\n".join([title] + lines),
              ):
             messages = align_bot.agent("BTC", market_data, state, "")
 
         expected_stop = align_bot.px(trade["sl"])
         expected_entry = align_bot.px(trade["e"])
-        text = "\\n".join(str(message) for message in messages)
+        text = "\n".join(str(message) for message in messages)
         self.assertAlmostEqual(trade["sl"], 100.1)
         self.assertIn(f"SL sécurisé : {expected_stop}", text)
         self.assertIn(f"entrée {expected_entry}", text)
