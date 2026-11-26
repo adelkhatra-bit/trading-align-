@@ -3990,6 +3990,7 @@ class PineOnlyEntryGateTests(unittest.TestCase):
         r = self._market()
         r["require_tv_bridge"] = True
         r["tv_indicator_mtf"]["snapshots"]["M15"]["price"] = 102.0
+        r["tv_indicator_mtf"]["snapshots"]["M5"]["price"] = 102.0
         r["tv_indicator_mtf"]["snapshots"]["M15"]["robotV12"]["entryTriggered"] = True
         state = {"t1m": 0}
         with patch.object(align_bot, "plan_cassure", side_effect=AssertionError("local breakout fallback called")), patch.object(align_bot, "point_entree", side_effect=AssertionError("local entry fallback called")), patch.object(align_bot, "pause_entree_marche", return_value=None), patch.object(align_bot, "bloque_dw", return_value=False), patch.object(align_bot, "profil_trade", return_value={"mode": "DAY"}), patch.object(align_bot, "memoire_refuse", return_value=(False, 0, 0)), patch.object(align_bot, "strategie_trade", return_value={"strat": "DAY"}):
