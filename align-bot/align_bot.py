@@ -10984,8 +10984,10 @@ def jauge(m, r, cle, cid=None, canal=False):
 def maj_jauge(etat, m, r, cle, chats, canal=None):
     for cid in list(chats) + ([canal] if canal else []):
         cid = str(cid)
+        position_cid = ((cle.get("trade") or {}).get("qui") or {}).get(cid)
+        en_position_marche = isinstance(position_cid, dict) and not position_cid.get("fini")
         if cid != str(canal or "") and (not marche_autorise(etat, cid, m) or
-                                         (not coach_actif(etat, cid, m) and not en_position(etat, cid))):
+                                         (not coach_actif(etat, cid, m) and not en_position_marche)):
             mid = (cle.get("jauge") or {}).get(cid)
             if mid:
                 try:
