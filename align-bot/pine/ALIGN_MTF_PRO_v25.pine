@@ -353,7 +353,9 @@ ptsInd = strat == "" ? 0 : rsiSain ? (sens == dP ? 10 : 5) : 0
 rrS = math.abs(tp1 - ent) / math.max(math.abs(ent - sl), syminfo.mintick)
 ptsRR = strat == "" ? 0 : rrS >= 2.0 ? 10 : rrS >= 1.5 ? 7 : 0
 scoreV = ptsAlign + ptsStruct + ptsZone + ptsVol + ptsInd + ptsRR
-decisionS = strat == "" ? "AUCUNE ENTRÉE" : scoreV < 60 ? "AUCUNE ENTRÉE : configuration insuffisante" : etatS != "CONFIRMÉ" ? "À SURVEILLER : confirmation manquante" : scoreV >= 85 ? "ENTRÉE POSSIBLE : fortement aligné" : scoreV >= 75 ? "INTÉRESSANT : attendre les conditions finales" : "À SURVEILLER : confirmation manquante"
+planRisk = math.abs(ent - sl)
+planRiskRewardOk = not na(atr15) and atr15 > 0 and rr >= 2.0 and planRisk <= 1.5 * atr15
+decisionS = strat == "" ? "AUCUNE ENTRÉE" : not planRiskRewardOk ? "AUCUNE ENTRÉE : risque ou gain/risque insuffisant" : scoreV < 60 ? "AUCUNE ENTRÉE : configuration insuffisante" : etatS != "CONFIRMÉ" ? "À SURVEILLER : confirmation manquante" : scoreV >= 85 ? "PLAN VALIDÉ : attendre le déclencheur" : scoreV >= 75 ? "INTÉRESSANT : attendre les conditions finales" : "À SURVEILLER : confirmation manquante"
 rr  = math.abs(tp1 - ent) / math.max(math.abs(ent - sl), syminfo.mintick)
 tEnt = ent == close ? "au marché" : "ordre limite"
 // Fibonacci du dernier mouvement 15 min (24 bougies clôturées) : même calcul que le robot Telegram
@@ -494,7 +496,7 @@ if barstate.islast
         table.cell(t, i, 1, sym, width=largCol, bgcolor=bg, text_color= color.white, text_size=size.normal, tooltip=tip)
 // État de confirmation calculé pour l'affichage ; les champs d'export restent dans le bloc bridge canonique.
 planClosedMtfOkUi = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan)
-planConfirmedUi = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2) and etatS == "CONFIRMÉ" and scoreV >= 75 and planClosedMtfOkUi
+planConfirmedUi = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and planRiskRewardOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2) and etatS == "CONFIRMÉ" and scoreV >= 75 and planClosedMtfOkUi
     titre = zoneBas ? "RETOURNEMENT ▼" : zoneHaut ? "REBOND ▲" : fortHaut ? "★ ACHAT FORT" : fortBas ? "★ VENTE FORTE" : retHaut ? "RETOURNEMENT ▲" : retBas ? "RETOURNEMENT ▼" : rsiOB >= 3 ? "RSI SURACHAT " + str.tostring(rsiOB) + "/11" : rsiOS >= 3 ? "RSI SURVENTE " + str.tostring(rsiOS) + "/11" : surcharge ? "⚡ SURCHARGE" : sens == 1 ? "HAUSSE" : sens == -1 ? "BAISSE" : "ATTENDRE"
     statutPlan = planConfirmedUi ? (dirPlan == 1 ? "▲ PLAN LONG VALIDÉ — ATTENTE ENTRÉE" : "▼ PLAN SHORT VALIDÉ — ATTENTE ENTRÉE") : strat != "" and dirPlan != 0 ? (dirPlan == 1 ? "⏳ BIAIS LONG — EN ATTENTE" : "⏳ BIAIS SHORT — EN ATTENTE") : "ATTENDRE • AUCUNE STRATÉGIE"
     ligne = (retDir != 0 and not retConf ? "↩ RETOURNEMENT  " : nVoy >= 3 ? "↩ " + str.tostring(nVoy) + "/5  " : "") + statutPlan + (planConfirmedUi ? " • " + (strat == "SCALPING" ? "SCALP" : strat) + " • TP " + px(tp1) + " • SL " + px(sl) : strat != "" and dirPlan != 0 ? " • " + strat + " • confirmation requise" : "   " + titre)
@@ -633,7 +635,7 @@ if barstate.islast
 // Le bridge ne publie LONG/SHORT que si le plan complet est confirmé.
 bridgePlanValid = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2)
 bridgeClosedMtfOk = strat == "SWING" ? (nz(dDFermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) != -dirPlan and nz(dWFermee) != -dirPlan) : strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d240Fermee) != -dirPlan) : strat == "SCALPING" ? (nz(d60Fermee) != -dirPlan and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan) : false
-bridgeConfirmed = bridgePlanValid and etatS == "CONFIRMÉ" and scoreV >= 75 and bridgeClosedMtfOk
+bridgeConfirmed = bridgePlanValid and planRiskRewardOk and etatS == "CONFIRMÉ" and scoreV >= 75 and bridgeClosedMtfOk
 bridgeSignal = bridgeConfirmed ? (dirPlan == 1 ? "LONG" : "SHORT") : "WAIT"
 bridgeZone = zoneHaut ? "SUPPORT" : zoneBas ? "RESISTANCE" : "PLAN"
 // Routage canonique : un graphique BTC ne peut publier que BTCUSD, un graphique Gold que XAUUSD.
