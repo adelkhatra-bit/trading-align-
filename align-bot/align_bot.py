@@ -198,7 +198,7 @@ def fetch_tv_mtf(pair):
                     "detail": detail_bridge_invalide(payload), "snapshots": payload["snapshots"]}
         active_tf = str(payload.get("activeTimeframe") or "").upper()
         active_fresh = payload.get("activeTimeframeFresh") is True
-        if active_tf not in {"M1", "M5", "M15", "M30", "H1", "H2", "H4", "D1", "W1"} or not active_fresh:
+        if active_tf not in {"M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1"} or not active_fresh:
             active_tf = None
         return {
             "available": True,
