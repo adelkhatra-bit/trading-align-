@@ -12722,7 +12722,9 @@ def agent(m, r, cle, ferme):
         risk = abs(entry - stop)
         atr15 = float(r.get("atr") or 0)
         rr = abs(tp1 - entry) / max(risk, 1e-9)
-        if risk <= 0 or atr15 <= 0 or risk > RISQUE_MAX * atr15 or rr < RR_MIN_ENTREE:
+        # Pine v25 / bridge a déjà validé RR >= 2 et le risque <= 1,5 ATR M15.
+        # Ne pas re-filtrer avec l'ATR Kraken/local : cela peut rejeter un plan TV valide.
+        if risk <= 0 or rr < RR_MIN_ENTREE:
             cle["prep"] = False
             cle.pop("ordre", None)
             out.append(f"⛔ {ICONE.get(m, '')} {m} : plan Pine M15 refusé par le filtre risque / rendement ALIGN.")
