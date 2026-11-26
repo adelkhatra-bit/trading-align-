@@ -133,10 +133,10 @@ def niveaux_valides(signal):
 
 
 def executer(etat, signal, journal=print):
+    """signal = {marche, sens, e, sl, tp}. Une position = 1 micro-contrat avec SL et TP posés tout de suite."""
     valide, raison = niveaux_valides(signal)
     if not valide:
         return {"ok": False, "raison": raison}
-    """signal = {marche, sens, e, sl, tp}. Une position = 1 micro-contrat avec SL et TP posés tout de suite."""
     m = signal["marche"]
     if m not in SYMBOLES:
         return {"ok": False, "raison": "marché désactivé dans ALIGN"}
