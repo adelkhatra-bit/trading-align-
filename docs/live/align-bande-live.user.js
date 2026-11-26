@@ -306,8 +306,8 @@
       const dansLangue = toutes.filter(v => String(v.lang || '').toLowerCase().startsWith(lang));
       // Thomas = voix masculine; Leïla = voix féminine. Pas de repli vers le mauvais locuteur.
       const nom = speaker === 't'
-        ? (lang === 'fr' ? /\\bpaul\\b|\\bhenri\\b|\\bthomas\\b|\\bremy\\b|\\brémy\\b/i : /\\bdavid\\b|\\bmark\\b|\\bguy\\b/i)
-        : (lang === 'fr' ? /hortense|julie|amélie|amelie|audrey|denise|eloise|vivienne/i : /\\bzira\\b|\\bsamantha\\b|\\bava\\b|\\bhazel\\b|\\bjenny\\b|\\baria\\b/i);
+        ? (lang === 'fr' ? /\bpaul\b|\bhenri\b|\bthomas\b|\bremy\b|\brémy\b/i : /\bdavid\b|\bmark\b|\bguy\b/i)
+        : (lang === 'fr' ? /hortense|julie|amélie|amelie|audrey|denise|eloise|vivienne/i : /\bzira\b|\bsamantha\b|\bava\b|\bhazel\b|\bjenny\b|\baria\b/i);
       // v12.2.8 : uniquement une voix naturelle disponible; aucune voix robot générique.
       return dansLangue.find(v => VOIX_NATURELLES.test(v.name) && nom.test(String(v.name || ''))) || null;
     } catch (e) { return null; }
