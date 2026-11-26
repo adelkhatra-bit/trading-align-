@@ -12606,6 +12606,13 @@ def agent(m, r, cle, ferme):
     # Une position déjà ouverte reste suivie jusqu'à sa clôture ; aucune nouvelle info de marché.
     require_tv = bool(r.get("require_tv_bridge"))
     sans_signal = mode_sans_signal(r)
+    # En mode bridge obligatoire, le plan Pine v25 est la source de direction ET de prix.
+    # Ne pas imposer en amont le filtre local H1/H4 : il bloquait DAY/SCALPING pourtant
+    # confirmés par leurs propres clôtures MTF Pine.
+    plan_tv = plan_indicateur(r) if require_tv and not tr else None
+    if require_tv and not tr and plan_tv and plan_tv.get("available") is True:
+        d = int(plan_tv["direction"])
+        p = float(plan_tv["price"])
     if sans_signal and not tr:
         cause = (r.get("tv_indicator_mtf") or {}).get("detail") or (r.get("tv_indicator_mtf") or {}).get("reason") or "inconnue"
         print(f"{m} : mode sans signal, bridge TradingView indisponible — aucune alerte locale. Cause : {cause}")
@@ -12678,7 +12685,6 @@ def agent(m, r, cle, ferme):
             cle["aligne"] = d
             return out
 
-        plan_tv = plan_indicateur(r)
         if not plan_tv.get("available"):
             cle["prep"] = False
             cle.pop("ordre", None)
