@@ -12,6 +12,21 @@ class LiveDuetCommentators(unittest.TestCase):
         self.js = LIVE_JS.read_text(encoding="utf-8")
         self.page = LIVE_PAGE.read_text(encoding="utf-8")
 
+    def test_visible_chart_publishes_initial_voice_state_before_poll(self):
+        publish = self.js.index("if (document.visibilityState === 'visible') publierEtatCoach(voixActive);")
+        poll = self.js.index("  ecouterDialoguesCoach();")
+        self.assertLess(publish, poll)
+
+    def test_french_male_voice_map_accepts_supported_windows_david_voice(self):
+        self.assertIn("t: { fr: /\\b(?:paul|henri|pierre|david)\\b/i", self.js)
+
+    def test_runtime_state_is_initialized_before_first_coach_poll(self):
+        vivant = self.js.index("let vivant = true;")
+        first_use = self.js.index("if (!vivant || !item || !voixActive")
+        first_poll = self.js.index("  ecouterDialoguesCoach();")
+        self.assertLess(vivant, first_use)
+        self.assertLess(vivant, first_poll)
+
     def test_two_hosts_are_present_and_dialogue_is_sent_to_the_voice_engine(self):
         self.assertIn('id="av-t"', self.page)
         self.assertIn('id="av-l"', self.page)
