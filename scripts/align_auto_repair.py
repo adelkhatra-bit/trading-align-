@@ -93,7 +93,9 @@ def summarize_failed_jobs(jobs_payload: dict) -> str:
 def all_issues() -> list[dict]:
     found = []
     for page in range(1, 11):
-        query = urllib.parse.urlencode({"state": "all", "per_page": 100, "page": page})
+        # Closed historical issues are unbounded and can exceed GitHub's 1,000-item
+        # pagination window. Only open issues can be reused or updated by this coordinator.
+        query = urllib.parse.urlencode({"state": "open", "per_page": 100, "page": page})
         batch = request_json(f"/repos/{EXPECTED_REPO}/issues?{query}")
         if not isinstance(batch, list):
             raise RuntimeError("GitHub returned an invalid issues response.")
