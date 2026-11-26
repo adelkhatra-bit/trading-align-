@@ -153,6 +153,19 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertTrue(after["canonicalPlanFresh"])
         self.assertTrue(after["snapshots"]["M15"]["robotFresh"])
 
+    def test_frequent_m1_alerts_cannot_keep_an_old_m15_plan_fresh(self):
+        status, _ = self.store.ingest(valid_payload(now_ms=BASE_MS, timeframe="M15"), INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+        status, _ = self.store.ingest(valid_payload(now_ms=BASE_MS + 100_000, timeframe="M1"),
+                                      INGEST, BASE_MS + 100_000)
+        self.assertEqual(status, 200)
+
+        _, data = self.store.read("BTCUSD", BASE_MS + 101_000)
+        self.assertTrue(data["activeTimeframeFresh"])
+        self.assertEqual(data["activeTimeframe"], "M1")
+        self.assertFalse(data["snapshots"]["M15"]["robotFresh"])
+        self.assertFalse(data["canonicalPlanFresh"])
+
     def test_m15_plan_is_preserved_when_other_chart_timeframes_send_opposite_signals(self):
         # The bridge receives every chart's alert stream. A later M1 payload must
         # not erase or replace the canonical M15 ROBOT V12 decision.
