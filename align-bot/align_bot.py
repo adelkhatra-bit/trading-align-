@@ -3076,7 +3076,15 @@ def carte_coach(m, r, cle, genre, tr=None, raison=None, declencheur=None, signal
     res, sup = niveaux_rs(r)
     if genre == "signal":
         d = tr["d"]
-        l = [f"{'🟢' if d == 1 else '🔴'} {m} - {'LONG' if d == 1 else 'SHORT'}", ""]      # sens en PREMIER, en couleur (vert LONG / rouge SHORT)
+        strategie = str(tr.get("strat") or tr.get("strategie") or "").upper()
+        profil = {"SWING": "SWING", "DAY": "INTRADAY", "SCALPING": "SCALP"}.get(strategie, strategie or "NON DÉFINI")
+        ut_entree = str(tr.get("entry_timeframe") or "").upper()
+        l = [
+            f"{'🟢' if d == 1 else '🔴'} {m} - {'LONG' if d == 1 else 'SHORT'}",
+            f"{'🟢' if d == 1 else '🔴'} ENTRÉE EN POSITION — COACH ALIGN",
+            f"🏷️ PROFIL : {profil}" + (f" • DÉCLENCHEMENT {ut_entree}" if ut_entree else ""),
+            "",
+        ]
         rr = abs(tr["tp1"] - tr["e"]) / max(abs(tr["e"] - tr["sl"]), 1e-9)
         tps = px(tr["tp1"]) + (f" / {px(tr['tp2'])}" if tr.get("tp2") is not None and tp2_affichable(d, tr["tp1"], tr["tp2"]) else "")
         # Ordre Telegram prioritaire : ENTRY, SL, TP1, TP2 (lecture immédiate sans défilement).
@@ -3107,7 +3115,7 @@ def carte_coach(m, r, cle, genre, tr=None, raison=None, declencheur=None, signal
             l += [""] + co[:2] if co else []
         except Exception:
             pass
-        action = "ENTRER"
+        action = "POSITION OUVERTE — COACH ALIGN"
     else:
         l = [f"📍 {m} - ATTENTE", "", f"⏳ Raison : {raison}"]
         if declencheur:
@@ -9288,9 +9296,9 @@ _PINE_TEXTES = {   # type -> variantes (FR, EN) ; {ic} {m} {n} {c} {seuil} {sens
                  ("🏁 {ic} {m} : retournement confirmé, direction {sens}", "🧭 {strat}")),
     "ret_cancel": (("⛔ {ic} {m} : SL cassé à la clôture", "↩ Retournement en cours, j'attends 15 min / 1h"), ("🛑 {ic} {m} : le stop du plan est franchi", "🔄 Je guette la confirmation 15 min / 1h"),
                    ("🚧 {ic} {m} : plan annulé (stop cassé)", "👀 Retournement possible, rien n'est validé")),
-    "sniper": (("🎯 Entrée sniper {ic} {m} : {ordre} Pine {entree} • zone {za}–{zb} ({ut})", "🛑 SL Pine {sl} • TP1 Pine {tp1} • TP2 Pine {tp}", "📐 R/R Pine {rr} (TP2 {rrp}) • rejet M1/M3 {rejets}"),
-               ("🔫 {ic} {m} : {ordre} Pine {entree} sur {ut} • zone {za}–{zb}", "🛑 Stop Pine {sl} • 🎯 TP1 {tp1}, puis TP2 {tp}", "📐 x{rr} au TP1 • x{rrp} au TP2 • rejet {rejets}"),
-               ("🎯 Sniper {ic} {m} : rejet M1/M3 confirmé {rejets}, {ordre} Pine {entree}", "🛑 SL Pine {sl} • TP1 {tp1} • TP2 {tp}", "🗺 Zone Pine {za}–{zb} • {ut} • R/R {rr}/{rrp}")),
+    "sniper": (("🎯 SNIPER VALIDÉ — {profil} {ic} {m} : {ordre} Pine {entree} • zone {za}–{zb}", "🛑 SL Pine {sl} • TP1 Pine {tp1} • TP2 Pine {tp}", "📐 R/R {rr}/{rrp} • timing {ut} • plan {ut_plan} • validation ROBOT V12 avant position ouverte"),
+               ("🔫 {ic} {m} : déclencheur SNIPER {profil} validé • {ordre} Pine {entree}", "🛑 Stop Pine {sl} • 🎯 TP1 {tp1}, puis TP2 {tp}", "📐 R/R {rr}/{rrp} • rejet {rejets} • confirmation finale ROBOT V12 requise"),
+               ("🎯 SNIPER {profil} {ic} {m} : rejet M1/M3 confirmé {rejets}", "📍 {ordre} Pine {entree} • zone {za}–{zb} • plan {ut_plan}", "🛑 SL {sl} • TP1 {tp1} • TP2 {tp} • position ouverte uniquement après validation bot")),
     "confirmation": (("✅ {ic} {m} : CONFIRMATION {sens}", "🕯 Clôture {u} {pos} {niv}"), ("🔔 {ic} {m} : confirmation {sens} validée", "🕯 {u} clôturée {pos} {niv}"),
                      ("🎯 {ic} {m} : {sens} confirmé à la clôture {u}", "📍 Ligne de décision {niv}")),
 }
@@ -9309,9 +9317,9 @@ _PINE_TEXTES_EN = {
                  ("🏁 {ic} {m}: reversal confirmed, direction {sens}", "🧭 {strat}")),
     "ret_cancel": (("⛔ {ic} {m}: SL broken at the close", "↩ Reversal in progress, waiting for 15 min / 1h"), ("🛑 {ic} {m}: the plan's stop is crossed", "🔄 Watching for the 15 min / 1h confirmation"),
                    ("🚧 {ic} {m}: plan cancelled (stop broken)", "👀 Reversal possible, nothing validated")),
-    "sniper": (("🎯 Pine-confirmed sniper entry {ic} {m}: {ordre} {entree} • zone {za}–{zb} ({ut})", "🛑 Pine SL {sl} • TP1 Pine {tp1} • TP2 Pine {tp}", "📐 Pine R/R {rr} (TP2 {rrp}) • M1/M3 rejection {rejets}"),
-               ("🔫 {ic} {m}: Pine {ordre} {entree} on {ut} • zone {za}–{zb}", "🛑 Pine stop {sl} • 🎯 TP1 {tp1}, then TP2 {tp}", "📐 x{rr} to TP1 • x{rrp} to TP2 • rejection {rejets}"),
-               ("🎯 Sniper {ic} {m}: confirmed M1/M3 rejection {rejets}, Pine {ordre} {entree}", "🛑 Pine SL {sl} • TP1 {tp1} • TP2 {tp}", "🗺 Pine zone {za}–{zb} • {ut} • R/R {rr}/{rrp}")),
+    "sniper": (("🎯 SNIPER CONFIRMED — {profil} {ic} {m}: Pine {ordre} {entree} • zone {za}–{zb}", "🛑 Pine SL {sl} • TP1 {tp1} • TP2 {tp}", "📐 R/R {rr}/{rrp} • timing {ut} • plan {ut_plan} • ROBOT V12 final check before position opens"),
+               ("🔫 {ic} {m}: {profil} SNIPER trigger validated • Pine {ordre} {entree}", "🛑 Stop {sl} • 🎯 TP1 {tp1}, then TP2 {tp}", "📐 R/R {rr}/{rrp} • rejection {rejets} • ROBOT V12 final confirmation required"),
+               ("🎯 {profil} SNIPER {ic} {m}: confirmed M1/M3 rejection {rejets}", "📍 Pine {ordre} {entree} • zone {za}–{zb} • plan {ut_plan}", "🛑 SL {sl} • TP1 {tp1} • TP2 {tp} • bot validation required before position opens")),
     "confirmation": (("✅ {ic} {m}: CONFIRMATION {sens}", "🕯 {u} close {pos} {niv}"), ("🔔 {ic} {m}: {sens} confirmation validated", "🕯 {u} closed {pos} {niv}"),
                      ("🎯 {ic} {m}: {sens} confirmed at the {u} close", "📍 Decision line {niv}")),
 }
@@ -9404,6 +9412,10 @@ def evenements_pine(etat, m, r, cle, now):
                 ev.append(dict(
                     kind="sniper", **base,
                     ordre="vente" if pine_direction == -1 else "achat",
+                    profil={"SWING": "SWING", "DAY": "INTRADAY", "SCALPING": "SCALP"}.get(
+                        str(plan_tv.get("strategy") or "").upper(), str(plan_tv.get("strategy") or "NON DÉFINI").upper()
+                    ),
+                    ut_plan=str(plan_tv.get("entry_timeframe") or "—").upper(),
                     entree=px(pine_entry), za=px(pine_zone_low), zb=px(pine_zone_high),
                     sl=px(pine_sl), tp1=px(pine_tp1), tp=px(pine_tp2) if pine_tp2 is not None else "—",
                     ut=str(sn.get("ut") or "M1/M3"), rejets="+".join(sn.get("rejets") or []),
@@ -12401,13 +12413,26 @@ def manipulation(out, m, r, cle):
     out.append(("\n".join(l), bouton_auto(m)) if not tr else "\n".join(l))
 
 def statut_position(tr, p):
-    """Position déjà ouverte : dire clairement si un nouvel arrivant peut encore entrer (comme les grandes salles de trading)."""
+    """N'autoriser une nouvelle entrée que si le prix TradingView est encore dans la zone Pine initiale."""
     d, e, t1 = tr["d"], tr["e"], tr.get("tp1") or tr["e"]
     couleur = "🟢 LONG ⬆️" if d == 1 else "🔴 SHORT ⬇️"
-    progres = d * (p - e) / max(abs(t1 - e), 1e-9)
-    if progres < 0.25:
-        return f"✅ ENTRÉE ENCORE POSSIBLE — {couleur}\n📍 Le prix est encore près de l'entrée"
-    return f"⛔ TROP TARD POUR ENTRER — {couleur} déjà parti\n🧑‍🏫 Si tu es dedans : je te suis jusqu'au TP"
+    try:
+        prix = float(p)
+        bas, haut = sorted((float(tr["za"]), float(tr["zb"])))
+        progres = d * (prix - float(e)) / max(abs(float(t1) - float(e)), 1e-9)
+        donnees_valides = all(math.isfinite(x) for x in (prix, bas, haut, progres)) and bas < haut
+    except (KeyError, TypeError, ValueError):
+        donnees_valides = False
+        progres = 0.0
+    if not donnees_valides:
+        return f"⛔ NE PAS ENTRER — {couleur}\n📍 Zone initiale ou prix TradingView indisponible : attendre un nouveau signal"
+    if not bas <= prix <= haut:
+        if progres >= 0.25:
+            return f"⛔ TROP TARD POUR ENTRER — {couleur}\n📈 Le mouvement a déjà parcouru au moins 25 % du trajet vers TP1"
+        return f"⛔ NE PAS ENTRER MAINTENANT — {couleur}\n↩️ Prix hors de la zone Pine : attendre un nouveau retest confirmé"
+    if progres >= 0.25:
+        return f"⛔ TROP TARD POUR ENTRER — {couleur}\n📈 Le mouvement a déjà parcouru au moins 25 % du trajet vers TP1"
+    return f"✅ ENTRÉE ENCORE POSSIBLE — {couleur}\n📍 Le prix TradingView est encore dans la zone Pine"
 
 def approche_tp(m, r, d, cible, nom):
     """Près d'un TP : « direction TP » si les petites unités poussent encore, sinon « petite perturbation » expliquée."""
