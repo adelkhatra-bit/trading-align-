@@ -386,7 +386,7 @@
     };
     requeteWorkerShow('/show/voice?message=' + encodeURIComponent(JSON.stringify(payload)));
   }
-  function parlerLive(item, forcer = false) {
+  function parlerLive(item, forcer = false, apresLecture = null) {
     if (!vivant || !item || !voixActive || !['ia', 'marche', 'coach'].includes(item.source) || !('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return 0;
     const speaker = item.speaker === 'l' ? 'l' : 't';
     // v12.2.7 (règle d'Adel) : chaque info est dite en FRANÇAIS, puis la même en ANGLAIS, jamais mélangées.
@@ -434,16 +434,17 @@
       voixUtterance = utterance;
       const duree = Math.max(4000, Math.ceil(phrase.length * 75 + 500));
       utterance.onstart = () => signalVoix('START', anglais ? 'en' : 'fr', speaker, phrase, duree);
-      utterance.onend = () => {
+      let lectureTerminee = false;
+      const terminerLecture = () => {
+        if (lectureTerminee) return;
+        lectureTerminee = true;
         signalVoix('STOP', anglais ? 'en' : 'fr', speaker);
         voixUtterances.delete(utterance);
         if (voixUtterance === utterance) voixUtterance = Array.from(voixUtterances).pop() || null;
+        if (typeof apresLecture === 'function') apresLecture();
       };
-      utterance.onerror = () => {
-        signalVoix('STOP', anglais ? 'en' : 'fr', speaker);
-        voixUtterances.delete(utterance);
-        if (voixUtterance === utterance) voixUtterance = Array.from(voixUtterances).pop() || null;
-      };
+      utterance.onend = terminerLecture;
+      utterance.onerror = terminerLecture;
       window.speechSynthesis.speak(utterance);
       if (anglais) { voixTexteEN = phrase; voixDerniereFR = 0; }
       else { voixTexte = phrase; voixDerniereFR = maintenant; }
@@ -466,13 +467,19 @@
       if (!vivant || !voixActive) return;
       const text1 = String(show.text1 || '');
       const text2 = String(show.text2 || '');
-      const estimated = Math.max(4000, Math.ceil(text1.length * 75 + 500));
-      parlerLive({ texte: text1, source: 'coach', speaker: show.speaker1, en: false, market: show.market }, true);
-      const pause = Math.max(2500, Math.min(12000, Number(show.duration1) || estimated));
-      coachPairTimers.push(setTimeout(() => {
-        if (!vivant || !voixActive) return;
-        parlerLive({ texte: text2, source: 'coach', speaker: show.speaker2, en: false, market: show.market }, true);
-      }, pause + 500));
+      // La deuxième voix attend la fin réelle de la première synthèse vocale.
+      // Aucun délai estimé ne peut déclencher Leïla/Thomas pendant que l'autre parle.
+      parlerLive(
+        { texte: text1, source: 'coach', speaker: show.speaker1, en: false, market: show.market },
+        true,
+        () => {
+          if (!vivant || !voixActive) return;
+          coachPairTimers.push(setTimeout(() => {
+            if (!vivant || !voixActive) return;
+            parlerLive({ texte: text2, source: 'coach', speaker: show.speaker2, en: false, market: show.market }, true);
+          }, 500));
+        }
+      );
     }, attendre));
   }
   function ecouterDialoguesCoach() {
