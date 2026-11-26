@@ -57,6 +57,15 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertEqual(profile["mode"], "ATTENTE")
         self.assertEqual(profile["direction"], 0)
 
+    def test_supported_short_chart_timeframes_have_explicit_context_labels(self):
+        for timeframe in ("M3", "M10", "M45"):
+            with self.subTest(timeframe=timeframe):
+                self.assertIn(timeframe, align_bot.FENETRES_UT)
+                self.assertIsNotNone(align_bot.lecture_unite_active({
+                    "tv_indicator_mtf": {"activeTimeframe": timeframe},
+                    "dirs": [1] * 11,
+                }))
+
     def test_fetch_tv_mtf_preserves_the_server_selected_timeframe(self):
         class FakeResponse:
             def __enter__(self):
