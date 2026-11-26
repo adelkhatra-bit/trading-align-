@@ -48,7 +48,7 @@ class LiveVoiceDisplayLanguage(unittest.TestCase):
         self.assertIn("function parlerLive(item, forcer = false)", source)
         self.assertIn("if (!vivant || !item || !voixActive", source)
         self.assertIn("const voixDuree = m.voiceOnce ? parlerLive(m) : 0", source)
-        self.assertIn("item.source !== 'ia'", source)
+        self.assertIn("!['ia', 'marche', 'coach'].includes(item.source)", source)
         self.assertIn("const dureeFR = parlerLive(fr);", source)
         self.assertIn("voiceOnce: source === 'marche' && (bulle || g === 'danger') && i === 0", source)
         self.assertIn("Math.max(4000, (W + w) / 0.38, voixDuree)", source)
