@@ -285,8 +285,13 @@
   });
   let voixActive = voixEtatInitial, voixDerniere = 0, voixTexte = '', voixDerniereFR = 0, voixTexteEN = '';
   let dernierCommentaireIA = null;  // dernier commentaire IA effectivement affiché, avec sa paire FR/EN
-  // v12.2.7 : voix la plus humaine disponible (gratuite, intégrée au navigateur / à Windows)
+  let dernierDialogueCoach = null;  // dernier dialogue Thomas/Leïla reçu de la scène ALIGN LIVE
+  // Voix système naturelles disponibles : Thomas (Paul/David), Leïla (Hortense/Zira).
   const VOIX_NATURELLES = /natural|neural|online|premium|enhanced|google|denise|vivienne|henri|eloise|remy|amélie|amelie|hortense|audrey|julie|charlotte|pierre|paul|thomas|jenny|aria|guy|samantha|ava|david|mark|hazel|zira/i;
+  const VOIX_PAR_ROLE = {
+    t: { fr: /\\b(?:paul|henri|pierre)\\b/i, en: /\\b(?:david|mark|guy)\\b/i },
+    l: { fr: /\\b(?:hortense|julie|audrey|charlotte|amelie|amélie)\\b/i, en: /\\b(?:zira|samantha|ava|jenny|aria|hazel)\\b/i }
+  };
   let voixEnAttente = null;  // commentaire FR gardé si les voix du navigateur arrivent après le premier message
   function rafraichirVoix() { try { return window.speechSynthesis.getVoices() || []; } catch (e) { return []; } }
   function voixSurVoixChangees() {
@@ -300,12 +305,15 @@
   if ('speechSynthesis' in window) {
     try { window.speechSynthesis.addEventListener('voiceschanged', voixSurVoixChangees); } catch (e) {}
   }
-  function choisirVoix(lang) {
+  function choisirVoix(lang, speaker = 't') {
     try {
       const toutes = window.speechSynthesis.getVoices() || [];
       const dansLangue = toutes.filter(v => String(v.lang || '').toLowerCase().startsWith(lang));
-      // v12.2.8 (demande d'Adel) : UNIQUEMENT une voix naturelle. Plus de repli sur la voix robot.
-      return dansLangue.find(v => VOIX_NATURELLES.test(v.name)) || null;
+      const role = speaker === 'l' ? 'l' : 't';
+      const langue = lang === 'en' ? 'en' : 'fr';
+      const filtreRole = VOIX_PAR_ROLE[role][langue];
+      // Aucun repli croisé : Thomas reste masculin, Leïla reste féminine dans chaque langue.
+      return dansLangue.find(v => VOIX_NATURELLES.test(v.name) && filtreRole.test(v.name)) || null;
     } catch (e) { return null; }
   }
   voixBtn.addEventListener('click', () => {
@@ -321,23 +329,30 @@
       voixBtn.setAttribute('aria-pressed', 'true');
       // Pas de phrase d'accueil : relire le dernier commentaire IA affiché, dans la langue FR puis EN.
       voixDerniere = Date.now();
-      const dernier = dernierCommentaireIA;
-      if (dernier && dernier.market && dernier.market === codeMarche()) {
-        const dureeFR = dernier.fr ? parlerLive(dernier.fr, true) : 0;
-        if (dureeFR > 0 && dernier.en && dernier.en.anglaisTraduit) parlerLive(dernier.en, true);
+      const dialogue = dernierDialogueCoach;
+      if (dialogue && Date.now() - dialogue.ts < 30000) {
+        parlerLive(dialogue, true);
+      } else {
+        const dernier = dernierCommentaireIA;
+        if (dernier && dernier.market && dernier.market === codeMarche()) {
+          const dureeFR = dernier.fr ? parlerLive(dernier.fr, true) : 0;
+          if (dureeFR > 0 && dernier.en && dernier.en.anglaisTraduit) parlerLive(dernier.en, true);
+        }
       }
     } else {
-      try { window.speechSynthesis.cancel(); } catch (e) {}   // v12.2.8 : OFF coupe tout ce qui est en file
+      try { window.speechSynthesis.cancel(); } catch (e) {}   // OFF coupe tout ce qui est en file
       voixEnAttente = null;
-      signalVoix('STOP', 'fr');
+      voixUtterances.clear(); voixUtterance = null;
+      signalVoix('STOP', 'fr', 't');
       voixBtn.textContent = '🔇 COACH VOCAL OFF';
       voixBtn.setAttribute('aria-pressed', 'false');
     }
   });
-  let voixUtterance = null;   // v12.2.10 : référence vivante de la phrase en cours (anti ramasse-miettes)
-  // v12.2.13 : signal minimal de synchronisation voix vers ALIGN LIVE (aucun texte vocal transmis).
-  function signalVoix(action, lang) {
-    const message = 'ALIGN_VOICE|' + action + '|' + (lang || 'fr') + '|' + Date.now();
+  let voixUtterance = null;
+  const voixUtterances = new Set(); // conserve aussi les phrases déjà mises en file (duo)
+  // Synchronisation explicite de l'animateur actif vers ALIGN LIVE.
+  function signalVoix(action, lang, speaker = 't') {
+    const message = 'ALIGN_VOICE|' + action + '|' + (speaker === 'l' ? 'l' : 't') + '|' + (lang || 'fr') + '|' + Date.now();
     const url = 'https://ntfy.sh/' + SUJET + '-voix';
     try {
       if (typeof GM_xmlhttpRequest === 'function') {
@@ -348,7 +363,8 @@
     } catch (e) {}
   }
   function parlerLive(item, forcer = false) {
-    if (!vivant || !item || !voixActive || (item.source !== 'ia' && item.source !== 'marche') || !('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return 0;
+    if (!vivant || !item || !voixActive || !['ia', 'marche', 'coach'].includes(item.source) || !('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return 0;
+    const speaker = item.speaker === 'l' ? 'l' : 't';
     // v12.2.7 (règle d'Adel) : chaque info est dite en FRANÇAIS, puis la même en ANGLAIS, jamais mélangées.
     const anglais = !!item.en;
     if (anglais && item.source === 'marche' && !item.anglaisTraduit) return 0;  // une bulle non traduite reste silencieuse en EN
@@ -375,7 +391,7 @@
     try {
       const utterance = new SpeechSynthesisUtterance(phrase);
       utterance.lang = anglais ? 'en-US' : 'fr-FR';
-      const v = choisirVoix(anglais ? 'en' : 'fr');
+      const v = choisirVoix(anglais ? 'en' : 'fr', speaker);
       if (!v) {
         // Les voix sont souvent chargées après document-idle : retenter le commentaire FR quand voiceschanged arrive.
         if (!anglais && voixActive) voixEnAttente = item;
@@ -384,12 +400,17 @@
       utterance.voice = v;
       utterance.rate = 1.04;     // ton d'animateur : un peu plus vif
       utterance.pitch = 1.08;
-      if (!anglais) window.speechSynthesis.cancel();   // l'anglais se met à la suite du français, sans le couper
+      if (!anglais && item.source !== 'coach') window.speechSynthesis.cancel();   // le duo conserve les deux répliques dans la file
       // v12.2.10 : Chrome coupe la lecture (2-3 mots) si l'objet utterance est ramassé par le ramasse-miettes :
       // on garde une référence jusqu'à la fin de la phrase.
+      voixUtterances.add(utterance);
       voixUtterance = utterance;
-      utterance.onstart = () => signalVoix('START', anglais ? 'en' : 'fr');
-      utterance.onend = utterance.onerror = () => { signalVoix('STOP', anglais ? 'en' : 'fr'); if (voixUtterance === utterance) voixUtterance = null; };
+      utterance.onstart = () => signalVoix('START', anglais ? 'en' : 'fr', speaker);
+      utterance.onend = utterance.onerror = () => {
+        signalVoix('STOP', anglais ? 'en' : 'fr', speaker);
+        voixUtterances.delete(utterance);
+        if (voixUtterance === utterance) voixUtterance = Array.from(voixUtterances).pop() || null;
+      };
       window.speechSynthesis.speak(utterance);
       if (anglais) { voixTexteEN = phrase; voixDerniereFR = 0; }
       else { voixTexte = phrase; voixDerniereFR = maintenant; }
@@ -397,6 +418,34 @@
       return Math.max(4000, Math.ceil(phrase.length * 75 + 500));
     } catch (e) { return 0; }
   }
+  // La scène ALIGN LIVE envoie chaque réplique à la page TradingView ; le clic vocal reste l'autorisation audio.
+  let coachShowES = null;
+  function ecouterDialoguesCoach() {
+    try {
+      const source = new EventSource('https://ntfy.sh/' + SUJET + '-show/sse');
+      coachShowES = source;
+      source.onmessage = e => {
+        if (!vivant || coachShowES !== source) return;
+        try {
+          const envelope = JSON.parse(e.data);
+          if (envelope.event !== 'message' || typeof envelope.message !== 'string') return;
+          const d = JSON.parse(envelope.message);
+          if (d.type !== 'ALIGN_SHOW' || d.action !== 'SAY' || !['t', 'l'].includes(d.speaker)) return;
+          const ts = Number(d.ts) || 0;
+          if (!ts || Date.now() - ts > 30000 || ts > Date.now() + 5000) return;
+          const texte = String(d.text || '').trim();
+          if (texte.length < 12) return;
+          const market = String(d.market || '').toUpperCase();
+          const item = { texte, source: 'coach', speaker: d.speaker, en: false, market, ts };
+          dernierDialogueCoach = item;
+          if (voixActive) parlerLive(item, true);
+        } catch (er) {}
+      };
+      source.onerror = () => { /* EventSource gère sa reconnexion native. */ };
+    } catch (e) { coachShowES = null; }
+  }
+  ecouterDialoguesCoach();
+
   let extra = [];
   // v4.8 : la bande dit toujours ce qu'on regarde (marché + unité), mise à jour dès que la vue change
   function vueTxt() {
@@ -1882,7 +1931,7 @@
       window.removeEventListener('pagehide', libererLeaseHeartbeat);
       if (suitT) { cancelAnimationFrame(suitT); suitT = 0; }
       libererLeaseHeartbeat();
-      clearTimeout(survolT); cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(coachT); clearInterval(iaT); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); clearInterval(botEtatSyncT); clearInterval(heartbeatT); clearTimeout(ecranRetryTimer); clearInterval(masqueT); try { window.speechSynthesis && window.speechSynthesis.cancel(); window.speechSynthesis && window.speechSynthesis.removeEventListener('voiceschanged', voixSurVoixChangees); voixEnAttente = null; } catch (e) {} try { controlsDock.remove(); } catch (e) {} try { voixBtn.remove(); } catch (e) {} try { voixLangueBtn.remove(); } catch (e) {} try { animationsBtn.remove(); cssAnimationsToggle.remove(); document.documentElement.classList.remove('align-animations-off'); } catch (e) {} masque.remove(); try { cssPunch.remove(); } catch (e) {}   /* v8.4 : plus de vieux styles qui restent après une réinjection */ clearInterval(etiqT); etiqBox.remove(); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
+      clearTimeout(survolT); cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(coachT); clearInterval(iaT); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); clearInterval(botEtatSyncT); clearInterval(heartbeatT); clearTimeout(ecranRetryTimer); clearInterval(masqueT); try { window.speechSynthesis && window.speechSynthesis.cancel(); window.speechSynthesis && window.speechSynthesis.removeEventListener('voiceschanged', voixSurVoixChangees); voixEnAttente = null; voixUtterances.clear(); voixUtterance = null; } catch (e) {} try { coachShowES && coachShowES.close(); coachShowES = null; } catch (e) {} try { controlsDock.remove(); } catch (e) {} try { voixBtn.remove(); } catch (e) {} try { voixLangueBtn.remove(); } catch (e) {} try { animationsBtn.remove(); cssAnimationsToggle.remove(); document.documentElement.classList.remove('align-animations-off'); } catch (e) {} masque.remove(); try { cssPunch.remove(); } catch (e) {}   /* v8.4 : plus de vieux styles qui restent après une réinjection */ clearInterval(etiqT); etiqBox.remove(); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
       [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur,.align-billet,.align-argent,.align-punch,.align-ping').forEach(x => x.remove()); try { cssBillet.remove(); } catch (e) {} obs.disconnect(); try { es && es.close(); es = null; } catch (e) {} bande.remove(); css.remove(); }
   };
 })();
