@@ -84,7 +84,7 @@ function annulerVoixDialogue() {
 function choisirVoixHote(qui) {
   try {
     var voices = window.speechSynthesis.getVoices() || [];
-    var nom = qui === 't' ? /\\bpaul\\b|\\bhenri\\b|\\bthomas\\b|\\bremy\\b|\\brémy\\b/i
+    var nom = qui === 't' ? /\bpaul\b|\bhenri\b|\bthomas\b|\bremy\b|\brémy\b/i
       : /hortense|julie|amélie|amelie|audrey|denise|eloise|vivienne/i;
     return voices.find(function (v) {
       return String(v.lang || '').toLowerCase().startsWith('fr') && nom.test(String(v.name || ''));
