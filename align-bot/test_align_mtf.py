@@ -97,7 +97,7 @@ class AlignMtfRulesTest(unittest.TestCase):
         self.assertTrue(result["available"])
         self.assertIsNone(result["activeTimeframe"])
 
-    def test_indicator_plan_uses_fixed_m15_levels_when_chart_timeframe_changes(self):
+    def test_indicator_plan_uses_canonical_m15_plan_when_chart_timeframe_changes(self):
         robot = {
             "signal": "LONG", "entry": 101, "sl": 99, "tp1": 105, "tp2": 108,
             "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
@@ -106,20 +106,35 @@ class AlignMtfRulesTest(unittest.TestCase):
             "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
             "confirmed": True,
         }
+        other_robot = {
+            "signal": "SHORT", "entry": 110, "sl": 112, "tp1": 106, "tp2": 104,
+            "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+            "entryZoneLow": 109.5, "entryZoneHigh": 110.5, "entryDecision": 110,
+            "entryBarTime": 900_000, "entryBarOpen": 110.0, "entryBarHigh": 111.0,
+            "entryBarLow": 109.0, "entryBarClose": 109.5, "entryTriggered": False,
+            "confirmed": True,
+        }
         for active_tf in ("M1", "M5", "M15", "H4"):
             with self.subTest(active_timeframe=active_tf):
-                r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": active_tf, "snapshots": {
-                    active_tf: {"fresh": True, "price": 101.0, "confirmed": True, "robotV12": dict(robot)}
-                }}}
+                snapshots = {
+                    "M15": {"fresh": True, "robotFresh": True, "price": 101.0,
+                            "confirmed": True, "robotV12": dict(robot)}
+                }
+                if active_tf != "M15":
+                    snapshots[active_tf] = {"fresh": True, "price": 110.0,
+                                            "confirmed": True, "robotV12": dict(other_robot)}
+                r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": active_tf,
+                                          "snapshots": snapshots}}
                 plan = align_bot.plan_indicateur(r)
                 self.assertTrue(plan["available"], plan.get("reason"))
-                self.assertEqual(plan["timeframe"], active_tf)
+                self.assertEqual(plan["timeframe"], "M15")
+                self.assertEqual(plan["active_timeframe"], active_tf)
                 self.assertEqual(plan["plan_timeframe"], "M15")
                 self.assertEqual(plan["entry_timeframe"], "M5")
                 self.assertEqual((plan["entry"], plan["sl"], plan["tp1"], plan["tp2"]), (101, 99, 105, 108))
                 self.assertEqual((plan["zone_low"], plan["decision"], plan["zone_high"]), (100, 101, 102))
+                self.assertEqual(plan["direction"], 1)
                 self.assertTrue(plan["confirmed"])
-
     def test_indicator_plan_enforces_strategy_trigger_timeframe(self):
         cases = (("SCALPING", "M1"), ("DAY", "M5"), ("SWING", "H1"))
         for strategy, trigger_tf in cases:
@@ -133,10 +148,12 @@ class AlignMtfRulesTest(unittest.TestCase):
                     "confirmed": True,
                 }
                 r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "H4", "snapshots": {
-                    "H4": {"fresh": True, "price": 110.0, "confirmed": True, "robotV12": robot}
+                    "M15": {"fresh": True, "robotFresh": True, "price": 101.0,
+                            "confirmed": True, "robotV12": robot},
+                    "H4": {"fresh": True, "price": 110.0, "confirmed": True,
+                           "robotV12": {"signal": "SHORT"}},
                 }}}
                 self.assertTrue(align_bot.plan_indicateur(r)["available"])
-
     def test_indicator_plan_rejects_inconsistent_plan_or_trigger_timeframe(self):
         valid_robot = {
             "signal": "LONG", "entry": 101, "sl": 99, "tp1": 105, "tp2": 108,
@@ -155,45 +172,56 @@ class AlignMtfRulesTest(unittest.TestCase):
                 }}}
                 self.assertFalse(align_bot.plan_indicateur(r)["available"])
 
-    def test_indicator_plan_changes_when_active_timeframe_changes(self):
+    def test_indicator_plan_does_not_change_when_another_chart_timeframe_reports_opposite_signal(self):
+        m15_robot = {
+            "signal": "LONG", "entry": 101, "sl": 99, "tp": 105,
+            "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+            "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
+            "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
+            "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
+        }
+        h4_robot = {
+            "signal": "SHORT", "entry": 110, "sl": 112, "tp": 106,
+            "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+            "entryZoneLow": 109.5, "entryZoneHigh": 110.5, "entryDecision": 110,
+            "entryBarTime": 900_000, "entryBarOpen": 110.0, "entryBarHigh": 111.0,
+            "entryBarLow": 109.0, "entryBarClose": 109.5, "entryTriggered": False,
+        }
         r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "H4", "snapshots": {
-            "M15": {"fresh": True, "price": 101.0, "robotV12": {
-                "signal": "LONG", "entry": 101, "sl": 99, "tp": 105,
-                "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
-                "entryZoneLow": 100, "entryZoneHigh": 102, "entryDecision": 101,
-                "entryBarTime": 900_000, "entryBarOpen": 100.0, "entryBarHigh": 102.0,
-                "entryBarLow": 99.0, "entryBarClose": 101.5, "entryTriggered": False,
-            }},
-            "H4": {"fresh": True, "price": 110.0, "confirmed": True, "robotV12": {
-                "signal": "SHORT", "entry": 110, "sl": 112, "tp": 106,
-                "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
-                "entryZoneLow": 109.5, "entryZoneHigh": 110.5, "entryDecision": 110,
-                "entryBarTime": 900_000, "entryBarOpen": 110.0, "entryBarHigh": 111.0,
-                "entryBarLow": 109.0, "entryBarClose": 109.5, "entryTriggered": False,
-            }}
+            "M15": {"fresh": True, "robotFresh": True, "price": 101.0, "confirmed": True,
+                    "robotV12": m15_robot},
+            "H4": {"fresh": True, "price": 110.0, "confirmed": True, "robotV12": h4_robot},
         }}}
         plan = align_bot.plan_indicateur(r)
         self.assertTrue(plan["available"], plan.get("reason"))
-        self.assertEqual(plan["timeframe"], "H4")
-        self.assertEqual(plan["plan_timeframe"], "M15")
-        self.assertEqual((plan["entry"], plan["sl"], plan["tp"]), (110, 112, 106))
-
-    def test_indicator_plan_rejects_stale_or_missing_active_snapshot(self):
-        stale = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "M15", "snapshots": {
-            "M15": {"fresh": False, "robotV12": {"signal": "LONG", "entry": 100, "sl": 98, "tp": 104}}
+        self.assertEqual(plan["timeframe"], "M15")
+        self.assertEqual(plan["active_timeframe"], "H4")
+        self.assertEqual(plan["direction"], 1)
+        self.assertEqual((plan["entry"], plan["sl"], plan["tp"]), (101, 99, 105))
+    def test_indicator_plan_rejects_stale_or_missing_canonical_m15_snapshot(self):
+        stale = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "M1", "snapshots": {
+            "M15": {"fresh": False, "robotFresh": False, "robotV12": {"signal": "LONG", "entry": 100, "sl": 98, "tp": 104}},
+            "M1": {"fresh": True, "price": 100.0, "confirmed": True,
+                   "robotV12": {"signal": "SHORT", "entry": 100, "sl": 102, "tp": 96}},
         }}}
         missing = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "H1", "snapshots": {
-            "M15": {"fresh": True, "robotV12": {"signal": "LONG", "entry": 100, "sl": 98, "tp": 104}}
+            "H1": {"fresh": True, "price": 100.0, "confirmed": True,
+                   "robotV12": {"signal": "LONG", "entry": 100, "sl": 98, "tp": 104}}
         }}}
         self.assertFalse(align_bot.plan_indicateur(stale)["available"])
         self.assertFalse(align_bot.plan_indicateur(missing)["available"])
-
     def test_indicator_plan_rejects_incoherent_levels(self):
         r = {"tv_indicator_mtf": {"available": True, "activeTimeframe": "M5", "snapshots": {
-            "M5": {"fresh": True, "price": 100.0, "robotV12": {"signal": "LONG", "entry": 100, "sl": 102, "tp": 104}}
+            "M15": {"fresh": True, "robotFresh": True, "price": 100.0, "robotV12": {
+                "signal": "LONG", "entry": 100, "sl": 102, "tp": 104,
+                "planTimeframe": "M15", "entryTimeframe": "M5", "strategy": "DAY",
+                "entryZoneLow": 99.0, "entryZoneHigh": 101.0, "entryDecision": 100.0,
+                "entryBarTime": 900_000, "entryBarOpen": 99.0, "entryBarHigh": 101.0,
+                "entryBarLow": 99.0, "entryBarClose": 100.5,
+            }},
+            "M5": {"fresh": True, "price": 100.0, "robotV12": {"signal": "SHORT"}},
         }}}
         self.assertFalse(align_bot.plan_indicateur(r)["available"])
-
     def test_tradingview_mtf_snapshot_does_not_mutate_align_context(self):
         dirs, rsis = [0] * 11, [50.0] * 11
         r = {"dirs": list(dirs), "rsis": list(rsis), "confirme": 0, "dirPlan": 0,
