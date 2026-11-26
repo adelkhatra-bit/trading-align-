@@ -160,14 +160,14 @@ def niveaux_valides(signal):
 
 def executer(etat, signal, journal=print):
     """signal = {marche, sens: 'LONG'|'SHORT', e, sl, tp}. Renvoie la liste des résultats par compte."""
-    valide, raison = niveaux_valides(signal)
-    if not valide:
-        return [{"compte": None, "ok": False, "raison": raison}]
     m = signal["marche"]
     if m not in SYMBOLES:
         return [{"compte": None, "ok": False, "raison": "marché désactivé dans ALIGN"}]
     if m not in marches_actifs(etat):
         return [{"compte": None, "ok": False, "raison": f"{m} éteint dans l'admin"}]
+    valide, raison = niveaux_valides(signal)
+    if not valide:
+        return [{"compte": None, "ok": False, "raison": raison}]
     if not TOKEN or not COMPTES:
         return [{"compte": None, "ok": False, "raison": "MetaApi pas encore branché"}]
     res = []
