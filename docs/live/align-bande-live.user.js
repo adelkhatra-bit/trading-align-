@@ -13,6 +13,7 @@
 // @grant        GM_registerMenuCommand
 // @grant        unsafeWindow
 // @connect      ntfy.sh
+// @connect      align-tv-mailbox.adel-khatra.workers.dev
 // ==/UserScript==
 (function () {
   'use strict';
@@ -20,6 +21,7 @@
   const VERSION = '12.2.25';  // v12.2.25 : arrêt propre des reconnexions SSE, écouteurs et rafraîchissement de vue. v12.2.24 : breaking news narrées en français puis en anglais, sans changement visuel. v12.2.14 : relecture vocale du dernier commentaire IA visible, en français puis en anglais.  // v12.2.13 : synchronisation bouche ALIGN LIVE avec le coach vocal. v12.2.12 : voix naturelle retentée quand les voix navigateur arrivent, ON réinitialisé après rechargement et listener nettoyé. v12.2.11 : heartbeat écran via GM_xmlhttpRequest (hors page, sans blocage CORS/réseau). v12.2.10 : la voix garde sa phrase en mémoire jusqu'à la fin (plus de coupure après 2-3 mots). v12.2.9 : libellé « COACH VOCAL OFF » (plus « ACTIVER LE COMMENTATEUR »). v12.2.8 : une seule voix (naturelle), off = silence total, plus de phrase d'accueil. v12.2.7 : la voix parle en français PUIS en anglais (chaque info), voix naturelle si disponible, jamais « risque »  // v12.2.6 : la voix ne lit ni disclaimer ni appel « lien en bio », ni phrase coupée  // v12.2.5 : la voix suit uniquement le commentaire IA visible ; commandes déplacées en bas à gauche  // v12.0 : les commentaires IA du live déclenchent immédiatement bulle, ping prix et lueur neutre  // v11.8 : narration marché calée à 55 s, au plus près du cooldown d'affichage de 52 s  // v11.7 : narration technique factuelle toutes les ~75 s, horloges séparées et activation vocale explicite  // v10.8 : commentaires IA ancrés sur les données réelles du marché affiché  // v10.7 : « ÇA PLONGE 🌊 » quand ça coule (en plus de la fusée) ; v10.6 : NEWS DE DERNIÈRE MINUTE prioritaire (coupe la bande) ; v10.5 : fusée 🚀 + sourire quand le bot entre / quand ça accélère ; v10.4 : bot en position = blagues taquines (je suis dedans avec vous, qui est rentré ? tapote, partage) ; v10.3 : blagues quand le marché dort (petit film, café, ouvertures, tapote MDR) ; v10.2 : « prépare-toi ≠ vas-y 😝 » ; v10.1 : l'animateur remet gentiment les petits malins à leur place (feu vert, discipline 😝) ; v10.0 : après un TP → « une rose ou un like » + « crée ton compte démo » ; v9.9 : fenêtre « 💰 ALIGN EN DIRECT » (gain réel en cours, après la moitié du chemin vers le TP1) ; v9.8 : « active ton coach en temps réel » + « un clic sur Mon bot pour arrêter » ; v9.7 : texte de la ligne du bas plus gros (taille des %) ; v9.6 : ligne du bas qui clignote vert ▲ LONG ? / rouge ▼ SHORT ? (plus vite quand une entrée approche) ; v9.5 : ligne du bas du tableau rouge ↔ vert en boucle + « LONG OU SHORT ? » (le sens ne se voit plus) ; v9.4 : « crée ton compte démo, teste gratuitement » + codes prop firms (lien en bio) ; v9.3 : titres de bulle drôles liés au marché (fin de « LE GRAPH BALANCE ») ; v9.2 : plus de spectacle quand le marché hésite (l'animateur parle toutes les ~40 s, discussion avis → merci → lien en bio), bulle « 🤫 PSST… LE GRAPH BALANCE » ; v9.1 : plus aucune flèche ni sens (monter / baisser) sur la bande ; v9.0 : « tu préfères BTC, Gold ou NASDAQ ? une autre unité de temps ? lien en bio » ; v8.9 : « ALIGN est dedans depuis le début… trop tard pour rentrer, on ne court jamais après le prix » ; v8.8  // v8.8 : l'animateur parle toutes les ~90 s (humour, nouveaux arrivants, commentaires), feu d'artifice « objectif de likes atteint » ; v8.7  // v8.7 : « je t'avais prévenu » après le chrono de grosse distribution / accumulation ; v8.6  // v8.6 : marché calme → l'animateur (vrai trader) parle aux spectateurs : questions rebond / cassure, pression pour taper et commenter ; v8.5  // v8.5 : phrases IA gratuites toujours nouvelles (FR/EN), chrono « une position arrive » + agenda (discours, annonces, ouvertures) venant du bot, chrono posé AU-DESSUS des colonnes 1 min / 3 min / 5 min ; v8.4   // v8.4 : ligne du bas du tableau revenue à sa couleur d'origine (v8.2), texte 13 px ; v8.3  // v8.3 : (étiquettes posées par-dessus désactivées, à faire dans le Pine), ligne du bas du tableau en couleur neutre, plus grosse, « tu peux rentrer ? 👍 » ; v8.2  // v8.2 : prix cachés dans la ligne du bas du tableau (❓ + lien en bio) ; v8.1  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
   // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
   const SUJET = 'align-live-2a4bccafd9548d93';
+  const WORKER_SHOW_URL = 'https://align-tv-mailbox.adel-khatra.workers.dev';
   const BASE = [
     '🟢 LIVE ALIGN 24/7 • BTC • GOLD',
     '👉 ABONNE-TOI • PARTAGE • TAPOTE L\'ÉCRAN',
@@ -330,9 +332,10 @@
       voixBtn.setAttribute('aria-pressed', 'true');
       // Pas de phrase d'accueil : relire le dernier commentaire IA affiché, dans la langue FR puis EN.
       voixDerniere = Date.now();
+      publierEtatCoach(true);
       const dialogue = dernierDialogueCoach;
-      if (dialogue && Date.now() - dialogue.ts < 30000) {
-        parlerLive(dialogue, true);
+      if (dialogue && Date.now() - Number(dialogue.ts || 0) < 30000) {
+        jouerDialogueCoach(dialogue, true);
       } else {
         const dernier = dernierCommentaireIA;
         if (dernier && dernier.market && dernier.market === codeMarche()) {
@@ -344,6 +347,8 @@
       try { window.speechSynthesis.cancel(); } catch (e) {}   // OFF coupe tout ce qui est en file
       voixEnAttente = null;
       voixUtterances.clear(); voixUtterance = null;
+      annulerDialogueCoach();
+      publierEtatCoach(false);
       signalVoix('STOP', 'fr', 't');
       voixBtn.textContent = '🔇 COACH VOCAL OFF';
       voixBtn.setAttribute('aria-pressed', 'false');
@@ -351,17 +356,35 @@
   });
   let voixUtterance = null;
   const voixUtterances = new Set(); // conserve aussi les phrases déjà mises en file (duo)
-  // Synchronisation explicite de l'animateur actif vers ALIGN LIVE.
-  function signalVoix(action, lang, speaker = 't') {
-    const message = 'ALIGN_VOICE|' + action + '|' + (speaker === 'l' ? 'l' : 't') + '|' + (lang || 'fr') + '|' + Date.now();
-    const url = 'https://ntfy.sh/' + SUJET + '-voix';
+  // Relais Cloudflare dédié à la scène live : aucune consommation du quota ntfy.
+  function requeteWorkerShow(path, callback) {
+    const done = typeof callback === 'function' ? callback : function () {};
+    const url = WORKER_SHOW_URL + path;
     try {
       if (typeof GM_xmlhttpRequest === 'function') {
-        GM_xmlhttpRequest({ method: 'POST', url, data: message, timeout: 5000, onerror: () => {}, ontimeout: () => {} });
+        GM_xmlhttpRequest({
+          method: 'GET', url, timeout: 5000,
+          onload: r => {
+            if (r.status < 200 || r.status >= 300) { done(null); return; }
+            try { done(JSON.parse(r.responseText || '{}')); } catch (e) { done(null); }
+          },
+          onerror: () => done(null), ontimeout: () => done(null)
+        });
       } else {
-        fetch(url, { method: 'POST', body: message, keepalive: true }).catch(() => {});
+        fetch(url, { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(done).catch(() => done(null));
       }
-    } catch (e) {}
+    } catch (e) { done(null); }
+  }
+  function publierEtatCoach(enabled) {
+    requeteWorkerShow('/show/coach?enabled=' + (enabled ? '1' : '0'));
+  }
+  function signalVoix(action, lang, speaker = 't', text = '', durationMs = 0) {
+    const payload = {
+      type: 'ALIGN_VOICE', action, speaker: speaker === 'l' ? 'l' : 't',
+      lang: lang || 'fr', ts: Date.now(), text: String(text || '').slice(0, 280),
+      durationMs: Math.max(0, Math.min(20000, Number(durationMs) || 0))
+    };
+    requeteWorkerShow('/show/voice?message=' + encodeURIComponent(JSON.stringify(payload)));
   }
   function parlerLive(item, forcer = false) {
     if (!vivant || !item || !voixActive || !['ia', 'marche', 'coach'].includes(item.source) || !('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return 0;
@@ -409,8 +432,14 @@
       // on garde une référence jusqu'à la fin de la phrase.
       voixUtterances.add(utterance);
       voixUtterance = utterance;
-      utterance.onstart = () => signalVoix('START', anglais ? 'en' : 'fr', speaker);
-      utterance.onend = utterance.onerror = () => {
+      const duree = Math.max(4000, Math.ceil(phrase.length * 75 + 500));
+      utterance.onstart = () => signalVoix('START', anglais ? 'en' : 'fr', speaker, phrase, duree);
+      utterance.onend = () => {
+        signalVoix('STOP', anglais ? 'en' : 'fr', speaker);
+        voixUtterances.delete(utterance);
+        if (voixUtterance === utterance) voixUtterance = Array.from(voixUtterances).pop() || null;
+      };
+      utterance.onerror = () => {
         signalVoix('STOP', anglais ? 'en' : 'fr', speaker);
         voixUtterances.delete(utterance);
         if (voixUtterance === utterance) voixUtterance = Array.from(voixUtterances).pop() || null;
@@ -419,36 +448,58 @@
       if (anglais) { voixTexteEN = phrase; voixDerniereFR = 0; }
       else { voixTexte = phrase; voixDerniereFR = maintenant; }
       voixDerniere = maintenant;
-      return Math.max(4000, Math.ceil(phrase.length * 75 + 500));
+      return duree;
     } catch (e) { return 0; }
   }
-  // La scène ALIGN LIVE envoie chaque réplique à la page TradingView ; le clic vocal reste l'autorisation audio.
-  let coachShowES = null, dernierDialogueCoachTs = 0;
+  // Polling du relais Cloudflare : le duo est lu depuis le même événement que la scène affiche.
+  let coachPollTimer = null, coachPollEnCours = false, dernierDialogueCoachTs = 0, coachPairTimers = [];
+  function annulerDialogueCoach() {
+    coachPairTimers.forEach(t => clearTimeout(t));
+    coachPairTimers = [];
+  }
+  function jouerDialogueCoach(show, replay = false) {
+    if (!show || !voixActive || !vivant) return;
+    annulerDialogueCoach();
+    const startAt = replay ? Date.now() + 250 : Number(show.startAt || 0);
+    const attendre = Math.max(0, Math.min(12000, startAt - Date.now()));
+    coachPairTimers.push(setTimeout(() => {
+      if (!vivant || !voixActive) return;
+      const text1 = String(show.text1 || '');
+      const text2 = String(show.text2 || '');
+      const estimated = Math.max(4000, Math.ceil(text1.length * 75 + 500));
+      parlerLive({ texte: text1, source: 'coach', speaker: show.speaker1, en: false, market: show.market }, true);
+      const pause = Math.max(2500, Math.min(12000, Number(show.duration1) || estimated));
+      coachPairTimers.push(setTimeout(() => {
+        if (!vivant || !voixActive) return;
+        parlerLive({ texte: text2, source: 'coach', speaker: show.speaker2, en: false, market: show.market }, true);
+      }, pause + 500));
+    }, attendre));
+  }
   function ecouterDialoguesCoach() {
-    if (!vivant || document.visibilityState !== 'visible') return;
-    try {
-      const source = new EventSource('https://ntfy.sh/' + SUJET + '-show/sse');
-      coachShowES = source;
-      source.onmessage = e => {
-        if (!vivant || coachShowES !== source) return;
-        try {
-          const envelope = JSON.parse(e.data);
-          if (envelope.event !== 'message' || typeof envelope.message !== 'string') return;
-          const d = JSON.parse(envelope.message);
-          if (d.type !== 'ALIGN_SHOW' || d.action !== 'SAY' || !['t', 'l'].includes(d.speaker)) return;
-          const ts = Number(d.ts) || 0;
-          if (!ts || ts <= dernierDialogueCoachTs || Date.now() - ts > 30000 || ts > Date.now() + 5000) return;
-          dernierDialogueCoachTs = ts;
-          const texte = String(d.text || '').trim();
-          if (texte.length < 12) return;
-          const market = String(d.market || '').toUpperCase();
-          const item = { texte, source: 'coach', speaker: d.speaker, en: false, market, ts };
-          dernierDialogueCoach = item;
-          if (voixActive) parlerLive(item, true);
-        } catch (er) {}
-      };
-      source.onerror = () => { /* EventSource gère sa reconnexion native. */ };
-    } catch (e) { coachShowES = null; }
+    if (!vivant || document.visibilityState !== 'visible' || coachPollTimer) return;
+    const poll = () => {
+      if (!vivant || document.visibilityState !== 'visible' || coachPollEnCours) return;
+      coachPollEnCours = true;
+      requeteWorkerShow('/show/state', state => {
+        coachPollEnCours = false;
+        if (!state || state.ok !== true || !state.show) return;
+        const show = state.show, ts = Number(show.ts) || 0;
+        if (!ts || ts <= dernierDialogueCoachTs || Date.now() - ts > 30000) return;
+        if (!['t', 'l'].includes(show.speaker1) || !['t', 'l'].includes(show.speaker2) ||
+            show.speaker1 === show.speaker2 || !show.text1 || !show.text2) return;
+        dernierDialogueCoachTs = ts;
+        dernierDialogueCoach = show;
+        if (voixActive) jouerDialogueCoach(show);
+      });
+    };
+    poll();
+    coachPollTimer = setInterval(poll, 3000);
+  }
+  function arreterEcouteDialoguesCoach() {
+    if (coachPollTimer) clearInterval(coachPollTimer);
+    coachPollTimer = null;
+    coachPollEnCours = false;
+    annulerDialogueCoach();
   }
   ecouterDialoguesCoach();
 
@@ -1128,12 +1179,12 @@
       if (ecouteRetryTimer) { clearTimeout(ecouteRetryTimer); ecouteRetryTimer = null; }
       try { es && es.close(); } catch (e) {}
       es = null;
-      try { coachShowES && coachShowES.close(); } catch (e) {}
-      coachShowES = null;
+      arreterEcouteDialoguesCoach();
+      publierEtatCoach(false);
       libererLeaseHeartbeat();
     } else {
       if (!es) { ecouter(); pingEcran(); }
-      if (!coachShowES) ecouterDialoguesCoach();
+      if (!coachPollTimer) { publierEtatCoach(voixActive); ecouterDialoguesCoach(); }
     }
   }
   document.addEventListener('visibilitychange', gererVisibilite);
@@ -1939,7 +1990,7 @@
       window.removeEventListener('pagehide', libererLeaseHeartbeat);
       if (suitT) { cancelAnimationFrame(suitT); suitT = 0; }
       libererLeaseHeartbeat();
-      clearTimeout(survolT); cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(coachT); clearInterval(iaT); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); clearInterval(botEtatSyncT); clearInterval(heartbeatT); clearTimeout(ecranRetryTimer); clearInterval(masqueT); try { window.speechSynthesis && window.speechSynthesis.cancel(); window.speechSynthesis && window.speechSynthesis.removeEventListener('voiceschanged', voixSurVoixChangees); voixEnAttente = null; voixUtterances.clear(); voixUtterance = null; } catch (e) {} try { coachShowES && coachShowES.close(); coachShowES = null; } catch (e) {} try { controlsDock.remove(); } catch (e) {} try { voixBtn.remove(); } catch (e) {} try { voixLangueBtn.remove(); } catch (e) {} try { animationsBtn.remove(); cssAnimationsToggle.remove(); document.documentElement.classList.remove('align-animations-off'); } catch (e) {} masque.remove(); try { cssPunch.remove(); } catch (e) {}   /* v8.4 : plus de vieux styles qui restent après une réinjection */ clearInterval(etiqT); etiqBox.remove(); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
+      clearTimeout(survolT); cancelAnimationFrame(raf); clearInterval(suivi); clearInterval(coachT); clearInterval(iaT); clearInterval(astuceT); clearInterval(regardT); clearInterval(chronoT); clearInterval(coeurT); clearInterval(posT); clearInterval(botEtatSyncT); clearInterval(heartbeatT); clearTimeout(ecranRetryTimer); clearInterval(masqueT); try { window.speechSynthesis && window.speechSynthesis.cancel(); window.speechSynthesis && window.speechSynthesis.removeEventListener('voiceschanged', voixSurVoixChangees); voixEnAttente = null; voixUtterances.clear(); voixUtterance = null; } catch (e) {} try { arreterEcouteDialoguesCoach(); publierEtatCoach(false); } catch (e) {} try { controlsDock.remove(); } catch (e) {} try { voixBtn.remove(); } catch (e) {} try { voixLangueBtn.remove(); } catch (e) {} try { animationsBtn.remove(); cssAnimationsToggle.remove(); document.documentElement.classList.remove('align-animations-off'); } catch (e) {} masque.remove(); try { cssPunch.remove(); } catch (e) {}   /* v8.4 : plus de vieux styles qui restent après une réinjection */ clearInterval(etiqT); etiqBox.remove(); try { cssEnnui.remove(); document.getElementById('align-ennui')?.remove(); } catch (e) {}
       [cadre, chrono, cssShow].forEach(x => { try { x.remove(); } catch (e) {} }); document.querySelectorAll('.align-coeur,.align-billet,.align-argent,.align-punch,.align-ping').forEach(x => x.remove()); try { cssBillet.remove(); } catch (e) {} obs.disconnect(); try { es && es.close(); es = null; } catch (e) {} bande.remove(); css.remove(); }
   };
 })();
