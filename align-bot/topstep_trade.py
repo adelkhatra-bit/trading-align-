@@ -134,14 +134,14 @@ def niveaux_valides(signal):
 
 def executer(etat, signal, journal=print):
     """signal = {marche, sens, e, sl, tp}. Une position = 1 micro-contrat avec SL et TP posés tout de suite."""
-    valide, raison = niveaux_valides(signal)
-    if not valide:
-        return {"ok": False, "raison": raison}
     m = signal["marche"]
     if m not in SYMBOLES:
         return {"ok": False, "raison": "marché désactivé dans ALIGN"}
     if m not in {k for k, v in (etat.get("auto_marches") or {}).items() if v}:
         return {"ok": False, "raison": f"{m} éteint dans l'admin"}
+    valide, raison = niveaux_valides(signal)
+    if not valide:
+        return {"ok": False, "raison": raison}
     if phase() != "ouvert":
         return {"ok": False, "raison": "fermeture du marché proche : pas de nouvelle position"}
     if not COMPTE or not os.environ.get("TOPSTEP_API_KEY"):
