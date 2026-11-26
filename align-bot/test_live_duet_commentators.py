@@ -29,6 +29,7 @@ class LiveDuetCommentators(unittest.TestCase):
         self.assertIn("l: { fr:", self.js)
         self.assertIn("function choisirVoix(lang, speaker = 't')", self.js)
         self.assertIn("filtreRole.test(v.name)", self.js)
+        self.assertIn("conseil financier", self.js)
         self.assertIn("const speaker = item.speaker === 'l' ? 'l' : 't';", self.js)
         self.assertIn("choisirVoix(anglais ? 'en' : 'fr', speaker)", self.js)
 
@@ -50,6 +51,15 @@ class LiveDuetCommentators(unittest.TestCase):
         self.assertIn("coachShowES && coachShowES.close()", self.js)
         self.assertIn("document.visibilityState !== 'visible'", self.js)
         self.assertIn("ts <= dernierDialogueCoachTs", self.js)
+
+    def test_show_page_reads_public_state_published_from_the_tradingview_bridge(self):
+        self.assertIn("live-data/live.json", self.page)
+        bot = (ROOT / "align_bot.py").read_text(encoding="utf-8")
+        self.assertIn('if r.get("require_tv_bridge"):', bot)
+        self.assertIn('bridge = r.get("tv_indicator_mtf") or {}', bot)
+        self.assertIn("plan = plan_indicateur(r)", bot)
+        self.assertIn('if not complet:', bot)
+        self.assertIn('etat_l = "ferme" if statut == "ferme" else "perime"', bot)
 
     def test_dialogue_pacing_leaves_time_for_both_voices(self):
         self.assertIn("}, 6500);", self.page)
