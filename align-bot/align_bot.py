@@ -1540,51 +1540,125 @@ def mouvement_recent_m1(r, nb=5):
 
 def texte_etat(nom_marche, r, cle=None, vip=True):
     """Carte Telegram complète : mise en page uniquement, aucune rubrique d'analyse supprimée."""
+    require_tv = bool(r.get("require_tv_bridge"))
+    trade = (cle or {}).get("trade")
+    trade_ouvert = isinstance(trade, dict)
+    try:
+        prix_local = float((r.get("m1") or [])[-1].get("c"))
+    except (IndexError, AttributeError, TypeError, ValueError):
+        prix_local = None
+    tv_price = prix_tradingview_actif(r) if require_tv else None
+    tv_plan = plan_indicateur(r) if not (require_tv and trade_ouvert) else None
+    plan_confirme = bool(
+        isinstance(tv_plan, dict)
+        and tv_plan.get("available") is True
+        and tv_plan.get("confirmed") is True
+    )
     # Codes visuels constants : vert = hausse, rouge = baisse, orange = neutre.
     fl = lambda d: "🟢⬆️" if d == 1 else "🔴⬇️" if d == -1 else "🟠➖"
-    prix = r["m1"][-1]["c"]
-    entete = f"{ICONE.get(nom_marche, '📊')}  ALIGN • {nom_marche}\n💹 Prix actuel : {px(prix)}"
+    prix = prix_local if prix_local is not None else 0.0
+    if require_tv:
+        if tv_price:
+            age_ms = tv_price.get("ageMs")
+            age_txt = (f" · actualisé il y a {max(0, int(float(age_ms) / 1000))} s"
+                       if isinstance(age_ms, (int, float)) and math.isfinite(float(age_ms)) else "")
+            entete = (f"{ICONE.get(nom_marche, '📊')}  ALIGN • {nom_marche}\n"
+                      f"📡 Prix TradingView {tv_price['timeframe']} : {px(tv_price['price'])}{age_txt}")
+        else:
+            entete = (f"{ICONE.get(nom_marche, '📊')}  ALIGN • {nom_marche}\n"
+                      "📡 Prix TradingView : indisponible — ATTENTE")
+        prix_local_ligne = (f"💹 Prix local M1 (contexte uniquement) : {px(prix_local)}"
+                            if prix_local is not None else
+                            "💹 Prix local M1 (contexte uniquement) : indisponible")
+    else:
+        entete = f"{ICONE.get(nom_marche, '📊')}  ALIGN • {nom_marche}\n💹 Prix actuel : {px(prix)}"
+        prix_local_ligne = None
     if not vip:
-        etat_pos = ("🟢 Une position VIP est actuellement ouverte" if (cle or {}).get("trade") else
-                    "🟡 Une opportunité VIP se prépare" if (cle or {}).get("ordre") and r["confirme"] else
-                    "⚪ Aucune position VIP pour le moment")
-        return "\n".join([entete, "━━━━━━━━━━━━━━━━━━", "📡 POINT DE MARCHÉ",
-                            etat_pos, r.get("news") or "📰 Calendrier économique indisponible",
-                            "━━━━━━━━━━━━━━━━━━"] + (
-                            # TOUT_GRATUIT (décision d'Adel, 15/11) : plus aucun prix VIP affiché, les positions sont gratuites.
-                            ["🎁 Positions gratuites : active ton coach pour recevoir la prochaine entrée"] if TOUT_GRATUIT else
-                            ["🔒 Direction et niveaux de trading réservés aux VIP", "💎 Accès VIP : 49,90 € / mois"]))
-    tv_plan = plan_indicateur(r)
+        if require_tv:
+            if trade_ouvert:
+                etat_pos = "🟢 POSITION ALIGN EN COURS — exécution manuelle, suivi personnel après confirmation"
+            elif not tv_plan or tv_plan.get("available") is not True:
+                etat_pos = "⏳ ATTENTE — plan TradingView/Pine v25 indisponible"
+            elif not plan_confirme:
+                etat_pos = "⏳ ATTENTE — confirmation MTF Pine non validée"
+            else:
+                etat_pos = "🟡 PLAN PINE CONFIRMÉ — déclencheur d'entrée en attente"
+        else:
+            etat_pos = ("🟢 Une position VIP est actuellement ouverte" if trade_ouvert else
+                        "🟡 Une opportunité VIP se prépare" if (cle or {}).get("ordre") and r["confirme"] else
+                        "⚪ Aucune position VIP pour le moment")
+        lignes_vip = [entete] + ([prix_local_ligne] if prix_local_ligne else []) + [
+            "━━━━━━━━━━━━━━━━━━", "📡 POINT DE MARCHÉ", etat_pos,
+            r.get("news") or "📰 Calendrier économique indisponible", "━━━━━━━━━━━━━━━━━━"
+        ]
+        return "\n".join(lignes_vip + (
+            ["🎁 Positions gratuites : active ton coach pour recevoir la prochaine entrée"] if TOUT_GRATUIT else
+            ["🔒 Direction et niveaux de trading réservés aux VIP", "💎 Accès VIP : 49,90 € / mois"]
+        ))
     D, R = r["dirs"], r["rsis"]
     maj, n_ok = alignement(r)
     ut = [("1m", 0), ("5m", 2), ("15m", 4), ("1h", 7), ("4h", 9), ("Daily", 10)]
-    biais = ("🟢 Biais haussier confirmé" if maj == 1 else
-             "🔴 Biais baissier confirmé" if maj == -1 else
-             "🟠 Pas de biais confirmé en 1h / 4h")
-    l = [entete, "━━━━━━━━━━━━━━━━━━", "📡 LECTURE DU MARCHÉ",
-         mouvement_recent_m1(r), "BIAIS DE FOND (H1 / H4)", biais,
-         "━━━━━━━━━━━━━━━━━━", "📊 INDICATEURS PAR UNITÉ DE TEMPS",
+    if require_tv:
+        nb_haussieres = sum(1 for direction_ut in D if direction_ut == 1)
+        nb_baissieres = sum(1 for direction_ut in D if direction_ut == -1)
+        biais = ("🟢 Fond local plutôt haussier — contexte uniquement, pas un signal" if nb_haussieres > nb_baissieres else
+                 "🔴 Fond local plutôt baissier — contexte uniquement, pas un signal" if nb_baissieres > nb_haussieres else
+                 "🟠 Fond local mixte — aucun sens Pine confirmé")
+    else:
+        biais = ("🟢 Biais haussier confirmé" if maj == 1 else
+                 "🔴 Biais baissier confirmé" if maj == -1 else
+                 "🟠 Pas de biais confirmé en 1h / 4h")
+    l = [entete] + ([prix_local_ligne] if prix_local_ligne else []) + [
+         "━━━━━━━━━━━━━━━━━━", "📡 LECTURE DU MARCHÉ",
+         ("MOUVEMENT LOCAL M1 (CONTEXTE)" if require_tv else "MOUVEMENT RÉCENT M1"),
+         mouvement_recent_m1(r),
+         ("BIAIS DE FOND LOCAL (CONTEXTE — PAS UN SIGNAL)" if require_tv else "BIAIS DE FOND (H1 / H4)"), biais,
+         "━━━━━━━━━━━━━━━━━━",
+         ("INDICATEURS ALIGN LOCAUX (CONTEXTE)" if require_tv else "📊 INDICATEURS PAR UNITÉ DE TEMPS"),
          "  /  ".join(f"{nom} {fl(D[i])}" for nom, i in ut),
-         "━━━━━━━━━━━━━━━━━━", "📈 RSI PAR UNITÉ DE TEMPS",
-         "  /  ".join(f"{nom} {R[i]:.0f}" for nom, i in ut)]
-    if tv_plan["available"]:
+         "━━━━━━━━━━━━━━━━━━",
+         ("RSI ALIGN LOCAL (CONTEXTE)" if require_tv else "📈 RSI PAR UNITÉ DE TEMPS"),
+         "  /  ".join(f"{nom} {R[i]:.0f}" for nom, i in ut)
+    ]
+    if require_tv and trade_ouvert:
+        l += ["━━━━━━━━━━━━━━━━━━", "📍 POSITION ALIGN MÉMORISÉE",
+              "La position et ses niveaux restent ceux mémorisés. Aucune nouvelle entrée locale ne les remplace."]
+    elif require_tv and (not tv_plan or tv_plan.get("available") is not True):
+        reason = ((tv_plan or {}).get("reason") or
+                  (r.get("tv_indicator_mtf") or {}).get("reason") or
+                  "snapshot TradingView canonique M15 indisponible")
+        l += ["━━━━━━━━━━━━━━━━━━", "⏳ DIVERGENCE DES SOURCES — ATTENTE",
+              f"Plan Pine v25 indisponible : {reason}",
+              "Aucun plan local ne remplace le plan TradingView canonique."]
+    elif require_tv and not plan_confirme:
+        l += ["━━━━━━━━━━━━━━━━━━", "⏳ CONFIRMATION MTF PINE EN ATTENTE",
+              "Configuration M15 détectée — confirmation MTF en attente.",
+              "Aucun niveau Entry / SL / TP n'est publié avant confirmation MTF."]
+    elif require_tv and plan_confirme:
+        age_ms = tv_plan.get("ageMs")
+        age_txt = (f"âge plan M15 : {max(0, int(float(age_ms) / 1000))} s"
+                   if isinstance(age_ms, (int, float)) and math.isfinite(float(age_ms)) else
+                   "âge plan M15 : indisponible")
         l += ["━━━━━━━━━━━━━━━━━━", "📡 PLAN CANONIQUE PINE v25",
               "Plan de niveaux : M15 (indépendant de l'unité du graphique)",
+              age_txt,
               f"Unité de validation : {tv_plan['entry_timeframe']} ({tv_plan['strategy']})",
               f"Entrée : {px(tv_plan['entry'])} • SL : {px(tv_plan['sl'])} • TP1 : {px(tv_plan['tp1'])}" +
               (f" • TP2 : {px(tv_plan['tp2'])}" if tv_plan.get("tp2") is not None else " • TP2 : non fourni par le bridge"),
               f"Zone verte : {px(tv_plan['zone_low'])} → {px(tv_plan['zone_high'])} • Décision : {px(tv_plan['decision'])}",
-              "Clôture MTF Pine : " + ("CONFIRMÉE" if tv_plan["confirmed"] else "EN ATTENTE"),
-              "Déclencheur clôturé : " + ("VALIDÉ" if tv_plan["triggered"] else "EN ATTENTE"),
+              "Clôture MTF Pine : CONFIRMÉE",
+              "Déclencheur clôturé : " + ("VALIDÉ" if tv_plan.get("triggered") else "EN ATTENTE"),
               "⚠️ Les filtres de sécurité ALIGN peuvent refuser l'entrée sans modifier les niveaux Pine."]
-    elif r.get("tv_indicator_mtf", {}).get("available"):
+    elif isinstance(tv_plan, dict) and tv_plan.get("available"):
         l += ["━━━━━━━━━━━━━━━━━━", "📡 PLAN TRADINGVIEW",
-              f"{tv_plan['timeframe']} : {tv_plan['reason']}"]
+              f"{tv_plan.get('timeframe', 'M15')} : {tv_plan.get('reason', 'Plan Pine disponible')}"]
     l += ["━━━━━━━━━━━━━━━━━━", "🧭 CONFIRMATION DE TENDANCE",
-          "ALIGNEMENT 1H + 4H", f"{n_ok}/2 {'✅ CONFIRMÉ' if r['confirme'] else '⏳ EN ATTENTE'}",
+          ("LECTURE LOCALE H1 + H4 (CONTEXTE)" if require_tv else "ALIGNEMENT 1H + 4H"),
+          f"{n_ok}/2 {'alignées' if r['confirme'] else 'non confirmées'}" + (" — lecture locale" if require_tv else (" ✅ CONFIRMÉ" if r['confirme'] else " ⏳ EN ATTENTE")),
           "ZONE DAILY", zone_txt(r['posD']),
           "ZONE WEEKLY", zone_txt(r['posW']),
-          "━━━━━━━━━━━━━━━━━━", "🧭 PLAN MULTI-TIMEFRAME"] + strategie_mtf(r)
+          "━━━━━━━━━━━━━━━━━━",
+          ("🧭 LECTURE LOCALE MULTI-TIMEFRAME (CONTEXTE)" if require_tv else "🧭 PLAN MULTI-TIMEFRAME")] + strategie_mtf(r)
     nc = dict((n, v) for v, n in (r.get("niv_cles") or []))
     ph_, pb_ = nc.get("plus haut d'hier"), nc.get("plus bas d'hier")
     contexte = []
@@ -1596,7 +1670,7 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
         contexte.append(f"🌏 Range Asie - plus haut : {px(r['asie'][0])}")
         contexte.append(f"🌏 Range Asie - plus bas : {px(r['asie'][1])}")
     contexte.extend(r.get("macro") or [])
-    p_ = r["m1"][-1]["c"]
+    p_ = prix_local if prix_local is not None else 0.0
     proches = sorted([f for f in r.get("fvg", []) if abs((f[0] + f[1]) / 2 - p_) <= 3 * r["atr"]],
                      key=lambda f: abs((f[0] + f[1]) / 2 - p_))
     for lo, hi, ut_fvg, dd in proches[:2]:
@@ -1662,6 +1736,9 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
     if tr:
         sens = "🟩 LONG" if tr["d"] == 1 else "🟥 SHORT"
         l.append(f"🎯 POSITION EN COURS : {sens} | Entrée {px(tr['e'])} | SL {px(tr['sl'])} | TP1 {px(tr['tp1'])} | TP2 {px(tr['tp2'])}")
+        if require_tv:
+            l.append("🧑‍🏫 Après ton exécution manuelle, confirme avec le bouton de suivi pour activer ton coach personnel.")
+            l.append("ℹ️ ALIGN n'envoie aucun ordre au broker.")
     elif require_tv:
         if not plan_confirme:
             l.append("🎯 POINT VISÉ : aucun — confirmation MTF Pine non validée")
@@ -9849,6 +9926,37 @@ def adapter_marches_session(lignes, mk, choisis, anglais=False):
 # ───────── Coach de concentration : sur quel marché se concentrer ? ─────────
 FOCUS_NOMS = {"dans_zone": "dans la zone d'entrée", "proche": "proche de la zone", "en_approche": "en approche", "loin": "loin de la zone",
               "bloque": "bloqué (zone extrême Daily/Weekly)", "sans_plan": "pas de plan fixé", "ferme": "marché fermé", "position": "déjà en position"}
+
+
+def prix_tradingview_actif(r):
+    """Prix et provenance du snapshot actif TradingView v25 ; aucun repli local en bridge obligatoire."""
+    bridge = (r or {}).get("tv_indicator_mtf") or {}
+    if bridge.get("available") is not True:
+        return None
+    timeframe = str(bridge.get("activeTimeframe") or "").upper()
+    snapshots = bridge.get("snapshots") if isinstance(bridge.get("snapshots"), dict) else {}
+    snap = snapshots.get(timeframe) or {}
+    if not timeframe or not isinstance(snap, dict) or snap.get("fresh") is not True:
+        return None
+    if bridge.get("activeTimeframeFresh") is False:
+        return None
+    try:
+        price = float(snap.get("price"))
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(price) or price <= 0:
+        return None
+    age_ms = bridge.get("activeTimeframeAgeMs")
+    if not isinstance(age_ms, (int, float)) or not math.isfinite(float(age_ms)) or age_ms < 0:
+        age_ms = snap.get("robotAgeMs")
+    if not isinstance(age_ms, (int, float)) or not math.isfinite(float(age_ms)) or age_ms < 0:
+        age_ms = None
+    return {
+        "price": price,
+        "timeframe": timeframe,
+        "ageMs": age_ms,
+        "timestamp": snap.get("robotTimestamp"),
+    }
 
 
 def _prix_tv_actif(r):
