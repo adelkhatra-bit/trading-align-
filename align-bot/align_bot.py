@@ -1257,6 +1257,20 @@ def _rejet(bars, d, niveau, a):
         return dict(x, rejection_type=" + ".join(motifs))
     return None
 
+
+def _rejet_anglais(label):
+    """Traduit le motif de rejet pour ne jamais mélanger les langues dans Telegram."""
+    for fr, en in (
+        ("mèche haute de rejet baissier", "upper bearish rejection wick"),
+        ("mèche basse de rejet haussier", "lower bullish rejection wick"),
+        ("balayage de la bande haute puis réintégration", "upper Bollinger sweep and re-entry"),
+        ("balayage de la bande basse puis réintégration", "lower Bollinger sweep and re-entry"),
+        ("bougie englobante baissière", "bearish engulfing candle"),
+        ("bougie englobante haussière", "bullish engulfing candle"),
+        ("de l'amplitude", "of candle range"),
+    ):
+        label = label.replace(fr, en)
+    return label
 def entree_sniper(r):
     return _sniper(r)[0]
 
@@ -1329,6 +1343,7 @@ def _sniper(r):
                 rr=abs(tp1 - e) / risque, rr_plan=abs(tp_final - e) / risque, niveau=L, src="dernier " + ("plus haut " if d == -1 else "plus bas ") + ut, meche=meche,
                 rejets=[n for n, x in rej.items() if x is not None],
                 rejets_detail=[f"{n} : {x['rejection_type']}" for n, x in rej.items() if x is not None],
+                rejets_detail_en=[f"{n}: {_rejet_anglais(x['rejection_type'])}" for n, x in rej.items() if x is not None],
                 marche=True, t=m1[-1]["t"]), "")
 
 def simuler_sniper(sn, m1_futur, duree_min=240):
@@ -9986,6 +10001,7 @@ def evenements_pine(etat, m, r, cle, now):
                     sl=px(pine_sl), tp1=px(pine_tp1), tp=px(pine_tp2) if pine_tp2 is not None else "—",
                     ut=str(sn.get("ut") or "M1/M3"),
                     rejets=" ; ".join(sn.get("rejets_detail") or sn.get("rejets") or []),
+                    rejets_en=" ; ".join(sn.get("rejets_detail_en") or sn.get("rejets_detail") or sn.get("rejets") or []),
                     rr=fmt_rr(rr_tp1), rrp=fmt_rr(rr_tp2),
                 ))
     # scalp_inverse() reste disponible pour les simulations et diagnostics locaux.
@@ -10015,6 +10031,8 @@ def texte_pine(etat, ev, anglais=False):
     lignes = list(var[_tournante(etat, f"p:{ev['kind']}:{ev['m']}", len(var))])
     ev = dict(ev)
     direction = int(ev.get("d") or 0)
+    if anglais and ev.get("rejets_en"):
+        ev["rejets"] = ev["rejets_en"]
     ev.setdefault("tf_total", 11)
     pine_confirme = ev.get("pine_confirmed") is True
     if anglais:
