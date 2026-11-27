@@ -1173,7 +1173,7 @@ class AlignMtfRulesTest(unittest.TestCase):
         from unittest.mock import patch
         now = align_bot.datetime.datetime(2026, 11, 11, 12, 0, tzinfo=align_bot.PARIS).timestamp()
         event = {"t": int(now + 40 * 60), "titre": "Discours Fed", "prev": "?", "avant": "?"}
-        state = {}
+        state = {"cal": {"t": now, "ev": [event]}}
         with patch.object(align_bot, "calendrier", return_value=[event]), \
              patch.object(align_bot, "minutes_avant_fermeture_gold", return_value=100), \
              patch.object(align_bot, "horaires_gold", return_value=(now + 100 * 60, now + 200 * 60, now + 300 * 60)):
@@ -1194,7 +1194,8 @@ class AlignMtfRulesTest(unittest.TestCase):
              patch.object(align_bot, "minutes_avant_fermeture_gold", return_value=100), \
              patch.object(align_bot, "horaires_gold", return_value=(now + 100 * 60, now + 200 * 60, now + 300 * 60)), \
              patch.object(align_bot, "ia", return_value="Le mouvement observé est haussier mais doit être confirmé en clôture.") as ai:
-            messages = align_bot.annonces_et_sessions({}, now, {"GOLD": {"m1": bars}})
+            state = {"cal": {"t": now, "ev": [event]}}
+            messages = align_bot.annonces_et_sessions(state, now, {"GOLD": {"m1": bars}})
         reaction = next(x for x in messages if "RÉACTION À LA NEWS" in x)
         self.assertIn("L'analyse de l'IA ALIGN après l'annonce", reaction)
         self.assertIn("doit être confirmé en clôture", reaction)
