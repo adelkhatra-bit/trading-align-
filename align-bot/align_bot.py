@@ -292,6 +292,14 @@ def plan_indicateur(r):
     snap = snapshots.get(plan_tf) or {}
     active_snap = snapshots.get(active_tf) if active_tf else None
     robot = snap.get("robotV12") or {}
+    pine_verdict = str(robot.get("verdict") or "").strip()
+
+    def indisponible(reason):
+        result = {"timeframe": plan_tf, "available": False, "reason": reason}
+        if (snap.get("fresh") is True and snap.get("robotFresh") is True
+                and pine_verdict and pine_verdict.upper() not in {"LONG", "SHORT", "WAIT"}):
+            result["verdict"] = pine_verdict
+        return result
     try:
         entry, sl = float(robot.get("entry")), float(robot.get("sl"))
         raw_tp1 = robot.get("tp1")
@@ -309,33 +317,32 @@ def plan_indicateur(r):
         entry_bar_low = float(robot.get("entryBarLow"))
         entry_bar_close = float(robot.get("entryBarClose"))
     except (TypeError, ValueError, KeyError):
-        return {"timeframe": plan_tf or None, "available": False,
-                "reason": "plan M15 / zone / bougie de validation Pine incomplets"}
+        return indisponible("plan M15 / zone / bougie de validation Pine incomplets")
 
     if snap.get("fresh") is not True:
-        return {"timeframe": plan_tf, "available": False, "reason": "snapshot TradingView canonique M15 périmé"}
+        return indisponible("snapshot TradingView canonique M15 périmé")
     if snap.get("robotFresh") is False:
-        return {"timeframe": plan_tf, "available": False, "reason": "plan ROBOT V12 M15 périmé"}
+        return indisponible("plan ROBOT V12 M15 périmé")
     if not active_tf or not isinstance(active_snap, dict) or active_snap.get("fresh") is not True:
-        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView actif absent ou périmé"}
+        return indisponible("prix TradingView actif absent ou périmé")
     try:
         current_price = float(active_snap.get("price"))
     except (TypeError, ValueError):
-        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView actif absent"}
+        return indisponible("prix TradingView actif absent")
     if not math.isfinite(current_price) or current_price <= 0:
-        return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView actif invalide"}
+        return indisponible("prix TradingView actif invalide")
     if str(robot.get("planTimeframe") or "").upper() != "M15":
-        return {"timeframe": plan_tf, "available": False, "reason": "référence du plan différente de M15"}
+        return indisponible("référence du plan différente de M15")
     strategy = str(robot.get("strategy") or "").upper()
     expected_entry_tf = {"SCALPING": "M1", "DAY": "M5", "SWING": "H1"}.get(strategy)
     entry_tf = str(robot.get("entryTimeframe") or "").upper()
     if expected_entry_tf is None or entry_tf != expected_entry_tf:
-        return {"timeframe": plan_tf, "available": False, "reason": "unité de validation incohérente avec la stratégie"}
+        return indisponible("unité de validation incohérente avec la stratégie")
 
     signal = str(robot.get("signal") or robot.get("verdict") or "").upper()
     direction = _direction_tv(signal)
     if direction not in (-1, 1) or min(entry, sl, tp1, zone_low, zone_high, decision) <= 0 or (tp2 is not None and tp2 <= 0):
-        return {"timeframe": plan_tf, "available": False, "reason": "direction ou niveaux M15 invalides"}
+        return indisponible("direction ou niveaux M15 invalides")
     risk = abs(entry - sl)
     # Même tolérance d'arrondi que le bridge (align_tv_bridge.py) : le Pine pose le bord de zone
     # EXACTEMENT à 25 % du risque et le JSON arrondit à 2 décimales. Sans elle, un plan accepté
@@ -354,10 +361,10 @@ def plan_indicateur(r):
             and zone_high <= sl - 0.25 * risk + tol
         )
     if not geometrie_ok:
-        return {"timeframe": plan_tf, "available": False, "reason": "géométrie zone / entrée / SL / TP incohérente"}
+        return indisponible("géométrie zone / entrée / SL / TP incohérente")
     if not (entry_bar_low <= min(entry_bar_open, entry_bar_close)
             <= max(entry_bar_open, entry_bar_close) <= entry_bar_high):
-        return {"timeframe": plan_tf, "available": False, "reason": "bougie de validation OHLC incohérente"}
+        return indisponible("bougie de validation OHLC incohérente")
     retested_zone = entry_bar_high >= zone_low and entry_bar_low <= zone_high
     candle_trigger = entry_bar_close > decision if direction == 1 else entry_bar_close < decision
     candle_before_stop = entry_bar_close > sl if direction == 1 else entry_bar_close < sl
@@ -377,6 +384,7 @@ def plan_indicateur(r):
         "entry_bar_high": entry_bar_high, "entry_bar_low": entry_bar_low,
         "entry_bar_close": entry_bar_close, "triggered": triggered,
         "confirmed": snap.get("confirmed") is True and robot.get("confirmed") is True,
+        "verdict": pine_verdict,
         "verdict": robot.get("verdict"), "long_score": robot.get("long_score"),
         "short_score": robot.get("short_score"),
         "timestamp": snap.get("robotTimestamp") or robot.get("receivedAt") or snap.get("timestamp"),
