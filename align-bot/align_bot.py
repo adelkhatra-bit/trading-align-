@@ -1632,15 +1632,17 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
         l += ["━━━━━━━━━━━━━━━━━━", "📍 POSITION ALIGN MÉMORISÉE",
               "La position et ses niveaux restent ceux mémorisés. Aucune nouvelle entrée locale ne les remplace."]
     elif require_tv and (not tv_plan or tv_plan.get("available") is not True):
-        reason = ((tv_plan or {}).get("reason") or
+        reason = ((tv_plan or {}).get("verdict") or (tv_plan or {}).get("reason") or
                   (r.get("tv_indicator_mtf") or {}).get("reason") or
                   "snapshot TradingView canonique M15 indisponible")
         l += ["━━━━━━━━━━━━━━━━━━", "⏳ DIVERGENCE DES SOURCES — ATTENTE",
               f"Plan Pine v25 indisponible : {reason}",
               "Aucun plan local ne remplace le plan TradingView canonique."]
     elif require_tv and not plan_confirme:
+        motif_pine = str((tv_plan or {}).get("verdict") or "Les clôtures MTF Pine ne sont pas toutes confirmées.")
         l += ["━━━━━━━━━━━━━━━━━━", "⏳ CONFIRMATION MTF PINE EN ATTENTE",
               "Configuration M15 détectée — confirmation MTF en attente.",
+              f"Motif Pine v25 : {motif_pine}",
               "Aucun niveau Entry / SL / TP n'est publié avant confirmation MTF."]
     elif require_tv and plan_confirme:
         age_ms = tv_plan.get("ageMs")
@@ -1650,6 +1652,7 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
         l += ["━━━━━━━━━━━━━━━━━━", "📡 PLAN CANONIQUE PINE v25",
               "Plan de niveaux : M15 (indépendant de l'unité du graphique)",
               age_txt,
+              f"Motif Pine v25 : {tv_plan.get('verdict') or 'Plan confirmé'}",
               f"Unité de validation : {tv_plan['entry_timeframe']} ({tv_plan['strategy']})",
               f"Entrée : {px(tv_plan['entry'])} • SL : {px(tv_plan['sl'])} • TP1 : {px(tv_plan['tp1'])}" +
               (f" • TP2 : {px(tv_plan['tp2'])}" if tv_plan.get("tp2") is not None else " • TP2 : non fourni par le bridge"),
@@ -5661,7 +5664,7 @@ def texte_pourquoi(m, r, cle):
     if r.get("require_tv_bridge") and not trade:
         plan = plan_indicateur(r)
         if not plan.get("available"):
-            reason = plan.get("reason") or (r.get("tv_indicator_mtf") or {}).get("reason") or "Plan Pine v25 indisponible"
+            reason = plan.get("verdict") or plan.get("reason") or (r.get("tv_indicator_mtf") or {}).get("reason") or "Plan Pine v25 indisponible"
             return "\n".join([f"❓ POURQUOI ALIGN ? — {m}", "━━━━━━━━━━━━━━━━━━━━",
                               "⏳ DIVERGENCE DES SOURCES — ATTENTE",
                               f"Motif : {reason}",
@@ -5671,6 +5674,7 @@ def texte_pourquoi(m, r, cle):
         if plan.get("confirmed") is not True:
             return "\n".join([f"❓ POURQUOI ALIGN ? — {m}", "━━━━━━━━━━━━━━━━━━━━",
                               "⏳ CONFIRMATION MTF PINE EN ATTENTE",
+                              f"Motif Pine v25 : {plan.get('verdict') or 'confirmation MTF manquante'}",
                               "Les clôtures requises ne sont pas toutes confirmées par Pine v25.",
                               "Aucun sens de trade ni niveau Entry/SL/TP n'est autorisé.",
                               "➡️ ACTION : attendre la confirmation MTF TradingView.",
@@ -6109,13 +6113,13 @@ def texte_apercu(m, r, cle, vip=True):
         if not tv_plan or tv_plan.get("available") is not True:
             decision = "⏳ DIVERGENCE DES SOURCES — ATTENTE"
             direction = "Non confirmée par TradingView"
-            raison = (tv_plan or {}).get("reason") or (r.get("tv_indicator_mtf") or {}).get("reason") or "Plan Pine v25 indisponible"
+            raison = (tv_plan or {}).get("verdict") or (tv_plan or {}).get("reason") or (r.get("tv_indicator_mtf") or {}).get("reason") or "Plan Pine v25 indisponible"
             sens = 0
             type_ = ""
         elif not plan_confirme:
             decision = "⏳ CONFIRMATION MTF PINE EN ATTENTE"
             direction = "Non confirmée par Pine"
-            raison = "Les clôtures MTF Pine ne sont pas toutes confirmées. Aucun sens ni niveau de trade n'est publié."
+            raison = str(tv_plan.get("verdict") or "Les clôtures MTF Pine ne sont pas toutes confirmées. Aucun sens ni niveau de trade n'est publié.")
             sens = 0
             type_ = ""
         else:
@@ -6130,7 +6134,7 @@ def texte_apercu(m, r, cle, vip=True):
                 raison = "Le prix TradingView est hors de la zone d'entrée M15. Aucune entrée au marché."
             else:
                 decision = "🟡 PLAN PINE CONFIRMÉ — DÉCLENCHEUR EN ATTENTE"
-                raison = "Le plan M15 est confirmé, mais la clôture de l'unité de validation n'a pas encore déclenché l'entrée."
+                raison = str(tv_plan.get("verdict") or "Le plan M15 est confirmé, mais la clôture de l'unité de validation n'a pas encore déclenché l'entrée.")
     elif require_tv and tr:
         decision = "📍 POSITION EN COURS"
         direction = "LONG ⬆️" if tr["d"] == 1 else "SHORT ⬇️"
@@ -6664,9 +6668,9 @@ def inscrire_auto(etat, cid, m, notifier=True):
             ]
         else:
             if plan and plan.get("available") and plan.get("confirmed") is not True:
-                raison = "Configuration Pine détectée, mais les clôtures MTF ne sont pas encore confirmées."
+                raison = str(plan.get("verdict") or "Configuration Pine détectée, mais les clôtures MTF ne sont pas encore confirmées.")
             else:
-                raison = str((plan or {}).get("reason") or "snapshots TradingView incomplets ou périmés")
+                raison = str((plan or {}).get("verdict") or (plan or {}).get("reason") or "snapshots TradingView incomplets ou périmés")
             lignes = [
                 f"🎯 SUIVI ACTIVÉ — {ICONE.get(m, '')} {m}",
                 "🧭 Direction : ATTENTE — aucun sens Pine v25 frais publiable avant confirmation MTF",
@@ -14627,6 +14631,7 @@ def contexte_technique_live(derniers):
             "biais_contextuel": biais_contextuel,
             "biais_plan": biais,
             "phase_plan": phase_plan,
+            "motif_plan": str((plan_pine or {}).get("verdict") or (plan_pine or {}).get("reason") or ""),
             "plan_confirme": plan_confirme,
             "strategie": (plan_pine.get("strategy") if plan_confirme else "aucune stratégie Pine confirmée"),
             "confirmation_4h_1h": "alignées à la hausse" if len(dirs) > 9 and dirs[7] == dirs[9] == 1 else
@@ -14864,6 +14869,7 @@ def live_phrases_ia(etat, maintenant, derniers=None):
         "Le champ biais_contextuel est une tendance de fond calculée sur les unités locales clôturées : tu peux l'expliquer, mais elle n'est jamais un signal. "
         "Le champ biais_plan est exclusivement la direction confirmée par Pine v25 ; neutre signifie qu'aucune direction de trade n'est confirmée. "
         "Le champ phase_plan indique l'étape réelle du plan Pine : aucun_plan, attente_confirmation_mtf, attente_declencheur, attente_retour_zone ou verification_finale. "
+        "Le champ motif_plan reprend le verdict exact de Pine v25 ; utilise-le pour expliquer pourquoi on attend, sans le transformer en autorisation. "
         "Si phase_plan n'est pas un signal d'entrée explicite, explique clairement que le commentaire décrit le contexte et qu'il faut attendre la carte Telegram ENTRÉE AUTORISÉE. "
         "Ne déduis jamais une autorisation d'entrée du seul alignement des unités de temps. "
         "Lis mouvement_court_terme M5/M15 : si une clôture courte contredit le biais de fond, annonce explicitement le contre-mouvement ou le retracement. "
