@@ -882,8 +882,8 @@ class LiveAgendaMarketTimezoneTests(unittest.TestCase):
 
     def test_bande_visual_animations_are_initialized_and_preserved(self):
         bande = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")).read_text(encoding="utf-8")
-        self.assertIn("// @version      12.2.29", bande)
-        self.assertIn("const VERSION = '12.2.29';", bande)
+        self.assertIn("// @version      12.2.30", bande)
+        self.assertIn("const VERSION = '12.2.30';", bande)
         self.assertIn("document.head.appendChild(cssAnimationsToggle);\n  appliquerAnimations();", bande)
         self.assertIn("function afficherIA(", bande)
         self.assertIn("function parlerLive(item, forcer = false, apresLecture = null)", bande)
@@ -1208,8 +1208,8 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
 
     def test_bande_version_12_2_28_voice_recovery_and_sync(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
-        self.assertIn("// @version      12.2.29", bande)
-        self.assertIn("const VERSION = '12.2.29';", bande)
+        self.assertIn("// @version      12.2.30", bande)
+        self.assertIn("const VERSION = '12.2.30';", bande)
         self.assertIn('let voixUtterance = null', bande)
         self.assertIn('const voixUtterances = new Set()', bande)
         self.assertIn('voixUtterance = utterance;', bande)
@@ -1278,7 +1278,7 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         self.assertNotIn("utterance.voice = dansLangue[0]", bande)
         self.assertNotIn("dansLangue[0]", bande)
         self.assertIn("if (!v) {", bande)
-        self.assertIn("if (!anglais && voixActive) voixEnAttente = { item, apresLecture };", bande)
+        self.assertIn("if (voixActive) { voixEnAttente = { item, apresLecture };", bande)
         self.assertIn("return 0;   // reprise à voiceschanged, callback conservé pour ne pas perdre la deuxième voix", bande)
         self.assertIn("utterance.voice = v;", bande)
 
