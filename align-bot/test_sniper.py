@@ -81,6 +81,7 @@ class Cascade(unittest.TestCase):
         self.assertIn("M1", sn["rejets"]); self.assertIn("M3", sn["rejets"])                    # rejet confirmé sur M1 ET M3
         self.assertTrue(all("mèche" in x or "balayage" in x or "englobante" in x for x in sn["rejets_detail"]))
         self.assertTrue(any(x.startswith("M1 : ") for x in sn["rejets_detail"]))
+        self.assertTrue(all("wick" in x or "sweep" in x or "engulfing" in x for x in sn["rejets_detail_en"]))
         self.assertAlmostEqual(sn["tp2"], 3895.54)                                               # TP du plan conservé
         self.assertLess(sn["tp1"], sn["e"]); self.assertGreater(sn["tp1"], sn["tp2"])           # TP1 intermédiaire réaliste, avant le TP du plan
         self.assertGreaterEqual(sn["rr"], ab.GAIN_MIN); self.assertGreater(sn["rr_plan"], sn["rr"])
@@ -208,7 +209,9 @@ class MessagesEtRegles(unittest.TestCase):
         # Keep a deterministic M1/M3/M5 timing proposal independent from changing market-data fixtures.
         r["sniper"] = {"d": -1, "t": r["m1"][-1]["t"], "ut": "M1/M3", "rejets": ["M1", "M3"],
                        "rejets_detail": ["M1 : mèche haute de rejet baissier (52% de l'amplitude)",
-                                          "M3 : bougie englobante baissière"]}
+                                          "M3 : bougie englobante baissière"],
+                       "rejets_detail_en": ["M1: upper bearish rejection wick (52% of candle range)",
+                                            "M3: bearish engulfing candle"]}
         now = now or r["m1"][-1]["t"]
         plan = self.PINE_PLAN if pine_plan is None else pine_plan
         with patch.object(ab, "cme_ouvert", return_value=True), \
@@ -227,6 +230,9 @@ class MessagesEtRegles(unittest.TestCase):
         self.assertIn("timing M1/M3 • plan H1", fr[2])
         self.assertIn("mèche haute de rejet baissier", fr[2])
         self.assertIn("bougie englobante baissière", fr[2])
+        self.assertIn("upper bearish rejection wick", en[2])
+        self.assertIn("bearish engulfing candle", en[2])
+        self.assertNotIn("mèche", " ".join(en))
         self.assertIn("validation ROBOT V12 avant position ouverte", fr[2])
         self.assertNotIn("POSITION OUVERTE", " ".join(fr))
         self.assertEqual(ev[0]["entree"], "4000,50")
