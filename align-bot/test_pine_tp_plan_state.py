@@ -4,6 +4,7 @@ import unittest
 
 
 PINE = Path(__file__).resolve().parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
+PINE_V24 = Path(__file__).resolve().parent / "pine" / "ALIGN_MTF_PRO_v24.pine"
 TIMEFRAMES = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1")
 
 
@@ -11,6 +12,7 @@ class PineTpPlanStateTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.source = PINE.read_text(encoding="utf-8")
+        cls.source_v24 = PINE_V24.read_text(encoding="utf-8")
 
     def test_tp_touch_state_is_bound_to_current_plan_levels(self):
         start = self.source.index("// TP1 touché :")
@@ -21,6 +23,15 @@ class PineTpPlanStateTests(unittest.TestCase):
         self.assertIn("(na(tp1) != na(tp1M))", block)
         self.assertIn("(na(tp2) != na(tp2M))", block)
         self.assertLess(block.index("if planTpChange"), block.index("if not tp1Ok and dirPlan"))
+
+    def test_v24_is_a_context_only_companion_and_does_not_publish_a_second_plan_by_default(self):
+        self.assertIn('voirPlan = input.bool(false, "Afficher le plan (TP / SL)"', self.source_v24)
+        self.assertIn('voirFibo = input.bool(false, "Zone d\'entrée + Fibonacci"', self.source_v24)
+        self.assertIn('voirSignauxV24 = input.bool(false, "Signaux indépendants v24 (désactivés par défaut)"', self.source_v24)
+        self.assertIn("sigHaut = voirSignauxV24 and isSupportedMarket", self.source_v24)
+        self.assertIn("sigBas  = voirSignauxV24 and isSupportedMarket", self.source_v24)
+        self.assertIn("CONTEXTE MTF v24 — plan Entry / SL / TP sur v25", self.source_v24)
+        self.assertNotIn('E " + px(ent) + "  TP " + px(tp1) + "  SL " + px(sl)', self.source_v24)
 
     def test_visual_confirmation_line_and_label_are_preserved_without_entry_marker(self):
         self.assertIn("lConf := line.new(bar_index, ent, bar_index + 30, ent", self.source)
