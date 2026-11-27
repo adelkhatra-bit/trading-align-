@@ -3121,6 +3121,43 @@ TRAD.update({   # Provenance explicite des sources dans les cartes Telegram ALIG
     " clôtures M1) : ": " M1 closes): ",
 })
 
+TRAD.update({   # Coach, résumé principal et vues individuelles en bridge TradingView obligatoire
+    "⏳ DIVERGENCE DES SOURCES — ATTENTE": "⏳ SOURCE DIVERGENCE — WAIT",
+    "⏳ CONFIRMATION MTF PINE EN ATTENTE": "⏳ PINE MTF CONFIRMATION PENDING",
+    "Non confirmée par TradingView": "Not confirmed by TradingView",
+    "Non confirmée par Pine": "Not confirmed by Pine",
+    "Direction Pine à surveiller :": "Pine direction to watch:",
+    "Position mémorisée :": "Stored position:",
+    "📊 LECTURES LOCALES ALIGN (CONTEXTE NON DÉCISIONNEL)": "📊 LOCAL ALIGN READINGS (NON-DECISIONAL CONTEXT)",
+    "Les clôtures MTF Pine ne sont pas toutes confirmées. Aucun sens ni niveau de trade n'est publié.": "Pine MTF closes are not all confirmed. No trade direction or levels are published.",
+    "Le plan M15 est confirmé, mais la clôture de l'unité de validation n'a pas encore déclenché l'entrée.": "The M15 plan is confirmed, but the validation-timeframe close has not triggered the entry yet.",
+    "Le prix TradingView est hors de la zone d'entrée M15. Aucune entrée au marché.": "TradingView price is outside the M15 entry zone. No market entry.",
+    "Déclencheur clôturé et prix dans la zone. Les filtres de risque, news et sécurité restent applicables.": "Closed-candle trigger and price are in the zone. Risk, news and safety filters still apply.",
+    "Position et niveaux mémorisés ; les nouvelles entrées restent gouvernées par Pine v25.": "Stored position and levels; new entries remain governed by Pine v25.",
+    "Unité du plan :": "Plan timeframe:",
+    "Unité de validation :": "Validation timeframe:",
+    "Clôture MTF Pine : CONFIRMÉE": "Pine MTF close: CONFIRMED",
+    "Déclencheur clôturé :": "Closed-candle trigger:",
+    "Zone d'entrée Pine M15 :": "Pine M15 entry zone:",
+    "Attendre un snapshot Pine v25 frais. Aucun Entry/SL/TP local n'est publié.": "Wait for a fresh Pine v25 snapshot. No local Entry/SL/TP is published.",
+    "Les clôtures requises ne sont pas toutes confirmées par Pine v25.": "The required closes are not all confirmed by Pine v25.",
+    "Les niveaux proviennent uniquement de Pine v25 / ROBOT V12.": "Levels come exclusively from Pine v25 / ROBOT V12.",
+    "Prix TradingView : indisponible — évolution non calculée": "TradingView price unavailable — PnL not calculated",
+    "⏳ Évolution indisponible : attendre un prix TradingView frais.": "⏳ PnL unavailable: waiting for a fresh TradingView price.",
+    "Prix local M1 (contexte uniquement)": "Local M1 price (context only)",
+    "📡 VISION ALIGN": "📡 ALIGN VISION",
+    "Plan Pine v25 indisponible": "Pine v25 plan unavailable",
+    "La configuration M15 n'est pas confirmée MTF. Aucun niveau Entry/SL/TP n'est affiché.": "The M15 setup is not MTF-confirmed. No Entry/SL/TP levels are shown.",
+    "Déclencheur Pine et zone de prix validés ; les filtres de sécurité ALIGN restent applicables.": "Pine trigger and price zone validated; ALIGN safety filters still apply.",
+    "Un plan confirmé n'est pas encore une entrée : attendre la clôture de validation.": "A confirmed plan is not yet an entry: wait for the validation close.",
+    "Le biais LONG/SHORT n'est pas, à lui seul, un ordre d'entrée.": "A LONG/SHORT bias alone is not an entry order.",
+    "Plan M15 confirmé • validation": "M15 plan confirmed • validation",
+    "Direction Pine :": "Pine direction:",
+    "Direction locale": "Local direction",
+    "Pine v25 indisponible": "Pine v25 unavailable",
+    "Nouvelle direction": "New direction",
+    "📡 Prix TradingView": "📡 TradingView price",
+})
 _CLES = sorted(TRAD, key=len, reverse=True)
 
 def traduire(t):
