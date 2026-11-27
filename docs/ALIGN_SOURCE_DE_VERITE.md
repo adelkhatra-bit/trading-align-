@@ -42,7 +42,7 @@ TradingView · Pine v25 · 2 alertes (BTCUSD et XAUUSD)
   → bande live (texte, animations, voix)
 ```
 
-Le script compagnon `ALIGN_MTF_PRO_v24.pine` peut rester chargé sur le graphique pour ses visuels de clôture de bougie. Il ne fait pas partie de la chaîne de données : aucune alerte sortante, aucun webhook, aucun bridge et aucune lecture par ROBOT V12. Ses niveaux Entry/SL/TP, zones Fibonacci et signaux indépendants sont désactivés par défaut pour éviter un second plan concurrent. Le v25 reste l'unique source des snapshots et décisions transmises au BOT.
+Le script compagnon `ALIGN_MTF_PRO_v24.pine` peut rester chargé sur le graphique pour ses visuels de clôture de bougie. Il ne fait pas partie de la chaîne de données : aucune alerte sortante, aucun webhook, aucun bridge et aucune lecture par ROBOT V12. Son tableau MTF reprend les directions clôturées du v25 et signale séparément les divergences en formation. Ses niveaux Entry/SL/TP, zones Fibonacci et signaux indépendants sont désactivés par défaut pour éviter un second plan concurrent. Le v25 reste l'unique source des snapshots et décisions transmises au BOT.
 
 Le bridge Python est éphémère dans le runner du workflow : **4100 n'est pas un service permanent du PC** et ne doit pas être exposé par un tunnel public. Le Worker ne remplace pas le bridge : il transporte et conserve le JSON brut. Le feeder le transmet sans compléter ni réécrire ses champs ; `BridgeStore` dans `align_tv_bridge.py` est l'unique validateur MTF.
 

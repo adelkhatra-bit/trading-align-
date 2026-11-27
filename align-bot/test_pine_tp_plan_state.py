@@ -35,6 +35,7 @@ class PineTpPlanStateTests(unittest.TestCase):
         self.assertIn("dv = array.get(dirsFermees, i)", self.source_v24)
         self.assertIn("Bougie en formation :", self.source_v24)
         self.assertIn("visuel MTF d'accompagnement", self.source_v24)
+        self.assertLessEqual(self.source_v24.count("request.security("), 40)
         self.assertNotIn('E " + px(ent) + "  TP " + px(tp1) + "  SL " + px(sl)', self.source_v24)
 
     def test_entry_sl_tp_visuals_are_hidden_until_the_plan_is_confirmed(self):
