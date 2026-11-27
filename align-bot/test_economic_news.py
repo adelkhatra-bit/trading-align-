@@ -110,6 +110,20 @@ class EconomicNewsNormalizationTest(unittest.TestCase):
         self.assertIn("U.S. Census Bureau", report)
         self.assertIn("census.gov", report)
 
+    def test_zero_is_preserved_as_a_real_published_value(self):
+        event = news.normaliser_evenement({
+            "title": "Retail Sales",
+            "country": "USD",
+            "date": "2026-11-27T08:30:00-05:00",
+            "impact": "Low",
+            "actual": 0,
+            "forecast": 0,
+            "previous": 0,
+        }, self.now)
+        self.assertEqual(event["actual"], "0")
+        self.assertEqual(event["forecast"], "0")
+        self.assertEqual(event["previous"], "0")
+
     def test_actual_value_is_labelled_as_aggregator_data_not_official_data(self):
         event = news.normaliser_evenement({
             "title": "Core CPI m/m",
