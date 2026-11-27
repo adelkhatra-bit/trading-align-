@@ -387,6 +387,7 @@
       // Nettoyer le cache avant même la synchronisation Worker : aucun ancien commentaire ne doit repartir.
       dernierDialogueCoach = null;
       dernierDialogueCoachTs = Date.now();
+      dernierCommentaireIA = null;
       voixDerniere = Date.now();
       if (!publierEtatCoach(true)) {
         voixBtn.title = 'Coach vocal activé globalement ; lecture sur l’onglet TradingView propriétaire.';
@@ -1328,6 +1329,7 @@
       // Activation synchronisée depuis un autre onglet : repartir sans commentaire ancien.
       dernierDialogueCoach = null;
       dernierDialogueCoachTs = Date.now();
+      dernierCommentaireIA = null;
       publierEtatCoach(true);
       if (!coachPollTimer) ecouterDialoguesCoach();
     } else {
