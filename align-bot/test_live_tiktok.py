@@ -1310,7 +1310,7 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         self.assertIn("function parlerLive(item, forcer = false, apresLecture = null)", bande)
 
         activation_start = bande.index("// Nettoyer le cache avant même la synchronisation Worker")
-        activation_end = bande.index("\n      })) return;", activation_start)
+        activation_end = bande.index("\n      } else {", activation_start)
         activation = bande[activation_start:activation_end]
         self.assertIn("dernierDialogueCoach = null;", activation)
         self.assertIn("dernierDialogueCoachTs = Date.now();", activation)
