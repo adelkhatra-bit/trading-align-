@@ -121,7 +121,7 @@ class BridgeStoreTests(unittest.TestCase):
                     ),
                     msg=f"{variable} must be returned by its matching request.security() tuple",
                 )
-        self.assertIn('[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time_close[1]]', pine)
+        self.assertIn('[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), ta.rsi(close, lenRsi)[1], time_close[1]]', pine)
         self.assertNotIn('[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]', pine)
         self.assertNotIn('lookahead=barmerge.lookahead_off)', pine)
 
