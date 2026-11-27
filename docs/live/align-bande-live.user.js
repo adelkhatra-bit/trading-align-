@@ -425,16 +425,6 @@
         voixBtn.setAttribute('aria-pressed', 'true');
         voixBtn.title = 'Activation confirmée par le Worker ALIGN.';
         voixDerniere = Date.now();
-        const dialogue = dernierDialogueCoach;
-        if (dialogue && Date.now() - Number(dialogue.ts || 0) < 30000) {
-          jouerDialogueCoach(dialogue, true);
-        } else {
-          const dernier = dernierCommentaireIA;
-          if (dernier && dernier.market && dernier.market === codeMarche()) {
-            const dureeFR = dernier.fr ? parlerLive(dernier.fr, true) : 0;
-            if (dureeFR > 0 && dernier.en && dernier.en.anglaisTraduit) parlerLive(dernier.en, true);
-          }
-        }
       })) return;
     } else {
       voixWorkerConfirmee = false;
@@ -1450,11 +1440,6 @@
           voixBtn.textContent = '🔊 COACH VOCAL ON';
           voixBtn.setAttribute('aria-pressed', 'true');
           voixBtn.title = 'Activation confirmée par le Worker ALIGN.';
-        }
-        const dernier = dernierCommentaireIA;
-        if (dernier && dernier.market && dernier.market === codeMarche()) {
-          const dureeFR = dernier.fr ? parlerLive(dernier.fr, true) : 0;
-          if (dureeFR > 0 && dernier.en && dernier.en.anglaisTraduit) parlerLive(dernier.en, true);
         }
       });
     } else {
