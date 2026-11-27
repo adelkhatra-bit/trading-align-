@@ -135,6 +135,14 @@ class LiveDuetCommentators(unittest.TestCase):
 
 
 
+    def test_missing_browser_voice_does_not_leave_coach_priority_lock_stuck(self):
+        self.assertIn("if (item.source === 'coach') coachDialogueActive = true;", self.js)
+        self.assertIn("if (item.source === 'coach' && dureeFR <= 0) coachDialogueActive = false;", self.js)
+        self.assertIn("const duree = parlerLive(", self.js)
+        self.assertIn("if (duree <= 0) coachDialogueActive = false;", self.js)
+        self.assertIn("if (!['t', 'l'].includes(item.speaker)) { coachDialogueActive = false; return; }", self.js)
+        self.assertIn("if (!vivant || !voixActive || codeMarche() !== marcheDialogue) { coachDialogueActive = false; return; }", self.js)
+
     def test_coach_duet_contains_separate_french_and_english_lines(self):
         self.assertIn("var anglaisPremiere;", self.page)
         self.assertIn("var secondeEN =", self.page)
