@@ -254,6 +254,22 @@ class EvenementsPine(unittest.TestCase):
         self.assertIn("1 min", english)
         self.assertNotIn("UT favorables", english)
 
+    def test_grouped_alerts_keep_the_alignment_timeframe_breakdown(self):
+        ev = {"kind": "align_haut", "m": "BTC", "ic": "₿", "d": 1, "n": 8,
+              "tf_total": 12, "pine_confirmed": True,
+              "tf_lines": ["🟢 UT favorables au LONG (8/12) : 1 min, 3 min",
+                           "🔴 UT contraires (2) : 10 min, 30 min",
+                           "➖ UT neutres (1) : 45 min",
+                           "⏳ UT absentes ou périmées (1) : 1 semaine",
+                           "🎯 Plan DAY M15 confirmé : attendre la clôture M5 ; aucune entrée pour l'instant."]}
+        alignment = ab.texte_pine({}, ev)
+        grouped = "\\n".join(ab.regrouper_alertes([alignment, ["⚡ Compression relâchée", "Autre information"]]))
+        self.assertIn("LONG", grouped)
+        self.assertIn("8/12", grouped)
+        self.assertIn("UT contraires", grouped)
+        self.assertIn("attendre la clôture M5", grouped)
+        self.assertLessEqual(len(grouped.split("\\n")), 9)
+
     def test_unconfirmed_pine_plan_never_creates_long_or_short_alignment_alert(self):
         plan = {"available": True, "confirmed": False, "direction": 1}
         snapshots = {tf: {"fresh": True, "direction": 1} for tf, _ in ab.TELEGRAM_TF_VIEWS}
