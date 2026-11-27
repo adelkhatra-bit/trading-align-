@@ -56,6 +56,22 @@ if not tp1Ok
     tp2M := tp2
 """
         without_tp_change = self.source[:tp_start] + baseline_tp_state + self.source[tp_end:]
+        # Remove only the new closed-RSI tuple value from the reviewed bridge source before
+        # comparing the remaining Pine bytes to the original canonical baseline.
+        without_tp_change = without_tp_change.replace(
+            "ta.rsi(close, lenRsi), ta.rsi(close, lenRsi)[1], time_close[1]",
+            "ta.rsi(close, lenRsi), time_close[1]",
+            1,
+        )
+        for closed_rsi in (
+            "r1Fermee", "r2Fermee", "r5Fermee", "r10Fermee", "r15Fermee", "r30Fermee",
+            "r45Fermee", "r60Fermee", "r120Fermee", "r240Fermee", "rDFermee", "rWFermee",
+        ):
+            without_tp_change = without_tp_change.replace(", " + closed_rsi + ",", ",", 1)
+        closed_rsi_start = without_tp_change.index("rsisFermees = array.from(")
+        closed_rsi_end = without_tp_change.index('d1Fermee = request.security', closed_rsi_start)
+        without_tp_change = without_tp_change[:closed_rsi_start] + without_tp_change[closed_rsi_end:]
+        without_tp_change = without_tp_change.replace("[dC, sC, rC, _, _] = f_etat()", "[dC, sC, rC, _] = f_etat()", 1)
         without_tp_change = without_tp_change.replace(
             "[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time_close[1]]",
             "[d, sqz ? 1 : 0, ta.rsi(close, lenRsi)]",
