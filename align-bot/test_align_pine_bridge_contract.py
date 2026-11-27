@@ -176,7 +176,7 @@ o1h = d1hStrat == -dP"""
         if without_export.endswith("\n\n"):
             without_export = without_export[:-1]
         raw = without_export.encode("utf-8")
-        git_blob = hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\\0" + raw).hexdigest()
+        git_blob = hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
         self.assertEqual(git_blob, BASELINE_GIT_BLOB_SHA)
 
     def test_rsi_crossovers_are_evaluated_unconditionally_on_every_bar(self):
