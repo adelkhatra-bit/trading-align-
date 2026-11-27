@@ -11546,7 +11546,7 @@ def minutes_avant_fermeture_gold(ts=None):
     t = ts or time.time()
     return (horaires_gold(t)[0] - t) / 60
 
-CALENDRIER_MAX_AGE = 6 * 3600   # rafraîchi toutes les heures : au-delà de 6 h sans succès, il est « inconnu »
+CALENDRIER_MAX_AGE = 6 * 3600   # âge maximal sans succès ; la cadence de rafraîchissement est adaptative
 
 
 def calendrier_connu(etat, maintenant):
