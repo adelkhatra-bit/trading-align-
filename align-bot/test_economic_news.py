@@ -34,6 +34,12 @@ class EconomicNewsNormalizationTest(unittest.TestCase):
         self.assertEqual(event["importance"], "Low")
         self.assertEqual(event["official_source_name"], "U.S. Census Bureau")
 
+    def test_official_reference_is_selected_by_release_type(self):
+        claims = news.normaliser_evenement({"title": "Unemployment Claims", "country": "USD", "date": "2026-11-27T08:30:00-05:00", "impact": "Low"}, self.now)
+        payrolls = news.normaliser_evenement({"title": "Employment Situation", "country": "USD", "date": "2026-11-27T08:30:00-05:00", "impact": "High"}, self.now)
+        self.assertEqual(claims["official_source_name"], "U.S. Department of Labor — Weekly Unemployment Claims")
+        self.assertEqual(payrolls["official_source_name"], "U.S. Bureau of Labor Statistics — Employment Situation")
+
     def test_naive_event_time_is_rejected_instead_of_assuming_runner_timezone(self):
         event = news.normaliser_evenement({"title": "CPI", "country": "USD", "date": "2026-11-27T08:30:00", "impact": "High"}, self.now)
         self.assertIsNone(event)
@@ -71,7 +77,7 @@ class EconomicNewsNormalizationTest(unittest.TestCase):
     def test_actual_value_is_labelled_as_aggregator_data_not_official_data(self):
         event = news.normaliser_evenement({"title": "Core CPI m/m", "country": "USD", "date": "2026-11-27T08:30:00-05:00", "impact": "High", "actual": "0.2%", "forecast": "0.3%", "previous": "0.3%"}, self.now)
         report = news.facts_line(event)
-        self.assertIn("Valeur reçue du calendrier agrégé: 0.2%", report)
+        self.assertIn("Valeur reçue du calendrier agrégé (non vérifiée directement auprès de l’organisme): 0.2%", report)
         self.assertIn("Source de la valeur: Forex Factory", report)
         self.assertIn("U.S. Bureau of Labor Statistics", report)
 
