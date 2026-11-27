@@ -273,6 +273,36 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
             self.assertIn("aucun biais LONG/SHORT déduit", unavailable)
             self.assertNotIn("11/11", unavailable)
 
+    def test_pine_wait_status_uses_candidate_scores_without_authorizing_entry(self):
+        cases = (
+            ({"available": False, "signal": "WAIT", "long_score": 68, "short_score": 0},
+             "biais candidat LONG", "Score candidat LONG : 68/100"),
+            ({"available": False, "signal": "WAIT", "long_score": 0, "short_score": 74},
+             "biais candidat SHORT", "Score candidat SHORT : 74/100"),
+            ({"available": False, "signal": "WAIT", "long_score": 0, "short_score": 0},
+             "aucun biais LONG/SHORT confirmé", "aucune configuration M15"),
+        )
+        for plan, expected_title, expected_reason in cases:
+            title, reason = ab.statut_attente_pine(plan)
+            with self.subTest(plan=plan):
+                self.assertIn(expected_title, title)
+                self.assertIn(expected_reason, reason)
+                self.assertNotIn("Aucune entrée autorisée", reason) if "aucun biais" in title else self.assertIn("aucune entrée", reason.lower())
+
+    def test_pine_wait_status_distinguishes_incomplete_data_and_confirmed_direction(self):
+        title, reason = ab.statut_attente_pine({"available": False, "signal": "SHORT"})
+        self.assertIn("signal SHORT", title)
+        self.assertIn("Entrée bloquée", reason)
+
+        title, reason = ab.statut_attente_pine({"available": False, "reason": "snapshot M15 périmé"})
+        self.assertIn("données Pine v25 absentes ou périmées", title)
+        self.assertIn("snapshot M15 périmé", reason)
+
+        title, reason = ab.statut_attente_pine({"available": True, "confirmed": False, "direction": 1})
+        self.assertIn("CONFIRMATION MTF PINE EN ATTENTE", title)
+        self.assertIn("Configuration LONG M15 détectée", reason)
+        self.assertIn("Aucune entrée autorisée", reason)
+
     def test_position_followup_allows_levels_only_for_exact_active_position_owner(self):
         position = {"fini": False, "e": 100.0, "sl": 95.0}
         trade = {"qui": {"101": position}}
