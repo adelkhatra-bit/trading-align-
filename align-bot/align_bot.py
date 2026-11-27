@@ -5308,7 +5308,7 @@ def markup_cloture(m):
 
 
 def texte_position(m, r, cle, cid):
-    """Résumé opérationnel individuel : prix, stop réellement conseillé et objectifs."""
+    """Résumé opérationnel individuel : niveaux mémorisés et prix TradingView si bridge obligatoire."""
     tr = (cle or {}).get("trade")
     if not tr:
         return f"📍 Aucune position ALIGN ouverte sur {m}.\n🔔 J'attends le prochain signal confirmé."
@@ -5318,39 +5318,97 @@ def texte_position(m, r, cle, cid):
                 "Tu n'es pas encore enregistré sur cette position.\n"
                 "Utilise « Suivre cette position » si tu l'as prise.\n"
                 "Aucun résultat personnel ne sera compté avant ton inscription.")
-    prix = (r or {}).get("m1", [{}])[-1].get("c", tr["e"])
+    require_tv = bool((r or {}).get("require_tv_bridge"))
+    tv_price = prix_tradingview_actif(r) if require_tv else None
+    if require_tv:
+        prix = tv_price["price"] if tv_price else None
+        price_line = (f"📡 Prix TradingView {tv_price['timeframe']} : {px(prix)}" if tv_price else
+                      "📡 Prix TradingView : indisponible — évolution non calculée")
+    else:
+        prix = (r or {}).get("m1", [{}])[-1].get("c", tr["e"])
+        price_line = f"💹 Prix actuel : {px(prix)}"
     entree = pos.get("e", tr["e"]) if isinstance(pos, dict) else tr["e"]
     sl = (pos.get("sl_conseil") or pos.get("sl") or tr["sl"]) if isinstance(pos, dict) else tr["sl"]
     tp1 = (pos.get("tp1") or tr["tp1"]) if isinstance(pos, dict) else tr["tp1"]
     tp2 = tr["tp2"]
     sens = "🟩 LONG ⬆️" if tr["d"] == 1 else "🟥 SHORT ⬇️"
     protege = tr["d"] * (sl - entree) >= 0
-    gain_pct = tr["d"] * (prix - entree) / max(abs(entree), 1e-9) * 100
-    return "\n".join([
+    gain_pct = tr["d"] * (prix - entree) / max(abs(entree), 1e-9) * 100 if prix is not None else None
+    lignes = [
         f"📍 TA POSITION — {m}",
         "━━━━━━━━━━━━━━━━━━━━",
         sens,
-        f"💹 Prix actuel : {px(prix)}",
+        price_line,
         f"📌 Ton entrée : {px(entree)}",
         f"🛑 Ton SL actuel : {px(sl)}",
         f"💰 TP1 : {px(tp1)}",
         f"🏁 TP2 : {px(tp2)}",
-        f"📈 Évolution depuis ton entrée : {gain_pct:+.2f} %",
+    ]
+    if gain_pct is not None:
+        lignes.append(f"📈 Évolution depuis ton entrée : {gain_pct:+.2f} %")
+    elif require_tv:
+        lignes.append("⏳ Évolution indisponible : attendre un prix TradingView frais.")
+    lignes += [
         "━━━━━━━━━━━━━━━━━━━━",
         ("🔒 STOP À BE / GAIN PROTÉGÉ" if protege else "🛡 STOP DE PROTECTION À CONSERVER"),
         ("Le stop est au niveau ou au-delà de ton entrée dans le sens du trade." if protege else
          "Ne retire pas le stop et ne l'élargis pas."),
         "🎯 Le coach surveille les clôtures, le SL, le BE et les objectifs.",
         "ℹ️ ALIGN ne passe aucun ordre sur ton broker : toute modification se fait sur ta plateforme."
-    ])
-
-
-UT_VISION = (("1m", 0), ("3m", 1), ("5m", 2), ("15m", 4), ("1h", 7), ("4h", 9), ("D", 10))
-
+    ]
+    return "\n".join(lignes)
 def texte_vision(m, r, cle, anglais=False):
-    """Pas encore de plan confirmé : le bot donne quand même SA VISION (sens probable, UT alignées, zone, ce qu'il attend),
-    à partir des vraies données du dernier cycle. Jamais « aucune vision » quand les unités de temps sont calculées."""
+    """Vue de niveaux ; en bridge obligatoire, seuls les niveaux Pine v25 confirmés sont autorisés."""
     r = r or {}
+    if r.get("require_tv_bridge"):
+        plan = plan_indicateur(r)
+        tv_price = prix_tradingview_actif(r)
+        title = f"📊 {'ALIGN VISION' if anglais else 'VISION ALIGN'} — {ICONE.get(m, '')} {m}"
+        if not plan.get("available"):
+            reason = plan.get("reason") or (r.get("tv_indicator_mtf") or {}).get("reason") or "TradingView snapshot unavailable"
+            if anglais:
+                return "\n".join([title, "⏳ SOURCE DIVERGENCE — WAIT", f"Pine v25 plan unavailable: {reason}",
+                                   "No local direction or Entry/SL/TP levels are substituted."])
+            return "\n".join([title, "⏳ DIVERGENCE DES SOURCES — ATTENTE", f"Plan Pine v25 indisponible : {reason}",
+                               "Aucune direction locale ni aucun niveau Entry/SL/TP ne remplace Pine."])
+        if plan.get("confirmed") is not True:
+            if anglais:
+                return "\n".join([title, "⏳ PINE MTF CONFIRMATION PENDING",
+                                   "The M15 Pine setup is not MTF-confirmed. No Entry/SL/TP levels are shown."])
+            return "\n".join([title, "⏳ CONFIRMATION MTF PINE EN ATTENTE",
+                               "La configuration M15 n'est pas confirmée MTF. Aucun niveau Entry/SL/TP n'est affiché."])
+        direction = "LONG ⬆️" if plan["direction"] == 1 else "SHORT ⬇️"
+        lines = [title, "📡 Source: TradingView · Pine v25" if anglais else "📡 Source : TradingView · Pine v25",
+                 f"🧭 Direction: {direction}" if anglais else f"🧭 Direction : {direction}",
+                 "Plan timeframe: M15" if anglais else "Unité du plan : M15",
+                 (f"Validation timeframe: {plan['entry_timeframe']} ({plan['strategy']})" if anglais else
+                  f"Unité de validation : {plan['entry_timeframe']} ({plan['strategy']})"),
+                 f"Entry: {px(plan['entry'])} • SL: {px(plan['sl'])} • TP1: {px(plan['tp1'])}" if anglais else
+                  f"Entrée : {px(plan['entry'])} • SL : {px(plan['sl'])} • TP1 : {px(plan['tp1'])}",
+                 (f"TP2: {px(plan['tp2'])}" if anglais else f"TP2 : {px(plan['tp2'])}")
+                 if plan.get("tp2") is not None else ("TP2: not supplied by bridge" if anglais else "TP2 : non fourni par le bridge"),
+                 (f"Entry zone: {px(plan['zone_low'])} → {px(plan['zone_high'])} • Decision: {px(plan['decision'])}" if anglais else
+                  f"Zone d'entrée : {px(plan['zone_low'])} → {px(plan['zone_high'])} • Décision : {px(plan['decision'])}"),
+                 "Pine MTF close: CONFIRMED" if anglais else "Clôture MTF Pine : CONFIRMÉE",
+                 ("Closed-candle trigger: VALIDATED" if plan.get("triggered") else "Closed-candle trigger: WAITING") if anglais else
+                 ("Déclencheur clôturé : VALIDÉ" if plan.get("triggered") else "Déclencheur clôturé : EN ATTENTE")]
+        if tv_price:
+            age = tv_price.get("ageMs")
+            age_text = f" · updated {max(0, int(float(age) / 1000))} s" if anglais and isinstance(age, (int, float)) else (
+                f" · actualisé il y a {max(0, int(float(age) / 1000))} s" if isinstance(age, (int, float)) else "")
+            lines.append((f"📡 TradingView price {tv_price['timeframe']}: {px(tv_price['price'])}{age_text}" if anglais else
+                          f"📡 Prix TradingView {tv_price['timeframe']} : {px(tv_price['price'])}{age_text}"))
+        if plan.get("triggered") and not plan.get("price_in_zone"):
+            lines.append("Wait for TradingView price to return to the M15 zone. No market entry." if anglais else
+                         "Attendre le retour du prix TradingView dans la zone M15. Aucune entrée au marché.")
+        elif plan.get("triggered") and plan.get("price_in_zone"):
+            lines.append("Pine trigger and price zone validated; final ALIGN safety filters still apply." if anglais else
+                         "Déclencheur Pine et zone de prix validés ; les filtres de sécurité ALIGN restent applicables.")
+        else:
+            lines.append("A confirmed plan is not yet an entry: wait for the validation close." if anglais else
+                         "Un plan confirmé n'est pas encore une entrée : attendre la clôture de validation.")
+        return "\n".join(lines)
+
     dirs = r.get("dirs") or []
     if len(dirs) < 11:
         return ("📊 ALIGN VISION\n⏳ Data still loading, try again in a minute." if anglais
@@ -5370,8 +5428,8 @@ def texte_vision(m, r, cle, anglais=False):
         dedans = bas <= h["prix"] <= haut
         dist = 0 if dedans else min(abs(h["prix"] - bas), abs(h["prix"] - haut))
         lignes.append((f"📍 Entry zone: {px(bas)} → {px(haut)} " if anglais else f"📍 Zone d'entrée : {px(bas)} → {px(haut)} ")
-                      + (("(price in the zone)" if anglais else "(prix dans la zone)") if dedans
-                         else (f"(price {px(dist)} away)" if anglais else f"(prix à {px(dist)})")))
+                      + (("price in the zone" if anglais else "prix dans la zone") if dedans
+                         else (f"price {px(dist)} away" if anglais else f"prix à {px(dist)}")))
     try:
         lignes.append("⏳ " + raison_attente(r, cle))
     except Exception:
@@ -5379,7 +5437,6 @@ def texte_vision(m, r, cle, anglais=False):
     lignes.append("🔔 No confirmed entry yet: I'll alert you at the confirmation close" if anglais
                   else "🔔 Pas encore d'entrée confirmée : je te préviens à la clôture de confirmation")
     return "\n".join(lignes)
-
 def texte_timeframes(m, r, anglais=False):
     """Résumé des 12 snapshots Pine v25 ; aucune substitution par les lectures locales."""
     bridge = (r or {}).get("tv_indicator_mtf") or {}
@@ -5509,7 +5566,35 @@ def texte_unite_timeframe(m, tf, r, anglais=False):
     ])
 
 def texte_pourquoi(m, r, cle):
-    """Explication courte de la décision, sans transformer le biais en signal d'entrée."""
+    """Explication courte : Pine v25 est l'autorité en bridge obligatoire."""
+    if r.get("require_tv_bridge") and not (cle or {}).get("trade"):
+        plan = plan_indicateur(r)
+        if not plan.get("available"):
+            reason = plan.get("reason") or (r.get("tv_indicator_mtf") or {}).get("reason") or "Plan Pine v25 indisponible"
+            return "\n".join([f"❓ POURQUOI ALIGN ? — {m}", "━━━━━━━━━━━━━━━━━━━━",
+                              "⏳ DIVERGENCE DES SOURCES — ATTENTE",
+                              f"Motif : {reason}",
+                              "Les lectures locales ne remplacent pas le plan TradingView canonique.",
+                              "➡️ ACTION : attendre un snapshot Pine v25 frais. Aucun Entry/SL/TP local n'est publié.",
+                              "ℹ️ Aucun ordre n'est envoyé au broker."])
+        if plan.get("confirmed") is not True:
+            return "\n".join([f"❓ POURQUOI ALIGN ? — {m}", "━━━━━━━━━━━━━━━━━━━━",
+                              "⏳ CONFIRMATION MTF PINE EN ATTENTE",
+                              "Les clôtures requises ne sont pas toutes confirmées par Pine v25.",
+                              "Aucun sens de trade ni niveau Entry/SL/TP n'est autorisé.",
+                              "➡️ ACTION : attendre la confirmation MTF TradingView.",
+                              "ℹ️ Aucun ordre n'est envoyé au broker."])
+        decision = ("Déclencheur Pine confirmé et prix TradingView dans la zone ; filtres de sécurité ALIGN encore applicables."
+                    if plan.get("triggered") and plan.get("price_in_zone") else
+                    "Déclencheur Pine confirmé, mais attendre le retour dans la zone M15."
+                    if plan.get("triggered") else
+                    "Plan Pine confirmé ; attendre la clôture de l'unité de validation.")
+        return "\n".join([f"❓ POURQUOI ALIGN ? — {m}", "━━━━━━━━━━━━━━━━━━━━",
+                          f"Direction Pine : {'LONG' if plan['direction'] == 1 else 'SHORT'}",
+                          f"Plan M15 confirmé • validation {plan['entry_timeframe']} ({plan['strategy']})",
+                          decision,
+                          "Les niveaux proviennent uniquement de Pine v25 / ROBOT V12.",
+                          "ℹ️ Aucun ordre n'est envoyé au broker."])
     titre, raison = verdict(r, cle)
     maj, n_ok = alignement(r)
     direction = "LONG ⬆️" if maj == 1 else "SHORT ⬇️" if maj == -1 else direction_attente(r)
@@ -5538,7 +5623,6 @@ def texte_pourquoi(m, r, cle):
         "Attendre une nouvelle validation explicite d'ALIGN. Le biais LONG/SHORT n'est pas, à lui seul, un ordre d'entrée.",
         "ℹ️ Aucun ordre n'est envoyé au broker."
     ])
-
 def news_courte(news):
     """Une seule ligne d'actualité dans la carte : la prochaine annonce, ou rien d'important d'ici 4 h."""
     lignes = [re.sub(r"^[^\wÀ-ÿ]+", "", x).strip() for x in str(news).split("\n") if x.strip()]
@@ -5921,80 +6005,139 @@ def zone_retournement_visee(r, cle):
     return l
 
 def texte_apercu(m, r, cle, vip=True):
-    """Carte d'abordage : autorisation d'entrée en premier, détails derrière les boutons."""
+    """Carte d'abordage : décision Pine v25 en bridge obligatoire, contexte local explicitement séparé."""
     cle = cle or {}
-    maj, n_ok = alignement(r)
-    titre, raison = verdict(r, cle)
-    prix = r["m1"][-1]["c"]
+    require_tv = bool(r.get("require_tv_bridge"))
     tr = cle.get("trade")
-    if tr:
-        decision = "📍 POSITION EN COURS"
-        direction = "LONG ⬆️" if tr["d"] == 1 else "SHORT ⬇️"
-    elif titre.startswith("🟢 TU PEUX ENTRER"):
-        decision = "🟢 ENTRÉE AUTORISÉE"
-        direction = "LONG ⬆️" if maj == 1 else "SHORT ⬇️" if maj == -1 else "À confirmer"
-    elif titre.startswith("⛔ TROP TARD"):
-        decision = "⛔ NE PAS ENTRER — TROP TARD"
-        direction = "LONG ⬆️" if maj == 1 else "SHORT ⬇️" if maj == -1 else "Non confirmée"
-    elif titre.startswith("🟡 PATIENCE"):
-        decision = "🟡 ATTENDRE — PAS D'ENTRÉE"
-        direction = "LONG ⬆️" if maj == 1 else "SHORT ⬇️" if maj == -1 else "Non confirmée"
+    maj, n_ok = alignement(r)
+    tv_price = prix_tradingview_actif(r) if require_tv else None
+    tv_plan = plan_indicateur(r) if require_tv and not tr else None
+    plan_confirme = bool(tv_plan and tv_plan.get("available") is True and tv_plan.get("confirmed") is True)
+
+    if require_tv and not tr:
+        if not tv_plan or tv_plan.get("available") is not True:
+            decision = "⏳ DIVERGENCE DES SOURCES — ATTENTE"
+            direction = "Non confirmée par TradingView"
+            raison = (tv_plan or {}).get("reason") or (r.get("tv_indicator_mtf") or {}).get("reason") or "Plan Pine v25 indisponible"
+            sens = 0
+            type_ = ""
+        elif not plan_confirme:
+            decision = "⏳ CONFIRMATION MTF PINE EN ATTENTE"
+            direction = "Non confirmée par Pine"
+            raison = "Les clôtures MTF Pine ne sont pas toutes confirmées. Aucun sens ni niveau de trade n'est publié."
+            sens = 0
+            type_ = ""
+        else:
+            sens = int(tv_plan["direction"])
+            direction = "LONG ⬆️" if sens == 1 else "SHORT ⬇️"
+            type_ = tv_plan.get("strategy") or ""
+            if tv_plan.get("triggered") and tv_plan.get("price_in_zone"):
+                decision = "🟡 DÉCLENCHEUR PINE VALIDÉ — CONTRÔLES ALIGN EN ATTENTE"
+                raison = "Déclencheur clôturé et prix dans la zone. Les filtres de risque, news et sécurité restent applicables."
+            elif tv_plan.get("triggered"):
+                decision = "🟡 DÉCLENCHEUR PINE VALIDÉ — RETOUR EN ZONE ATTENDU"
+                raison = "Le prix TradingView est hors de la zone d'entrée M15. Aucune entrée au marché."
+            else:
+                decision = "🟡 PLAN PINE CONFIRMÉ — DÉCLENCHEUR EN ATTENTE"
+                raison = "Le plan M15 est confirmé, mais la clôture de l'unité de validation n'a pas encore déclenché l'entrée."
     else:
-        decision = "⛔ NE PAS ENTRER"
-        direction = "LONG ⬆️" if maj == 1 else "SHORT ⬇️" if maj == -1 else direction_attente(r)
+        titre, raison = verdict(r, cle)
+        if tr:
+            decision = "📍 POSITION EN COURS"
+            direction = "LONG ⬆️" if tr["d"] == 1 else "SHORT ⬇️"
+        elif titre.startswith("🟢 TU PEUX ENTRER"):
+            decision = "🟢 ENTRÉE AUTORISÉE"
+            direction = "LONG ⬆️" if maj == 1 else "SHORT ⬇️" if maj == -1 else "À confirmer"
+        elif titre.startswith("⛔ TROP TARD"):
+            decision = "⛔ NE PAS ENTRER — TROP TARD"
+            direction = "LONG ⬆️" if maj == 1 else "SHORT ⬇️" if maj == -1 else "Non confirmée"
+        elif titre.startswith("🟡 PATIENCE"):
+            decision = "🟡 ATTENDRE — PAS D'ENTRÉE"
+            direction = "LONG ⬆️" if maj == 1 else "SHORT ⬇️" if maj == -1 else "Non confirmée"
+        else:
+            decision = "⛔ NE PAS ENTRER"
+            direction = "LONG ⬆️" if maj == 1 else "SHORT ⬇️" if maj == -1 else direction_attente(r)
+        sens = (tr or {}).get("d") or maj or 0
+        prof = profil_strategie(r) if r.get("dirs") and len(r.get("dirs")) >= 11 else {}
+        type_ = prof.get("mode") or ""
 
     if r.get("ferme_txt"):
         decision = "🔒 MARCHÉ FERMÉ — rien ne bouge 😴"
-    prof = profil_strategie(r) if r.get("dirs") and len(r.get("dirs")) >= 11 else {}
-    # Même sens que la décision : pas de cible tant que la 4 h + 1 h ne donnent pas de direction.
-    sens = (tr or {}).get("d") or maj or 0
-    if r.get("tv_bridge_conflict") and not tr:
-        sens = 0
-    type_ = prof.get("mode") or ""
-    if r.get("tv_bridge_conflict"):
-        direction = "Non confirmée par TradingView"
-    lignes = [
-        f"{ICONE.get(m, '📊')} {m} — {px(prix)}",
-        f"🚦 {decision}",
-        f"🧭 Biais de fond à surveiller : {direction}" + (f" ({type_})" if type_ and not direction.startswith(('AUCUNE', 'Non confirmée', 'À confirmer')) else ""),
-        mouvement_recent_m1(r),
-        (f"⏰ Réouverture : {r['ferme_txt']} (heure de Paris)" + (" • ta position est en pause, je la reprends à la réouverture" if tr else ""))
-        if r.get("ferme_txt") else "⚠️ Le biais n'est pas une autorisation d'entrée." if not tr else "📍 Position ouverte : suis les alertes du coach.",
-        "",
-    ] + voyants_unites(r) + [""]
-    # Position ouverte : les niveaux du trade font foi (pas de cible différente du TP).
-    obj = ([f"🟨 Entrée : {px(tr['e'])} (étiquette ENTRÉE)",
-            (f"🔒 SL protégé : {px(tr['sl'])} (plus de perte possible)" if tr.get("d") and tr["d"] * (tr["e"] - tr["sl"]) <= 0
-             else f"🛑 SL : {px(tr['sl'])} (ligne rouge)"),
-            f"🎯 TP1 : {px(tr['tp1'])} (ligne bleue)"]
-           + ([f"🏁 TP2 : {px(tr['tp2'])}"] if tr.get("tp2") else [])) if tr else objectifs_marche(r, sens)
+
+    lignes = [f"{ICONE.get(m, '📊')} {m}"]
+    if require_tv:
+        if tv_price:
+            age_ms = tv_price.get("ageMs")
+            age_txt = (f" · actualisé il y a {max(0, int(float(age_ms) / 1000))} s"
+                       if isinstance(age_ms, (int, float)) and math.isfinite(float(age_ms)) else "")
+            lignes.append(f"📡 Prix TradingView {tv_price['timeframe']} : {px(tv_price['price'])}{age_txt}")
+        else:
+            lignes.append("📡 Prix TradingView : indisponible — ATTENTE")
+        if r.get("m1"):
+            lignes.append(f"💹 Prix local M1 (contexte uniquement) : {px(r['m1'][-1]['c'])}")
+        if not tr:
+            lignes.append(f"🚦 {decision}")
+            lignes.append(f"🧭 Direction Pine à surveiller : {direction}" + (f" ({type_})" if type_ else ""))
+        else:
+            lignes.append(f"🚦 {decision}")
+            lignes.append(f"🧭 Position mémorisée : {direction}")
+        lignes.append(mouvement_recent_m1(r) + " • flux local ALIGN")
+        lignes.append("📊 LECTURES LOCALES ALIGN (CONTEXTE NON DÉCISIONNEL)")
+        lignes += voyants_unites(r)
+    else:
+        prix = r["m1"][-1]["c"]
+        lignes += [f"— {px(prix)}", f"🚦 {decision}",
+                   f"🧭 Biais de fond à surveiller : {direction}" +
+                   (f" ({type_})" if type_ and not direction.startswith(("AUCUNE", "Non confirmée", "À confirmer")) else ""),
+                   mouvement_recent_m1(r)]
+        if r.get("tv_bridge_conflict"):
+            lignes[-2] = "🧭 Biais de fond à surveiller : Non confirmée par TradingView"
+        lignes += voyants_unites(r)
+
+    lignes.append(
+        (f"⏰ Réouverture : {r['ferme_txt']} (heure de Paris)" +
+         (" • ta position est en pause, je la reprends à la réouverture" if tr else ""))
+        if r.get("ferme_txt") else
+        "📍 Position ouverte : suis les alertes du coach." if tr else
+        "⚠️ Le biais n'est pas une autorisation d'entrée."
+    )
+
+    if tr:
+        obj = ([f"🟨 Entrée : {px(tr['e'])} (étiquette ENTRÉE)",
+                (f"🔒 SL protégé : {px(tr['sl'])} (plus de perte possible)" if tr.get("d") and tr["d"] * (tr["e"] - tr["sl"]) <= 0
+                 else f"🛑 SL : {px(tr['sl'])} (ligne rouge)"),
+                f"🎯 TP1 : {px(tr['tp1'])} (ligne bleue)"] +
+               ([f"🏁 TP2 : {px(tr['tp2'])}"] if tr.get("tp2") else []))
+    elif require_tv:
+        obj = []
+    else:
+        obj = objectifs_marche(r, sens)
     if obj:
         lignes += obj + [""]
+
     if not tr:
         lignes.append(f"❓ Pourquoi : {court(raison or 'Aucune entrée autorisée pour le moment.', 150)}")
-    lignes += [
-        "➡️ À faire : " + ("gérer la position ouverte et suivre les alertes de sortie." if tr else
-                         "Attendre un nouveau message explicite « ENTRÉE AUTORISÉE »."),
-    ]
-    if not tr:
-        lignes += zone_retournement_visee(r, cle)
-    jour_ = news_du_jour(DERNIER_ETAT) if (DERNIER_ETAT and vip) else []      # news : VIP uniquement (règle gratuit/VIP)
+    if require_tv and not tr:
+        lignes.append("➡️ À faire : attendre un déclencheur clôturé Pine v25 et la validation explicite du coach.")
+        if plan_confirme:
+            lignes.append(f"📍 Zone d'entrée Pine M15 : {px(tv_plan['zone_low'])} → {px(tv_plan['zone_high'])}")
+            lignes.append("⏳ " + ("Déclencheur clôturé validé." if tv_plan.get("triggered") else "Attendre la clôture de validation Pine."))
+        else:
+            lignes.append("⏳ Aucun point d'entrée n'est affiché avant confirmation MTF Pine.")
+    else:
+        lignes.append("➡️ À faire : " + ("gérer la position ouverte et suivre les alertes de sortie." if tr else
+                                         "Attendre un nouveau message explicite « ENTRÉE AUTORISÉE »."))
+        if not tr:
+            lignes += zone_retournement_visee(r, cle)
+
+    jour_ = news_du_jour(DERNIER_ETAT) if (DERNIER_ETAT and vip) else []
     if jour_:
         lignes += [""] + jour_
     elif r.get("news") and vip:
         lignes += [news_courte(r["news"])]
-    lignes += ["", "👇 Détails : boutons ci-dessous", "ℹ️ Cette carte ne passe aucun ordre. Le module broker est séparé et dépend de ses réglages ADMIN / TEST / RÉEL."]
+    lignes += ["", "👇 Détails : boutons ci-dessous",
+               "ℹ️ Cette carte ne passe aucun ordre. Le module broker est séparé et dépend de ses réglages ADMIN / TEST / RÉEL."]
     return "\n".join(lignes)
-
-DERNIERS = {}               # dernière analyse de chaque marché (pour le chrono)
-DERNIER_ETAT = {}           # état courant (calendrier des news) lu par les cartes d'analyse
-CHRONO_MAX = 4 * 3600        # délai max d'attente d'une position réservée
-SL_RISQUE_MIN_ATR = 1.4      # stop jamais plus serré que 1,4 ATR 15 min (évite les SL pris par une simple mèche)
-SL_RISQUE_MIN_PCT = 0.0012   # ni plus serré que 0,12 % du prix
-CHRONO_REFRESH_SEC = 30      # 1 édition / 30 s par chrono : au-delà, Telegram bloque le chat pendant des heures (429)
-JAUGE_REFRESH_SEC = 60       # la jauge de prix n'est rééditée qu'une fois par minute au maximum
-CHRONO_LOCK = threading.RLock()  # un seul éditeur Telegram par chronomètre, même pendant l'analyse réseau
-
 def prochaine_cloture(ts, interval_sec=300):
     """Retourne la prochaine clôture strictement future (horodatage UTC)."""
     if interval_sec < 1:
