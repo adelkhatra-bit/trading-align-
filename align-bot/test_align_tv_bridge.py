@@ -71,6 +71,11 @@ def valid_payload(now_ms=BASE_MS, symbol="BTCUSD", timeframe="M1"):
         "entryBarHigh": 101.0,
         "entryBarLow": 99.0,
         "entryBarClose": 100.5,
+        "activeEntryBarTime": now_ms,
+        "activeEntryBarOpen": 100.5,
+        "activeEntryBarHigh": 102.0,
+        "activeEntryBarLow": 100.0,
+        "activeEntryBarClose": 101.0,
         "anticipation": "AUCUNE",
         "zone_proche": "FVG",
         "volume": "OK",
@@ -122,7 +127,10 @@ class BridgeStoreTests(unittest.TestCase):
                     msg=f"{variable} must be returned by its matching request.security() tuple",
                 )
         self.assertIn('[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]', pine)
-        self.assertNotIn('lookahead=barmerge.lookahead_off)', pine)
+        # MTF direction snapshots keep their established closed-bar semantics;
+        # lookahead_off is reserved for the current trigger candle OHLC.
+        self.assertNotIn('lookahead=barmerge.lookahead_off)', pine.split("bridgeEntryTf =", 1)[0])
+        self.assertIn("request.security(syminfo.tickerid, bridgeEntryTf, [open, high, low, close, time], lookahead=barmerge.lookahead_off)", pine)
 
     def test_accepts_snapshot_and_exposes_workflow_contract(self):
         status, result = self.store.ingest(valid_payload(), INGEST, BASE_MS)
