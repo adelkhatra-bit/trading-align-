@@ -192,34 +192,42 @@ o1h = d1hStrat == -dP"""
         self.assertIn(">= 20000", self.source)
         request_calls = self.source.count("request.security(") + self.source.count("request.security_lower_tf(")
         self.assertLessEqual(request_calls, 40)
-        for variable, tuple_head in (
-            ("bridgeTimeM1", "d1, s1, r1"),
-            ("bridgeTimeM3", "d2, s2, r2"),
-            ("bridgeTimeM5", "d5, s5, r5"),
-            ("bridgeTimeM10", "d10, s10, r10"),
-            ("bridgeTimeM15", "d15, s15, r15"),
-            ("bridgeTimeM30", "d30, s30, r30"),
-            ("bridgeTimeM45", "d45, s45, r45"),
-            ("bridgeTimeH1", "d60, s60, r60"),
-            ("bridgeTimeH2", "d120, s120, r120"),
-            ("bridgeTimeH4", "d240, s240, r240"),
-            ("bridgeTimeD1", "dD, sD, rD"),
-            ("bridgeTimeW1", "dW, sW, rW"),
+        # Each timeframe fetch remains one shared security request. The tuple
+        # now contains live RSI, the previous closed RSI, and its close timestamp.
+        for timeframe, live, closed, stamp in (
+            ("1", "r1", "r1Fermee", "bridgeTimeM1"),
+            ("3", "r2", "r2Fermee", "bridgeTimeM3"),
+            ("5", "r5", "r5Fermee", "bridgeTimeM5"),
+            ("10", "r10", "r10Fermee", "bridgeTimeM10"),
+            ("15", "r15", "r15Fermee", "bridgeTimeM15"),
+            ("30", "r30", "r30Fermee", "bridgeTimeM30"),
+            ("45", "r45", "r45Fermee", "bridgeTimeM45"),
+            ("60", "r60", "r60Fermee", "bridgeTimeH1"),
+            ("120", "r120", "r120Fermee", "bridgeTimeH2"),
+            ("240", "r240", "r240Fermee", "bridgeTimeH4"),
+            ("D", "rD", "rDFermee", "bridgeTimeD1"),
+            ("W", "rW", "rWFermee", "bridgeTimeW1"),
         ):
-            self.assertIn(f"[{tuple_head}, {variable}]", self.source)
-            self.assertNotIn(f"{variable} = request.security(", self.source)
+            self.assertIn(f"{live}, {closed}, {stamp}", self.source)
+            self.assertIn(f'request.security(syminfo.tickerid, "{timeframe}"', self.source)
+            self.assertNotIn(f"{stamp} = request.security(", self.source)
         self.assertIn('bridgeTfSeconds == 180 ? "M3"', self.source)
         self.assertIn('bridgeTfSeconds == 600 ? "M10"', self.source)
         self.assertIn('bridgeTfSeconds == 2700 ? "M45"', self.source)
         export_block = self.source.split(EXPORT_MARKER, 1)[1]
-        expected_m3 = '''"M3":{"direction":' + f_align_v25_json_int(nz(d3Fermee)) + ',"rsi":' + f_align_v25_json_num(r2)'''
-        wrong_m3 = '''"M3":{"direction":' + f_align_v25_json_int(d2) + ',"rsi":' + f_align_v25_json_num(r2)'''
-        self.assertIn(expected_m3, export_block)
-        self.assertNotIn(wrong_m3, export_block)
+        for closed in (
+            "r1Fermee", "r2Fermee", "r5Fermee", "r10Fermee",
+            "r15Fermee", "r30Fermee", "r45Fermee", "r60Fermee",
+            "r120Fermee", "r240Fermee", "rDFermee", "rWFermee",
+        ):
+            self.assertIn("f_align_v25_json_num(" + closed + ")", export_block)
+        for current in ("r1", "r2", "r5", "r10", "r15", "r30", "r45", "r60", "r120", "r240", "rD", "rW"):
+            self.assertNotIn("f_align_v25_json_num(" + current + ")", export_block)
         for missing_value_fallback in ("f_align_v25_json_num(nz(r1, 50))", "f_align_v25_json_num(nz(r5, 50))", "f_align_v25_json_num(nz(r15, 50))", "f_align_v25_json_num(nz(r60, 50))", "str.tostring(nz(d1))"):
             self.assertNotIn(missing_value_fallback, export_block)
         self.assertIn('na(v) ? "null" : str.tostring(v)', export_block)
         self.assertIn('na(v) ? "null" : v == 1', export_block)
+        self.assertIn('"M3":{"direction":' + " + f_align_v25_json_int(nz(d3Fermee))", export_block)
 
     def test_bridge_bar_timestamps_match_the_closed_mtf_candle(self):
         # The exported direction is based on the previous, fully closed candle.
