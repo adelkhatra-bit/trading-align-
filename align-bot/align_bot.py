@@ -12885,7 +12885,7 @@ def meche_suspecte(out, m, r, cle):
         return
     cle["pre_manip"] = {"t15": debut, "d": dm}
     out.append(f"⚠️ MÈCHE SUSPECTE EN COURS — {ICONE.get(m, '')} {m}\n"
-               f"🕯 Type : mèche {'basse sous le dernier plus bas' if dm == 1 else 'haute au-dessus du dernier plus haut'} en formation ≈ {px(niv)}\n"
+               f"🕯 Type : mèche {'basse en formation sous le dernier plus bas' if dm == 1 else 'haute en formation au-dessus du dernier plus haut'} ≈ {px(niv)}\n"
                f"🔎 Balayage de liquidité POSSIBLE : le prix réintègre le niveau, mais la clôture n'a pas confirmé le rejet\n"
                f"🙅 N'entre pas maintenant\n⏳ Attendre la CLÔTURE M15 ({heure(debut + 900)}) avant de qualifier la manipulation")
 
