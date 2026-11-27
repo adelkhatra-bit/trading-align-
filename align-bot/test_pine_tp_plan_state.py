@@ -33,6 +33,12 @@ class PineTpPlanStateTests(unittest.TestCase):
         self.assertIn("CONTEXTE MTF v24 — plan Entry / SL / TP sur v25", self.source_v24)
         self.assertNotIn('E " + px(ent) + "  TP " + px(tp1) + "  SL " + px(sl)', self.source_v24)
 
+    def test_entry_sl_tp_visuals_are_hidden_until_the_plan_is_confirmed(self):
+        self.assertIn("planConfirmedUi = dirPlan != 0 and strat != \"\" and dirPlan == dirFig", self.source)
+        self.assertIn("if voirPlan and planConfirmedUi", self.source)
+        self.assertNotIn("if voirPlan and dirPlan != 0", self.source)
+        self.assertIn("voirTP2 and tp1Ok and voirPlan and planConfirmedUi", self.source)
+
     def test_visual_confirmation_line_and_label_are_preserved_without_entry_marker(self):
         self.assertIn("lConf := line.new(bar_index, ent, bar_index + 30, ent", self.source)
         self.assertIn('eConf := label.new(bar_index + 30, ent, "✅ CONFIRMATION"', self.source)
