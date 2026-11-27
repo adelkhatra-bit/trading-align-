@@ -168,6 +168,11 @@ o1h = d1hStrat == -dP"""
     def test_only_btc_and_gold_are_supported_for_signals_and_bridge(self):
         self.assertNotIn('input.string("BTCUSD", "Marché ALIGN"', self.source)
         self.assertIn('bridgeMarket = isBtc ? "BTCUSD" : isGold ? "XAUUSD" : "UNSUPPORTED"', self.source)
+        self.assertIn("rsisFermees = array.from(", self.source)
+        self.assertIn("rsiOBFermee += rsiValeurFermee >= 70 ? 1 : 0", self.source)
+        self.assertIn("rsiOSFermee += rsiValeurFermee <= 30 ? 1 : 0", self.source)
+        self.assertIn('rsiOBFermee >= 3 ? "SURACHAT"', self.source)
+        self.assertIn('rsiOSFermee >= 3 ? "SURVENTE"', self.source)
         export_block = self.source.split(EXPORT_MARKER, 1)[1]
         self.assertIn('bridgeMarket +', export_block)
         self.assertNotIn("NAS100", self.source)
