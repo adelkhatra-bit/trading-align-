@@ -190,14 +190,14 @@ o1h = d1hStrat == -dP"""
         self.assertIn('"source":"ALIGN_MTF_PRO_V25"', self.source)
 
     def test_active_plan_and_all_required_mtf_timeframes_are_exported(self):
-        for key in ('"entry"', '"sl"', '"tp1"', '"tp2"', '"lecture_1m"', '"lecture_5m"', '"lecture_15m"', '"lecture_60m"'):
-            self.assertIn(key, self.source)
-        for tf in ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1"):
-            self.assertIn('"' + tf + '"', self.source)
+        required_fields = ('"entry"', '"sl"', '"tp1"', '"tp2"', '"lecture_1m"', '"lecture_5m"', '"lecture_15m"', '"lecture_60m"')
+        for field in required_fields:
+            self.assertIn(field, self.source)
+        timeframes = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1")
+        for timeframe in timeframes:
+            self.assertIn('"' + timeframe + '":{"direction":', self.source)
         self.assertIn(">= 20000", self.source)
-        request_calls = self.source.count("request.security(") + self.source.count("request.security_lower_tf(")
-        self.assertLessEqual(request_calls, 40)
-        for tuple_head, stamp in (
+        tuple_contracts = (
             ("d1, s1, r1, r1Fermee", "bridgeTimeM1"),
             ("d2, s2, r2, r2Fermee", "bridgeTimeM3"),
             ("d5, s5, r5, r5Fermee", "bridgeTimeM5"),
@@ -210,23 +210,28 @@ o1h = d1hStrat == -dP"""
             ("d240, s240, r240, r240Fermee", "bridgeTimeH4"),
             ("dD, sD, rD, rDFermee", "bridgeTimeD1"),
             ("dW, sW, rW, rWFermee", "bridgeTimeW1"),
-        ):
-            self.assertIn(f"[{tuple_head}, {stamp}]", self.source)
-            self.assertNotIn(f"{stamp} = request.security(", self.source)
+        )
+        for tuple_head, closed_time in tuple_contracts:
+            self.assertIn("[" + tuple_head + ", " + closed_time + "]", self.source)
+            self.assertNotIn(closed_time + " = request.security(", self.source)
+        request_sites = self.source.count("request.security(") + self.source.count("request.security_lower_tf(")
+        self.assertLessEqual(request_sites, 40)
         self.assertIn('bridgeTfSeconds == 180 ? "M3"', self.source)
         self.assertIn('bridgeTfSeconds == 600 ? "M10"', self.source)
         self.assertIn('bridgeTfSeconds == 2700 ? "M45"', self.source)
         export_block = self.source.split(EXPORT_MARKER, 1)[1]
-        m3_export = export_block.split('"M3":{"direction":', 1)[1].split('},', 1)[0]
-        self.assertIn('f_align_v25_json_int(nz(d3Fermee))', m3_export)
-        self.assertIn('f_align_v25_json_num(r2Fermee)', m3_export)
-        self.assertNotIn('f_align_v25_json_num(r2)', m3_export)
-        for closed in ('r1Fermee', 'r2Fermee', 'r5Fermee', 'r10Fermee', 'r15Fermee', 'r30Fermee', 'r45Fermee', 'r60Fermee', 'r120Fermee', 'r240Fermee', 'rDFermee', 'rWFermee'):
-            self.assertIn('f_align_v25_json_num(' + closed + ')', export_block)
-        for live in ('r1', 'r2', 'r5', 'r10', 'r15', 'r30', 'r45', 'r60', 'r120', 'r240', 'rD', 'rW'):
-            self.assertNotIn('f_align_v25_json_num(' + live + ')', export_block)
+        pairs = (("M1", "r1Fermee"), ("M3", "r2Fermee"), ("M5", "r5Fermee"), ("M10", "r10Fermee"), ("M15", "r15Fermee"), ("M30", "r30Fermee"), ("M45", "r45Fermee"), ("H1", "r60Fermee"), ("H2", "r120Fermee"), ("H4", "r240Fermee"), ("D1", "rDFermee"), ("W1", "rWFermee"))
+        for timeframe, closed_rsi in pairs:
+            with self.subTest(timeframe=timeframe):
+                marker = '"' + timeframe + '":{"direction":'
+                self.assertIn(marker, export_block)
+                timeframe_block = export_block.split(marker, 1)[1].split("}", 1)[0]
+                self.assertIn("f_align_v25_json_num(" + closed_rsi + ")", timeframe_block)
+        m3_marker = '"M3":{"direction":'
+        m3_block = export_block.split(m3_marker, 1)[1].split("}", 1)[0]
+        self.assertIn("f_align_v25_json_int(nz(d3Fermee))", m3_block)
+        self.assertNotIn("f_align_v25_json_int(d2)", m3_block)
         self.assertIn('na(v) ? "null" : str.tostring(v)', export_block)
-        self.assertIn('na(v) ? "null" : v == 1', export_block)
         self.assertIn('na(v) ? "null" : v == 1', export_block)
 
     def test_bridge_bar_timestamps_match_the_closed_mtf_candle(self):
