@@ -36,7 +36,7 @@ f_etat() =>
     kc = ta.ema(close, lenSqz)
     rng = 1.5 * ta.atr(lenSqz)
     sqz = (basis + dev) < (kc + rng) and (basis - dev) > (kc - rng)
-    [d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]
+    [d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time[1]]
 
 [d1, s1, r1, bridgeTimeM1]       = request.security(syminfo.tickerid, "1",   f_etat())
 [d2, s2, r2, bridgeTimeM3]       = request.security(syminfo.tickerid, "3",   f_etat())
