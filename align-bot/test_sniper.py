@@ -79,6 +79,8 @@ class Cascade(unittest.TestCase):
         self.assertTrue(3998.5 <= sn["sl"] <= 4001.0, sn["sl"])                                # SL juste derrière la mèche du pic (~3999-4000 + marge)
         self.assertGreater(sn["sl"], 3997.6)                                                     # jamais sous la mèche
         self.assertIn("M1", sn["rejets"]); self.assertIn("M3", sn["rejets"])                    # rejet confirmé sur M1 ET M3
+        self.assertTrue(all("mèche" in x or "balayage" in x or "englobante" in x for x in sn["rejets_detail"]))
+        self.assertTrue(any(x.startswith("M1 : ") for x in sn["rejets_detail"]))
         self.assertAlmostEqual(sn["tp2"], 3895.54)                                               # TP du plan conservé
         self.assertLess(sn["tp1"], sn["e"]); self.assertGreater(sn["tp1"], sn["tp2"])           # TP1 intermédiaire réaliste, avant le TP du plan
         self.assertGreaterEqual(sn["rr"], ab.GAIN_MIN); self.assertGreater(sn["rr_plan"], sn["rr"])
@@ -142,6 +144,52 @@ class Cascade(unittest.TestCase):
         self.assertTrue(all(n in ("15m", "1h", "4h", "Daily") for _, n in r["niveaux"]))
 
 
+class TypesDeRejet(unittest.TestCase):
+    def _base(self):
+        return [dict(t=i, o=100.0, h=100.2, l=99.8, c=100.0) for i in range(20)]
+
+    def test_simple_close_back_below_level_is_not_a_rejection_pattern(self):
+        bars = self._base()
+        bars.append(dict(t=20, o=99.95, h=99.99, l=99.0, c=99.8))
+        self.assertIsNone(ab._rejet(bars, -1, 100.2, 1.0))
+
+    def test_explicit_upper_wick_rejection_is_classified(self):
+        bars = self._base()
+        bars.append(dict(t=20, o=99.95, h=101.5, l=99.5, c=100.0))
+        result = ab._rejet(bars, -1, 101.0, 1.0)
+        self.assertIsNotNone(result)
+        self.assertIn("mèche haute de rejet baissier", result["rejection_type"])
+        self.assertIn("% de l'amplitude", result["rejection_type"])
+
+    def test_bollinger_rejection_requires_a_real_sweep_and_reentry(self):
+        bars = self._base()
+        bars.append(dict(t=20, o=99.95, h=101.5, l=96.5, c=99.9))
+        result = ab._rejet(bars, -1, 101.0, 1.0)
+        self.assertIsNotNone(result)
+        self.assertIn("balayage de la bande haute puis réintégration", result["rejection_type"])
+        self.assertNotIn("mèche haute de rejet baissier", result["rejection_type"])
+
+
+class PreAlerteMeche(unittest.TestCase):
+    def test_in_progress_wick_is_not_reported_as_confirmed_stop_hunt(self):
+        b15 = [dict(t=1000 + 900 * i, o=100.0, h=101.0, l=99.0, c=100.0) for i in range(21)]
+        debut = b15[-1]["t"] + 900
+        m1 = [
+            dict(t=debut + 60 * i, o=100.0, h=100.5, l=99.2, c=99.8)
+            for i in range(5)
+        ]
+        m1[0].update(o=100.0, h=100.1, l=98.0, c=99.0)
+        m1[-1].update(c=100.2)
+        out = []
+        ab.meche_suspecte(out, "BTC", {"b15": b15, "atr": 1.0, "m1": m1}, {})
+        message = "\\n".join(out)
+        self.assertIn("mèche basse en formation", message)
+        self.assertIn("Balayage de liquidité POSSIBLE", message)
+        self.assertIn("clôture n'a pas confirmé", message)
+        self.assertIn("Attendre la CLÔTURE M15", message)
+        self.assertNotIn("Les stops viennent d'être pris", message)
+
+
 class MessagesEtRegles(unittest.TestCase):
     M1 = chemin_nuit()
 
@@ -158,7 +206,9 @@ class MessagesEtRegles(unittest.TestCase):
         r = dict(r_at(self.M1, k), comp=0, sqzs=[0] * 11, dirW=0, pctH=20, sniper=sn)
         # This test exercises only the Pine notification/rendering contract, not the local sniper detector.
         # Keep a deterministic M1/M3/M5 timing proposal independent from changing market-data fixtures.
-        r["sniper"] = {"d": -1, "t": r["m1"][-1]["t"], "ut": "M1/M3", "rejets": ["M1", "M3"]}
+        r["sniper"] = {"d": -1, "t": r["m1"][-1]["t"], "ut": "M1/M3", "rejets": ["M1", "M3"],
+                       "rejets_detail": ["M1 : mèche haute de rejet baissier (52% de l'amplitude)",
+                                          "M3 : bougie englobante baissière"]}
         now = now or r["m1"][-1]["t"]
         plan = self.PINE_PLAN if pine_plan is None else pine_plan
         with patch.object(ab, "cme_ouvert", return_value=True), \
@@ -175,6 +225,8 @@ class MessagesEtRegles(unittest.TestCase):
         self.assertIn("zone 3993,28–4012,79", fr[0])
         self.assertIn("SL Pine 4020 • TP1 Pine 3970 • TP2 Pine 3895,54", fr[1])
         self.assertIn("timing M1/M3 • plan H1", fr[2])
+        self.assertIn("mèche haute de rejet baissier", fr[2])
+        self.assertIn("bougie englobante baissière", fr[2])
         self.assertIn("validation ROBOT V12 avant position ouverte", fr[2])
         self.assertNotIn("POSITION OUVERTE", " ".join(fr))
         self.assertEqual(ev[0]["entree"], "4000,50")
