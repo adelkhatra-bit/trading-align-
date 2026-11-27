@@ -12288,7 +12288,7 @@ def humaniser(etat, cid, texte):
     return tete + ("\n" + reste if reste else "") + "\n" + fin
 
 def coach(etat, m, r, cle):
-    """Agent individuel : messages courts envoyés aux abonnés effectivement inscrits sur la position."""
+    """Agent individuel : progression et alertes calculées pour l'entrée réelle de chaque abonné."""
     tr = cle.get("trade")
     if not tr:
         return
@@ -12299,65 +12299,80 @@ def coach(etat, m, r, cle):
     tv_price = prix_tradingview_actif(r) if bridge_required else None
     if bridge_required and not tv_price:
         return
-    d, e = tr["d"], tr["e"]; p = tv_price["price"] if tv_price else r["m1"][-1]["c"]
-    cible = tr["tp2"] if tr["statut"] == "tp1" else tr["tp1"]
-    prog = d * (p - e) / max(abs(cible - e), 1e-9)        # 1 = objectif atteint
-    perte = d * (e - p) / max(abs(e - tr["sl"]), 1e-9)    # 1 = stop touché
-    vu = tr.setdefault("coach", [])
-    msgs = []
-    fleche = "⬆️" if d == 1 else "⬇️"
-    if prog >= 0.7 and f"presque{tr['statut']}" not in vu:
-        vu.append(f"presque{tr['statut']}")
-        msgs.append(f"💪 {m}\nTiens bon, presque arrivé\n{fleche} {barre_pct(prog * 100)}\n🎯 Objectif   {px(cible)}")
-    if 0.3 <= prog < 0.7 and "bon" not in vu and tr["statut"] == "entree":
-        vu.append("bon")
-        msgs.append(f"✅ {m}\nÇa part dans le bon sens\n{fleche} {barre_pct(prog * 100)}")
-    if perte >= 0.6 and "danger" not in vu:
-        vu.append("danger")
-        msgs.append(f"⚠️ {m}\nLe prix revient contre nous\n🛑 Stop   {px(tr['sl'])}\n🙅 On ne le déplace pas")
-    # Petites perturbations pendant le trade (messages rassurants, 1 fois toutes les 30-45 min max)
-    tps = tr.setdefault("coach_t", {})
-    def libre(cle_m, minutes):
-        if time.time() - tps.get(cle_m, 0) >= minutes * 60:
-            tps[cle_m] = time.time(); return True
-        return False
-    if not bridge_required:
-        r5 = r["r5"][-1]
-        surcharge5 = (r5 >= 65) if d == -1 else (r5 <= 35)
-        grandes_ok = r["dirs"][7] == d and r["dirs"][9] == d
-        if 0.25 <= perte < 0.6 and grandes_ok and libre("perturb", 30):
-            msgs.append(f"😌 {m}\nPetite perturbation, c'est normal\n"
-                        + (f"⚡ RSI 5 min   {r5:.0f} (surcharge)\n" if surcharge5 else "")
-                        + f"✅ 1 h   {fleche}\n✅ 4 h   {fleche}\n"
-                        f"🎯 Cap sur le TP\n🛑 Stop   {px(tr['sl'])}")
-        if 0 < prog < 0.7:
-            a = r["atr"]
-            obstacle = [(v, n) for v, n in r["niveaux"] if n in ("15m", "1h", "4h") and abs(v - p) <= 0.3 * a and d * (cible - v) > 0]
-            if obstacle and libre("mur", 45):
-                v, n = obstacle[0]
-                msgs.append(f"🧱 {m}\n{'Résistance' if d == 1 else 'Support'} {n}   {px(v)}\n"
-                            f"⏸ Pause normale, patience\n🎯 S'il casse : cap sur le TP")
-        # Les lectures locales ne peuvent pas annuler un plan de position issu de Pine v25.
-        dirs = r["dirs"]
-        if (dirs[9] == -d or (dirs[4] == -d and dirs[7] == -d)) and "annule" not in vu and tr["statut"] == "entree":
-            vu.append("annule")
-            msgs.append(f"❌ {m}\nPlan annulé\n{'⬇️' if d == 1 else '⬆️'} Les unités de temps se retournent\n✂️ Je coupe ma position")
-    # Annonce économique pendant la position
-    for ev in etat.get("cal", {}).get("ev", []):
-        reste = ev["t"] - time.time()
-        if 0 <= reste <= 30 * 60 and f"news{ev['t']}" not in vu:
-            vu.append(f"news{ev['t']}")
-            msgs.append(f"📰 {m}\nNews dans   {round(reste / 60)} min\n"
-                        + ("🔎 Vérifie ton SL actuel\n🙅 Ne le déplace pas à BE sans validation des critères de protection du coach." if prog > 0.2 else "✂️ Le trade n'avance pas\n✂️ Je coupe avant la news"))
+    p = tv_price["price"] if tv_price else r["m1"][-1]["c"]
+    fleche = "⬆️" if tr["d"] == 1 else "⬇️"
+
     for c in dedans:
-        # Le stop perso d'abord : s'il vient de sortir l'abonné, il ne reçoit plus aucun suivi (BE, direction TP…)
-        # (vu le 14/11 : Adel sorti à son stop, puis « mets-toi à BE » / « direction TP1 » quand même)
+        pos = tr["qui"][c]
+        d = pos.get("d", tr["d"])
+        e = float(pos.get("e", tr["e"]))
+        sl = float(pos.get("sl_conseil", pos.get("sl", tr["sl"])))
+        tp1 = float(pos.get("tp1", tr["tp1"]))
+        cible = float(tr["tp2"] if tr["statut"] == "tp1" and tr.get("tp2") is not None else tp1)
+        prog = d * (p - e) / max(abs(cible - e), 1e-9)       # progression depuis l'entrée personnelle
+        perte = d * (e - p) / max(abs(e - sl), 1e-9)        # risque restant depuis le stop personnel
+        vu = pos.setdefault("coach", [])
+        msgs = []
+
+        if tr["statut"] == "tp1" and not pos.get("be_notified"):
+            pos["sl"] = e
+            pos.pop("sl_conseil", None)
+            pos["be_notified"] = True
+            msgs.append(f"🔒 {m}\nTP1 touché : ton stop de suivi est remonté à ton entrée {px(e)}.\nAjuste aussi ton stop manuellement sur ta plateforme.")
+
+        if prog >= 0.7 and f"presque{tr['statut']}" not in vu:
+            vu.append(f"presque{tr['statut']}")
+            msgs.append(f"💪 {m}\nTiens bon, presque arrivé\n{fleche} {barre_pct(prog * 100)}\n🎯 Objectif   {px(cible)}")
+        if 0.3 <= prog < 0.7 and "bon" not in vu and tr["statut"] == "entree":
+            vu.append("bon")
+            msgs.append(f"✅ {m}\nÇa part dans le bon sens\n{fleche} {barre_pct(prog * 100)}")
+        if perte >= 0.6 and "danger" not in vu:
+            vu.append("danger")
+            msgs.append(f"⚠️ {m}\nLe prix revient contre nous\n🛑 Ton stop   {px(sl)}\n🙅 Ne le déplace pas")
+
+        # Les lectures locales ne peuvent pas contredire une position dont le prix vient de Pine v25.
+        if not bridge_required:
+            tps = pos.setdefault("coach_t", {})
+            def libre(cle_m, minutes):
+                if time.time() - tps.get(cle_m, 0) >= minutes * 60:
+                    tps[cle_m] = time.time()
+                    return True
+                return False
+            r5 = r["r5"][-1]
+            surcharge5 = (r5 >= 65) if d == -1 else (r5 <= 35)
+            grandes_ok = r["dirs"][7] == d and r["dirs"][9] == d
+            if 0.25 <= perte < 0.6 and grandes_ok and libre("perturb", 30):
+                msgs.append(f"😌 {m}\nPetite perturbation, c'est normal\n"
+                            + (f"⚡ RSI 5 min   {r5:.0f} (surcharge)\n" if surcharge5 else "")
+                            + f"✅ 1 h   {fleche}\n✅ 4 h   {fleche}\n"
+                            f"🎯 Cap sur le TP\n🛑 Ton stop   {px(sl)}")
+            if 0 < prog < 0.7:
+                a = r["atr"]
+                obstacle = [(v, n) for v, n in r["niveaux"] if n in ("15m", "1h", "4h") and abs(v - p) <= 0.3 * a and d * (cible - v) > 0]
+                if obstacle and libre("mur", 45):
+                    v, n = obstacle[0]
+                    msgs.append(f"🧱 {m}\n{'Résistance' if d == 1 else 'Support'} {n}   {px(v)}\n"
+                                f"⏸ Pause normale, patience\n🎯 S'il casse : cap sur le TP")
+            dirs = r["dirs"]
+            if (dirs[9] == -d or (dirs[4] == -d and dirs[7] == -d)) and "annule" not in vu and tr["statut"] == "entree":
+                vu.append("annule")
+                msgs.append(f"❌ {m}\nPlan de marché invalidé\nLes unités de temps locales se retournent. Vérifie le signal TradingView.")
+
+        # Annonce économique pendant la position, évaluée selon le résultat personnel.
+        for ev in etat.get("cal", {}).get("ev", []):
+            reste = ev["t"] - time.time()
+            if 0 <= reste <= 30 * 60 and f"news{ev['t']}" not in vu:
+                vu.append(f"news{ev['t']}")
+                msgs.append(f"📰 {m}\nNews dans   {round(reste / 60)} min\n"
+                            + ("🔎 Vérifie ton stop personnel actuel.\n🙅 Ne le déplace pas sans validation."
+                               if prog > 0.2 else "⚠️ Le trade avance peu : protège-toi avant la news."))
+
         gerer_stop(etat, m, r, tr, c)
-        if tr["qui"][c].get("fini"):
+        if pos.get("fini"):
             continue
-        for t in msgs:
+        for message in msgs:
             _telegram_envoyer_commentaire_coach_prive(
-                etat, c, m, humaniser(etat, c, t), trade=tr, position=tr["qui"][c],
+                etat, c, m, humaniser(etat, c, message), trade=tr, position=pos,
                 reply_markup=markup_position(m)
             )
 
@@ -13718,6 +13733,11 @@ def agent(m, r, cle, ferme):
             cle.pop("trade"); cle["aligne"] = 0; return out
         if touche_t1:
             tr["statut"] = "tp1"; tr["sl"] = e
+            # Chaque abonné protège sa propre entrée, qui peut différer du prix du robot.
+            for pos_perso in tr.get("qui", {}).values():
+                if isinstance(pos_perso, dict) and not pos_perso.get("fini"):
+                    pos_perso["sl"] = pos_perso.get("e", e)
+                    pos_perso.pop("sl_conseil", None)
             details_tp1 = [] if require_tv else lecture_tp1(r, d)
             out.append(cs_(m, "TP1 TOUCHÉ", [f"💰 TP1 : {px(t1)} ✅ 🎆", f"🔒 SL → BE : {px(e)} (plus de perte possible)", "☕ Va boire un café, la suite se fait sans risque", f"🏁 TP2 : {px(t2)}"] + details_tp1,
                                    "Sécuriser une partie, garder le reste", r))
