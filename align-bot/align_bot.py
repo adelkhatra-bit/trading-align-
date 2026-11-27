@@ -5481,8 +5481,8 @@ def texte_vision(m, r, cle, anglais=False):
         dedans = bas <= h["prix"] <= haut
         dist = 0 if dedans else min(abs(h["prix"] - bas), abs(h["prix"] - haut))
         lignes.append((f"📍 Entry zone: {px(bas)} → {px(haut)} " if anglais else f"📍 Zone d'entrée : {px(bas)} → {px(haut)} ")
-                      + (("price in the zone" if anglais else "prix dans la zone") if dedans
-                         else (f"price {px(dist)} away" if anglais else f"prix à {px(dist)}")))
+                      + (("(price in the zone)" if anglais else "(prix dans la zone)") if dedans
+                         else (f"(price {px(dist)} away)" if anglais else f"(prix à {px(dist)})")))
     try:
         lignes.append("⏳ " + raison_attente(r, cle))
     except Exception:
