@@ -715,7 +715,7 @@ bridgeEntryRetestedUi = bridgeEntryHigh >= zBas and bridgeEntryLow <= zHaut
 bridgeEntryDecisionUi = dirPlan == 1 ? bridgeEntryClose > (zBas + zHaut) / 2 : dirPlan == -1 ? bridgeEntryClose < (zBas + zHaut) / 2 : false
 bridgeEntryBeforeStopUi = dirPlan == 1 ? bridgeEntryClose > sl : dirPlan == -1 ? bridgeEntryClose < sl : false
 entryTriggeredUi = bridgeConfirmed and bridgeEntryFreshUi and bridgeEntryOhlcValidUi and bridgeEntryRetestedUi and bridgeEntryDecisionUi and bridgeEntryBeforeStopUi
-entryReadyUi = entryTriggeredUi and close >= zBas and close <= zHaut
+entryReadyUi = entryTriggeredUi and close >= zBas and close <= zHaut and (dirPlan == 1 ? close > (zBas + zHaut) / 2 : dirPlan == -1 ? close < (zBas + zHaut) / 2 : false)
 if barstate.islast and entryTriggeredUi
     if not na(lZH)
         line.set_color(lZH, dirPlan == 1 ? color.lime : color.red)
