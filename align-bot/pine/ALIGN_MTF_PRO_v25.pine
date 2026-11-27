@@ -265,8 +265,10 @@ dirBrut = zoneHaut ? 1 : zoneBas ? -1 : longT >= 2 ? 1 : longT <= -2 ? -1 : retH
 // et seulement si le 15 min ou l'1h confirme le nouveau sens. Pas de LONG / SHORT qui clignote en cours de bougie.
 var int dirStable = 0
 if barstate.isconfirmed
+    // Même à l'initialisation, un retournement ne peut jamais imposer un sens sans clôture M15 ou H1 concordante.
     if dirStable == 0
-        dirStable := dirBrut
+        if dirBrut != 0 and (nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut)
+            dirStable := dirBrut
     else if dirBrut != 0 and dirBrut != dirStable and (nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut)
         dirStable := dirBrut
     else if dirBrut == 0 and nz(d15Fermee) != dirStable and nz(d60Fermee) != dirStable
