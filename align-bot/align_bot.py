@@ -6148,6 +6148,8 @@ def texte_apercu(m, r, cle, vip=True):
             lignes.append("📡 Prix TradingView : indisponible — ATTENTE")
         if r.get("m1"):
             lignes.append(f"💹 Prix local M1 (contexte uniquement) : {px(r['m1'][-1]['c'])}")
+        biais_contexte_txt = "haussier" if maj == 1 else "baissier" if maj == -1 else "mixte"
+        lignes.append(f"🌡 Biais de fond local (non décisionnel) : {biais_contexte_txt} • {n_ok}/11 UT")
         if not tr:
             lignes.append(f"🚦 {decision}")
             lignes.append(f"🧭 Direction Pine à surveiller : {direction}" + (f" ({type_})" if type_ else ""))
@@ -14371,6 +14373,11 @@ def contexte_technique_live(derniers):
         if not isinstance(r, dict):
             continue
         dirs = (r.get("dirs_cloturees") or r.get("dirs")) or []
+        # Le biais de fond local est informatif ; seul Pine v25 peut confirmer un plan de trade.
+        nb_haussieres = sum(1 for direction_ut in dirs if direction_ut == 1)
+        nb_baissieres = sum(1 for direction_ut in dirs if direction_ut == -1)
+        biais_contextuel = ("haussier" if nb_haussieres > nb_baissieres else
+                            "baissier" if nb_baissieres > nb_haussieres else "mixte")
         # Le biais décisionnel vient exclusivement du plan Pine v25 ; les directions locales restent du contexte.
         plan_pine = plan_indicateur(r) if r.get("require_tv_bridge") else None
         plan_disponible = bool(plan_pine and plan_pine.get("available"))
@@ -14394,6 +14401,7 @@ def contexte_technique_live(derniers):
             len(dirs) > 9 and dirs[2] == dirs[4] == dirs[7] == dirs[9] == -1
         )
         contexte = {
+            "biais_contextuel": biais_contextuel,
             "biais_plan": biais,
             "phase_plan": phase_plan,
             "plan_confirme": plan_confirme,
@@ -14630,6 +14638,7 @@ def live_phrases_ia(etat, maintenant, derniers=None):
         "ou fausses cassures confirmées par une bougie clôturée. Le M5 sert d'alerte précoce, le M15 de confirmation plus robuste. "
         "Distingue une baisse momentanée, un vrai breakdown et une reprise haussière après balayage des stops ; "
         "ne confonds jamais une mèche avec une cassure confirmée et signale les désaccords M5/M15. "
+        "Le champ biais_contextuel est une tendance de fond calculée sur les unités locales clôturées : tu peux l'expliquer, mais elle n'est jamais un signal. "
         "Le champ biais_plan est exclusivement la direction confirmée par Pine v25 ; neutre signifie qu'aucune direction de trade n'est confirmée. "
         "Le champ phase_plan indique l'étape réelle du plan Pine : aucun_plan, attente_confirmation_mtf, attente_declencheur, attente_retour_zone ou verification_finale. "
         "Si phase_plan n'est pas un signal d'entrée explicite, explique clairement que le commentaire décrit le contexte et qu'il faut attendre la carte Telegram ENTRÉE AUTORISÉE. "
