@@ -72,7 +72,7 @@ _LOW_IMPACT_MACRO_KEYWORDS = (
 
 
 def _clean(value, limit=240):
-    text = re.sub(r"<[^>]*>", " ", str(value or ""))
+    text = re.sub(r"<[^>]*>", " ", "" if value is None else str(value))
     text = re.sub(r"[\x00-\x1f\x7f]+", " ", text)
     return re.sub(r"\s+", " ", text).strip()[:limit]
 
@@ -141,7 +141,12 @@ def normaliser_evenement(raw, retrieved_at):
         None,
     )
     published_ts = _timestamp(published_value)
-    actual = _clean(raw.get("actual") or raw.get("actualValue") or raw.get("result"), 100)
+    actual_raw = next(
+        (raw.get(key) for key in ("actual", "actualValue", "result")
+         if raw.get(key) not in (None, "")),
+        None,
+    )
+    actual = _clean(actual_raw, 100)
     forecast = _clean(raw.get("forecast"), 100)
     previous = _clean(raw.get("previous"), 100)
     identity = "|".join((CALENDAR_SOURCE, currency, title.casefold(), str(event_ts)))
@@ -229,8 +234,10 @@ def source_line(event):
 def facts_line(event):
     """Sépare les valeurs du flux agrégé des données officielles et de la réaction prix."""
     actual = _clean(event.get("actual"), 100)
-    forecast = _clean(event.get("forecast") or event.get("prev"), 100)
-    previous = _clean(event.get("previous") or event.get("avant"), 100)
+    forecast_raw = event.get("forecast") if event.get("forecast") not in (None, "") else event.get("prev")
+    previous_raw = event.get("previous") if event.get("previous") not in (None, "") else event.get("avant")
+    forecast = _clean(forecast_raw, 100)
+    previous = _clean(previous_raw, 100)
     if actual:
         line = f"📌 Valeur reçue du calendrier agrégé: {actual}"
     else:
