@@ -498,7 +498,7 @@ if barstate.islast
         eSL  := label.new(x1, sl, "STOP " + px(sl), style=label.style_label_right, color= color.new(color.red, 20), textcolor= color.white, size=size.small, tooltip="Stop placé derrière la " + (dirPlan == 1 ? "zone de support" : "zone de résistance") + " 1h / 4h la plus proche (+ marge 0,3 ATR)")
 
 // ═════════ BARRE (en bas, propre, explications au clic) ═════════
-var table t = table.new(pos, 11, 3, border_width=1, frame_color= color.new(color.gray, 70), frame_width=1)
+var table t = table.new(pos, 12, 3, border_width=1, frame_color= color.new(color.gray, 70), frame_width=1)
 varip int tick = 0
 if barstate.isrealtime
     tick += 1
@@ -511,7 +511,8 @@ if barstate.islast
         dvLive = array.get(dirs, i)
         dv = array.get(dirsFermees, i)
         sq = array.get(sqzs, i) == 1
-        rv = array.get(rsis, i)
+        // RSI affiché = dernière valeur clôturée, comme la direction utilisée pour la décision.
+        rv = array.get(rsisFermees, i)
         bg = sq ?  color.rgb(230, 130, 0) : dv == 1 ?  color.rgb(0, 140, 70) : dv == -1 ?  color.rgb(190, 30, 45) :  color.rgb(90, 90, 90)
         sym = (dv == 1 ? "▲" : dv == -1 ? "▼" : "—") + (rv >= 70 ? "!" : rv <= 30 ? "!" : "") + (dirPlan != 0 and dv == -dirPlan and i <= 4 ? "↩" : "") + (dvLive != dv ? "~" : "")
         roleUT = array.get(array.from("déclenchement SCALP", "timing très court", "déclenchement DAY • structure SCALP", "préparation", "direction SCALP • retracement DAY", "intermédiaire", "intermédiaire", "contexte SCALP • direction DAY • confirmation SWING", "intermédiaire", "contexte DAY • retracement SWING", "direction SWING"), i)
@@ -521,9 +522,18 @@ if barstate.islast
         tendUT = dv == 1 ? "prix au-dessus de l'EMA 20, EMA 20 au-dessus de l'EMA 50" : dv == -1 ? "prix sous l'EMA 20, EMA 20 sous l'EMA 50" : "prix entre les moyennes : pas de sens net"
         rsiUT = rv >= 70 ? "SURACHAT (risque de baisse)" : rv <= 30 ? "SURVENTE (risque de rebond)" : rv >= 55 ? "acheteurs plus forts" : rv <= 45 ? "vendeurs plus forts" : "équilibré"
         planUT = dirPlan == 0 ? "pas de plan en cours" : dv == dirPlan ? "✅ va dans le sens du plan " + (dirPlan == 1 ? "LONG" : "SHORT") : dv == -dirPlan ? "⛔ contre le plan " + (dirPlan == 1 ? "LONG" : "SHORT") + " : attendre qu'elle se retourne" : "⏳ neutre : pas encore de confirmation"
-        tip = array.get(nomsL, i) + " — clôture : " + sensUT + "\nBougie en formation : " + sensLive + (dvLive != dv ? " • divergence temporaire (~)" : " • cohérente avec la clôture") + "\n━━━━━━━━━━━━\nTendance : " + tendUT + "\nRSI : " + str.tostring(rv, "#") + " — " + rsiUT + "\nCompression : " + (sq ? "OUI ⚡ prêt à exploser (attendre la direction)" : "non") + "\nRôle : " + roleUT + (minUT > 0 ? "\nClôture dans : " + f_mmss(f_reste(minUT)) : "") + "\n━━━━━━━━━━━━\n" + planUT + (dirPlan != 0 and dv == -dirPlan and i <= 4 ? "\n↩ VOYANT RETOURNEMENT allumé : " + str.tostring(nVoy) + "/5 petites unités (1 à 15 min) ont tourné contre le plan\n3/5 = le retournement se prépare • confirmé quand le 15 min ET la 1h clôturent dans le nouveau sens" : "")
+        tip = array.get(nomsL, i) + " — clôture : " + sensUT + "\nBougie en formation : " + sensLive + (dvLive != dv ? " • divergence temporaire (~)" : " • cohérente avec la clôture") + "\n━━━━━━━━━━━━\nTendance : " + tendUT + "\nRSI clôturé : " + str.tostring(rv, "#") + " — " + rsiUT + "\nCompression en formation : " + (sq ? "OUI ⚡ (information provisoire)" : "non") + "\nRôle : " + roleUT + (minUT > 0 ? "\nClôture dans : " + f_mmss(f_reste(minUT)) : "") + "\n━━━━━━━━━━━━\n" + planUT + (dirPlan != 0 and dv == -dirPlan and i <= 4 ? "\n↩ VOYANT RETOURNEMENT allumé : " + str.tostring(nVoy) + "/5 petites unités (1 à 15 min) ont tourné contre le plan\n3/5 = le retournement se prépare • confirmé quand le 15 min ET la 1h clôturent dans le nouveau sens" : "")
         table.cell(t, i, 0, array.get(noms, i), width=largCol, bgcolor=rv >= 70 ?  color.rgb(120, 20, 30) : rv <= 30 ?  color.rgb(0, 90, 50) :  color.rgb(30, 34, 45), text_color=rv >= 70 or rv <= 30 ?  color.white :  color.gray, text_size=size.small, tooltip=tip)
         table.cell(t, i, 1, sym, width=largCol, bgcolor=bg, text_color= color.white, text_size=size.normal, tooltip=tip)
+    // Weekly : contexte clôturé affiché séparément, hors score 11 UT ; filtre de contexte SWING conservé.
+    dvW = nz(dWFermee)
+    dvWLive = nz(dW)
+    rvW = nz(rWFermee, 50)
+    symW = (dvW == 1 ? "▲" : dvW == -1 ? "▼" : "—") + (rvW >= 70 or rvW <= 30 ? "!" : "") + (dvWLive != dvW ? "~" : "")
+    bgW = dvW == 1 ? color.rgb(0, 140, 70) : dvW == -1 ? color.rgb(190, 30, 45) : color.rgb(90, 90, 90)
+    tipW = "1W — clôture : " + (dvW == 1 ? "HAUSSE ▲" : dvW == -1 ? "BAISSE ▼" : "NEUTRE —") + "\nBougie hebdomadaire en formation : " + (dvWLive == 1 ? "HAUSSE ▲" : dvWLive == -1 ? "BAISSE ▼" : "NEUTRE —") + (dvWLive != dvW ? " • divergence provisoire (~)" : " • cohérente") + "\nRSI hebdomadaire clôturé : " + str.tostring(rvW, "#") + (rvW >= 70 ? " — SURACHAT" : rvW <= 30 ? " — SURVENTE" : " — équilibré") + "\nRôle : contexte hebdomadaire et filtre SWING ; hors score d'alignement des 11 UT."
+    table.cell(t, 11, 0, "1W", width=largCol, bgcolor=rvW >= 70 ? color.rgb(120, 20, 30) : rvW <= 30 ? color.rgb(0, 90, 50) : color.rgb(30, 34, 45), text_color=color.white, text_size=size.small, tooltip=tipW)
+    table.cell(t, 11, 1, symW, width=largCol, bgcolor=bgW, text_color=color.white, text_size=size.normal, tooltip=tipW)
 // État de confirmation calculé pour l'affichage ; les champs d'export restent dans le bloc bridge canonique.
 
     titre = zoneBas ? "RETOURNEMENT ▼" : zoneHaut ? "REBOND ▲" : fortHaut ? "★ ACHAT FORT" : fortBas ? "★ VENTE FORTE" : retHaut ? "RETOURNEMENT ▲" : retBas ? "RETOURNEMENT ▼" : rsiOB >= 3 ? "RSI SURACHAT " + str.tostring(rsiOB) + "/11" : rsiOS >= 3 ? "RSI SURVENTE " + str.tostring(rsiOS) + "/11" : surcharge ? "⚡ SURCHARGE" : sens == 1 ? "HAUSSE" : sens == -1 ? "BAISSE" : "ATTENDRE"
@@ -533,7 +543,7 @@ if barstate.islast
     vbg0 = zoneBas or zoneHaut ? color.rgb(170, 130, 0) : planConfirmedUi and dirPlan == 1 ? color.rgb(0, 140, 70) : planConfirmedUi and dirPlan == -1 ? color.rgb(190, 30, 45) : color.rgb(60, 60, 60)
     actif = zoneBas or zoneHaut or fortHaut or fortBas or retHaut or retBas or surcharge
     table.cell(t, 0, 2, ligne, bgcolor=actif and clignote ? color.new(vbg0, 50) : vbg0, text_color= color.white, text_size=size.normal, tooltip=titre + "\n" + plan)
-    table.merge_cells(t, 0, 2, 10, 2)
+    table.merge_cells(t, 0, 2, 11, 2)
 
 // ═════════ ALERTES (créer une alerte « N'importe quel appel alert() ») ═════════
 if sigHaut

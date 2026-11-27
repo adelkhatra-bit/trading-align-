@@ -3,7 +3,7 @@ import hashlib
 import unittest
 
 PINE = Path(__file__).parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
-BASELINE_GIT_BLOB_SHA = "de6f38dc8ec189fa62669a01200dbfdc639117ec"  # reviewed normalized v25 baseline after exact RSI and entry-direction blocks are restored
+BASELINE_GIT_BLOB_SHA = "09b58ccdcdf3264aa4e63473285e9246548b6f19"  # reviewed normalized v25 baseline after exact RSI and entry-direction blocks are restored
 SETTINGS_BLOCK = """// ═════════ BRIDGE ALIGN (optionnel, sans modification visuelle) ═════════
 grpBridge = "Bridge ALIGN (optionnel)"
 bridgeEnabled = input.bool(true, "Envoyer les snapshots au ROBOT V12", group=grpBridge)
@@ -197,6 +197,40 @@ if barstate.isconfirmed
         without_export = without_export.replace(
             "entryReadyUi = entryTriggeredUi and close >= zBas and close <= zHaut and (dirPlan == 1 ? close > (zBas + zHaut) / 2 : dirPlan == -1 ? close < (zBas + zHaut) / 2 : false)",
             "entryReadyUi = entryTriggeredUi and close >= zBas and close <= zHaut",
+            1,
+        )
+        # Normalize only the approved MTF table presentation changes; the dedicated
+        # visual contract test asserts the new 1W column and closed-RSI semantics.
+        without_export = without_export.replace(
+            "var table t = table.new(pos, 12, 3",
+            "var table t = table.new(pos, 11, 3",
+            1,
+        )
+        without_export = without_export.replace(
+            "rv = array.get(rsisFermees, i)",
+            "rv = array.get(rsis, i)",
+            1,
+        )
+        without_export = without_export.replace(
+            "        // RSI affiché = dernière valeur clôturée, comme la direction utilisée pour la décision.\\n",
+            "",
+            1,
+        )
+        without_export = without_export.replace("RSI clôturé :", "RSI :", 1)
+        without_export = without_export.replace("Compression en formation :", "Compression :", 1)
+        without_export = without_export.replace(
+            "OUI ⚡ (information provisoire)",
+            "OUI ⚡ prêt à exploser (attendre la direction)",
+            1,
+        )
+        weekly_start = without_export.find("    // Weekly : contexte clôturé affiché séparément")
+        weekly_end = without_export.find("    titre = ", weekly_start)
+        self.assertGreaterEqual(weekly_start, 0)
+        self.assertGreater(weekly_end, weekly_start)
+        without_export = without_export[:weekly_start] + without_export[weekly_end:]
+        without_export = without_export.replace(
+            "table.merge_cells(t, 0, 2, 11, 2)",
+            "table.merge_cells(t, 0, 2, 10, 2)",
             1,
         )
         raw = without_export.encode("utf-8")
