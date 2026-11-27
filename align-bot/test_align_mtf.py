@@ -2714,6 +2714,301 @@ class TestTradingViewReportRegression(unittest.TestCase):
         self.assertIn("Profil SWING", message)
 
 
+    @staticmethod
+    def _required_bridge_card_fixture():
+        return {
+            "dirs": [1] * 11, "rsis": [55.0] * 11,
+            "m1": [candle(1, c=99.25)], "confirme": 1,
+            "posD": 0.5, "posW": 0.5, "niv_cles": [], "asie": None,
+            "macro": [], "fvg": [], "atr": 1.0, "distrib": False,
+            "accum": False, "b5": [candle(i) for i in range(22)],
+            "require_tv_bridge": True,
+            "tv_indicator_mtf": {
+                "available": True, "activeTimeframe": "M5",
+                "activeTimeframeAgeMs": 2450,
+                "snapshots": {
+                    "M5": {
+                        "fresh": True, "price": 101.25, "robotAgeMs": 2450,
+                        "robotTimestamp": "2026-11-27T02:10:00Z",
+                    }
+                },
+            },
+        }
+
+    @staticmethod
+    def _confirmed_or_waiting_pine_plan(confirmed):
+        return {
+            "available": True, "timeframe": "M15", "plan_timeframe": "M15",
+            "entry_timeframe": "M5", "strategy": "DAY", "direction": 1,
+            "entry": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0,
+            "zone_low": 99.0, "zone_high": 101.0, "decision": 100.0,
+            "price": 101.25, "price_in_zone": False,
+            "confirmed": confirmed, "triggered": False, "ageMs": 5100,
+        }
+
+    def test_required_bridge_card_translates_source_labels_for_english_users(self):
+        french = (
+            "📡 Prix TradingView M5 : 101,25 · actualisé il y a 2 s\n"
+            "💹 Prix local M1 (contexte uniquement) : 99,25\n"
+            "📊 INDICATEURS ALIGN LOCAUX (CONTEXTE)\n"
+            "⏳ CONFIRMATION MTF PINE EN ATTENTE"
+        )
+        english = align_bot.traduire(french)
+        self.assertIn("📡 TradingView price M5", english)
+        self.assertIn("Local M1 price (context only)", english)
+        self.assertIn("LOCAL ALIGN INDICATORS (CONTEXT)", english)
+        self.assertIn("PINE MTF CONFIRMATION PENDING", english)
+        self.assertNotIn("Prix TradingView", english)
+        self.assertNotIn("contexte uniquement", english)
+
+    def test_required_bridge_card_separates_tradingview_price_from_local_m1(self):
+        from unittest.mock import patch
+        for market in ("BTC", "GOLD"):
+            with self.subTest(market=market):
+                r = self._required_bridge_card_fixture()
+                with patch.object(align_bot, "plan_indicateur",
+                                  return_value=self._confirmed_or_waiting_pine_plan(True)), \
+                     patch.object(align_bot, "zone_txt", return_value="milieu"), \
+                     patch.object(align_bot, "strategie_mtf", return_value=["Contexte local"]), \
+                     patch.object(align_bot, "verdict", side_effect=AssertionError("local verdict must not override Pine")):
+                    message = align_bot.texte_etat(market, r, {
+                        "ordre": {"d": -1, "e": 123.0, "sl": 125.0, "tp1": 119.0, "tp2": 117.0}
+                    })
+                self.assertIn("Prix TradingView M5 : 101,25", message)
+                self.assertIn("actualisé il y a 2 s", message)
+                self.assertIn("Prix local M1 (contexte uniquement) : 99,25", message)
+                self.assertIn("INDICATEURS ALIGN LOCAUX (CONTEXTE)", message)
+                self.assertIn("RSI ALIGN LOCAL (CONTEXTE)", message)
+                self.assertIn("Plan de niveaux : M15", message)
+                self.assertIn("âge plan M15 : 5 s", message)
+                self.assertIn("Clôture MTF Pine : CONFIRMÉE", message)
+                self.assertNotIn("123", message)
+                self.assertLess(len(message), 4096)
+
+    def test_required_bridge_card_hides_pine_levels_until_mtf_confirmation(self):
+        from unittest.mock import patch
+        r = self._required_bridge_card_fixture()
+        plan = self._confirmed_or_waiting_pine_plan(False)
+        stale_order = {"d": -1, "e": 123.0, "sl": 125.0, "tp1": 119.0, "tp2": 117.0}
+        with patch.object(align_bot, "plan_indicateur", return_value=plan), \
+             patch.object(align_bot, "zone_txt", return_value="milieu"), \
+             patch.object(align_bot, "strategie_mtf", return_value=["Contexte local"]), \
+             patch.object(align_bot, "verdict", side_effect=AssertionError("local verdict must not override Pine")):
+            message = align_bot.texte_etat("GOLD", r, {"ordre": stale_order})
+        self.assertIn("Configuration M15 détectée — confirmation MTF en attente.", message)
+        self.assertIn("Aucun niveau Entry / SL / TP n'est publié avant confirmation MTF.", message)
+        self.assertIn("CONFIRMATION MTF PINE EN ATTENTE", message)
+        self.assertIn("POINT VISÉ : aucun", message)
+        self.assertNotIn("Entrée : 100,00", message)
+        self.assertNotIn("SL : 98,00", message)
+        self.assertNotIn("TP1 : 104,00", message)
+        self.assertNotIn("123", message)
+        self.assertNotIn("DIRECTION À SURVEILLER", message)
+
+    def test_required_bridge_card_fails_closed_when_tradingview_plan_is_unavailable(self):
+        from unittest.mock import patch
+        r = self._required_bridge_card_fixture()
+        r["tv_indicator_mtf"] = {"available": False, "reason": "bridge inaccessible", "snapshots": {}}
+        plan = {"available": False, "reason": "snapshot TradingView canonique M15 périmé"}
+        with patch.object(align_bot, "plan_indicateur", return_value=plan), \
+             patch.object(align_bot, "zone_txt", return_value="milieu"), \
+             patch.object(align_bot, "strategie_mtf", return_value=["Contexte local"]), \
+             patch.object(align_bot, "verdict", side_effect=AssertionError("local verdict must not override Pine")):
+            message = align_bot.texte_etat("BTC", r, {
+                "ordre": {"d": 1, "e": 123.0, "sl": 121.0, "tp1": 127.0, "tp2": 129.0}
+            })
+        self.assertIn("Prix TradingView : indisponible — ATTENTE", message)
+        self.assertIn("Prix local M1 (contexte uniquement) : 99,25", message)
+        self.assertIn("DIVERGENCE DES SOURCES — ATTENTE", message)
+        self.assertIn("snapshot TradingView canonique M15 périmé", message)
+        self.assertIn("Aucun plan local ne remplace le plan TradingView canonique.", message)
+        self.assertIn("POINT VISÉ : aucun", message)
+        self.assertNotIn("123", message)
+        self.assertNotIn("DIRECTION À SURVEILLER", message)
+
+    def test_required_bridge_report_preserves_open_trade_without_waiting_for_new_plan(self):
+        from unittest.mock import patch
+        r = self._required_bridge_card_fixture()
+        trade = {"d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0}
+        with patch.object(align_bot, "plan_indicateur", side_effect=AssertionError("open trade must not request a new entry plan")), \
+             patch.object(align_bot, "verdict", side_effect=AssertionError("open trade must not use local verdict")), \
+             patch.object(align_bot, "zone_txt", return_value="milieu"), \
+             patch.object(align_bot, "strategie_mtf", return_value=["Lecture locale"]) :
+            message = align_bot.texte_etat("BTC", r, {"trade": trade})
+        self.assertIn("POSITION EN COURS", message)
+        self.assertIn("La position et ses niveaux restent ceux mémorisés", message)
+        self.assertIn("POSITION EN COURS : 🟩 LONG", message)
+        self.assertIn("Entrée 100", message)
+        self.assertIn("SL 98", message)
+        self.assertNotIn("PLAN CANONIQUE PINE v25", message)
+        self.assertNotIn("DIVERGENCE DES SOURCES", message)
+
+    def test_tradingview_active_price_rejects_stale_or_invalid_snapshots(self):
+        r = self._required_bridge_card_fixture()
+        self.assertEqual(align_bot.prix_tradingview_actif(r)["price"], 101.25)
+        r["tv_indicator_mtf"]["snapshots"]["M5"]["fresh"] = False
+        self.assertIsNone(align_bot.prix_tradingview_actif(r))
+        r["tv_indicator_mtf"]["snapshots"]["M5"]["fresh"] = True
+        r["tv_indicator_mtf"]["snapshots"]["M5"]["price"] = float("nan")
+        self.assertIsNone(align_bot.prix_tradingview_actif(r))
+
+    def test_required_bridge_overview_waits_for_pine_and_suppresses_local_order(self):
+        from unittest.mock import patch
+        r = self._required_bridge_card_fixture()
+        r["tv_indicator_mtf"]["available"] = False
+        plan = {"available": False, "reason": "snapshot TradingView canonique M15 périmé"}
+        stale_order = {"d": -1, "e": 123.0, "sl": 125.0, "tp1": 119.0, "tp2": 117.0}
+        with patch.object(align_bot, "plan_indicateur", return_value=plan), \
+             patch.object(align_bot, "verdict", side_effect=AssertionError("local verdict must not authorize")), \
+             patch.object(align_bot, "news_du_jour", return_value=[]):
+            message = align_bot.texte_apercu("BTC", r, {"ordre": stale_order})
+        self.assertIn("Prix TradingView : indisponible — ATTENTE", message)
+        self.assertIn("Prix local M1 (contexte uniquement) : 99,25", message)
+        self.assertIn("DIVERGENCE DES SOURCES — ATTENTE", message)
+        self.assertIn("Non confirmée par TradingView", message)
+        self.assertNotIn("123", message)
+        self.assertNotIn("Cible probable", message)
+        self.assertNotIn("Zone de retournement visée", message)
+
+    def test_required_bridge_overview_uses_confirmed_pine_direction_without_local_targets(self):
+        from unittest.mock import patch
+        r = self._required_bridge_card_fixture()
+        plan = self._confirmed_or_waiting_pine_plan(True)
+        plan["direction"] = 1
+        with patch.object(align_bot, "plan_indicateur", return_value=plan), \
+             patch.object(align_bot, "verdict", side_effect=AssertionError("Pine must own the decision")), \
+             patch.object(align_bot, "news_du_jour", return_value=[]):
+            message = align_bot.texte_apercu("GOLD", r, {})
+        self.assertIn("Prix TradingView M5 : 101,25", message)
+        self.assertIn("Direction Pine à surveiller : LONG", message)
+        self.assertIn("Zone d'entrée Pine M15 : 99 → 101", message)
+        self.assertIn("PLAN PINE CONFIRMÉ — DÉCLENCHEUR EN ATTENTE", message)
+        self.assertNotIn("Cible probable", message)
+        self.assertNotIn("Zone de retournement visée", message)
+        self.assertLess(len(message), 4096)
+
+    def test_required_bridge_vision_does_not_substitute_local_levels(self):
+        from unittest.mock import patch
+        r = self._required_bridge_card_fixture()
+        pending = self._confirmed_or_waiting_pine_plan(False)
+        with patch.object(align_bot, "plan_indicateur", return_value=pending):
+            message = align_bot.texte_vision("BTC", r, {}, anglais=False)
+        self.assertIn("CONFIRMATION MTF PINE EN ATTENTE", message)
+        self.assertNotIn("Entrée :", message)
+        self.assertNotIn("SL :", message)
+        self.assertNotIn("TP1 :", message)
+        confirmed = self._confirmed_or_waiting_pine_plan(True)
+        with patch.object(align_bot, "plan_indicateur", return_value=confirmed):
+            message = align_bot.texte_vision("BTC", r, {}, anglais=True)
+        self.assertIn("TradingView · Pine v25", message)
+        self.assertIn("Entry: 100", message)
+        self.assertIn("SL: 98", message)
+        self.assertIn("TP1: 104", message)
+
+    def test_required_bridge_why_view_never_calls_local_verdict(self):
+        from unittest.mock import patch
+        r = self._required_bridge_card_fixture()
+        pending = self._confirmed_or_waiting_pine_plan(False)
+        with patch.object(align_bot, "plan_indicateur", return_value=pending), \
+             patch.object(align_bot, "verdict", side_effect=AssertionError("local verdict must not be used")):
+            message = align_bot.texte_pourquoi("GOLD", r, {})
+        self.assertIn("CONFIRMATION MTF PINE EN ATTENTE", message)
+        self.assertIn("Aucun sens de trade ni niveau Entry/SL/TP n'est autorisé.", message)
+        self.assertNotIn("Direction à surveiller", message)
+
+    def test_required_bridge_why_view_keeps_open_trade_and_never_calls_local_verdict(self):
+        from unittest.mock import patch
+        r = self._required_bridge_card_fixture()
+        state = {"trade": {"d": -1, "e": 100.0, "sl": 102.0, "tp1": 96.0, "tp2": 94.0}}
+        with patch.object(align_bot, "verdict", side_effect=AssertionError("local verdict must not be used")):
+            message = align_bot.texte_pourquoi("GOLD", r, state)
+        self.assertIn("POSITION DÉJÀ OUVERTE", message)
+        self.assertIn("Direction de la position mémorisée : SHORT", message)
+        self.assertIn("Entrée, SL et objectifs restent ceux enregistrés", message)
+        self.assertGreater(message.count("\n"), 4)
+        self.assertNotIn("\\n", message)
+        self.assertNotIn("biais local", message.lower())
+
+    def test_required_bridge_position_uses_tv_price_and_preserves_personal_trade_levels(self):
+        r = self._required_bridge_card_fixture()
+        state = {"trade": {
+            "d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0,
+            "qui": {"123": {"e": 100.0, "sl": 99.0, "sl_conseil": 100.1, "tp1": 104.0}}
+        }}
+        before = dict(state["trade"])
+        message = align_bot.texte_position("BTC", r, state, "123")
+        self.assertIn("Prix TradingView M5 : 101,25", message)
+        self.assertIn("Ton entrée : 100", message)
+        self.assertIn("Ton SL actuel : 100,10", message)
+        self.assertIn("TP1 : 104", message)
+        self.assertIn("TP2 : 108", message)
+        self.assertIn("+1.25 %", message)
+        self.assertNotIn("99,25", message)
+        self.assertEqual(state["trade"]["e"], before["e"])
+        self.assertEqual(state["trade"]["sl"], before["sl"])
+        self.assertEqual(state["trade"]["tp1"], before["tp1"])
+        self.assertEqual(state["trade"]["tp2"], before["tp2"])
+
+    def test_required_bridge_position_omits_pnl_when_tradingview_price_is_unavailable(self):
+        r = self._required_bridge_card_fixture()
+        r["tv_indicator_mtf"] = {"available": False, "reason": "bridge inaccessible", "snapshots": {}}
+        state = {"trade": {
+            "d": -1, "e": 100.0, "sl": 102.0, "tp1": 96.0, "tp2": 94.0,
+            "qui": {"123": {"e": 100.0, "sl": 102.0, "tp1": 96.0}}
+        }}
+        message = align_bot.texte_position("GOLD", r, state, "123")
+        self.assertIn("Prix TradingView : indisponible", message)
+        self.assertIn("Évolution indisponible", message)
+        self.assertNotIn("99,25", message)
+        self.assertNotIn("%", message)
+
+    def test_required_bridge_levels_callback_ignores_stale_local_order(self):
+        from unittest.mock import patch
+        update = {"update_id": 9201, "callback_query": {
+            "id": "cb-levels-wait", "data": "levels:BTC",
+            "message": {"chat": {"id": 123, "type": "private"}}, "from": {"id": 123}
+        }}
+        r = self._required_bridge_card_fixture()
+        state = {"BTC": {"ordre": {"d": -1, "e": 123.0, "sl": 125.0, "tp1": 119.0, "tp2": 117.0}}}
+        with (
+            patch.object(align_bot, "autorise", return_value=True),
+            patch.dict(align_bot.DERNIERS, {"BTC": r}),
+            patch.object(align_bot, "texte_vision", return_value="PINE MTF WAIT — NO LOCAL LEVELS") as vision,
+            patch.object(align_bot, "fmt_trade", side_effect=AssertionError("stale local order must not be rendered")),
+            patch.object(align_bot, "_envoi_sur") as send,
+            patch.object(align_bot, "telegram"),
+        ):
+            align_bot.traiter(state, set(), [update])
+        vision.assert_called_once()
+        self.assertIn("PINE MTF WAIT — NO LOCAL LEVELS", send.call_args.kwargs["text"])
+        self.assertNotIn("123", send.call_args.kwargs["text"])
+
+    def test_required_bridge_levels_callback_uses_tv_price_for_existing_trade(self):
+        from unittest.mock import patch
+        update = {"update_id": 9202, "callback_query": {
+            "id": "cb-levels-position", "data": "levels:GOLD",
+            "message": {"chat": {"id": 123, "type": "private"}}, "from": {"id": 123}
+        }}
+        r = self._required_bridge_card_fixture()
+        r["market"] = "GOLD"
+        state = {"GOLD": {"trade": {
+            "d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0,
+            "za": 99.0, "zb": 101.0, "rr": 2.0, "n1": "TP1", "n2": "TP2",
+            "strat": "", "sl_ut": "5 min"
+        }}}
+        with (
+            patch.object(align_bot, "autorise", return_value=True),
+            patch.dict(align_bot.DERNIERS, {"GOLD": r}),
+            patch.object(align_bot, "fmt_trade", side_effect=lambda m, tr, price: f"TV_LEVEL_PRICE={price}") as fmt,
+            patch.object(align_bot, "_envoi_sur") as send,
+            patch.object(align_bot, "telegram"),
+        ):
+            align_bot.traiter(state, set(), [update])
+        fmt.assert_called_once()
+        self.assertEqual(fmt.call_args.args[2], 101.25)
+        self.assertIn("TV_LEVEL_PRICE=101.25", send.call_args.kwargs["text"])
+        self.assertNotIn("99.25", send.call_args.kwargs["text"])
+
     def test_analysis_command_maps_to_market_selection_prompt(self):
         self.assertEqual(align_bot.COMMANDES["/faire_analyse"], "📊 Faire une analyse")
         from unittest.mock import patch
