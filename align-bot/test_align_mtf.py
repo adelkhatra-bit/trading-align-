@@ -4998,7 +4998,7 @@ class TradingViewPositionLifecycleTests(unittest.TestCase):
                     "qui": {"user": personal},
                 }
                 tv_price = {"price": price, "bar_fresh": True, "bar_high": high, "bar_low": low}
-                with unittest.mock.patch.object(align_bot, "prix_tradingview_actif", return_value=tv_price), \\
+                with unittest.mock.patch.object(align_bot, "prix_tradingview_actif", return_value=tv_price), \
                      unittest.mock.patch.object(align_bot, "carte_suivi", return_value="suivi"):
                     messages = align_bot.agent("BTC", r, {"trade": trade}, "")
                 self.assertEqual(trade["statut"], "tp1")
@@ -5027,10 +5027,10 @@ class TradingViewPositionLifecycleTests(unittest.TestCase):
                 }
                 sent = []
                 r = {"require_tv_bridge": True}
-                with unittest.mock.patch.object(align_bot, "prix_tradingview_actif", return_value={"price": price}), \\
-                     unittest.mock.patch.object(align_bot, "gerer_stop"), \\
-                     unittest.mock.patch.object(align_bot, "humaniser", side_effect=lambda state, cid, message: message), \\
-                     unittest.mock.patch.object(align_bot, "markup_position", return_value="{}"), \\
+                with unittest.mock.patch.object(align_bot, "prix_tradingview_actif", return_value={"price": price}), \
+                     unittest.mock.patch.object(align_bot, "gerer_stop"), \
+                     unittest.mock.patch.object(align_bot, "humaniser", side_effect=lambda state, cid, message: message), \
+                     unittest.mock.patch.object(align_bot, "markup_position", return_value="{}"), \
                      unittest.mock.patch.object(align_bot, "_telegram_envoyer_commentaire_coach_prive",
                                                 side_effect=lambda *args, **kwargs: sent.append(args[3])):
                     align_bot.coach({}, "BTC", r, {"trade": trade})
