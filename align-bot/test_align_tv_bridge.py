@@ -269,7 +269,7 @@ class BridgeStoreTests(unittest.TestCase):
 
     def test_stale_entry_trigger_keeps_fresh_mtf_but_downgrades_plan_to_wait(self):
         payload = valid_payload()
-        payload["entryBarTime"] = BASE_MS - 300_000 + 60_000  # DAY → M5
+        payload["entryBarTime"] = BASE_MS - 300_000 - 60_000  # DAY → M5
         status, result = self.store.ingest(payload, INGEST, BASE_MS)
         self.assertEqual(status, 200, result)
         self.assertTrue(result["accepted"])
@@ -326,7 +326,7 @@ class BridgeStoreTests(unittest.TestCase):
 
     def test_stale_entry_trigger_rejection_emits_diagnostic_line(self):
         payload = valid_payload()
-        payload["entryBarTime"] = BASE_MS - TIMEFRAME_MS["M5"] + ENTRY_BAR_GRACE_MS + 1
+        payload["entryBarTime"] = BASE_MS - TIMEFRAME_MS["M5"] - ENTRY_BAR_GRACE_MS - 1
         output = io.StringIO()
         with redirect_stdout(output):
             status, result = self.store.ingest(payload, INGEST, BASE_MS)
@@ -616,13 +616,13 @@ class BridgeStoreTests(unittest.TestCase):
 
                 btc = valid_payload(symbol="BTCUSD")
                 btc["tickerid"] = "BINANCE:BTCUSDT"
-                btc["entryBarTime"] = BASE_MS - TIMEFRAME_MS["M5"] + ENTRY_BAR_GRACE_MS + 1
+                btc["entryBarTime"] = BASE_MS - TIMEFRAME_MS["M5"] - ENTRY_BAR_GRACE_MS - 1
                 status, result = self.store.ingest(btc, INGEST, BASE_MS)
                 self.assertEqual(status, 200, result)
 
                 gold = valid_payload(symbol="XAUUSD")
                 gold["tickerid"] = "FOREXCOM:XAUUSD"
-                gold["entryBarTime"] = BASE_MS - TIMEFRAME_MS["M5"] + ENTRY_BAR_GRACE_MS + 2
+                gold["entryBarTime"] = BASE_MS - TIMEFRAME_MS["M5"] - ENTRY_BAR_GRACE_MS - 2
                 status, result = self.store.ingest(gold, INGEST, BASE_MS + 1_000)
                 self.assertEqual(status, 200, result)
 
@@ -671,7 +671,7 @@ class BridgeStoreTests(unittest.TestCase):
                 bridge.DIAG_STARTED_AT_MS = previous_started
 
     def test_stale_or_future_entry_trigger_downgrades_plan_and_keeps_fresh_mtf(self):
-        for time_value in (BASE_MS - TIMEFRAME_MS["M5"] + MTF_BAR_GRACE_MS + 1,
+        for time_value in (BASE_MS - TIMEFRAME_MS["M5"] - MTF_BAR_GRACE_MS - 1,
                            BASE_MS + MAX_FUTURE_SKEW_MS + 1):
             with self.subTest(entryBarTime=time_value):
                 payload = valid_payload()
