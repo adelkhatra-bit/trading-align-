@@ -211,6 +211,11 @@ if barstate.isconfirmed
             "rv = array.get(rsis, i)",
             1,
         )
+        without_export = without_export.replace(
+            "        // RSI affiché = dernière valeur clôturée, comme la direction utilisée pour la décision.\\n",
+            "",
+            1,
+        )
         without_export = without_export.replace("RSI clôturé :", "RSI :", 1)
         without_export = without_export.replace("Compression en formation :", "Compression :", 1)
         without_export = without_export.replace(
