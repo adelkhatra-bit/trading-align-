@@ -13,7 +13,7 @@ class LiveDuetCommentators(unittest.TestCase):
         self.page = LIVE_PAGE.read_text(encoding="utf-8")
 
     def test_visible_chart_acquires_owner_before_publishing_and_polling(self):
-        initial = self.js.rindex("  ecouter();\\n  pingEcran();")
+        initial = self.js.rindex("  ecouter();\n  pingEcran();")
         owner = self.js.index("if (estProprietaireEcran()) {", initial)
         publish = self.js.index("publierEtatCoach(voixActive);", owner)
         poll = self.js.index("ecouterDialoguesCoach();", publish)
