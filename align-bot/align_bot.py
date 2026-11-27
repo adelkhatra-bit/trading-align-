@@ -13401,8 +13401,19 @@ def agent(m, r, cle, ferme):
             cle["fin"] = [tr, sl, "🔒 Sorti à BE" if tr.get("be_dit") else "🛑 Stop touché"]; cle["stop_t"] = r["t"]
             cle.pop("trade"); cle["aligne"] = 0; return out
         if touche_t1:
-            tr["statut"] = "tp1"; tr["sl"] = e
-            out.append(cs_(m, "TP1 TOUCHÉ", [f"💰 TP1 : {px(t1)} ✅ 🎆", f"🔒 SL → BE : {px(e)} (plus de perte possible)", "☕ Va boire un café, la suite se fait sans risque", f"🏁 TP2 : {px(t2)}"] + lecture_tp1(r, d),
+            sl_precedent = float(tr.get("sl", e))
+            sl_protege = max(sl_precedent, e) if d == 1 else min(sl_precedent, e)
+            tr["statut"] = "tp1"
+            tr["sl"] = sl_protege
+            if d * (sl_precedent - e) > 1e-9:
+                libelle_sl = "SL conservé (plus protecteur)"
+            elif abs(sl_precedent - e) <= 1e-9:
+                libelle_sl = "SL maintenu au BE"
+            else:
+                libelle_sl = "SL → BE"
+            out.append(cs_(m, "TP1 TOUCHÉ", [f"💰 TP1 : {px(t1)} ✅ 🎆",
+                                           f"🔒 {libelle_sl} : {px(sl_protege)} (entrée {px(e)} • protection jamais relâchée)",
+                                           "☕ Va boire un café, la suite se fait sans risque", f"🏁 TP2 : {px(t2)}"] + lecture_tp1(r, d),
                                    "Sécuriser une partie, garder le reste", r))
             return out
         # ↩ Voyants de retournement (comme l'indicateur) : 3/5 petites unités contre la position = alerte, 1 fois.
