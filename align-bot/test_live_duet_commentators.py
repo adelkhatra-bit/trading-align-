@@ -125,10 +125,13 @@ class LiveDuetCommentators(unittest.TestCase):
         self.assertIn("parlerLive(item, true, attente.apresLecture)", self.js)
         self.assertIn("if (!voixActive || !attente || !attente.item) return;", self.js)
 
-    def test_synthesis_error_never_starts_the_second_duet_speaker(self):
+    def test_synthesis_error_does_not_block_the_remaining_duet_replies(self):
         self.assertIn("utterance.onerror = () => {", self.js)
-        self.assertIn("terminerLecture(false);", self.js)
+        self.assertIn("terminerLecture(true);", self.js)
         self.assertIn("if (continuer && typeof apresLecture === 'function') apresLecture();", self.js)
+        self.assertIn("coachDialogueActive = true;", self.js)
+        self.assertIn("coachDialogueActive = false;", self.js)
+        self.assertIn("if (coachDialogueActive && item.source !== 'coach') return 0;", self.js)
 
 
 

@@ -156,6 +156,8 @@ class LiveTikTok(unittest.TestCase):
         self.assertIn("const overlayVisible = el =>", bande)
         self.assertIn("const overlayOuvert = Array.from(document.querySelectorAll", bande)
         self.assertIn(".some(overlayVisible)", bande)
+        self.assertIn("el.matches('[role=\"dialog\"][aria-modal=\"true\"], [data-dialog-name][aria-modal=\"true\"]')", bande)
+        self.assertIn("Seule une vraie fenêtre modale TradingView peut le masquer.", bande)
         self.assertNotIn("classList.toggle('align-cache', !!document.querySelector", bande)
 
     def test_position_confirmee_declenche_spectacle_visuel(self):
@@ -880,8 +882,8 @@ class LiveAgendaMarketTimezoneTests(unittest.TestCase):
 
     def test_bande_visual_animations_are_initialized_and_preserved(self):
         bande = Path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "live", "align-bande-live.user.js")).read_text(encoding="utf-8")
-        self.assertIn("// @version      12.2.28", bande)
-        self.assertIn("const VERSION = '12.2.28';", bande)
+        self.assertIn("// @version      12.2.29", bande)
+        self.assertIn("const VERSION = '12.2.29';", bande)
         self.assertIn("document.head.appendChild(cssAnimationsToggle);\n  appliquerAnimations();", bande)
         self.assertIn("function afficherIA(", bande)
         self.assertIn("function parlerLive(item, forcer = false, apresLecture = null)", bande)
@@ -1206,8 +1208,8 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
 
     def test_bande_version_12_2_28_voice_recovery_and_sync(self):
         bande = self._lire(["docs", "live", "align-bande-live.user.js"])
-        self.assertIn("// @version      12.2.28", bande)
-        self.assertIn("const VERSION = '12.2.28';", bande)
+        self.assertIn("// @version      12.2.29", bande)
+        self.assertIn("const VERSION = '12.2.29';", bande)
         self.assertIn('let voixUtterance = null', bande)
         self.assertIn('const voixUtterances = new Set()', bande)
         self.assertIn('voixUtterance = utterance;', bande)
