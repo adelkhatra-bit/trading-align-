@@ -296,9 +296,19 @@ def plan_indicateur(r):
 
     def indisponible(reason):
         result = {"timeframe": plan_tf, "available": False, "reason": reason}
-        if (snap.get("fresh") is True and snap.get("robotFresh") is True
-                and pine_verdict and pine_verdict.upper() not in {"LONG", "SHORT", "WAIT"}):
-            result["verdict"] = pine_verdict
+        if snap.get("fresh") is True and snap.get("robotFresh") is True:
+            if pine_verdict:
+                result["verdict"] = pine_verdict
+            signal = str(robot.get("signal") or "").strip().upper()
+            if signal:
+                result["signal"] = signal
+            for key in ("long_score", "short_score"):
+                try:
+                    score = float(robot.get(key))
+                    if math.isfinite(score):
+                        result[key] = score
+                except (TypeError, ValueError):
+                    pass
         return result
     try:
         entry, sl = float(robot.get("entry")), float(robot.get("sl"))
@@ -390,6 +400,61 @@ def plan_indicateur(r):
         "timestamp": snap.get("robotTimestamp") or robot.get("receivedAt") or snap.get("timestamp"),
         "ageMs": snap.get("robotAgeMs") if snap.get("robotAgeMs") is not None else robot.get("ageMs"),
     }
+
+def statut_attente_pine(tv_plan, bridge=None):
+    """Formule le statut d'attente sans transformer un biais candidat en entrée."""
+    bridge = bridge if isinstance(bridge, dict) else {}
+    if isinstance(tv_plan, dict) and tv_plan.get("available") is True:
+        direction = tv_plan.get("direction")
+        sens = "LONG" if direction == 1 else "SHORT" if direction == -1 else ""
+        if sens:
+            return (
+                "⏳ CONFIRMATION MTF PINE EN ATTENTE",
+                f"Configuration {sens} M15 détectée. Attendre la confirmation MTF et le déclencheur clôturé. Aucune entrée autorisée.",
+            )
+        return (
+            "⏳ CONFIRMATION MTF PINE EN ATTENTE",
+            "Aucune direction LONG/SHORT confirmée. Aucun niveau ni aucune entrée autorisés.",
+        )
+
+    plan = tv_plan if isinstance(tv_plan, dict) else {}
+    signal = str(plan.get("signal") or "").upper()
+    try:
+        long_score = float(plan.get("long_score") or 0)
+    except (TypeError, ValueError):
+        long_score = 0.0
+    try:
+        short_score = float(plan.get("short_score") or 0)
+    except (TypeError, ValueError):
+        short_score = 0.0
+
+    if signal == "WAIT" and long_score > short_score and long_score > 0:
+        return (
+            "⏳ ATTENTE — biais candidat LONG",
+            f"Score candidat LONG : {long_score:.0f}/100. Pas de plan confirmé ; aucun Entry/SL/TP ni aucune entrée.",
+        )
+    if signal == "WAIT" and short_score > long_score and short_score > 0:
+        return (
+            "⏳ ATTENTE — biais candidat SHORT",
+            f"Score candidat SHORT : {short_score:.0f}/100. Pas de plan confirmé ; aucun Entry/SL/TP ni aucune entrée.",
+        )
+    if signal == "WAIT":
+        return (
+            "⏳ ATTENTE — aucun biais LONG/SHORT confirmé par Pine v25",
+            "Pine v25 n'a confirmé aucune configuration M15. Aucune entrée autorisée.",
+        )
+    if signal in {"LONG", "SHORT"}:
+        return (
+            f"⏳ DONNÉES PINE INCOMPLÈTES — signal {signal}",
+            f"Signal {signal} reçu mais niveaux/zone M15 incomplets. Entrée bloquée jusqu'à réception d'un plan valide.",
+        )
+
+    reason = str(plan.get("reason") or bridge.get("reason") or "snapshot TradingView canonique M15 absent ou périmé")
+    return (
+        "⏳ ATTENTE — données Pine v25 absentes ou périmées",
+        f"Raison technique : {reason}. Aucune entrée ni aucun niveau ne sont autorisés.",
+    )
+
 
 TTL_KRAKEN = {1: 5, 5: 10, 15: 30, 30: 60, 60: 120, 240: 300, 1440: 900, 10080: 1800}
 
@@ -1617,10 +1682,8 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
         if require_tv:
             if trade_ouvert:
                 etat_pos = "🟢 POSITION ALIGN EN COURS — exécution manuelle, suivi personnel après confirmation"
-            elif not tv_plan or tv_plan.get("available") is not True:
-                etat_pos = "⏳ ATTENTE — plan TradingView/Pine v25 indisponible"
             elif not plan_confirme:
-                etat_pos = "⏳ ATTENTE — confirmation MTF Pine non validée"
+                etat_pos, _ = statut_attente_pine(tv_plan, r.get("tv_indicator_mtf"))
             else:
                 etat_pos = "🟡 PLAN PINE CONFIRMÉ — déclencheur d'entrée en attente"
         else:
@@ -1663,19 +1726,10 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
     if require_tv and trade_ouvert:
         l += ["━━━━━━━━━━━━━━━━━━", "📍 POSITION ALIGN MÉMORISÉE",
               "La position et ses niveaux restent ceux mémorisés. Aucune nouvelle entrée locale ne les remplace."]
-    elif require_tv and (not tv_plan or tv_plan.get("available") is not True):
-        reason = ((tv_plan or {}).get("verdict") or (tv_plan or {}).get("reason") or
-                  (r.get("tv_indicator_mtf") or {}).get("reason") or
-                  "snapshot TradingView canonique M15 indisponible")
-        l += ["━━━━━━━━━━━━━━━━━━", "⏳ DIVERGENCE DES SOURCES — ATTENTE",
-              f"Plan Pine v25 indisponible : {reason}",
-              "Aucun plan local ne remplace le plan TradingView canonique."]
     elif require_tv and not plan_confirme:
-        motif_pine = str((tv_plan or {}).get("verdict") or "Les clôtures MTF Pine ne sont pas toutes confirmées.")
-        l += ["━━━━━━━━━━━━━━━━━━", "⏳ CONFIRMATION MTF PINE EN ATTENTE",
-              "Configuration M15 détectée — confirmation MTF en attente.",
-              f"Motif Pine v25 : {motif_pine}",
-              "Aucun niveau Entry / SL / TP n'est publié avant confirmation MTF."]
+        titre_attente, raison_attente = statut_attente_pine(tv_plan, r.get("tv_indicator_mtf"))
+        l += ["━━━━━━━━━━━━━━━━━━", titre_attente, raison_attente,
+              "Aucun plan local ne remplace le plan TradingView canonique."]
     elif require_tv and plan_confirme:
         age_ms = tv_plan.get("ageMs")
         age_txt = (f"âge plan M15 : {max(0, int(float(age_ms) / 1000))} s"
@@ -1766,10 +1820,8 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
         titre = "📍 POSITION EN COURS"
         raison = "La position et ses niveaux restent ceux mémorisés ; aucune nouvelle entrée locale n'est proposée."
     elif require_tv and not plan_confirme:
-        cause = tv_plan.get("reason") or (r.get("tv_indicator_mtf") or {}).get("reason") or "confirmation MTF Pine absente"
-        titre = "⏳ DIVERGENCE DES SOURCES — ATTENTE" if not tv_plan.get("available") else "⏳ CONFIRMATION MTF PINE EN ATTENTE"
-        raison = (f"{cause}. Les lectures locales ALIGN restent du contexte uniquement. "
-                  "Aucun sens de trade ni niveau Entry/SL/TP n'est autorisé.")
+        titre, raison = statut_attente_pine(tv_plan, r.get("tv_indicator_mtf"))
+        raison += " Les lectures locales ALIGN restent du contexte uniquement."
     elif require_tv and plan_confirme:
         if tv_plan.get("triggered") and tv_plan.get("price_in_zone"):
             titre = "🟢 DÉCLENCHEUR PINE VALIDÉ — PRIX DANS LA ZONE"
@@ -2982,6 +3034,20 @@ TRAD.update({
     "🟢 Bougie en hausse": "🟢 Candle rising",
     "🔴 Bougie en baisse": "🔴 Candle falling",
     "⚪ Bougie à plat": "⚪ Flat candle",
+    "⏳ ATTENTE — biais candidat LONG": "⏳ WAITING — candidate LONG bias",
+    "⏳ ATTENTE — biais candidat SHORT": "⏳ WAITING — candidate SHORT bias",
+    "⏳ ATTENTE — aucun biais LONG/SHORT confirmé par Pine v25": "⏳ WAITING — no LONG/SHORT bias confirmed by Pine v25",
+    "⏳ DONNÉES PINE INCOMPLÈTES — signal LONG": "⏳ INCOMPLETE PINE DATA — LONG signal",
+    "⏳ DONNÉES PINE INCOMPLÈTES — signal SHORT": "⏳ INCOMPLETE PINE DATA — SHORT signal",
+    "⏳ CONFIRMATION MTF PINE EN ATTENTE": "⏳ PINE MTF CONFIRMATION PENDING",
+    "Configuration LONG M15 détectée.": "LONG M15 setup detected.",
+    "Configuration SHORT M15 détectée.": "SHORT M15 setup detected.",
+    "Attendre la confirmation MTF et le déclencheur clôturé.": "Wait for MTF confirmation and the closed trigger.",
+    "Pas de plan confirmé": "No plan confirmed",
+    "aucun Entry/SL/TP ni aucune entrée": "no Entry/SL/TP or entry",
+    "Aucune entrée autorisée": "No entry authorized",
+    "Entrée bloquée": "Entry blocked",
+    "données Pine v25 absentes ou périmées": "Pine v25 data missing or stale",
     "👁 Mèche haute : rejet": "👁 Upper wick: rejection",
     "👁 Mèche basse : rejet": "👁 Lower wick: rejection",
     "👁 Mèche haute : rejet vendeur potentiel (biais SHORT)": "👁 Upper wick: potential seller rejection (SHORT bias)",

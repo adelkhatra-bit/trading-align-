@@ -2795,8 +2795,9 @@ class TestTradingViewReportRegression(unittest.TestCase):
              patch.object(align_bot, "strategie_mtf", return_value=["Contexte local"]), \
              patch.object(align_bot, "verdict", side_effect=AssertionError("local verdict must not override Pine")):
             message = align_bot.texte_etat("GOLD", r, {"ordre": stale_order})
-        self.assertIn("Configuration M15 détectée — confirmation MTF en attente.", message)
-        self.assertIn("Aucun niveau Entry / SL / TP n'est publié avant confirmation MTF.", message)
+        self.assertIn("Configuration LONG M15 détectée.", message)
+        self.assertIn("Attendre la confirmation MTF et le déclencheur clôturé.", message)
+        self.assertIn("Aucune entrée autorisée.", message)
         self.assertIn("CONFIRMATION MTF PINE EN ATTENTE", message)
         self.assertIn("POINT VISÉ : aucun", message)
         self.assertNotIn("Entrée : 100,00", message)
@@ -2819,8 +2820,8 @@ class TestTradingViewReportRegression(unittest.TestCase):
             })
         self.assertIn("Prix TradingView : indisponible — ATTENTE", message)
         self.assertIn("Prix local M1 (contexte uniquement) : 99,25", message)
-        self.assertIn("DIVERGENCE DES SOURCES — ATTENTE", message)
-        self.assertIn("snapshot TradingView canonique M15 périmé", message)
+        self.assertIn("données Pine v25 absentes ou périmées", message)
+        self.assertIn("Raison technique : snapshot TradingView canonique M15 périmé", message)
         self.assertIn("Aucun plan local ne remplace le plan TradingView canonique.", message)
         self.assertIn("POINT VISÉ : aucun", message)
         self.assertNotIn("123", message)

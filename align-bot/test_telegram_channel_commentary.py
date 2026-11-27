@@ -273,6 +273,71 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
             self.assertIn("aucun biais LONG/SHORT déduit", unavailable)
             self.assertNotIn("11/11", unavailable)
 
+    def test_pine_wait_status_uses_candidate_scores_without_authorizing_entry(self):
+        cases = (
+            ({"available": False, "signal": "WAIT", "long_score": 68, "short_score": 0},
+             "biais candidat LONG", "Score candidat LONG : 68/100"),
+            ({"available": False, "signal": "WAIT", "long_score": 0, "short_score": 74},
+             "biais candidat SHORT", "Score candidat SHORT : 74/100"),
+            ({"available": False, "signal": "WAIT", "long_score": 0, "short_score": 0},
+             "aucun biais LONG/SHORT confirmé", "aucune configuration M15"),
+        )
+        for plan, expected_title, expected_reason in cases:
+            title, reason = ab.statut_attente_pine(plan)
+            with self.subTest(plan=plan):
+                self.assertIn(expected_title, title)
+                self.assertIn(expected_reason, reason)
+                if "aucun biais" in title:
+                    self.assertIn("Aucune entrée autorisée", reason)
+                else:
+                    self.assertIn("aucune entrée", reason.lower())
+
+    def test_plan_indicateur_preserves_wait_signal_and_candidate_scores(self):
+        market = {
+            "tv_indicator_mtf": {
+                "activeTimeframe": "M15",
+                "snapshots": {
+                    "M15": {
+                        "fresh": True,
+                        "robotFresh": True,
+                        "robotV12": {
+                            "signal": "WAIT",
+                            "verdict": "À SURVEILLER : confirmation manquante",
+                            "long_score": 0,
+                            "short_score": 74,
+                        },
+                    }
+                },
+            }
+        }
+        plan = ab.plan_indicateur(market)
+        self.assertIs(plan["available"], False)
+        self.assertEqual(plan["signal"], "WAIT")
+        self.assertEqual(plan["short_score"], 74)
+        title, reason = ab.statut_attente_pine(plan)
+        self.assertIn("biais candidat SHORT", title)
+        self.assertIn("Score candidat SHORT : 74/100", reason)
+        english = ab.traduire(title + "\n" + reason)
+        self.assertIn("candidate SHORT bias", english)
+        self.assertIn("No plan confirmed", english)
+
+    def test_pine_wait_status_distinguishes_incomplete_data_and_confirmed_direction(self):
+        title, reason = ab.statut_attente_pine({"available": False, "signal": "SHORT"})
+        self.assertIn("signal SHORT", title)
+        self.assertIn("Entrée bloquée", reason)
+
+        title, reason = ab.statut_attente_pine({"available": False, "reason": "snapshot M15 périmé"})
+        self.assertIn("données Pine v25 absentes ou périmées", title)
+        self.assertIn("snapshot M15 périmé", reason)
+
+        title, reason = ab.statut_attente_pine({"available": True, "confirmed": False, "direction": 1})
+        self.assertIn("CONFIRMATION MTF PINE EN ATTENTE", title)
+        self.assertIn("Configuration LONG M15 détectée", reason)
+        self.assertIn("Aucune entrée autorisée", reason)
+        english = ab.traduire(title + "\\n" + reason)
+        self.assertIn("LONG M15 setup detected", english)
+        self.assertIn("Wait for MTF confirmation and the closed trigger", english)
+
     def test_position_followup_allows_levels_only_for_exact_active_position_owner(self):
         position = {"fini": False, "e": 100.0, "sl": 95.0}
         trade = {"qui": {"101": position}}
