@@ -2988,7 +2988,7 @@ TRAD.update({
     "👁 Le marché hésite 🤏": "👁 Market is hesitating 🤏",
     "📉 Unités :": "📉 Timeframes:",
     "📈 Unités :": "📈 Timeframes:",
-    "📊 UT clôturées :": "📊 Closed TFs:",
+    "📊 UT clôturées :": "📊 Timeframes:",
     "🎯 Vs sens confirmé ": "🎯 Vs confirmed direction ",
     "📊 Sans plan :": "📊 No plan:",
     "alignées": "aligned",
