@@ -5614,7 +5614,7 @@ def texte_pourquoi(m, r, cle):
     trade = (cle or {}).get("trade")
     if r.get("require_tv_bridge") and trade:
         sens = "LONG" if trade.get("d") == 1 else "SHORT"
-        return "\\n".join([
+        return "\n".join([
             f"❓ POURQUOI ALIGN ? — {m}",
             "━━━━━━━━━━━━━━━━━━━━",
             "📍 POSITION DÉJÀ OUVERTE",
