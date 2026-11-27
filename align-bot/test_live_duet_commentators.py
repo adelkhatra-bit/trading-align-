@@ -151,7 +151,7 @@ class LiveDuetCommentators(unittest.TestCase):
         self.assertIn("if (!voixActive || !attente || !attente.item) return;", self.js)
 
     def test_synthesis_error_does_not_block_the_remaining_duet_replies(self):
-        self.assertIn("utterance.onerror = () => {", self.js)
+        self.assertIn("utterance.onerror = event => {", self.js)
         self.assertIn("terminerLecture(true);", self.js)
         self.assertIn("if (continuer && typeof apresLecture === 'function') apresLecture();", self.js)
         self.assertIn("coachDialogueActive = true;", self.js)
