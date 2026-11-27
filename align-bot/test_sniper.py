@@ -146,7 +146,7 @@ class Cascade(unittest.TestCase):
 
 class TypesDeRejet(unittest.TestCase):
     def _base(self):
-        return [dict(t=i, o=100.0, h=100.2, l=99.8, c=100.0) for i in range(20)]
+        return [dict(t=i, o=99.8, h=100.2, l=99.8, c=100.2) for i in range(20)]
 
     def test_simple_close_back_below_level_is_not_a_rejection_pattern(self):
         bars = self._base()
