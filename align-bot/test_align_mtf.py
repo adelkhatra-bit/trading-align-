@@ -2881,7 +2881,7 @@ class TestTradingViewReportRegression(unittest.TestCase):
             message = align_bot.texte_apercu("GOLD", r, {})
         self.assertIn("Prix TradingView M5 : 101,25", message)
         self.assertIn("Direction Pine à surveiller : LONG", message)
-        self.assertIn("Zone d'entrée Pine M15 : 99,00 → 101,00", message)
+        self.assertIn("Zone d'entrée Pine M15 : 99 → 101", message)
         self.assertIn("PLAN PINE CONFIRMÉ — DÉCLENCHEUR EN ATTENTE", message)
         self.assertNotIn("Cible probable", message)
         self.assertNotIn("Zone de retournement visée", message)
