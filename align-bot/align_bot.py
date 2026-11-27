@@ -9763,7 +9763,7 @@ _PINE_TEXTES_EN = {
     "align_haut": (("📈 {ic} {m}: {sens_label} — {n}/{tf_total} timeframes support the plan", "{sens_action}"), ("🧲 {ic} {m}: {sens_label} scenario confluence is rising ({n}/{tf_total})", "{sens_action}"),
                    ("⬆️ {ic} {m}: {sens_label} — {n}/{tf_total} timeframes converge", "{sens_action}")),
     "align_bas": (("📉 {ic} {m}: {sens_label} scenario confluence is weakening ({n}/{tf_total})", "{sens_baisse}"), ("⬇️ {ic} {m}: fewer timeframes support {sens_label} ({n}/{tf_total})", "{sens_baisse}"),
-                  ("🌫 {ic} {m}: support for {sens_label} is fading ({n}/{tf_total})", "{sens_baisse})),
+                  ("🌫 {ic} {m}: support for {sens_label} is fading ({n}/{tf_total})", "{sens_baisse}")),
     "surcharge": (("⚡ {ic} {m}: OVERLOAD, {c}/11 timeframes squeezed", "👀 Breakout possible, wait for the direction"), ("🔋 {ic} {m}: the spring is tightening ({c}/11)", "🧭 The close will give the way"),
                   ("💤 {ic} {m}: very tight market ({c}/11)", "⚠️ It can go all at once")),
     "relache": (("💥 {ic} {m}: squeeze released", "🧭 Direction to confirm at the close"), ("🚀 {ic} {m}: it's freeing up after the squeeze", "👀 No rush, wait for the candle"),
