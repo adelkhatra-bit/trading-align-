@@ -1617,12 +1617,12 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
             if trade_ouvert:
                 etat_pos = "🟢 POSITION ALIGN EN COURS — exécution manuelle, suivi personnel après confirmation"
             elif not tv_plan or tv_plan.get("available") is not True:
-                verdict = str((tv_plan or {}).get("verdict") or "").upper()
-                if "SHORT" in verdict or "BAISSE" in verdict:
+                pine_verdict = str((tv_plan or {}).get("verdict") or "").upper()
+                if "SHORT" in pine_verdict or "BAISSE" in pine_verdict:
                     etat_pos = "⏳ ATTENTE — biais SHORT, aucun plan confirmé par Pine v25"
-                elif "LONG" in verdict or "HAUSSE" in verdict:
+                elif "LONG" in pine_verdict or "HAUSSE" in pine_verdict:
                     etat_pos = "⏳ ATTENTE — biais LONG, aucun plan confirmé par Pine v25"
-                elif verdict in {"WAIT", "ATTENDRE", "ATTENTE"}:
+                elif pine_verdict in {"WAIT", "ATTENDRE", "ATTENTE"}:
                     etat_pos = "⏳ ATTENTE — aucun biais LONG/SHORT confirmé par Pine v25"
                 else:
                     etat_pos = "⏳ ATTENTE — données Pine v25 absentes ou périmées"
