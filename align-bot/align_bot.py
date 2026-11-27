@@ -9739,10 +9739,10 @@ def texte_session(etat, ev, anglais=False):
     return out[:3]
 
 _PINE_TEXTES = {   # type -> variantes (FR, EN) ; {ic} {m} {n} {c} {seuil} {sens} {strat} {u} {niv} {fleche} {ratio}
-    "align_haut": (("📈 {ic} {m} : {n}/11 UT alignées", "🎯 Seuil {seuil} {etat_seuil}"), ("🧲 {ic} {m} : l'alignement monte ({n}/11)", "🎯 {etat_seuil_court}"),
-                   ("⬆️ {ic} {m} : {n} unités dans le même sens", "🎯 {etat_seuil_court}")),
-    "align_bas": (("📉 {ic} {m} : alignement qui baisse ({n}/11)", "⏳ Il en faut {seuil}"), ("⬇️ {ic} {m} : {n}/11 UT, ça se disperse", "🙅 Pas de validation"),
-                  ("🌫 {ic} {m} : moins d'unités d'accord ({n}/11)", "👀 Seuil {seuil}")),
+    "align_haut": (("📈 {ic} {m} : {n}/11 UT pointent vers {sens_label}", "{sens_action}"), ("🧲 {ic} {m} : la confluence progresse ({n}/11)", "{sens_action}"),
+                   ("⬆️ {ic} {m} : {n}/11 unités convergent", "{sens_action}")),
+    "align_bas": (("📉 {ic} {m} : l'accord des UT baisse ({n}/11)", "{sens_baisse}"), ("⬇️ {ic} {m} : la confluence se disperse ({n}/11)", "{sens_baisse}"),
+                  ("🌫 {ic} {m} : moins d'unités vont dans le même sens ({n}/11)", "{sens_baisse}")),
     "surcharge": (("⚡ {ic} {m} : SURCHARGE, {c}/11 UT comprimées", "👀 Explosion possible, attends la direction"), ("🔋 {ic} {m} : le ressort se comprime ({c}/11)", "🧭 La clôture donnera le sens"),
                   ("💤 {ic} {m} : marché très comprimé ({c}/11)", "⚠️ Ça peut partir d'un coup")),
     "relache": (("💥 {ic} {m} : compression relâchée", "🧭 Sens à confirmer à la clôture"), ("🚀 {ic} {m} : ça se libère après la compression", "👀 Pas de précipitation, on attend la bougie"),
@@ -9760,10 +9760,10 @@ _PINE_TEXTES = {   # type -> variantes (FR, EN) ; {ic} {m} {n} {c} {seuil} {sens
                      ("🎯 {ic} {m} : {sens} confirmé à la clôture {u}", "📍 Ligne de décision {niv}")),
 }
 _PINE_TEXTES_EN = {
-    "align_haut": (("📈 {ic} {m}: {n}/11 timeframes aligned", "🎯 Threshold {seuil} {etat_seuil}"), ("🧲 {ic} {m}: alignment is rising ({n}/11)", "🎯 {etat_seuil_court}"),
-                   ("⬆️ {ic} {m}: {n} timeframes agree", "🎯 {etat_seuil_court}")),
-    "align_bas": (("📉 {ic} {m}: alignment dropping ({n}/11)", "⏳ Need {seuil}"), ("⬇️ {ic} {m}: {n}/11, it's scattering", "🙅 No validation"),
-                  ("🌫 {ic} {m}: fewer timeframes agree ({n}/11)", "👀 Threshold {seuil}")),
+    "align_haut": (("📈 {ic} {m}: {n}/11 timeframes point toward {sens_label}", "{sens_action}"), ("🧲 {ic} {m}: confluence is increasing ({n}/11)", "{sens_action}"),
+                   ("⬆️ {ic} {m}: {n}/11 timeframes converge", "{sens_action}")),
+    "align_bas": (("📉 {ic} {m}: timeframe agreement is weakening ({n}/11)", "{sens_baisse}"), ("⬇️ {ic} {m}: confluence is dispersing ({n}/11)", "{sens_baisse}"),
+                  ("🌫 {ic} {m}: fewer timeframes share the same direction ({n}/11)", "{sens_baisse}")),
     "surcharge": (("⚡ {ic} {m}: OVERLOAD, {c}/11 timeframes squeezed", "👀 Breakout possible, wait for the direction"), ("🔋 {ic} {m}: the spring is tightening ({c}/11)", "🧭 The close will give the way"),
                   ("💤 {ic} {m}: very tight market ({c}/11)", "⚠️ It can go all at once")),
     "relache": (("💥 {ic} {m}: squeeze released", "🧭 Direction to confirm at the close"), ("🚀 {ic} {m}: it's freeing up after the squeeze", "👀 No rush, wait for the candle"),
@@ -9792,7 +9792,7 @@ def evenements_pine(etat, m, r, cle, now):
     statut, _ = etat_marche_hb(m, r, now)
     ev, e = [], hb_etat_surveille(r)
     d, n, comp = e["d"], e["n"], int(r.get("comp", 0))
-    base = dict(m=m, ic=ICONE.get(m, ""), seuil=MIN_ALIGN, n=n, c=comp)
+    base = dict(m=m, ic=ICONE.get(m, ""), seuil=MIN_ALIGN, n=n, c=comp, d=d)
     if statut != "ouvert":
         mem.update(n=n, comp=comp)
         return ev                                      # marché fermé ou données périmées : aucune alerte inventée
@@ -9904,12 +9904,20 @@ def texte_pine(etat, ev, anglais=False):
     var = (_PINE_TEXTES_EN if anglais else _PINE_TEXTES)[ev["kind"]]
     lignes = var[_tournante(etat, f"p:{ev['kind']}:{ev['m']}", len(var))]
     ev = dict(ev)
+    direction = int(ev.get("d") or 0)
     if anglais:
+        ev["sens_label"] = "LONG (Pine direction, not confirmed)" if direction == 1 else "SHORT (Pine direction, not confirmed)" if direction == -1 else "no LONG/SHORT direction from Pine"
+        ev["sens_action"] = "Confluence only — wait for the Pine trigger and ROBOT V12 check." if direction else "No trade direction confirmed — wait for a Pine plan."
+        ev["sens_baisse"] = "The LONG scenario is losing support; this is not a SHORT signal." if direction == 1 else "The SHORT scenario is losing support; this is not a LONG signal." if direction == -1 else "No reversal or opposite trade direction is confirmed."
         ev["pos"] = {"au-dessus de": "above", "sous": "below"}.get(ev.get("pos"), ev.get("pos"))
         ev["etat_seuil"] = "reached ✅" if "atteint" in str(ev.get("etat_seuil", "")) else "almost"
         ev["etat_seuil_court"] = "Threshold reached" if "atteint" in str(ev.get("etat_seuil_court", "")) else "Almost at the threshold"
         ev["ordre"] = {"vente": "sell", "achat": "buy"}.get(ev.get("ordre"), ev.get("ordre"))
         ev["fleche"] = str(ev.get("fleche", "")).replace("HAUSSIER", "BULLISH").replace("BAISSIER", "BEARISH")
+    else:
+        ev["sens_label"] = "LONG (orientation Pine, non confirmée)" if direction == 1 else "SHORT (orientation Pine, non confirmée)" if direction == -1 else "aucun sens LONG/SHORT défini par Pine"
+        ev["sens_action"] = "Confluence seulement : attendre le déclencheur Pine et le contrôle ROBOT V12." if direction else "Aucune direction de trade confirmée : attendre un plan Pine."
+        ev["sens_baisse"] = "Le scénario LONG perd du soutien ; ce message ne signale pas un SHORT." if direction == 1 else "Le scénario SHORT perd du soutien ; ce message ne signale pas un LONG." if direction == -1 else "Aucun retournement ni sens inverse n'est confirmé par ce message."
     return [l.format(**{k: v for k, v in ev.items() if k != "kind"}) for l in lignes]
 
 def regrouper_alertes(blocs):
