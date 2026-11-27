@@ -194,8 +194,6 @@ o1h = d1hStrat == -dP"""
         for field in required_fields:
             self.assertIn(field, self.source)
         timeframes = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1")
-        for timeframe in timeframes:
-            self.assertIn('"' + timeframe + '":{"direction":', self.source)
         self.assertIn(">= 20000", self.source)
         tuple_contracts = (
             ("d1, s1, r1, r1Fermee", "bridgeTimeM1"),
@@ -220,12 +218,12 @@ o1h = d1hStrat == -dP"""
         self.assertIn('bridgeTfSeconds == 600 ? "M10"', self.source)
         self.assertIn('bridgeTfSeconds == 2700 ? "M45"', self.source)
         export_block = self.source.split(EXPORT_MARKER, 1)[1]
-        pairs = (("M1", "r1Fermee"), ("M3", "r2Fermee"), ("M5", "r5Fermee"), ("M10", "r10Fermee"), ("M15", "r15Fermee"), ("M30", "r30Fermee"), ("M45", "r45Fermee"), ("H1", "r60Fermee"), ("H2", "r120Fermee"), ("H4", "r240Fermee"), ("D1", "rDFermee"), ("W1", "rWFermee"))
-        for timeframe, closed_rsi in pairs:
+        for timeframe in timeframes:
             with self.subTest(timeframe=timeframe):
                 marker = '"' + timeframe + '":{"direction":'
                 self.assertIn(marker, export_block)
                 timeframe_block = export_block.split(marker, 1)[1].split("}", 1)[0]
+                closed_rsi = {"M1":"r1Fermee", "M3":"r2Fermee", "M5":"r5Fermee", "M10":"r10Fermee", "M15":"r15Fermee", "M30":"r30Fermee", "M45":"r45Fermee", "H1":"r60Fermee", "H2":"r120Fermee", "H4":"r240Fermee", "D1":"rDFermee", "W1":"rWFermee"}[timeframe]
                 self.assertIn("f_align_v25_json_num(" + closed_rsi + ")", timeframe_block)
         m3_marker = '"M3":{"direction":'
         m3_block = export_block.split(m3_marker, 1)[1].split("}", 1)[0]
