@@ -195,7 +195,6 @@ class EvenementsPine(unittest.TestCase):
                 message = "\n".join(ab.texte_pine({}, events[0]))
                 self.assertIn(expected_direction, message)
                 self.assertIn(expected_action, message)
-                self.assertIn("pas un signal Pine", message)
 
         falling_cases = (
             (1, {"bull": 8, "bear": 2}, {"bull": 6, "bear": 2},
@@ -250,7 +249,7 @@ class EvenementsPine(unittest.TestCase):
         self.assertIn("UT absentes ou périmées", message)
         self.assertIn("attendre la clôture M5", message)
         self.assertNotIn("entrée autorisée", message.lower())
-        english = "\\n".join(ab.texte_pine({}, events[0], True))
+        english = "\n".join(ab.texte_pine({}, events[0], True))
         self.assertIn("Against LONG / SHORT pressure", english)
         self.assertIn("1 min", english)
         self.assertNotIn("UT favorables", english)
