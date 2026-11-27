@@ -1,5 +1,6 @@
 """Regression checks for configured external AI provider model identifiers."""
 import unittest
+from pathlib import Path
 
 import align_bot as ab
 
@@ -127,6 +128,13 @@ class AIProviderModelConfig(unittest.TestCase):
                          [{"role": "user", "content": "test"}])
         payload = json.loads(request.call_args.args[0].data.decode())
         self.assertNotIn("service_tier", payload)
+
+
+    def test_manual_ai_healthcheck_fails_when_no_external_provider_responds(self):
+        workflow = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "ai-check.yml"
+        content = workflow.read_text(encoding="utf-8")
+        self.assertIn("run: python3 ai_healthcheck.py", content)
+        self.assertNotIn("continue-on-error:", content)
 
 
 if __name__ == "__main__":
