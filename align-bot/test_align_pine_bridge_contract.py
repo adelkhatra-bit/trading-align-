@@ -175,6 +175,30 @@ o1h = d1hStrat == -dP"""
         without_export = without_settings.split(EXPORT_MARKER, 1)[0]
         if without_export.endswith("\n\n"):
             without_export = without_export[:-1]
+        # Normalize the targeted reversal-direction guard and live entry-zone gate.
+        direction_start = without_export.find("// Plan automatique : les grosses UT (2h, 4h, Daily) décident, sauf zone de retournement")
+        direction_end = without_export.find("// GOLD : aucune direction de trade", direction_start)
+        self.assertGreaterEqual(direction_start, 0)
+        self.assertGreater(direction_end, direction_start)
+        baseline_direction = """// Plan automatique : les grosses UT (2h, 4h, Daily) décident, sauf zone de retournement
+dirBrut = zoneHaut ? 1 : zoneBas ? -1 : longT >= 2 ? 1 : longT <= -2 ? -1 : retHaut ? 1 : retBas ? -1 : sens
+// Anti-parasites (vue 1 / 3 / 5 min) : le sens ne change qu'à la CLÔTURE d'une bougie,
+// et seulement si le 15 min ou l'1h confirme le nouveau sens. Pas de LONG / SHORT qui clignote en cours de bougie.
+var int dirStable = 0
+if barstate.isconfirmed
+    if dirStable == 0
+        dirStable := dirBrut
+    else if dirBrut != 0 and dirBrut != dirStable and (nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut)
+        dirStable := dirBrut
+    else if dirBrut == 0 and nz(d15Fermee) != dirStable and nz(d60Fermee) != dirStable
+        dirStable := 0
+"""
+        without_export = without_export[:direction_start] + baseline_direction + without_export[direction_end:]
+        without_export = without_export.replace(
+            "entryReadyUi = entryTriggeredUi and close >= zBas and close <= zHaut and (dirPlan == 1 ? close > (zBas + zHaut) / 2 : dirPlan == -1 ? close < (zBas + zHaut) / 2 : false)",
+            "entryReadyUi = entryTriggeredUi and close >= zBas and close <= zHaut",
+            1,
+        )
         raw = without_export.encode("utf-8")
         git_blob = hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
         self.assertEqual(git_blob, BASELINE_GIT_BLOB_SHA)
