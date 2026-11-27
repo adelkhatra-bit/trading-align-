@@ -1538,17 +1538,59 @@ def mouvement_recent_m1(r, nb=5):
     return f"📈 Mouvement court terme ({nb} clôtures M1) : {sens} {variation:+.2f}%"
 
 
+def prix_tradingview_actif(r):
+    """Retourne uniquement le prix actif du snapshot TradingView/Pine frais et explicitement disponible."""
+    bridge = (r or {}).get("tv_indicator_mtf") or {}
+    if bridge.get("available") is not True:
+        return None
+    timeframe = str(bridge.get("activeTimeframe") or "").upper()
+    snapshot = (bridge.get("snapshots") or {}).get(timeframe)
+    if not timeframe or not isinstance(snapshot, dict) or snapshot.get("fresh") is not True:
+        return None
+    try:
+        price = float(snapshot.get("price"))
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(price) or price <= 0:
+        return None
+    age_ms = bridge.get("activeTimeframeAgeMs")
+    if age_ms is None:
+        age_ms = snapshot.get("robotAgeMs")
+    return {
+        "price": price,
+        "timeframe": timeframe,
+        "ageMs": age_ms,
+        "timestamp": snapshot.get("robotTimestamp") or snapshot.get("timestamp"),
+    }
+
+
 def texte_etat(nom_marche, r, cle=None, vip=True):
     """Carte Telegram complète : mise en page uniquement, aucune rubrique d'analyse supprimée."""
     # Codes visuels constants : vert = hausse, rouge = baisse, orange = neutre.
     fl = lambda d: "🟢⬆️" if d == 1 else "🔴⬇️" if d == -1 else "🟠➖"
-    prix = r["m1"][-1]["c"]
-    entete = f"{ICONE.get(nom_marche, '📊')}  ALIGN • {nom_marche}\n💹 Prix actuel : {px(prix)}"
+    require_tv = bool(r.get("require_tv_bridge"))
+    prix_local = r["m1"][-1]["c"]
+    tv_price = prix_tradingview_actif(r) if require_tv else None
+    if require_tv:
+        if tv_price:
+            age_ms = tv_price.get("ageMs")
+            age_txt = (f" · actualisé il y a {max(0, int(float(age_ms) / 1000))} s"
+                       if isinstance(age_ms, (int, float)) and math.isfinite(float(age_ms)) else "")
+            entete = (f"{ICONE.get(nom_marche, '📊')}  ALIGN • {nom_marche}\n"
+                      f"📡 Prix TradingView {tv_price['timeframe']} : {px(tv_price['price'])}{age_txt}")
+        else:
+            entete = (f"{ICONE.get(nom_marche, '📊')}  ALIGN • {nom_marche}\n"
+                      "📡 Prix TradingView : indisponible — ATTENTE")
+        prix_local_ligne = f"💹 Prix local M1 (contexte uniquement) : {px(prix_local)}"
+    else:
+        entete = f"{ICONE.get(nom_marche, '📊')}  ALIGN • {nom_marche}\n💹 Prix actuel : {px(prix_local)}"
+        prix_local_ligne = None
+    lignes_entete = [entete] + ([prix_local_ligne] if prix_local_ligne else [])
     if not vip:
         etat_pos = ("🟢 Une position VIP est actuellement ouverte" if (cle or {}).get("trade") else
                     "🟡 Une opportunité VIP se prépare" if (cle or {}).get("ordre") and r["confirme"] else
                     "⚪ Aucune position VIP pour le moment")
-        return "\n".join([entete, "━━━━━━━━━━━━━━━━━━", "📡 POINT DE MARCHÉ",
+        return "\n".join(lignes_entete + ["━━━━━━━━━━━━━━━━━━", "📡 POINT DE MARCHÉ",
                             etat_pos, r.get("news") or "📰 Calendrier économique indisponible",
                             "━━━━━━━━━━━━━━━━━━"] + (
                             # TOUT_GRATUIT (décision d'Adel, 15/11) : plus aucun prix VIP affiché, les positions sont gratuites.
@@ -1558,33 +1600,61 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
     D, R = r["dirs"], r["rsis"]
     maj, n_ok = alignement(r)
     ut = [("1m", 0), ("5m", 2), ("15m", 4), ("1h", 7), ("4h", 9), ("Daily", 10)]
-    biais = ("🟢 Biais haussier confirmé" if maj == 1 else
-             "🔴 Biais baissier confirmé" if maj == -1 else
-             "🟠 Pas de biais confirmé en 1h / 4h")
-    l = [entete, "━━━━━━━━━━━━━━━━━━", "📡 LECTURE DU MARCHÉ",
-         mouvement_recent_m1(r), "BIAIS DE FOND (H1 / H4)", biais,
-         "━━━━━━━━━━━━━━━━━━", "📊 INDICATEURS PAR UNITÉ DE TEMPS",
+    biais = ("🟢 Biais haussier local (contexte)" if maj == 1 else
+             "🔴 Biais baissier local (contexte)" if maj == -1 else
+             "🟠 Pas de biais local confirmé en 1h / 4h")
+    if not require_tv:
+        biais = ("🟢 Biais haussier confirmé" if maj == 1 else
+                 "🔴 Biais baissier confirmé" if maj == -1 else
+                 "🟠 Pas de biais confirmé en 1h / 4h")
+    mouvement = mouvement_recent_m1(r)
+    if require_tv:
+        mouvement += " • flux local ALIGN"
+    l = lignes_entete + ["━━━━━━━━━━━━━━━━━━", "📡 LECTURE DU MARCHÉ",
+         mouvement, "BIAIS DE FOND LOCAL (H1 / H4)" if require_tv else "BIAIS DE FOND (H1 / H4)", biais,
+         "━━━━━━━━━━━━━━━━━━", "📊 INDICATEURS ALIGN LOCAUX (CONTEXTE)" if require_tv else "📊 INDICATEURS PAR UNITÉ DE TEMPS",
          "  /  ".join(f"{nom} {fl(D[i])}" for nom, i in ut),
-         "━━━━━━━━━━━━━━━━━━", "📈 RSI PAR UNITÉ DE TEMPS",
+         "━━━━━━━━━━━━━━━━━━", "📈 RSI ALIGN LOCAL (CONTEXTE)" if require_tv else "📈 RSI PAR UNITÉ DE TEMPS",
          "  /  ".join(f"{nom} {R[i]:.0f}" for nom, i in ut)]
-    if tv_plan["available"]:
+    plan_confirme = tv_plan.get("available") is True and tv_plan.get("confirmed") is True
+    if tv_plan.get("available") is True and plan_confirme:
+        age_plan = tv_plan.get("ageMs")
+        age_plan_txt = (f" · âge plan M15 : {max(0, int(float(age_plan) / 1000))} s"
+                        if isinstance(age_plan, (int, float)) and math.isfinite(float(age_plan)) else "")
+        age_actif = tv_price.get("ageMs") if tv_price else None
+        age_actif_txt = (f" · âge prix {tv_price['timeframe']} : {max(0, int(float(age_actif) / 1000))} s"
+                         if tv_price and isinstance(age_actif, (int, float)) and math.isfinite(float(age_actif)) else "")
         l += ["━━━━━━━━━━━━━━━━━━", "📡 PLAN CANONIQUE PINE v25",
-              "Plan de niveaux : M15 (indépendant de l'unité du graphique)",
+              "Plan de niveaux : M15 (indépendant de l'unité du graphique)" + age_plan_txt,
               f"Unité de validation : {tv_plan['entry_timeframe']} ({tv_plan['strategy']})",
               f"Entrée : {px(tv_plan['entry'])} • SL : {px(tv_plan['sl'])} • TP1 : {px(tv_plan['tp1'])}" +
               (f" • TP2 : {px(tv_plan['tp2'])}" if tv_plan.get("tp2") is not None else " • TP2 : non fourni par le bridge"),
               f"Zone verte : {px(tv_plan['zone_low'])} → {px(tv_plan['zone_high'])} • Décision : {px(tv_plan['decision'])}",
-              "Clôture MTF Pine : " + ("CONFIRMÉE" if tv_plan["confirmed"] else "EN ATTENTE"),
-              "Déclencheur clôturé : " + ("VALIDÉ" if tv_plan["triggered"] else "EN ATTENTE"),
+              "Clôture MTF Pine : CONFIRMÉE",
+              "Déclencheur clôturé : " + ("VALIDÉ" if tv_plan.get("triggered") else "EN ATTENTE"),
+              age_actif_txt.strip(),
               "⚠️ Les filtres de sécurité ALIGN peuvent refuser l'entrée sans modifier les niveaux Pine."]
+        l = [line for line in l if line != ""]
+    elif tv_plan.get("available") is True:
+        l += ["━━━━━━━━━━━━━━━━━━", "📡 PLAN CANONIQUE PINE v25",
+              "Configuration M15 détectée — confirmation MTF en attente.",
+              "Aucun niveau Entry / SL / TP n'est publié avant confirmation MTF."]
+    elif require_tv:
+        bridge_reason = tv_plan.get("reason") or (r.get("tv_indicator_mtf") or {}).get("reason") or "snapshot TradingView indisponible"
+        l += ["━━━━━━━━━━━━━━━━━━", "⏳ DIVERGENCE DES SOURCES — ATTENTE",
+              f"Plan Pine v25 indisponible : {bridge_reason}",
+              "Aucun plan local ne remplace le plan TradingView canonique."]
     elif r.get("tv_indicator_mtf", {}).get("available"):
         l += ["━━━━━━━━━━━━━━━━━━", "📡 PLAN TRADINGVIEW",
-              f"{tv_plan['timeframe']} : {tv_plan['reason']}"]
-    l += ["━━━━━━━━━━━━━━━━━━", "🧭 CONFIRMATION DE TENDANCE",
-          "ALIGNEMENT 1H + 4H", f"{n_ok}/2 {'✅ CONFIRMÉ' if r['confirme'] else '⏳ EN ATTENTE'}",
-          "ZONE DAILY", zone_txt(r['posD']),
-          "ZONE WEEKLY", zone_txt(r['posW']),
-          "━━━━━━━━━━━━━━━━━━", "🧭 PLAN MULTI-TIMEFRAME"] + strategie_mtf(r)
+              f"{tv_plan.get('timeframe', 'M15')} : {tv_plan.get('reason', 'plan indisponible')}"]
+    l += ["━━━━━━━━━━━━━━━━━━", "🧭 CONFIRMATION LOCALE (CONTEXTE, NON DÉCISIONNELLE)" if require_tv else "🧭 CONFIRMATION DE TENDANCE",
+          "ALIGNEMENT LOCAL 1H + 4H" if require_tv else "ALIGNEMENT 1H + 4H",
+          f"{n_ok}/2 {'✅ ALIGNÉS' if r['confirme'] else '⏳ EN ATTENTE'}" if require_tv else f"{n_ok}/2 {'✅ CONFIRMÉ' if r['confirme'] else '⏳ EN ATTENTE'}",
+          "ZONE DAILY LOCALE", zone_txt(r['posD']) if require_tv else "ZONE DAILY",
+          zone_txt(r['posW']) if require_tv else "ZONE WEEKLY",
+          "ZONE WEEKLY LOCALE" if require_tv else "",
+          "━━━━━━━━━━━━━━━━━━", "🧭 LECTURE MULTI-TIMEFRAME LOCALE" if require_tv else "🧭 PLAN MULTI-TIMEFRAME"] + strategie_mtf(r)
+    l = [line for line in l if line != ""]
     nc = dict((n, v) for v, n in (r.get("niv_cles") or []))
     ph_, pb_ = nc.get("plus haut d'hier"), nc.get("plus bas d'hier")
     contexte = []
@@ -1632,17 +1702,42 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
     if contexte:
         l += ["━━━━━━━━━━━━━━━━━━", "🌍 NIVEAUX & CONTEXTE"] + contexte
     o = (cle or {}).get("ordre")
-    if r["confirme"] and o and not (cle or {}).get("trade"):
+    tr = (cle or {}).get("trade")
+    if not require_tv and r["confirme"] and o and not tr:
         l += ["━━━━━━━━━━━━━━━━━━", "🟨 ZONE DE PRÉPARATION",
               f"Limite basse : {px(o.get('za', o['e']))}",
               f"Limite haute : {px(o.get('zb', o['e']))}"]
-    titre, raison = verdict(r, cle)
+    if require_tv and not plan_confirme:
+        cause = tv_plan.get("reason") or (r.get("tv_indicator_mtf") or {}).get("reason") or "confirmation MTF Pine absente"
+        titre = "⏳ DIVERGENCE DES SOURCES — ATTENTE" if not tv_plan.get("available") else "⏳ CONFIRMATION MTF PINE EN ATTENTE"
+        raison = (f"{cause}. Les lectures locales ALIGN restent du contexte uniquement. "
+                  "Aucun sens de trade ni niveau Entry/SL/TP n'est autorisé.")
+    elif require_tv and plan_confirme:
+        if tv_plan.get("triggered") and tv_plan.get("price_in_zone"):
+            titre = "🟢 DÉCLENCHEUR PINE VALIDÉ — PRIX DANS LA ZONE"
+            raison = "Validation technique Pine acquise. Les filtres de risque, news et sécurité ALIGN restent applicables."
+        elif tv_plan.get("triggered"):
+            titre = "🟡 DÉCLENCHEUR PINE VALIDÉ — PRIX HORS ZONE"
+            raison = "Attendre le retour du prix TradingView dans la zone d'entrée M15. Aucune entrée au marché."
+        else:
+            titre = "🟡 PLAN PINE CONFIRMÉ — DÉCLENCHEUR EN ATTENTE"
+            raison = "Attendre la clôture de l'unité de validation Pine. Un plan confirmé n'est pas encore une entrée."
+    else:
+        titre, raison = verdict(r, cle)
     l += ["┏━━━━━━━━ 🚦 DÉCISION ALIGN ━━━━━━━━┓", titre, raison,
           "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"]
-    tr = (cle or {}).get("trade")
     if tr:
         sens = "🟩 LONG" if tr["d"] == 1 else "🟥 SHORT"
         l.append(f"🎯 POSITION EN COURS : {sens} | Entrée {px(tr['e'])} | SL {px(tr['sl'])} | TP1 {px(tr['tp1'])} | TP2 {px(tr['tp2'])}")
+    elif require_tv:
+        if not plan_confirme:
+            l.append("🎯 POINT VISÉ : aucun — confirmation MTF Pine non validée")
+        elif tv_plan.get("triggered") and tv_plan.get("price_in_zone"):
+            l.append("🎯 POINT VISÉ : déclencheur Pine validé, sous réserve des filtres de sécurité ALIGN")
+        elif tv_plan.get("triggered"):
+            l.append("🎯 POINT VISÉ : attente du retour dans la zone Pine M15")
+        else:
+            l.append("🎯 POINT VISÉ : plan Pine confirmé, déclencheur clôturé en attente")
     elif o:
         d_ordre = o.get("d", r["confirme"])
         sens = "🟩 LONG" if d_ordre == 1 else "🟥 SHORT"
@@ -1656,9 +1751,9 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
         l.append(f"🎯 DIRECTION À SURVEILLER : {sens} | Point d'entrée après validation du déclencheur")
     else:
         l.append("🎯 POINT VISÉ : aucun tant que le biais 1h / 4h n'est pas confirmé")
-    if r["confirme"] and not tr and len(r["b5"]) >= 22:
+    if not require_tv and r["confirme"] and not tr and len(r["b5"]) >= 22:
         l.append(ligne_cassure(r, r["confirme"]))
-    if "Prochaine entrée" not in raison and not tr:
+    if not require_tv and "Prochaine entrée" not in raison and not tr:
         l.append(prochaine(r, cle))
     return "\n".join(l)
 # Unité regardée sur TradingView → fenêtre d'alignement et type de position (UT = 1,3,5,10,15,30,45,1h,2h,4h,D).
