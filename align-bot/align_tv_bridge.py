@@ -419,8 +419,13 @@ class BridgeStore:
                         return 400, {"ok": False, "error": "invalid_entry_trigger_ohlc"}
                     retested_zone = entry_bar_high >= entry_zone_low and entry_bar_low <= entry_zone_high
                     trigger_closed = entry_bar_close > entry_decision if signal_direction == 1 else entry_bar_close < entry_decision
+                    # A closed trigger candle is not enough: never publish an actionable entry
+                    # after the live market has already left the planned retest zone.
+                    current_price_in_zone = entry_zone_low <= price <= entry_zone_high
+                    current_price_confirmed = price > entry_decision if signal_direction == 1 else price < entry_decision
                     entry_triggered = bool(payload.get("confirmed") is True and signal_direction in (-1, 1)
                                            and retested_zone and trigger_closed
+                                           and current_price_in_zone and current_price_confirmed
                                            and (entry_bar_close > plan_sl if signal_direction == 1 else entry_bar_close < plan_sl))
 
         if not has_plan:
