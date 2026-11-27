@@ -4494,7 +4494,6 @@ class PineOnlyEntryGateTests(unittest.TestCase):
              patch.object(align_bot, "statut_sys", return_value="SYS"):
             message = align_bot.carte_coach("BTC", r, {}, "signal", tr=trade)
         self.assertIn("🛡️ Action : ENTRÉE AUTORISÉE — EXÉCUTION MANUELLE", message)
-        self.assertNotIn("Agent Auto-Trade : %%AGENT:signal%%", message) if False else None
 
     def test_personal_position_summary_uses_same_entry_confirmation_button_wording(self):
         r = self._market(current_price=101.25)
