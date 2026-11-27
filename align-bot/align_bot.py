@@ -1650,8 +1650,16 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
               "Déclencheur clôturé : " + ("VALIDÉ" if tv_plan.get("triggered") else "EN ATTENTE"),
               "⚠️ Les filtres de sécurité ALIGN peuvent refuser l'entrée sans modifier les niveaux Pine."]
     elif isinstance(tv_plan, dict) and tv_plan.get("available"):
-        l += ["━━━━━━━━━━━━━━━━━━", "📡 PLAN TRADINGVIEW",
-              f"{tv_plan.get('timeframe', 'M15')} : {tv_plan.get('reason', 'Plan Pine disponible')}"]
+        # Hors bridge obligatoire, préserver le rendu historique du rapport TradingView.
+        l += ["━━━━━━━━━━━━━━━━━━", "📡 PLAN CANONIQUE PINE v25",
+              "Plan de niveaux : M15 (indépendant de l'unité du graphique)",
+              f"Unité de validation : {tv_plan['entry_timeframe']} ({tv_plan['strategy']})",
+              f"Entrée : {px(tv_plan['entry'])} • SL : {px(tv_plan['sl'])} • TP1 : {px(tv_plan['tp1'])}" +
+              (f" • TP2 : {px(tv_plan['tp2'])}" if tv_plan.get("tp2") is not None else " • TP2 : non fourni par le bridge"),
+              f"Zone verte : {px(tv_plan['zone_low'])} → {px(tv_plan['zone_high'])} • Décision : {px(tv_plan['decision'])}",
+              "Clôture MTF Pine : " + ("CONFIRMÉE" if tv_plan.get("confirmed") else "EN ATTENTE"),
+              "Déclencheur clôturé : " + ("VALIDÉ" if tv_plan.get("triggered") else "EN ATTENTE"),
+              "⚠️ Les filtres de sécurité ALIGN peuvent refuser l'entrée sans modifier les niveaux Pine."]
     l += ["━━━━━━━━━━━━━━━━━━", "🧭 CONFIRMATION DE TENDANCE",
           ("LECTURE LOCALE H1 + H4 (CONTEXTE)" if require_tv else "ALIGNEMENT 1H + 4H"),
           f"{n_ok}/2 {'alignées' if r['confirme'] else 'non confirmées'}" + (" — lecture locale" if require_tv else (" ✅ CONFIRMÉ" if r['confirme'] else " ⏳ EN ATTENTE")),
