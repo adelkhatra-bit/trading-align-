@@ -9907,7 +9907,7 @@ def texte_pine(etat, ev, anglais=False):
     direction = int(ev.get("d") or 0)
     if anglais:
         ev["sens_label"] = "LONG (Pine direction, not confirmed)" if direction == 1 else "SHORT (Pine direction, not confirmed)" if direction == -1 else "no LONG/SHORT direction from Pine"
-        ev["sens_action"] = "Confluence only — wait for the Pine trigger and ROBOT V12 check." if direction else "No trade direction confirmed — wait for a Pine plan."
+        ev["sens_action"] = "Threshold reached: confluence only — wait for Pine trigger and ROBOT V12 check." if direction else "Threshold reached, but no trade direction is confirmed — wait for a Pine plan."
         ev["sens_baisse"] = "The LONG scenario is losing support; this is not a SHORT signal." if direction == 1 else "The SHORT scenario is losing support; this is not a LONG signal." if direction == -1 else "No reversal or opposite trade direction is confirmed."
         ev["pos"] = {"au-dessus de": "above", "sous": "below"}.get(ev.get("pos"), ev.get("pos"))
         ev["etat_seuil"] = "reached ✅" if "atteint" in str(ev.get("etat_seuil", "")) else "almost"
@@ -9916,7 +9916,7 @@ def texte_pine(etat, ev, anglais=False):
         ev["fleche"] = str(ev.get("fleche", "")).replace("HAUSSIER", "BULLISH").replace("BAISSIER", "BEARISH")
     else:
         ev["sens_label"] = "LONG (orientation Pine, non confirmée)" if direction == 1 else "SHORT (orientation Pine, non confirmée)" if direction == -1 else "aucun sens LONG/SHORT défini par Pine"
-        ev["sens_action"] = "Confluence seulement : attendre le déclencheur Pine et le contrôle ROBOT V12." if direction else "Aucune direction de trade confirmée : attendre un plan Pine."
+        ev["sens_action"] = "Seuil technique atteint : confluence seulement, attendre le déclencheur Pine et le contrôle ROBOT V12." if direction else "Seuil technique atteint, mais aucun sens de trade confirmé : attendre un plan Pine."
         ev["sens_baisse"] = "Le scénario LONG perd du soutien ; ce message ne signale pas un SHORT." if direction == 1 else "Le scénario SHORT perd du soutien ; ce message ne signale pas un LONG." if direction == -1 else "Aucun retournement ni sens inverse n'est confirmé par ce message."
     return [l.format(**{k: v for k, v in ev.items() if k != "kind"}) for l in lignes]
 
