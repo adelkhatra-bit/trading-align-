@@ -57,7 +57,7 @@ if not tp1Ok
 """
         without_tp_change = self.source[:tp_start] + baseline_tp_state + self.source[tp_end:]
         without_tp_change = without_tp_change.replace(
-            "[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]",
+            "[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time[1]]",
             "[d, sqz ? 1 : 0, ta.rsi(close, lenRsi)]",
             1,
         )
@@ -220,6 +220,12 @@ o1h = d1hStrat == -dP"""
             self.assertNotIn(missing_value_fallback, export_block)
         self.assertIn('na(v) ? "null" : str.tostring(v)', export_block)
         self.assertIn('na(v) ? "null" : v == 1', export_block)
+
+    def test_bridge_bar_timestamps_match_the_closed_mtf_candle(self):
+        # The exported direction is based on the previous, fully closed candle.
+        # Its bar_time must identify that same candle, not the currently forming one.
+        self.assertIn("[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time[1]]", self.source)
+        self.assertNotIn("[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]", self.source)
 
     def test_robot_v12_exports_closed_mtf_directions_for_entry_confirmation(self):
         self.assertIn(
