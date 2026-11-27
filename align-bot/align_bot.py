@@ -1596,7 +1596,10 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
                             # TOUT_GRATUIT (décision d'Adel, 15/11) : plus aucun prix VIP affiché, les positions sont gratuites.
                             ["🎁 Positions gratuites : active ton coach pour recevoir la prochaine entrée"] if TOUT_GRATUIT else
                             ["🔒 Direction et niveaux de trading réservés aux VIP", "💎 Accès VIP : 49,90 € / mois"]))
-    tv_plan = plan_indicateur(r)
+    trade_ouvert = bool((cle or {}).get("trade"))
+    tv_plan = plan_indicateur(r) if not (require_tv and trade_ouvert) else {
+        "timeframe": "M15", "available": False, "reason": "position déjà ouverte — niveaux mémorisés"
+    }
     D, R = r["dirs"], r["rsis"]
     maj, n_ok = alignement(r)
     ut = [("1m", 0), ("5m", 2), ("15m", 4), ("1h", 7), ("4h", 9), ("Daily", 10)]
@@ -1617,7 +1620,10 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
          "━━━━━━━━━━━━━━━━━━", "📈 RSI ALIGN LOCAL (CONTEXTE)" if require_tv else "📈 RSI PAR UNITÉ DE TEMPS",
          "  /  ".join(f"{nom} {R[i]:.0f}" for nom, i in ut)]
     plan_confirme = tv_plan.get("available") is True and tv_plan.get("confirmed") is True
-    if tv_plan.get("available") is True and plan_confirme:
+    if require_tv and trade_ouvert:
+        # Le trade en cours conserve ses niveaux mémorisés ; aucun nouveau plan M15 n'est nécessaire.
+        pass
+    elif tv_plan.get("available") is True and plan_confirme:
         age_plan = tv_plan.get("ageMs")
         age_plan_txt = (f" · âge plan M15 : {max(0, int(float(age_plan) / 1000))} s"
                         if isinstance(age_plan, (int, float)) and math.isfinite(float(age_plan)) else "")
@@ -1700,7 +1706,10 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
         l += ["━━━━━━━━━━━━━━━━━━", "🟨 ZONE DE PRÉPARATION",
               f"Limite basse : {px(o.get('za', o['e']))}",
               f"Limite haute : {px(o.get('zb', o['e']))}"]
-    if require_tv and not plan_confirme:
+    if require_tv and trade_ouvert:
+        titre = "📍 POSITION EN COURS"
+        raison = "La position et ses niveaux restent ceux mémorisés ; aucune nouvelle entrée locale n'est proposée."
+    elif require_tv and not plan_confirme:
         cause = tv_plan.get("reason") or (r.get("tv_indicator_mtf") or {}).get("reason") or "confirmation MTF Pine absente"
         titre = "⏳ DIVERGENCE DES SOURCES — ATTENTE" if not tv_plan.get("available") else "⏳ CONFIRMATION MTF PINE EN ATTENTE"
         raison = (f"{cause}. Les lectures locales ALIGN restent du contexte uniquement. "
