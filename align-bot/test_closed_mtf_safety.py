@@ -319,8 +319,18 @@ class ClosedMtfSafety(unittest.TestCase):
         message = ab.texte_coach_live(
             "GOLD", bar(now - 900, o=101.0, h=102.0, l=99.0, c=100.0), r, {}
         )
-        self.assertIn("📉 Unités : 7/7 ⬇️", message)
+        self.assertIn("📊 UT clôturées : M1⬇️ M3⬇️ M5⬇️ M10⬇️ M15⬇️ M30⬇️ M45⬇️ H1⬇️ H2⬇️ H4⬇️ D1⬇️", message)
+        self.assertIn("🎯 Vs sens confirmé SHORT : 11/11 alignées • 0 opposées • 0 neutres", message)
+        self.assertIn("🌐 W1 contexte : ➡️", message)
+        self.assertIn("🎯 Rôles : H4 tendance • H1 confirmation • M15 setup • M5 timing • M1 exécution", message)
         self.assertIn("🔴 baisse", message)
+        english = ab.traduire(message)
+        self.assertIn("📊 Timeframes:", english)
+        self.assertIn("🎯 Vs confirmed direction SHORT : 11/11 aligned", english)
+        self.assertIn("🌐 W1 context:", english)
+        self.assertIn("🎯 Roles:", english)
+        self.assertNotIn("UT clôturées", english)
+        self.assertNotIn("clôture de validation", english)
 
     def test_live_ai_context_uses_four_closed_timeframes_for_gold_nasdaq(self):
         r = {

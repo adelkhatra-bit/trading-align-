@@ -2988,6 +2988,21 @@ TRAD.update({
     "👁 Le marché hésite 🤏": "👁 Market is hesitating 🤏",
     "📉 Unités :": "📉 Timeframes:",
     "📈 Unités :": "📈 Timeframes:",
+    "📊 UT clôturées :": "📊 Timeframes:",
+    "🎯 Vs sens confirmé ": "🎯 Vs confirmed direction ",
+    "📊 Sans plan :": "📊 No plan:",
+    "alignées": "aligned",
+    "opposées": "opposed",
+    "haussières": "bullish",
+    "baissières": "bearish",
+    "neutres": "neutral",
+    "🌐 W1 contexte :": "🌐 W1 context:",
+    "🎯 Rôles :": "🎯 Roles:",
+    "🎯 Rôles : W1/D1 contexte • H4 retracement • H1 confirmation": "🎯 Roles: W1/D1 context • H4 pullback • H1 confirmation",
+    "🎯 Rôles : H4 contexte • H1 direction • M15 repli • M5 déclencheur": "🎯 Roles: H4 context • H1 direction • M15 pullback • M5 trigger",
+    "🎯 Rôles : H1 contexte • M15 direction • M5 structure • M1 déclencheur": "🎯 Roles: H1 context • M15 direction • M5 structure • M1 trigger",
+    "🎯 Rôles : H4 tendance • H1 confirmation • M15 setup • M5 timing • M1 exécution": "🎯 Roles: H4 trend • H1 confirmation • M15 setup • M5 timing • M1 execution",
+    "ℹ️ Le décompte décrit le contexte ; seule la clôture de validation du plan autorise l'entrée.": "ℹ️ This count describes context; only the plan's validation close can authorize an entry.",
     "➖ Unités partagées": "➖ Mixed timeframes",
     "📏 Écart :": "📏 Range:",
     "🧭 Tendance :": "🧭 Trend:",
@@ -7222,20 +7237,40 @@ def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
     d = r.get("confirme") or 0
     tr = cle.get("trade")
     dirs = (r.get("dirs_cloturees") or r.get("dirs")) or [0] * 11
-    idx = [i for i in (0, 1, 2, 4, 7, 9, 10) if i < len(dirs)]
-    bas, haut = sum(1 for i in idx if dirs[i] == -1), sum(1 for i in idx if dirs[i] == 1)
-    if bas > haut:
-        unites = f"📉 Unités : {bas}/{len(idx)} ⬇️"
-    elif haut > bas:
-        unites = f"📈 Unités : {haut}/{len(idx)} ⬆️"
+    noms_ut = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1")
+    lectures_ut = [(nom, dirs[i] if i < len(dirs) and dirs[i] in (-1, 1) else 0)
+                   for i, nom in enumerate(noms_ut)]
+    fleche_ut = lambda sens: "⬆️" if sens == 1 else "⬇️" if sens == -1 else "➡️"
+    unites = "📊 UT clôturées : " + " ".join(f"{nom}{fleche_ut(sens)}" for nom, sens in lectures_ut)
+    haut = sum(1 for _, sens in lectures_ut if sens == 1)
+    bas = sum(1 for _, sens in lectures_ut if sens == -1)
+    neutres = len(lectures_ut) - haut - bas
+    if d in (-1, 1):
+        alignes = sum(1 for _, sens in lectures_ut if sens == d)
+        opposes = sum(1 for _, sens in lectures_ut if sens == -d)
+        bilan_ut = (f"🎯 Vs sens confirmé {'LONG' if d == 1 else 'SHORT'} : "
+                    f"{alignes}/11 alignées • {opposes} opposées • {neutres} neutres")
     else:
-        unites = "➖ Unités partagées"
+        bilan_ut = f"📊 Sans plan : {haut}/11 haussières • {bas} baissières • {neutres} neutres"
+    w1 = r.get("dirW") or 0
+    w1_txt = "🌐 W1 contexte : " + fleche_ut(w1)
+    strategie = str(r.get("strat") or "").upper()
+    if strategie == "SWING":
+        role_ut = "🎯 Rôles : W1/D1 contexte • H4 retracement • H1 confirmation"
+    elif strategie == "DAY":
+        role_ut = "🎯 Rôles : H4 contexte • H1 direction • M15 repli • M5 déclencheur"
+    elif strategie == "SCALPING":
+        role_ut = "🎯 Rôles : H1 contexte • M15 direction • M5 structure • M1 déclencheur"
+    else:
+        role_ut = "🎯 Rôles : H4 tendance • H1 confirmation • M15 setup • M5 timing • M1 exécution"
     l = ["🎙 COACH COMMENTATEUR", "👁 EN DIRECT", SEPARATEUR,
          "📊 BILAN 15 MIN", f"{ICONE.get(m, '')} {m} : {px(p)}"]
     if public or not tr:
         l.append("ℹ️ Info, pas une entrée")
     l += [SEPARATEUR, sens_b, f"📏 Écart : {'+' if c_ >= o_ else '-'}{px(corps)}", lecture,
-          "🧭 Tendance : " + ("🟢 hausse" if d == 1 else "🔴 baisse" if d == -1 else "➖ floue"), unites]
+          "🧭 Tendance : " + ("🟢 hausse" if d == 1 else "🔴 baisse" if d == -1 else "➖ floue"),
+          unites, bilan_ut, w1_txt, role_ut,
+          "ℹ️ Le décompte décrit le contexte ; seule la clôture de validation du plan autorise l'entrée."]
     if sum((r.get("sqzs") or [0] * 11)[4:10]) >= 3:
         l.append("⚡ Compression : ça charge")
     if tr and public:
