@@ -17,8 +17,33 @@ class LiveDuetCommentators(unittest.TestCase):
         poll = self.js.index("  ecouterDialoguesCoach();")
         self.assertLess(publish, poll)
 
-    def test_french_male_voice_map_accepts_supported_windows_david_voice(self):
-        self.assertIn("t: { fr: /\\b(?:paul|henri|pierre|david)\\b/i", self.js)
+    def test_french_male_voice_map_accepts_supported_windows_and_chrome_aliases(self):
+        self.assertIn("t: { fr: /\\b(?:paul|henri|pierre|david|thomas|remy|rémy|male)\\b/i", self.js)
+        self.assertIn("denise", self.js.lower())
+        self.assertIn("thomas", self.js.lower())
+
+    def test_french_female_voice_map_accepts_windows_denise_and_eloise(self):
+        self.assertIn("l: { fr: /\\b(?:hortense|julie|audrey|charlotte|amelie|amélie|denise|eloise|éloïse|female)\\b/i", self.js)
+
+    def test_voice_retry_does_not_depend_only_on_voiceschanged(self):
+        self.assertIn("function programmerRepriseVoix()", self.js)
+        self.assertIn("const delais = [250, 750, 1500, 3000, 6000];", self.js)
+        self.assertIn("const langue = item && item.en ? 'en' : 'fr';", self.js)
+        self.assertIn("voixRetryTimers.push(setTimeout(tenter, 0));", self.js)
+        self.assertIn("programmerRepriseVoix();", self.js)
+
+    def test_voice_button_reports_missing_voices_and_synthesis_errors(self):
+        self.assertIn("function mettreEtatVoix()", self.js)
+        self.assertIn("⚠️ VOIX FR INCOMPLÈTE", self.js)
+        self.assertIn("utterance.onerror = event => {", self.js)
+        self.assertIn("event && event.error", self.js)
+        self.assertIn("Synthèse démarrée :", self.js)
+
+    def test_ai_commentary_from_ntfy_is_connected_to_the_speech_engine(self):
+        self.assertIn("const source = new EventSource('https://ntfy.sh/' + SUJET + '/sse');", self.js)
+        self.assertIn("if (txt.startsWith('IA:')) { recuIA(txt.slice(3)); return; }", self.js)
+        self.assertIn("const dureeFR = parlerLive(fr);", self.js)
+        self.assertIn("publierEtatCoach(true)", self.js)
 
     def test_runtime_state_is_initialized_before_first_coach_poll(self):
         vivant = self.js.index("let vivant = true;")
