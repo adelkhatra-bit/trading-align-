@@ -4266,3 +4266,64 @@ class VerdictOptionalPullbackZoneTests(unittest.TestCase):
         self.assertIn("zone extrême", detail)
         self.assertEqual(bloque.call_args_list[1].args, (r, 1, 105.0))
         repli.assert_called_once_with(r, 1)
+
+
+class CmeThanksgivingHoursTest(unittest.TestCase):
+    @staticmethod
+    def _ts(year, month, day, hour, minute):
+        return datetime.datetime(year, month, day, hour, minute,
+                                 tzinfo=ZoneInfo("America/Chicago")).timestamp()
+
+    @staticmethod
+    def _ct(ts):
+        return datetime.datetime.fromtimestamp(ts, ZoneInfo("America/Chicago"))
+
+    def test_gold_not_required_during_thanksgiving_halt_and_returns_at_reopen(self):
+        before_halt = self._ts(2026, 11, 26, 13, 29)
+        halt = self._ts(2026, 11, 26, 13, 30)
+        reopen = self._ts(2026, 11, 26, 17, 0)
+        self.assertTrue(align_bot.cme_ouvert(before_halt))
+        self.assertEqual(align_bot.symboles_bridge_obligatoires(before_halt), ("BTCUSD", "XAUUSD"))
+        self.assertFalse(align_bot.cme_ouvert(halt))
+        self.assertEqual(align_bot.symboles_bridge_obligatoires(halt), ("BTCUSD",))
+        self.assertTrue(align_bot.cme_ouvert(reopen))
+        self.assertEqual(align_bot.symboles_bridge_obligatoires(reopen), ("BTCUSD", "XAUUSD"))
+
+    def test_gold_friday_thanksgiving_early_close_is_respected(self):
+        before_close = self._ts(2026, 11, 27, 13, 44)
+        close = self._ts(2026, 11, 27, 13, 45)
+        self.assertTrue(align_bot.cme_ouvert(before_close))
+        self.assertFalse(align_bot.cme_ouvert(close))
+        self.assertEqual(align_bot.symboles_bridge_obligatoires(close), ("BTCUSD",))
+
+    def test_thanksgiving_topstep_and_cme_cutoffs_are_distinct(self):
+        thursday = self._ts(2026, 11, 26, 11, 0)
+        tp, cme, reopen = align_bot.horaires_gold(thursday)
+        self.assertEqual(self._ct(tp).strftime("%H:%M"), "11:45")
+        self.assertEqual(self._ct(cme).strftime("%H:%M"), "13:30")
+        self.assertEqual(self._ct(reopen).strftime("%Y-%m-%d %H:%M"), "2026-11-26 17:00")
+        self.assertAlmostEqual(align_bot.minutes_avant_fermeture_gold(thursday), 45.0)
+
+    def test_day_after_thanksgiving_uses_live_safe_cutoff_and_sunday_reopen(self):
+        friday = self._ts(2026, 11, 27, 10, 0)
+        tp, cme, reopen = align_bot.horaires_gold(friday)
+        self.assertEqual(self._ct(tp).strftime("%H:%M"), "11:25")
+        self.assertEqual(self._ct(tp + 35 * 60).strftime("%H:%M"), "12:00")
+        self.assertEqual(self._ct(cme).strftime("%H:%M"), "13:45")
+        self.assertEqual(self._ct(reopen).strftime("%Y-%m-%d %H:%M"), "2026-11-29 17:00")
+        self.assertAlmostEqual(align_bot.minutes_avant_fermeture_gold(friday), 85.0)
+
+    def test_regular_friday_reopens_sunday_not_saturday(self):
+        friday = self._ts(2026, 12, 4, 10, 0)
+        _, _, reopen = align_bot.horaires_gold(friday)
+        self.assertEqual(self._ct(reopen).strftime("%Y-%m-%d %H:%M"), "2026-12-06 17:00")
+
+    def test_friday_close_alert_reports_both_topstep_cutoffs_and_paris_reopen(self):
+        now = self._ts(2026, 11, 27, 10, 25)
+        with unittest.mock.patch.object(align_bot, "calendrier", return_value=[]):
+            messages = align_bot.annonces_et_sessions({}, now, {})
+        message = next(x for x in messages if "FERMETURE DU GOLD DANS 60 MIN" in x)
+        self.assertIn("Topstep Live : à plat avant 18:25", message)
+        self.assertIn("Topstep SIM / Combine : à plat avant 19:00", message)
+        self.assertIn("fermeture 20:45", message)
+        self.assertIn("lun. 30/11 00:00", message)

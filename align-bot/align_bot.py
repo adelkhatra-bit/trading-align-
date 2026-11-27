@@ -1349,8 +1349,20 @@ def _normalise_prix_dans_texte(texte):
     return re.sub(motif, lambda m: _compacte_prix(m.group(1)), texte)
 
 def cme_ouvert(ts):
-    """Session CME en heure locale Chicago avec bascule DST automatique."""
+    """Session CME en heure locale Chicago, avec les horaires spéciaux Thanksgiving 2026."""
     ct = datetime.datetime.fromtimestamp(ts, ZoneInfo("America/Chicago"))
+    # Thanksgiving 2026 — CME Energy/Metals (GC): halt jeudi 13:30 CT,
+    # reprise 17:00 CT ; vendredi clôture anticipée 13:45 CT.
+    special_hours = {
+        "2026-11-26": ((13, 30), (17, 0)),
+        "2026-11-27": ((13, 45), None),
+    }
+    special = special_hours.get(ct.date().isoformat())
+    if special:
+        halt, reopen = special
+        local_hm = (ct.hour, ct.minute)
+        if local_hm >= halt and (reopen is None or local_hm < reopen):
+            return False
     if ct.weekday() == 5 or (ct.weekday() == 4 and ct.hour >= 16) or (ct.weekday() == 6 and ct.hour < 17):
         return False
     return ct.hour != 16
@@ -2338,7 +2350,7 @@ TRAD = {
 "pression haussière sur les rendements": "upward pressure on yields",
 "détente des rendements": "yields easing",
 "rendement stable": "yields stable",
-"favorable au 🟩 LONG": "favourable to 🟩 LONG", "frein pour le 🟩 LONG": "headwind for 🟩 LONG", "🏦 Taux US 10 ans": "🏦 US 10-year yield", "sur la journée": "on the day", "frein pour le Gold": "headwind for Gold", "favorable au Gold": "favourable to Gold", "📏 Hier : haut": "📏 Yesterday: high", "• bas": "• low", "🌏 Range Asie : haut": "🌏 Asia range: high", "💥 CASSURE": "💥 BREAKOUT", "🧲 NIVEAU CLÉ": "🧲 KEY LEVEL", "📍 Le prix approche le": "📍 Price is approaching the", "🕯 Vue 15 min : ça peut rebondir OU casser": "🕯 15 min view: it can bounce OR break", "⏳ J'attends la clôture de la bougie 15 min": "⏳ Waiting for the 15 min candle close", "plus haut d'hier et de la semaine dernière": "yesterday's and last week's high", "plus bas d'hier et de la semaine dernière": "yesterday's and last week's low", "plus haut d'hier": "yesterday's high", "plus bas d'hier": "yesterday's low", "plus haut de la semaine dernière": "last week's high", "plus bas de la semaine dernière": "last week's low", "plus haut du range Asie": "Asia range high", "plus bas du range Asie": "Asia range low", "👀 Je vérifie l'alignement 15 min / 1 h / 4 h avant d'entrer": "👀 I check the 15 min / 1 h / 4 h alignment before entering", "💵 DOLLAR EN FORTE BAISSE": "💵 DOLLAR FALLING HARD", "💵 DOLLAR EN FORTE HAUSSE": "💵 DOLLAR RISING HARD", "prudence": "be careful", "🧭 Le bot n'entre toujours qu'avec 15 min / 1 h / 4 h alignées": "🧭 The bot still only enters with 15 min / 1 h / 4 h aligned", "📰 NEWS USA DANS 1 H": "📰 US NEWS IN 1 H", "🛑 Pas de nouvelle position à partir de": "🛑 No new position from", "🔒 En position ? Mets-toi à BE si tu es en gain": "🔒 In a trade? Move to BE if in profit", "📊 Prévu": "📊 Forecast", "• avant": "• previous", "📰 RÉACTION À LA NEWS": "📰 NEWS REACTION", "⏳ J'attends la clôture de la bougie 15 min avant de reprendre": "⏳ Waiting for the 15 min close before resuming", "haussier ≈": "bullish ≈", "baissier ≈": "bearish ≈", ": le prix peut y rebondir": ": price may bounce there", ": le prix peut y buter": ": price may stall there", "🌙 MARCHÉ BIENTÔT FERMÉ": "🌙 MARKET CLOSING SOON", "⏰ Fermeture à": "⏰ Closes at", "🟥 Topstep / prop firms : tout fermé avant": "🟥 Topstep / prop firms: everything closed before", "(sinon fermeture automatique)": "(otherwise auto-flattened)", "🌙 Broker (CFD) / CME : fermeture": "🌙 Broker (CFD) / CME: close", "🔓 Réouverture": "🔓 Reopen", "dimanche": "Sunday", "• réouverture à": "• reopens at", "• réouverture dimanche soir": "• reopens Sunday evening", "(heure de Paris)": "(Paris time)", "🛡 Pas de nouvelle position avant la fermeture": "🛡 No new position before the close", "🔔 Je reprends la recherche après la réouverture": "🔔 I'll resume after the reopen", "🌙 FERMETURE DU GOLD DANS": "🌙 GOLD CLOSES IN", "🚦 🙅 PAS DE NOUVELLE POSITION": "🚦 🙅 NO NEW POSITION", "🔒 Tu es en position : mets-toi à BE si tu es en gain": "🔒 You're in a trade: move to BE if in profit", "🛡 Vérifie que ton SL est bien placé": "🛡 Check your SL is in place", "🛡 Ne pas ouvrir de position avant la fermeture": "🛡 Don't open a position before the close", "💥 Week-end : le prix peut s'ouvrir loin (écart), sécurise tes gains": "💥 Weekend: price may gap at the open, secure your profits", "💥 À la réouverture le prix peut sauter (écart)": "💥 At the reopen price may gap", "🎯 TP1 TOUCHÉ": "🎯 TP1 HIT", "✂️ Prends une partie des gains": "✂️ Take part of the profit", "🔒 Vérifie que ton SL est à BE": "🔒 Check your SL is at BE", "📈 Garde le reste : le marché peut encore pousser": "📈 Keep the rest: the market can push further", "🏁 TP2 visé": "🏁 Target TP2", "🙅 Ne coupe pas tout sur le TP1": "🙅 Don't close everything at TP1", "⏱ Durée estimée": "⏱ Estimated duration", "📅 Position de LONGUE DURÉE : elle peut durer plus d'une journée, garde ton SL en place la nuit": "📅 Long-DURATION position: it can last more than a day, keep your SL overnight", "🎁 Ta position gratuite arrive avec le prochain signal": "🎁 Your free position comes with the next signal", "🔒 Cette position est réservée aux VIP": "🔒 This position is VIP-only", "🎉🎉 BRAVO": "🎉🎉 WELL DONE", "💰 Ta position gratuite": "💰 Your free position", "🔥 C'est ça, ALIGN": "🔥 That's ALIGN", "😍 Imagine chaque position comme celle-là": "😍 Imagine every position like this one", "💎 En VIP : toutes les positions + le sens + le coach (BE, TP)": "💎 In VIP: every position + the direction + the coach (BE, TP)", "🔓 VIP 49,90 € / mois 👇": "🔓 VIP €49.90 / month 👇", "📊 Ça fait partie du jeu : on coupe petit, on gagne gros": "📊 It's part of the game: cut small, win big", "💎 En VIP : toutes les positions pour se refaire + le coach": "💎 In VIP: every position to bounce back + the coach", "RÉSULTAT ALIGN": "ALIGN RESULT", "📌 Entrée": "📌 Entry", "🏁 Sortie": "🏁 Exit", "📈 Résultat": "📈 Result", "⏱ Durée": "⏱ Duration", ": bravo !": ": well done!", "📸 N'hésite pas à partager ta capture dans ALIGN Résultats": "📸 Feel free to share your screenshot in ALIGN Results", "👇 Bouton 📸 Partager mon gain": "👇 Button 📸 Share my profit", "🛡 SL respecté, risque maîtrisé": "🛡 SL respected, risk under control", "📸 Voir les résultats ALIGN": "📸 See ALIGN results", ": SL touché, risque maîtrisé": ": SL hit, risk under control", "📊 Tous les résultats (TP et SL) sont publiés en toute transparence": "📊 All results (TP and SL) are published transparently", "👇 Bouton ci-dessous": "👇 Button below", "🔥 Une position VIP est EN COURS": "🔥 A VIP position is RUNNING", "👀 Une position VIP se PRÉPARE": "👀 A VIP position is COMING", "⏳ Pas de position pour l'instant": "⏳ No position right now", "🔒 Sens du marché : VIP": "🔒 Market direction: VIP", "🔒 LONG ou SHORT, entrée, SL, TP : réservés aux VIP": "🔒 LONG or SHORT, entry, SL, TP: VIP only", "Nouvelle info pour les VIP": "New info for VIPs", "🤫 Sens et niveaux cachés": "🤫 Direction and levels hidden", "🌀🌀 MANIPULATION EN COURS": "🌀🌀 MANIPULATION IN PROGRESS", "⚠️ MÈCHE SUSPECTE EN COURS": "⚠️ SUSPICIOUS WICK IN PROGRESS", "⏱ CHRONO EN DIRECT": "⏱ LIVE TIMER", "🚦 🟢 J'ENTRE": "🚦 🟢 I'M ENTERING", "🚦 🟢 ON RESTE EN POSITION": "🚦 🟢 WE STAY IN", "objectifs remis dans l'ordre": "targets put back in order", "🛑 SL inchangé": "🛑 SL unchanged", "🚦 🙅 JE N'ENTRE PAS": "🚦 🙅 I'M NOT ENTERING", "🚦 ⏳ JE N'ENTRE PAS ENCORE": "🚦 ⏳ NOT ENTERING YET", "💰 TP visé": "💰 Target TP", "🎯 Inscrit depuis": "🎯 Registered for", "✅ ENTRÉ": "✅ ENTERED", "🎯 Le coach te suit jusqu'au TP": "🎯 The coach follows you to TP",
+"favorable au 🟩 LONG": "favourable to 🟩 LONG", "frein pour le 🟩 LONG": "headwind for 🟩 LONG", "🏦 Taux US 10 ans": "🏦 US 10-year yield", "sur la journée": "on the day", "frein pour le Gold": "headwind for Gold", "favorable au Gold": "favourable to Gold", "📏 Hier : haut": "📏 Yesterday: high", "• bas": "• low", "🌏 Range Asie : haut": "🌏 Asia range: high", "💥 CASSURE": "💥 BREAKOUT", "🧲 NIVEAU CLÉ": "🧲 KEY LEVEL", "📍 Le prix approche le": "📍 Price is approaching the", "🕯 Vue 15 min : ça peut rebondir OU casser": "🕯 15 min view: it can bounce OR break", "⏳ J'attends la clôture de la bougie 15 min": "⏳ Waiting for the 15 min candle close", "plus haut d'hier et de la semaine dernière": "yesterday's and last week's high", "plus bas d'hier et de la semaine dernière": "yesterday's and last week's low", "plus haut d'hier": "yesterday's high", "plus bas d'hier": "yesterday's low", "plus haut de la semaine dernière": "last week's high", "plus bas de la semaine dernière": "last week's low", "plus haut du range Asie": "Asia range high", "plus bas du range Asie": "Asia range low", "👀 Je vérifie l'alignement 15 min / 1 h / 4 h avant d'entrer": "👀 I check the 15 min / 1 h / 4 h alignment before entering", "💵 DOLLAR EN FORTE BAISSE": "💵 DOLLAR FALLING HARD", "💵 DOLLAR EN FORTE HAUSSE": "💵 DOLLAR RISING HARD", "prudence": "be careful", "🧭 Le bot n'entre toujours qu'avec 15 min / 1 h / 4 h alignées": "🧭 The bot still only enters with 15 min / 1 h / 4 h aligned", "📰 NEWS USA DANS 1 H": "📰 US NEWS IN 1 H", "🛑 Pas de nouvelle position à partir de": "🛑 No new position from", "🔒 En position ? Mets-toi à BE si tu es en gain": "🔒 In a trade? Move to BE if in profit", "📊 Prévu": "📊 Forecast", "• avant": "• previous", "📰 RÉACTION À LA NEWS": "📰 NEWS REACTION", "⏳ J'attends la clôture de la bougie 15 min avant de reprendre": "⏳ Waiting for the 15 min close before resuming", "haussier ≈": "bullish ≈", "baissier ≈": "bearish ≈", ": le prix peut y rebondir": ": price may bounce there", ": le prix peut y buter": ": price may stall there", "🌙 MARCHÉ BIENTÔT FERMÉ": "🌙 MARKET CLOSING SOON", "⏰ Fermeture à": "⏰ Closes at", "🟥 Topstep / prop firms : tout fermé avant": "🟥 Topstep / prop firms: everything closed before", "🟥 Topstep Live : à plat avant": "🟥 Topstep Live: flat by", "🟥 Topstep SIM / Combine : à plat avant": "🟥 Topstep SIM / Combine: flat by", "(sinon fermeture automatique)": "(otherwise auto-flattened)", "🌙 Broker (CFD) / CME : fermeture": "🌙 Broker (CFD) / CME: close", "🔓 Réouverture": "🔓 Reopen", "dimanche": "Sunday", "lun.": "Mon.", "mar.": "Tue.", "mer.": "Wed.", "jeu.": "Thu.", "ven.": "Fri.", "sam.": "Sat.", "dim.": "Sun.", "• réouverture à": "• reopens at", "• réouverture dimanche soir": "• reopens Sunday evening", "(heure de Paris)": "(Paris time)", "🛡 Pas de nouvelle position avant la fermeture": "🛡 No new position before the close", "🔔 Je reprends la recherche après la réouverture": "🔔 I'll resume after the reopen", "🌙 FERMETURE DU GOLD DANS": "🌙 GOLD CLOSES IN", "🚦 🙅 PAS DE NOUVELLE POSITION": "🚦 🙅 NO NEW POSITION", "🔒 Tu es en position : mets-toi à BE si tu es en gain": "🔒 You're in a trade: move to BE if in profit", "🛡 Vérifie que ton SL est bien placé": "🛡 Check your SL is in place", "🛡 Ne pas ouvrir de position avant la fermeture": "🛡 Don't open a position before the close", "💥 Week-end : le prix peut s'ouvrir loin (écart), sécurise tes gains": "💥 Weekend: price may gap at the open, secure your profits", "💥 À la réouverture le prix peut sauter (écart)": "💥 At the reopen price may gap", "🎯 TP1 TOUCHÉ": "🎯 TP1 HIT", "✂️ Prends une partie des gains": "✂️ Take part of the profit", "🔒 Vérifie que ton SL est à BE": "🔒 Check your SL is at BE", "📈 Garde le reste : le marché peut encore pousser": "📈 Keep the rest: the market can push further", "🏁 TP2 visé": "🏁 Target TP2", "🙅 Ne coupe pas tout sur le TP1": "🙅 Don't close everything at TP1", "⏱ Durée estimée": "⏱ Estimated duration", "📅 Position de LONGUE DURÉE : elle peut durer plus d'une journée, garde ton SL en place la nuit": "📅 Long-DURATION position: it can last more than a day, keep your SL overnight", "🎁 Ta position gratuite arrive avec le prochain signal": "🎁 Your free position comes with the next signal", "🔒 Cette position est réservée aux VIP": "🔒 This position is VIP-only", "🎉🎉 BRAVO": "🎉🎉 WELL DONE", "💰 Ta position gratuite": "💰 Your free position", "🔥 C'est ça, ALIGN": "🔥 That's ALIGN", "😍 Imagine chaque position comme celle-là": "😍 Imagine every position like this one", "💎 En VIP : toutes les positions + le sens + le coach (BE, TP)": "💎 In VIP: every position + the direction + the coach (BE, TP)", "🔓 VIP 49,90 € / mois 👇": "🔓 VIP €49.90 / month 👇", "📊 Ça fait partie du jeu : on coupe petit, on gagne gros": "📊 It's part of the game: cut small, win big", "💎 En VIP : toutes les positions pour se refaire + le coach": "💎 In VIP: every position to bounce back + the coach", "RÉSULTAT ALIGN": "ALIGN RESULT", "📌 Entrée": "📌 Entry", "🏁 Sortie": "🏁 Exit", "📈 Résultat": "📈 Result", "⏱ Durée": "⏱ Duration", ": bravo !": ": well done!", "📸 N'hésite pas à partager ta capture dans ALIGN Résultats": "📸 Feel free to share your screenshot in ALIGN Results", "👇 Bouton 📸 Partager mon gain": "👇 Button 📸 Share my profit", "🛡 SL respecté, risque maîtrisé": "🛡 SL respected, risk under control", "📸 Voir les résultats ALIGN": "📸 See ALIGN results", ": SL touché, risque maîtrisé": ": SL hit, risk under control", "📊 Tous les résultats (TP et SL) sont publiés en toute transparence": "📊 All results (TP and SL) are published transparently", "👇 Bouton ci-dessous": "👇 Button below", "🔥 Une position VIP est EN COURS": "🔥 A VIP position is RUNNING", "👀 Une position VIP se PRÉPARE": "👀 A VIP position is COMING", "⏳ Pas de position pour l'instant": "⏳ No position right now", "🔒 Sens du marché : VIP": "🔒 Market direction: VIP", "🔒 LONG ou SHORT, entrée, SL, TP : réservés aux VIP": "🔒 LONG or SHORT, entry, SL, TP: VIP only", "Nouvelle info pour les VIP": "New info for VIPs", "🤫 Sens et niveaux cachés": "🤫 Direction and levels hidden", "🌀🌀 MANIPULATION EN COURS": "🌀🌀 MANIPULATION IN PROGRESS", "⚠️ MÈCHE SUSPECTE EN COURS": "⚠️ SUSPICIOUS WICK IN PROGRESS", "⏱ CHRONO EN DIRECT": "⏱ LIVE TIMER", "🚦 🟢 J'ENTRE": "🚦 🟢 I'M ENTERING", "🚦 🟢 ON RESTE EN POSITION": "🚦 🟢 WE STAY IN", "objectifs remis dans l'ordre": "targets put back in order", "🛑 SL inchangé": "🛑 SL unchanged", "🚦 🙅 JE N'ENTRE PAS": "🚦 🙅 I'M NOT ENTERING", "🚦 ⏳ JE N'ENTRE PAS ENCORE": "🚦 ⏳ NOT ENTERING YET", "💰 TP visé": "💰 Target TP", "🎯 Inscrit depuis": "🎯 Registered for", "✅ ENTRÉ": "✅ ENTERED", "🎯 Le coach te suit jusqu'au TP": "🎯 The coach follows you to TP",
 "⏸ News dans moins de 15 min : pause": "⏸ News in less than 15 min: pause", "⏳ Reprise juste après la news": "⏳ Resuming right after the news",
 ": j'attends 15 min + 1 h + 4 h": ": waiting for 15 min + 1 h + 4 h", "⏳ Pas d'estimation tant que ce n'est pas aligné": "⏳ No estimate until aligned",
 "🚀 Le marché est parti : j'attends le repli": "🚀 The market ran: waiting for the pullback", "↩️ Repli visé": "↩️ Target pullback",
@@ -11413,10 +11425,15 @@ def annonces_et_sessions(etat, maintenant, derniers):
                 vus.append(f"{cle_f}{cle_j}")
                 tr_g = (etat.get("GOLD") or {}).get("trade")
                 week = jour.weekday() == 4
+                if jour.date().isoformat() == "2026-11-27":
+                    topstep_lignes = (f"🟥 Topstep Live : à plat avant {heure(tp_)}\n"
+                                      f"🟥 Topstep SIM / Combine : à plat avant {heure(tp_ + 35 * 60)}\n")
+                else:
+                    topstep_lignes = f"🟥 Topstep / prop firms : tout fermé avant {heure(tp_)} (sinon fermeture automatique)\n"
                 out.append(f"🌙 FERMETURE DU GOLD DANS {avant} MIN — 🥇 GOLD\n🚦 🙅 PAS DE NOUVELLE POSITION\n"
-                           f"🟥 Topstep / prop firms : tout fermé avant {heure(tp_)} (sinon fermeture automatique)\n"
-                           f"🌙 Broker (CFD) / CME : fermeture {heure(cme_)}\n"
-                           f"🔓 Réouverture : {'dimanche ' if week else ''}{heure(rouv_)} (heure de Paris)\n"
+                           + topstep_lignes
+                           + f"🌙 Broker (CFD) / CME : fermeture {heure(cme_)}\n"
+                           + f"🔓 Réouverture : {quand_txt(rouv_, maintenant)} (heure de Paris)\n"
                            + ("🔒 Tu es en position : vérifie ton SL ; ne le déplace pas sans validation du coach\n🛡 Vérifie que ton SL est bien placé\n" if tr_g else "🛡 Ne pas ouvrir de position avant la fermeture\n")
                            + ("💥 Week-end : le prix peut s'ouvrir loin (écart), sécurise tes gains" if week else "💥 À la réouverture le prix peut sauter (écart)"))
     # Ouvertures / fermetures de marché : voir alertes_courtes() (préavis 15 et 5 min, FR/EN, regroupées)
@@ -11425,9 +11442,11 @@ def annonces_et_sessions(etat, maintenant, derniers):
 
 JOURS_FR = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."]
 
-def quand_txt(t):
-    """« aujourd'hui 14:30 », « demain 10:00 », « mar. 10/11 14:30 » — toujours à l'heure de Paris."""
-    d = datetime.datetime.fromtimestamp(t, PARIS); auj = datetime.datetime.now(PARIS).date()
+def quand_txt(t, maintenant=None):
+    """« aujourd'hui 14:30 », « demain 10:00 », « lun. 30/11 00:00 » — toujours à l'heure de Paris."""
+    d = datetime.datetime.fromtimestamp(t, PARIS)
+    reference = time.time() if maintenant is None else maintenant
+    auj = datetime.datetime.fromtimestamp(reference, PARIS).date()
     jour = "aujourd'hui" if d.date() == auj else "demain" if (d.date() - auj).days == 1 else f"{JOURS_FR[d.weekday()]} {d.strftime('%d/%m')}"
     return f"{jour} {d.strftime('%H:%M')}"
 
@@ -11491,14 +11510,25 @@ def prochaine_news(etat):
     return f"Prochaine news   {jour} {heure(e['t'])} {e['titre']}"
 
 def horaires_gold(ts=None):
-    """Horaires du Gold, calculés en heure de Chicago (gère tout seul heure d'été / d'hiver) :
-    Topstep (prop firm futures) : tout fermer avant 15:10 CT • CME / CFD : fermeture 16:00 CT • réouverture 17:00 CT."""
-    ct = datetime.datetime.fromtimestamp(ts or time.time(), ZoneInfo("America/Chicago"))
+    """Horaires Gold en heure de Chicago ; les dates spéciales priment sur les horaires normaux."""
+    instant = time.time() if ts is None else ts
+    ct = datetime.datetime.fromtimestamp(instant, ZoneInfo("America/Chicago"))
     h = lambda hh, mm: ct.replace(hour=hh, minute=mm, second=0, microsecond=0).timestamp()
-    return h(15, 10), h(16, 0), h(17, 0)
+    date = ct.date().isoformat()
+    if date == "2026-11-26":
+        # Topstep : flat 11:45 CT ; CME Metals : halt 13:30 CT ; reprise 17:00 CT.
+        return h(11, 45), h(13, 30), h(17, 0)
+    if date == "2026-11-27":
+        # Topstep Live 11:25 CT / SIM-Combine 12:00 CT ; CME Metals close 13:45 CT.
+        # La reprise a lieu dimanche 17:00 CT, pas vendredi soir.
+        reopen = (ct + datetime.timedelta(days=2)).replace(hour=17, minute=0, second=0, microsecond=0).timestamp()
+        return h(11, 25), h(13, 45), reopen
+    reopen = ((ct + datetime.timedelta(days=2)).replace(hour=17, minute=0, second=0, microsecond=0)
+              if ct.weekday() == 4 else ct.replace(hour=17, minute=0, second=0, microsecond=0))
+    return h(15, 10), h(16, 0), reopen.timestamp()
 
 def minutes_avant_fermeture_gold(ts=None):
-    """Minutes avant la clôture Topstep (15:10 CT, la plus tôt) — négatif après."""
+    """Minutes avant le cutoff Topstep le plus prudent (15:10 normal, horaires spéciaux les jours fériés) — négatif après."""
     t = ts or time.time()
     return (horaires_gold(t)[0] - t) / 60
 
@@ -13089,10 +13119,18 @@ def agent(m, r, cle, ferme):
     if not tr and r.get("fermeture"):
         if r["t"] - cle.get("ferm_dit", 0) > 3 * 3600:
             cle["ferm_dit"] = r["t"]
-            tp_, cme_, rouv_ = horaires_gold()
+            now_fermeture = time.time()
+            tp_, cme_, rouv_ = horaires_gold(now_fermeture)
+            date_ct = datetime.datetime.fromtimestamp(now_fermeture, ZoneInfo("America/Chicago")).date().isoformat()
+            if date_ct == "2026-11-27":
+                topstep_lignes = (f"🟥 Topstep Live : à plat avant {heure(tp_)}\n"
+                                  f"🟥 Topstep SIM / Combine : à plat avant {heure(tp_ + 35 * 60)}\n")
+            else:
+                topstep_lignes = f"🟥 Topstep / prop firms : tout fermé avant {heure(tp_)}\n"
             out.append(f"🌙 MARCHÉ BIENTÔT FERMÉ — {ICONE.get(m, '')} {m}\n🚦 🙅 JE N'ENTRE PAS\n"
-                       f"🟥 Topstep / prop firms : tout fermé avant {heure(tp_)}\n🌙 Broker (CFD) / CME : fermeture {heure(cme_)}\n"
-                       f"🔓 Réouverture : {heure(rouv_)} (heure de Paris)\n"
+                       + topstep_lignes
+                       + f"🌙 Broker (CFD) / CME : fermeture {heure(cme_)}\n"
+                       + f"🔓 Réouverture : {quand_txt(rouv_, now_fermeture)} (heure de Paris)\n"
                        "🛡 Pas de nouvelle position avant la fermeture\n🔔 Je reprends la recherche après la réouverture")
         return out
     if not tr:
