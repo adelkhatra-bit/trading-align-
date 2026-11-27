@@ -46,7 +46,7 @@ class LiveVoiceDisplayLanguage(unittest.TestCase):
     def test_voice_is_optional_and_reads_french_live_comments(self):
         source = LIVE_JS.read_text(encoding="utf-8")
         self.assertIn("function parlerLive(item, forcer = false, apresLecture = null)", source)
-        self.assertIn("if (!vivant || !item || !voixActive", source)
+        self.assertIn("if (!vivant || !item || !voixActive || !voixWorkerConfirmee", source)
         self.assertIn("const voixDuree = m.voiceOnce ? parlerLive(m) : 0", source)
         self.assertIn("!['ia', 'marche', 'coach'].includes(item.source)", source)
         self.assertIn("const dureeFR = parlerLive(fr);", source)
@@ -62,6 +62,23 @@ class LiveVoiceDisplayLanguage(unittest.TestCase):
         self.assertNotIn("animCur.pause()", source)
         self.assertIn("timerCur = setTimeout", source)
         self.assertIn("function appliquerAnimations()", source)
+
+
+    def test_coach_on_requires_a_positive_worker_acknowledgement(self):
+        source = LIVE_JS.read_text(encoding="utf-8")
+        publisher_start = source.index("function publierEtatCoach(")
+        publisher_end = source.index("function signalVoix(", publisher_start)
+        publisher = source[publisher_start:publisher_end]
+        self.assertIn("result.ok === true && result.voiceEnabled === enabled", publisher)
+        self.assertIn("typeof callback === 'function'", publisher)
+        click_start = source.index("voixBtn.addEventListener('click', () => {")
+        click_end = source.index("let voixUtterance = null;", click_start)
+        click = source[click_start:click_end]
+        self.assertIn("publierEtatCoach(true, false, ok =>", click)
+        self.assertIn("⏳ SYNCHRONISATION...", click)
+        self.assertIn("⚠️ COACH VOCAL NON CONNECTÉ", click)
+        self.assertNotIn("voixBtn.textContent = '🔊 COACH VOCAL ON';", click.split("publierEtatCoach(true", 1)[0])
+        self.assertIn("!voixWorkerConfirmee", source)
 
 
 if __name__ == "__main__":
