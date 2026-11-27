@@ -80,10 +80,60 @@ class FlashCommentateur(unittest.TestCase):
         t = ab.flash_commentateur("BTC", r, {"trade": {"d": -1}})
         self.assertIn("ÇA BOUGE", t); self.assertIn("vendeurs", t); self.assertIn("Dans le sens du bot", t)
 
-    def test_grosse_meche(self):
-        r = {"atr": 100, "m1": [dict(o=1000, c=1000)] * 3, "b15": [dict(o=990, h=1080, l=985, c=1000)]}
+    def test_grosse_meche_haute_est_clairement_un_rejet_baissier_non_confirme(self):
+        r = {
+            "atr": 100, "m1": [dict(o=1000, c=1000)] * 3,
+            "b15": [dict(o=990, h=1080, l=985, c=1000)],
+            "dirs_cloturees": [-1] * 8 + [1, 1, 0],
+        }
         t = ab.flash_commentateur("GOLD", r, {})
-        self.assertIn("GROSSE MÈCHE", t)
+        self.assertIn("REJET BAISSIER POTENTIEL", t)
+        self.assertIn("mèche haute", t)
+        self.assertIn("Vendeurs rejettent le haut", t)
+        self.assertIn("Biais de contexte : SHORT dominant", t)
+        self.assertIn("8/11 baissières", t)
+        self.assertIn("pas un signal", t)
+        self.assertIn("M15 non clôturée", t)
+        english = ab.traduire(t)
+        self.assertIn("POTENTIAL BEARISH REJECTION", english)
+        self.assertIn("Context bias: SHORT dominant", english)
+        self.assertIn("M15 not closed", english)
+
+    def test_grosse_meche_basse_est_clairement_un_rejet_haussier_non_confirme(self):
+        r = {
+            "atr": 100, "m1": [dict(o=1000, c=1000)] * 3,
+            "b15": [dict(o=1010, h=1015, l=920, c=1000)],
+            "dirs_cloturees": [1] * 7 + [-1] * 3 + [0],
+        }
+        t = ab.flash_commentateur("GOLD", r, {})
+        self.assertIn("REJET HAUSSIER POTENTIEL", t)
+        self.assertIn("mèche basse", t)
+        self.assertIn("Acheteurs défendent le bas", t)
+        self.assertIn("Biais de contexte : LONG dominant", t)
+        self.assertIn("7/11 haussières", t)
+        self.assertIn("M15 non clôturée", t)
+
+    def test_deux_meches_ne_sont_pas_forcees_en_direction(self):
+        r = {
+            "atr": 100, "m1": [dict(o=1000, c=1000)] * 3,
+            "b15": [dict(o=1000, h=1080, l=920, c=1000)],
+            "dirs_cloturees": [-1] * 6 + [1] * 5,
+        }
+        t = ab.flash_commentateur("GOLD", r, {})
+        self.assertIn("INDÉCISION", t)
+        self.assertIn("aucun rejet directionnel", t)
+        self.assertNotIn("REJET BAISSIER POTENTIEL", t)
+        self.assertNotIn("REJET HAUSSIER POTENTIEL", t)
+
+    def test_absence_de_clotures_mtf_n_est_pas_remplacee_par_les_ut_en_formation(self):
+        r = {
+            "atr": 100, "m1": [dict(o=1000, c=1000)] * 3,
+            "b15": [dict(o=990, h=1080, l=985, c=1000)],
+            "dirs": [-1] * 11,
+        }
+        t = ab.flash_commentateur("GOLD", r, {})
+        self.assertIn("Clôtures MTF : indisponibles", t)
+        self.assertNotIn("11/11", t)
 
     def test_rien_de_special(self):
         r = {"atr": 100, "m1": [dict(o=1000, c=1001)] * 3, "b15": [dict(o=1000, h=1010, l=995, c=1001)]}
