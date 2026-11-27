@@ -828,6 +828,7 @@ class LiveOutbox(unittest.TestCase):
             self.assertTrue(ab.live_phrases_ia(state, 1000, {}))
             ia_mock.assert_called_with(mock.ANY, mock.ANY, mock.ANY, cle_cache="live_commentary", duree=ab.LIVE_IA_INTERVALLE, premium=True, prefer_paid=True)
             prompt = ia_mock.call_args.args[1]
+            self.assertIn("biais_contextuel", prompt)
             self.assertIn("phase_plan", prompt)
             self.assertIn("carte Telegram ENTRÉE AUTORISÉE", prompt)
             self.assertFalse(ab.live_phrases_ia(state, 1599, {}))
@@ -1196,6 +1197,7 @@ class LivePlanBiasUsesPineV25(unittest.TestCase):
             "available": True, "confirmed": False, "direction": 1,
             "strategy": "DAY", "triggered": False, "price_in_zone": False
         })
+        self.assertEqual(context["biais_contextuel"], "haussier")
         self.assertEqual(context["biais_plan"], "neutre")
         self.assertEqual(context["phase_plan"], "attente_confirmation_mtf")
         self.assertFalse(context["plan_confirme"])
@@ -1206,6 +1208,7 @@ class LivePlanBiasUsesPineV25(unittest.TestCase):
             "available": True, "confirmed": True, "direction": -1,
             "strategy": "DAY", "triggered": False, "price_in_zone": False
         })
+        self.assertEqual(context["biais_contextuel"], "haussier")
         self.assertEqual(context["biais_plan"], "baissier")
         self.assertEqual(context["phase_plan"], "attente_declencheur")
         self.assertTrue(context["plan_confirme"])
