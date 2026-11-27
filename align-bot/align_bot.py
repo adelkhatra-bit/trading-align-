@@ -9884,7 +9884,8 @@ def evenements_pine(etat, m, r, cle, now):
             franchit_haut = align_n >= MIN_ALIGN and (prev_n < MIN_ALIGN or sens_change)
             franchit_bas = align_n < MIN_ALIGN <= prev_n and prev_d == align_d
             align_base = dict(base, d=align_d, n=align_n, tf_total=align_total,
-                              tf_lines=align_lines, sens_label=sens_label)
+                              tf_lines=align_lines, sens_label=sens_label,
+                              pine_confirmed=bool(bridge_required and align_available))
             if franchit_haut:
                 ev.append(dict(kind="align_haut", **align_base, etat_seuil="atteint ✅", etat_seuil_court="Seuil atteint")); mem["t_align"] = now
             elif franchit_bas:
@@ -9990,9 +9991,14 @@ def texte_pine(etat, ev, anglais=False):
     lignes = list(var[_tournante(etat, f"p:{ev['kind']}:{ev['m']}", len(var))])
     ev = dict(ev)
     direction = int(ev.get("d") or 0)
+    ev.setdefault("tf_total", 11)
+    pine_confirme = ev.get("pine_confirmed") is True
     if anglais:
-        ev["sens_label"] = "LONG to watch (not confirmed)" if direction == 1 else "SHORT to watch (not confirmed)" if direction == -1 else "undefined (neither LONG nor SHORT)"
-        ev["sens_action"] = "Threshold reached: confluence only — wait for Pine trigger and ROBOT V12 check." if direction else "Threshold reached, but no trade direction is confirmed — wait for a Pine plan."
+        ev["sens_label"] = (("LONG to watch (confirmed Pine M15 plan)" if direction == 1 else "SHORT to watch (confirmed Pine M15 plan)")
+                            if pine_confirme else
+                            ("LONG context only (not a Pine entry signal)" if direction == 1 else "SHORT context only (not a Pine entry signal)" if direction == -1 else "undefined (neither LONG nor SHORT)"))
+        ev["sens_action"] = ("Alignment is context, not entry permission. Wait for the Pine trigger and ROBOT V12 final check."
+                             if pine_confirme else "Local alignment only: it is not a TradingView/Pine direction or an entry signal.")
         ev["sens_baisse"] = "The LONG scenario is losing support; this is not a SHORT signal." if direction == 1 else "The SHORT scenario is losing support; this is not a LONG signal." if direction == -1 else "No reversal or opposite trade direction is confirmed."
         ev["pos"] = {"au-dessus de": "above", "sous": "below"}.get(ev.get("pos"), ev.get("pos"))
         ev["etat_seuil"] = "reached ✅" if "atteint" in str(ev.get("etat_seuil", "")) else "almost"
@@ -10000,8 +10006,11 @@ def texte_pine(etat, ev, anglais=False):
         ev["ordre"] = {"vente": "sell", "achat": "buy"}.get(ev.get("ordre"), ev.get("ordre"))
         ev["fleche"] = str(ev.get("fleche", "")).replace("HAUSSIER", "BULLISH").replace("BAISSIER", "BEARISH")
     else:
-        ev["sens_label"] = "LONG à surveiller (non confirmée)" if direction == 1 else "SHORT à surveiller (non confirmée)" if direction == -1 else "non définie (ni LONG ni SHORT)"
-        ev["sens_action"] = "Seuil technique atteint : confluence seulement, attendre le déclencheur Pine et le contrôle ROBOT V12." if direction else "Seuil technique atteint, mais aucun sens de trade confirmé : attendre un plan Pine."
+        ev["sens_label"] = (("LONG à surveiller (plan Pine M15 confirmé)" if direction == 1 else "SHORT à surveiller (plan Pine M15 confirmé)")
+                            if pine_confirme else
+                            ("LONG en contexte local uniquement (pas un signal Pine)" if direction == 1 else "SHORT en contexte local uniquement (pas un signal Pine)" if direction == -1 else "non définie (ni LONG ni SHORT)"))
+        ev["sens_action"] = ("L'alignement donne le contexte, pas l'autorisation d'entrer. Attendre le déclencheur Pine et le contrôle final ROBOT V12."
+                             if pine_confirme else "Alignement local uniquement : ce n'est pas une direction TradingView/Pine ni un signal d'entrée.")
         ev["sens_baisse"] = "Le scénario LONG perd du soutien ; ce message ne signale pas un SHORT." if direction == 1 else "Le scénario SHORT perd du soutien ; ce message ne signale pas un LONG." if direction == -1 else "Aucun retournement ni sens inverse n'est confirmé par ce message."
     out = [l.format(**{k: v for k, v in ev.items() if k not in {"kind", "tf_lines"}}) for l in lignes]
     if ev.get("kind") in {"align_haut", "align_bas"}:
