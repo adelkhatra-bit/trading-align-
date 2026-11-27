@@ -10024,9 +10024,20 @@ def texte_pine(etat, ev, anglais=False):
     return out
 
 def regrouper_alertes(blocs):
-    """Plusieurs alertes dans la même minute = UN seul message de 4 lignes max : titre + première ligne de chacune."""
+    """Regroupe les alertes sans supprimer le détail MTF d'un franchissement d'alignement."""
     if len(blocs) == 1:
-        return blocs[0][:4]
+        bloc = blocs[0]
+        detail_mtf = any("UT favorables au " in str(l) or "LONG support (" in str(l) or "SHORT support (" in str(l) for l in bloc)
+        return bloc[:9] if detail_mtf else bloc[:4]
+    alignement = next((b for b in blocs if any(
+        "UT favorables au " in str(l) or "LONG support (" in str(l) or "SHORT support (" in str(l) for l in b
+    )), None)
+    if alignement:
+        autres = [b for b in blocs if b is not alignement]
+        selection = [alignement] + autres[:2]
+        lignes = [f"⚡ {len(blocs)} infos"] + [b[0] for b in selection]
+        details = alignement[2:]   # direction + action précèdent le détail des 12 UT
+        return (lignes + details)[:9]
     lignes = [b[0] for b in blocs[:3]]
     return ([f"⚡ {len(blocs)} infos"] + lignes)[:4]
 
