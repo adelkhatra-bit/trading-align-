@@ -1621,9 +1621,6 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
         age_plan = tv_plan.get("ageMs")
         age_plan_txt = (f" · âge plan M15 : {max(0, int(float(age_plan) / 1000))} s"
                         if isinstance(age_plan, (int, float)) and math.isfinite(float(age_plan)) else "")
-        age_actif = tv_price.get("ageMs") if tv_price else None
-        age_actif_txt = (f" · âge prix {tv_price['timeframe']} : {max(0, int(float(age_actif) / 1000))} s"
-                         if tv_price and isinstance(age_actif, (int, float)) and math.isfinite(float(age_actif)) else "")
         l += ["━━━━━━━━━━━━━━━━━━", "📡 PLAN CANONIQUE PINE v25",
               "Plan de niveaux : M15 (indépendant de l'unité du graphique)" + age_plan_txt,
               f"Unité de validation : {tv_plan['entry_timeframe']} ({tv_plan['strategy']})",
@@ -1632,9 +1629,7 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
               f"Zone verte : {px(tv_plan['zone_low'])} → {px(tv_plan['zone_high'])} • Décision : {px(tv_plan['decision'])}",
               "Clôture MTF Pine : CONFIRMÉE",
               "Déclencheur clôturé : " + ("VALIDÉ" if tv_plan.get("triggered") else "EN ATTENTE"),
-              age_actif_txt.strip(),
               "⚠️ Les filtres de sécurité ALIGN peuvent refuser l'entrée sans modifier les niveaux Pine."]
-        l = [line for line in l if line != ""]
     elif tv_plan.get("available") is True:
         l += ["━━━━━━━━━━━━━━━━━━", "📡 PLAN CANONIQUE PINE v25",
               "Configuration M15 détectée — confirmation MTF en attente.",
@@ -1650,9 +1645,8 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
     l += ["━━━━━━━━━━━━━━━━━━", "🧭 CONFIRMATION LOCALE (CONTEXTE, NON DÉCISIONNELLE)" if require_tv else "🧭 CONFIRMATION DE TENDANCE",
           "ALIGNEMENT LOCAL 1H + 4H" if require_tv else "ALIGNEMENT 1H + 4H",
           f"{n_ok}/2 {'✅ ALIGNÉS' if r['confirme'] else '⏳ EN ATTENTE'}" if require_tv else f"{n_ok}/2 {'✅ CONFIRMÉ' if r['confirme'] else '⏳ EN ATTENTE'}",
-          "ZONE DAILY LOCALE", zone_txt(r['posD']) if require_tv else "ZONE DAILY",
-          zone_txt(r['posW']) if require_tv else "ZONE WEEKLY",
-          "ZONE WEEKLY LOCALE" if require_tv else "",
+          "ZONE DAILY LOCALE" if require_tv else "ZONE DAILY", zone_txt(r['posD']),
+          "ZONE WEEKLY LOCALE" if require_tv else "ZONE WEEKLY", zone_txt(r['posW']),
           "━━━━━━━━━━━━━━━━━━", "🧭 LECTURE MULTI-TIMEFRAME LOCALE" if require_tv else "🧭 PLAN MULTI-TIMEFRAME"] + strategie_mtf(r)
     l = [line for line in l if line != ""]
     nc = dict((n, v) for v, n in (r.get("niv_cles") or []))
