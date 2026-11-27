@@ -14371,10 +14371,22 @@ def contexte_technique_live(derniers):
         if not isinstance(r, dict):
             continue
         dirs = (r.get("dirs_cloturees") or r.get("dirs")) or []
-        # Le coach ne doit jamais présenter un biais de plan non confirmé comme une direction exploitable.
-        # BTC exige H1/H4 ; GOLD exige M5/M15/H1/H4 : ces règles sont déjà matérialisées dans confirme.
-        sens = int(r.get("confirme") or 0)
+        # Le biais décisionnel vient exclusivement du plan Pine v25 ; les directions locales restent du contexte.
+        plan_pine = plan_indicateur(r) if r.get("require_tv_bridge") else None
+        plan_disponible = bool(plan_pine and plan_pine.get("available"))
+        plan_confirme = bool(plan_disponible and plan_pine.get("confirmed") is True)
+        sens = int(plan_pine.get("direction") or 0) if plan_confirme else 0
         biais = {1: "haussier", -1: "baissier", 0: "neutre"}[1 if sens > 0 else -1 if sens < 0 else 0]
+        if not plan_disponible:
+            phase_plan = "aucun_plan"
+        elif not plan_confirme:
+            phase_plan = "attente_confirmation_mtf"
+        elif not plan_pine.get("triggered"):
+            phase_plan = "attente_declencheur"
+        elif not plan_pine.get("price_in_zone"):
+            phase_plan = "attente_retour_zone"
+        else:
+            phase_plan = "verification_finale"
         confirmation_complete = (
             len(dirs) > 9 and dirs[2] == dirs[4] == dirs[7] == dirs[9] == 1
         )
@@ -14383,6 +14395,9 @@ def contexte_technique_live(derniers):
         )
         contexte = {
             "biais_plan": biais,
+            "phase_plan": phase_plan,
+            "plan_confirme": plan_confirme,
+            "strategie": (plan_pine.get("strategy") if plan_confirme else "aucune stratégie Pine confirmée"),
             "confirmation_4h_1h": "alignées à la hausse" if len(dirs) > 9 and dirs[7] == dirs[9] == 1 else
                                   "alignées à la baisse" if len(dirs) > 9 and dirs[7] == dirs[9] == -1 else "non alignées",
             "confirmation_m5_m15_h1_h4": (
@@ -14399,7 +14414,6 @@ def contexte_technique_live(derniers):
             },
             "unites_haussieres_sur_11": sum(1 for d in dirs[:11] if d == 1),
             "unites_baissieres_sur_11": sum(1 for d in dirs[:11] if d == -1),
-            "strategie": r.get("strat") or "aucune stratégie confirmée",
             "rsi_15m": round(float(r.get("rC")), 1) if isinstance(r.get("rC"), (int, float)) else None,
             "compression_unites": r.get("comp"),
         }
@@ -14616,7 +14630,10 @@ def live_phrases_ia(etat, maintenant, derniers=None):
         "ou fausses cassures confirmées par une bougie clôturée. Le M5 sert d'alerte précoce, le M15 de confirmation plus robuste. "
         "Distingue une baisse momentanée, un vrai breakdown et une reprise haussière après balayage des stops ; "
         "ne confonds jamais une mèche avec une cassure confirmée et signale les désaccords M5/M15. "
-        "Le champ biais_plan est exclusivement la direction déjà confirmée par le moteur ; neutre signifie qu'aucune direction de trade n'est confirmée. "
+        "Le champ biais_plan est exclusivement la direction confirmée par Pine v25 ; neutre signifie qu'aucune direction de trade n'est confirmée. "
+        "Le champ phase_plan indique l'étape réelle du plan Pine : aucun_plan, attente_confirmation_mtf, attente_declencheur, attente_retour_zone ou verification_finale. "
+        "Si phase_plan n'est pas un signal d'entrée explicite, explique clairement que le commentaire décrit le contexte et qu'il faut attendre la carte Telegram ENTRÉE AUTORISÉE. "
+        "Ne déduis jamais une autorisation d'entrée du seul alignement des unités de temps. "
         "Lis mouvement_court_terme M5/M15 : si une clôture courte contredit le biais de fond, annonce explicitement le contre-mouvement ou le retracement. "
         "Ne présente jamais le biais de fond comme la direction immédiate du prix et ne prédis jamais une chute ou une hausse sans clôture de confirmation. "
         "Si le prix est dans la zone Fibonacci 61,8–78,6 %, explique naturellement qu'il teste une zone de retracement profonde "
