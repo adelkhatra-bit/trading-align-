@@ -397,6 +397,7 @@ class ClosedMtfSafety(unittest.TestCase):
             "strategy": "DAY", "triggered": False, "price_in_zone": False,
         }):
             context = ab.contexte_technique_live({"BTC": base})["marches"]["BTC"]
+        self.assertEqual(context["biais_contextuel"], "baissier")
         self.assertEqual(context["biais_plan"], "baissier")
         self.assertTrue(context["conflit_biais_court_terme"])
         fallback = ab.commentaires_live_de_secours({"marches": {"BTC": context}})
