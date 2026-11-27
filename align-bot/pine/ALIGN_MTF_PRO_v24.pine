@@ -364,8 +364,8 @@ var int dernierB = -100
 // Entrées uniquement dans le sens des grosses UT (2h, 4h, Daily)
 sigHaut0 = ((fortHaut or explHaut) and longT >= 1) or (zoneHaut and longT >= 0)
 sigBas0  = ((fortBas or explBas) and longT <= -1) or (zoneBas and longT <= 0)
-sigHaut = sigHaut0 and bar_index - dernierH > 12
-sigBas  = sigBas0 and bar_index - dernierB > 12
+sigHaut = voirSignauxV24 and sigHaut0 and bar_index - dernierH > 12
+sigBas  = voirSignauxV24 and sigBas0 and bar_index - dernierB > 12
 if sigHaut
     dernierH := bar_index
 if sigBas
@@ -476,7 +476,7 @@ if barstate.islast
         table.cell(t, i, 1, sym, width=largCol, bgcolor=bg, text_color= color.white, text_size=size.normal, tooltip=tip)
     titre = zoneBas ? "RETOURNEMENT ▼" : zoneHaut ? "REBOND ▲" : fortHaut ? "★ ACHAT FORT" : fortBas ? "★ VENTE FORTE" : retHaut ? "RETOURNEMENT ▲" : retBas ? "RETOURNEMENT ▼" : rsiOB >= 3 ? "RSI SURACHAT " + str.tostring(rsiOB) + "/11" : rsiOS >= 3 ? "RSI SURVENTE " + str.tostring(rsiOS) + "/11" : surcharge ? "⚡ SURCHARGE" : sens == 1 ? "HAUSSE" : sens == -1 ? "BAISSE" : "ATTENDRE"
     ligne = "📊 CONTEXTE MTF v24 — plan Entry / SL / TP sur v25 • " + titre
-    plan = "VISUEL COMPLÉMENTAIRE v24 : contexte et clôtures uniquement.\nLa direction du plan, Entry, SL et TP de référence sont exclusivement ceux de ALIGN MTF PRO v25."
+    plan = "VISUEL COMPLÉMENTAIRE v24 : contexte et clôtures uniquement.\nClôture de validation : seule une bougie clôturée compte.\nLa direction du plan, Entry, SL et TP de référence sont exclusivement ceux de ALIGN MTF PRO v25."
     vbg0 = zoneBas or zoneHaut ?  color.rgb(170, 130, 0) : dirPlan == 1 ?  color.rgb(0, 140, 70) : dirPlan == -1 ?  color.rgb(190, 30, 45) :  color.rgb(60, 60, 60)
     actif = zoneBas or zoneHaut or fortHaut or fortBas or retHaut or retBas or surcharge
     table.cell(t, 0, 2, ligne, bgcolor=actif and clignote ? color.new(vbg0, 50) : vbg0, text_color= color.white, text_size=size.normal, tooltip=titre + "\n" + plan)

@@ -82,9 +82,9 @@ class PineTpPlanStateTests(unittest.TestCase):
         for name in ("d1Fermee", "d3Fermee", "d5Fermee", "d10Fermee", "d15Fermee",
                      "d30Fermee", "d45Fermee", "d60Fermee", "d120Fermee", "d240Fermee", "dDFermee", "dWFermee"):
             self.assertIn(f"f_align_v25_json_int(nz({name}))", self.source)
-        self.assertIn('lecture_1m\\":\' + f_align_v25_json_dir(nz(d1Fermee))', self.source)
-        self.assertIn('macro_bull\\":\' + str.tostring(bullFermee)', self.source)
-        self.assertIn('macro_bear\\":\' + str.tostring(bearFermee)', self.source)
+        self.assertIn('f_align_v25_json_dir(nz(d1Fermee)) + \',"lecture_5m":\'', self.source)
+        self.assertIn('str.tostring(bullFermee) + \',"macro_bear":\'', self.source)
+        self.assertIn('str.tostring(bearFermee) + \',"long_score":\'', self.source)
         self.assertIn("d5Strat = nz(d5Fermee)", self.source)
         self.assertIn("d1Strat = nz(d1Fermee)", self.source)
         self.assertIn("uD  = nz(dDFermee) == dP", self.source)

@@ -602,7 +602,7 @@ class AffichageTPGraphique(unittest.TestCase):
         with open(chemin, encoding="utf-8") as f:
             pine = f.read()
         bloc = pine[pine.index("// ═════════ LIGNES DU PLAN (TP1, TP2, STOP)"):pine.index("// ═════════ BARRE (en bas")]
-        self.assertIn("if voirPlan and dirPlan != 0", bloc)
+        self.assertIn("if voirPlan and planConfirmedUi", bloc)
         self.assertIn("lTP1 := line.new(x1, tp1", bloc)
         self.assertIn("lTP2 := line.new(x1, tp2", bloc)
         self.assertIn('eTP1 := label.new(x1, tp1, "TP1 "', bloc)
