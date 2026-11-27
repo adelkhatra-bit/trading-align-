@@ -320,14 +320,27 @@
   }
   function programmerRepriseVoix() {
     annulerReprisesVoix();
-    [250, 750, 1500, 3000, 6000].forEach(delai => {
-      voixRetryTimers.push(setTimeout(() => {
-        if (!voixActive || !voixEnAttente) return;
-        rafraichirVoix();
+    const delais = [250, 750, 1500, 3000, 6000];
+    let index = 0;
+    const tenter = () => {
+      if (!voixActive || !voixEnAttente) { annulerReprisesVoix(); return; }
+      rafraichirVoix();
+      const item = voixEnAttente.item;
+      const langue = item && item.en ? 'en' : 'fr';
+      const speaker = item && item.speaker === 'l' ? 'l' : 't';
+      if (item && choisirVoix(langue, speaker)) {
+        annulerReprisesVoix();
         voixSurVoixChangees();
-        if (voixEnAttente && delai === 6000) mettreEtatVoix();
-      }, delai));
-    });
+        return;
+      }
+      if (index >= delais.length) {
+        mettreEtatVoix();
+        annulerReprisesVoix();
+        return;
+      }
+      voixRetryTimers.push(setTimeout(tenter, delais[index++]));
+    };
+    voixRetryTimers.push(setTimeout(tenter, 0));
   }
   function voixSurVoixChangees() {
     annulerReprisesVoix();
@@ -462,8 +475,8 @@
       utterance.lang = anglais ? 'en-US' : 'fr-FR';
       const v = choisirVoix(anglais ? 'en' : 'fr', speaker);
       if (!v) {
-        // Les voix peuvent arriver tard et certains Chrome ne déclenchent pas toujours voiceschanged.
-        if (!anglais && voixActive) {
+        // Les voix FR et EN peuvent arriver tard ; certains Chrome ne déclenchent pas toujours voiceschanged.
+        if (voixActive) {
           voixEnAttente = { item, apresLecture };
           mettreEtatVoix();
           programmerRepriseVoix();
