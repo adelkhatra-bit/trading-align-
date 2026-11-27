@@ -9739,10 +9739,10 @@ def texte_session(etat, ev, anglais=False):
     return out[:3]
 
 _PINE_TEXTES = {   # type -> variantes (FR, EN) ; {ic} {m} {n} {c} {seuil} {sens} {strat} {u} {niv} {fleche} {ratio}
-    "align_haut": (("📈 {ic} {m} : {n}/11 UT • orientation Pine : {sens_label}", "{sens_action}"), ("🧲 {ic} {m} : la confluence progresse ({n}/11)", "{sens_action}"),
-                   ("⬆️ {ic} {m} : {n}/11 unités convergent", "{sens_action}")),
-    "align_bas": (("📉 {ic} {m} : l'accord des UT baisse ({n}/11)", "{sens_baisse}"), ("⬇️ {ic} {m} : la confluence se disperse ({n}/11)", "{sens_baisse}"),
-                  ("🌫 {ic} {m} : moins d'unités vont dans le même sens ({n}/11)", "{sens_baisse}")),
+    "align_haut": (("📈 {ic} {m} : {sens_label} — {n}/{tf_total} UT dans le sens du plan", "{sens_action}"), ("🧲 {ic} {m} : scénario {sens_label}, confluence en hausse ({n}/{tf_total})", "{sens_action}"),
+                   ("⬆️ {ic} {m} : {sens_label} — {n}/{tf_total} UT convergent", "{sens_action}")),
+    "align_bas": (("📉 {ic} {m} : scénario {sens_label}, confluence en baisse ({n}/{tf_total})", "{sens_baisse}"), ("⬇️ {ic} {m} : moins d'UT soutiennent le scénario {sens_label} ({n}/{tf_total})", "{sens_baisse}"),
+                  ("🌫 {ic} {m} : soutien du scénario {sens_label} en recul ({n}/{tf_total})", "{sens_baisse}")),
     "surcharge": (("⚡ {ic} {m} : SURCHARGE, {c}/11 UT comprimées", "👀 Explosion possible, attends la direction"), ("🔋 {ic} {m} : le ressort se comprime ({c}/11)", "🧭 La clôture donnera le sens"),
                   ("💤 {ic} {m} : marché très comprimé ({c}/11)", "⚠️ Ça peut partir d'un coup")),
     "relache": (("💥 {ic} {m} : compression relâchée", "🧭 Sens à confirmer à la clôture"), ("🚀 {ic} {m} : ça se libère après la compression", "👀 Pas de précipitation, on attend la bougie"),
@@ -9760,10 +9760,10 @@ _PINE_TEXTES = {   # type -> variantes (FR, EN) ; {ic} {m} {n} {c} {seuil} {sens
                      ("🎯 {ic} {m} : {sens} confirmé à la clôture {u}", "📍 Ligne de décision {niv}")),
 }
 _PINE_TEXTES_EN = {
-    "align_haut": (("📈 {ic} {m}: {n}/11 timeframes • Pine direction: {sens_label}", "{sens_action}"), ("🧲 {ic} {m}: confluence is increasing ({n}/11)", "{sens_action}"),
-                   ("⬆️ {ic} {m}: {n}/11 timeframes converge", "{sens_action}")),
-    "align_bas": (("📉 {ic} {m}: timeframe agreement is weakening ({n}/11)", "{sens_baisse}"), ("⬇️ {ic} {m}: confluence is dispersing ({n}/11)", "{sens_baisse}"),
-                  ("🌫 {ic} {m}: fewer timeframes share the same direction ({n}/11)", "{sens_baisse}")),
+    "align_haut": (("📈 {ic} {m}: {sens_label} — {n}/{tf_total} timeframes support the plan", "{sens_action}"), ("🧲 {ic} {m}: {sens_label} scenario confluence is rising ({n}/{tf_total})", "{sens_action}"),
+                   ("⬆️ {ic} {m}: {sens_label} — {n}/{tf_total} timeframes converge", "{sens_action}")),
+    "align_bas": (("📉 {ic} {m}: {sens_label} scenario confluence is weakening ({n}/{tf_total})", "{sens_baisse}"), ("⬇️ {ic} {m}: fewer timeframes support {sens_label} ({n}/{tf_total})", "{sens_baisse}"),
+                  ("🌫 {ic} {m}: support for {sens_label} is fading ({n}/{tf_total})", "{sens_baisse})),
     "surcharge": (("⚡ {ic} {m}: OVERLOAD, {c}/11 timeframes squeezed", "👀 Breakout possible, wait for the direction"), ("🔋 {ic} {m}: the spring is tightening ({c}/11)", "🧭 The close will give the way"),
                   ("💤 {ic} {m}: very tight market ({c}/11)", "⚠️ It can go all at once")),
     "relache": (("💥 {ic} {m}: squeeze released", "🧭 Direction to confirm at the close"), ("🚀 {ic} {m}: it's freeing up after the squeeze", "👀 No rush, wait for the candle"),
@@ -9784,6 +9784,68 @@ _PINE_PRIO = {"ret_conf": 0, "sniper": 1, "scalp_inv": 1, "confirmation": 1, "re
 
 CONF_REPIT = {"SWING": 4 * 3600, "DAY": 3600, "SCALPING": 900}   # même confirmation (même sens) : une seule fois par période — la zone qui bouge ne la relance pas
 
+def resume_alignement_tradingview(r, plan, anglais=False):
+    """Détail des 12 UT TradingView fraîches, comparées au sens du plan Pine M15 confirmé."""
+    if not isinstance(plan, dict) or plan.get("available") is not True or plan.get("confirmed") is not True:
+        return None
+    direction = int(plan.get("direction") or 0)
+    if direction not in (-1, 1):
+        return None
+    snapshots = ((r or {}).get("tv_indicator_mtf") or {}).get("snapshots") or {}
+    favorables, contraires, neutres, indisponibles = [], [], [], []
+    for tf, label in TELEGRAM_TF_VIEWS:
+        snap = snapshots.get(tf)
+        if not isinstance(snap, dict) or snap.get("fresh") is not True:
+            indisponibles.append(label)
+            continue
+        value = snap.get("direction")
+        try:
+            value = int(value) if not isinstance(value, bool) else None
+        except (TypeError, ValueError, OverflowError):
+            value = _direction_tv(value)
+        if value == direction:
+            favorables.append(label)
+        elif value == -direction:
+            contraires.append(label)
+        elif value == 0:
+            neutres.append(label)
+        else:
+            indisponibles.append(label)
+    sens = "LONG" if direction == 1 else "SHORT"
+    oppose = "SHORT" if direction == 1 else "LONG"
+    if anglais:
+        lines = [
+            f"🟢 {sens} support ({len(favorables)}/12): {', '.join(favorables) or 'none'}",
+            f"🔴 Against {sens} / {oppose} pressure ({len(contraires)}): {', '.join(contraires) or 'none'}",
+            f"➖ Neutral ({len(neutres)}): {', '.join(neutres) or 'none'}",
+            f"⏳ Missing or stale ({len(indisponibles)}): {', '.join(indisponibles) or 'none'}",
+        ]
+        strategy = str(plan.get("strategy") or "—").upper()
+        trigger_tf = str(plan.get("entry_timeframe") or "—").upper()
+        if plan.get("triggered") and plan.get("price_in_zone"):
+            lines.append("🛡 Pine trigger and entry zone confirmed: wait for final ROBOT V12 validation.")
+        elif plan.get("triggered"):
+            lines.append("↩ Pine trigger confirmed: wait for price to return to the M15 entry zone; no market entry.")
+        else:
+            lines.append(f"🎯 Confirmed {strategy} plan M15: wait for the {trigger_tf} candle close; no entry yet.")
+    else:
+        lines = [
+            f"🟢 UT favorables au {sens} ({len(favorables)}/12) : {', '.join(favorables) or 'aucune'}",
+            f"🔴 UT contraires (pression {oppose}) ({len(contraires)}) : {', '.join(contraires) or 'aucune'}",
+            f"➖ UT neutres ({len(neutres)}) : {', '.join(neutres) or 'aucune'}",
+            f"⏳ UT absentes ou périmées ({len(indisponibles)}) : {', '.join(indisponibles) or 'aucune'}",
+        ]
+        strategy = str(plan.get("strategy") or "—").upper()
+        trigger_tf = str(plan.get("entry_timeframe") or "—").upper()
+        if plan.get("triggered") and plan.get("price_in_zone"):
+            lines.append("🛡 Déclencheur Pine et zone validés : attendre le contrôle final ROBOT V12.")
+        elif plan.get("triggered"):
+            lines.append("↩ Déclencheur Pine validé : attendre le retour du prix dans la zone M15 ; aucune entrée au marché.")
+        else:
+            lines.append(f"🎯 Plan {strategy} M15 confirmé : attendre la clôture {trigger_tf} ; aucune entrée pour l'instant.")
+    return {"direction": direction, "count": len(favorables), "total": len(TELEGRAM_TF_VIEWS), "lines": lines}
+
+
 def evenements_pine(etat, m, r, cle, now):
     """Évènements de l'indicateur au moment où ils arrivent : chacun une seule fois (fronts montants mémorisés par marché)."""
     if m not in MARCHES:
@@ -9793,23 +9855,46 @@ def evenements_pine(etat, m, r, cle, now):
     ev, e = [], hb_etat_surveille(r)
     d, n, comp = e["d"], e["n"], int(r.get("comp", 0))
     base = dict(m=m, ic=ICONE.get(m, ""), seuil=MIN_ALIGN, n=n, c=comp, d=d)
+    bridge_required = r.get("require_tv_bridge") is True
+    if bridge_required:
+        plan_tv = plan_indicateur(r)
+        detail_tv = resume_alignement_tradingview(r, plan_tv)
+        align_d = detail_tv["direction"] if detail_tv else 0
+        align_n = detail_tv["count"] if detail_tv else 0
+        align_total = detail_tv["total"] if detail_tv else len(TELEGRAM_TF_VIEWS)
+        align_lines = detail_tv["lines"] if detail_tv else []
+        align_available = detail_tv is not None
+        sens_label = ("LONG à surveiller (plan Pine M15 confirmé)" if align_d == 1 else
+                      "SHORT à surveiller (plan Pine M15 confirmé)" if align_d == -1 else
+                      "non définie : plan Pine M15 non confirmé")
+    else:
+        align_d, align_n, align_total = d, n, 11
+        align_lines, align_available = [], True
+        sens_label = ("LONG à surveiller (contexte local non décisionnel)" if d == 1 else
+                      "SHORT à surveiller (contexte local non décisionnel)" if d == -1 else
+                      "non définie : aucune direction LONG/SHORT")
     if statut != "ouvert":
-        mem.update(n=n, comp=comp)
+        mem.update(n=align_n, d=align_d, comp=comp)
         return ev                                      # marché fermé ou données périmées : aucune alerte inventée
-    prev_n, prev_c = mem.get("n"), mem.get("comp")
-    if prev_n is not None and not cle.get("trade") and now - mem.get("t_align", 0) >= 1800:   # 7↔8 qui clignote : au plus 1 alerte / 30 min
-        franchit_haut, franchit_bas = n >= MIN_ALIGN > prev_n, n < MIN_ALIGN <= prev_n
-        # Seulement le franchissement du seuil : la montée « 6/11 → il en faut 8 » est déjà affichée dans le RADAR (pas de doublon).
-        if franchit_haut:
-            ev.append(dict(kind="align_haut", **base, etat_seuil="atteint ✅", etat_seuil_court="Seuil atteint")); mem["t_align"] = now
-        elif franchit_bas:
-            ev.append(dict(kind="align_bas", **base)); mem["t_align"] = now
+    prev_n, prev_d, prev_c = mem.get("n"), mem.get("d", 0), mem.get("comp")
+    if align_available and prev_n is not None and not cle.get("trade"):
+        sens_change = prev_d != align_d
+        cooldown_ok = now - mem.get("t_align", 0) >= 1800 or sens_change
+        if cooldown_ok:
+            franchit_haut = align_n >= MIN_ALIGN and (prev_n < MIN_ALIGN or sens_change)
+            franchit_bas = align_n < MIN_ALIGN <= prev_n and prev_d == align_d
+            align_base = dict(base, d=align_d, n=align_n, tf_total=align_total,
+                              tf_lines=align_lines, sens_label=sens_label)
+            if franchit_haut:
+                ev.append(dict(kind="align_haut", **align_base, etat_seuil="atteint ✅", etat_seuil_court="Seuil atteint")); mem["t_align"] = now
+            elif franchit_bas:
+                ev.append(dict(kind="align_bas", **align_base)); mem["t_align"] = now
     if prev_c is not None:
         if comp >= MIN_SQZ > prev_c:
             ev.append(dict(kind="surcharge", **base))
         elif prev_c >= MIN_SQZ and comp <= MIN_SQZ - 2:
             ev.append(dict(kind="relache", **base))
-    mem.update(n=n, comp=comp)
+    mem.update(n=align_n, d=align_d, comp=comp)
     b15, atr_ = r.get("b15") or [], float(r.get("atr") or 0)
     if len(b15) >= 3 and atr_ > 0:                      # impulsion : dernière bougie 15 min CLÔTURÉE, grande et pleine
         x = b15[-2]; rng = x["h"] - x["l"]
@@ -9902,7 +9987,7 @@ def evenements_pine(etat, m, r, cle, now):
 
 def texte_pine(etat, ev, anglais=False):
     var = (_PINE_TEXTES_EN if anglais else _PINE_TEXTES)[ev["kind"]]
-    lignes = var[_tournante(etat, f"p:{ev['kind']}:{ev['m']}", len(var))]
+    lignes = list(var[_tournante(etat, f"p:{ev['kind']}:{ev['m']}", len(var))])
     ev = dict(ev)
     direction = int(ev.get("d") or 0)
     if anglais:
@@ -9918,7 +10003,10 @@ def texte_pine(etat, ev, anglais=False):
         ev["sens_label"] = "LONG à surveiller (non confirmée)" if direction == 1 else "SHORT à surveiller (non confirmée)" if direction == -1 else "non définie (ni LONG ni SHORT)"
         ev["sens_action"] = "Seuil technique atteint : confluence seulement, attendre le déclencheur Pine et le contrôle ROBOT V12." if direction else "Seuil technique atteint, mais aucun sens de trade confirmé : attendre un plan Pine."
         ev["sens_baisse"] = "Le scénario LONG perd du soutien ; ce message ne signale pas un SHORT." if direction == 1 else "Le scénario SHORT perd du soutien ; ce message ne signale pas un LONG." if direction == -1 else "Aucun retournement ni sens inverse n'est confirmé par ce message."
-    return [l.format(**{k: v for k, v in ev.items() if k != "kind"}) for l in lignes]
+    out = [l.format(**{k: v for k, v in ev.items() if k not in {"kind", "tf_lines"}}) for l in lignes]
+    if ev.get("kind") in {"align_haut", "align_bas"}:
+        out.extend(ev.get("tf_lines") or [])
+    return out
 
 def regrouper_alertes(blocs):
     """Plusieurs alertes dans la même minute = UN seul message de 4 lignes max : titre + première ligne de chacune."""
