@@ -192,7 +192,7 @@ class EvenementsPine(unittest.TestCase):
                 self.lance(etat, "BTC", self.r(dirPlan=direction, **before))
                 events = self.lance(etat, "BTC", self.r(dirPlan=direction, **after), self.NOW + 60)
                 self.assertEqual(self.kinds(events), ["align_haut"])
-                message = "\\n".join(ab.texte_pine({}, events[0]))
+                message = "\n".join(ab.texte_pine({}, events[0]))
                 self.assertIn(expected_direction, message)
                 self.assertIn(expected_action, message)
 
@@ -210,7 +210,7 @@ class EvenementsPine(unittest.TestCase):
                 self.lance(etat, "BTC", self.r(dirPlan=direction, **before))
                 events = self.lance(etat, "BTC", self.r(dirPlan=direction, **after), self.NOW + 60)
                 self.assertEqual(self.kinds(events), ["align_bas"])
-                message = "\\n".join(ab.texte_pine({}, events[0]))
+                message = "\n".join(ab.texte_pine({}, events[0]))
                 self.assertIn(expected_direction, message)
                 self.assertIn(expected_action, message)
 
