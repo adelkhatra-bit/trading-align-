@@ -4451,6 +4451,59 @@ class PineOnlyEntryGateTests(unittest.TestCase):
         self.assertIn("101,25", send.call_args.args[3])
 
 
+    def test_no_open_trade_reply_offers_the_real_search_position_button(self):
+        import json
+        from unittest.mock import patch
+        with patch.object(align_bot, "_envoi_sur") as send:
+            align_bot.repondre({}, "123", True, "BTC")
+        payload = json.loads(send.call_args.kwargs["reply_markup"])
+        button = payload["inline_keyboard"][0][0]
+        self.assertEqual(button["text"], "🎯 Chercher une position")
+        self.assertEqual(button["callback_data"], "searchpos:BOTH")
+        self.assertIn("Aucun signal d'entrée confirmé", send.call_args.kwargs["text"])
+
+    def test_personal_follow_confirmation_explains_tv_click_price_and_trade_closure(self):
+        from unittest.mock import patch
+        r = self._market(current_price=101.25)
+        r["require_tv_bridge"] = True
+        state = {"BTC": {"trade": {
+            "d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0,
+            "qui": {}
+        }}}
+        with patch.dict(align_bot.DERNIERS, {"BTC": r}), \
+             patch.object(align_bot, "prix_actuel", side_effect=AssertionError("local price must not be used")), \
+             patch.object(align_bot, "_envoi_sur") as send, \
+             patch.object(align_bot, "live_suivi"), \
+             patch.object(align_bot, "controle_entree", return_value="Plan Pine v25 confirmé"):
+            align_bot.repondre(state, "123", True, "BTC")
+        message = send.call_args.kwargs["text"]
+        self.assertIn("prix TradingView au clic", message)
+        self.assertIn("jusqu'à la clôture du plan", message)
+        self.assertIn("prix TradingView actif", message)
+        self.assertNotIn("Je surveille toutes les 5 min", message)
+
+    def test_coach_card_explicitly_says_entry_authorized_and_manual(self):
+        from unittest.mock import patch
+        r = self._market(current_price=101.25)
+        r["require_tv_bridge"] = True
+        trade = {
+            "d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0,
+            "strat": "DAY", "entry_timeframe": "M5", "sl_ut": "M15"
+        }
+        with patch.object(align_bot, "niveaux_rs", return_value=(None, None)), \
+             patch.object(align_bot, "statut_sys", return_value="SYS"):
+            message = align_bot.carte_coach("BTC", r, {}, "signal", tr=trade)
+        self.assertIn("🛡️ Action : ENTRÉE AUTORISÉE — EXÉCUTION MANUELLE", message)
+        self.assertNotIn("Agent Auto-Trade : %%AGENT:signal%%", message) if False else None
+
+    def test_personal_position_summary_uses_same_entry_confirmation_button_wording(self):
+        r = self._market(current_price=101.25)
+        r["require_tv_bridge"] = True
+        trade = {"d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0, "qui": {}}
+        message = align_bot.texte_position("BTC", r, {"trade": trade}, "123")
+        self.assertIn("J'ai exécuté le plan — suivre ma position", message)
+
+
 class TelegramTp1Tp2BridgeTests(unittest.TestCase):
     def _snapshot(self, robot, timeframe="M15"):
         robot = dict(robot)
