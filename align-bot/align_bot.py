@@ -11553,11 +11553,12 @@ def calendrier_connu(etat, maintenant):
     cache = etat.get("cal") or {}
     succes = cache.get("t") or 0
     erreur = cache.get("erreur") or {}
+    erreur_t = erreur.get("t") if isinstance(erreur, dict) else 0
     if not succes or not (0 <= maintenant - succes <= CALENDRIER_MAX_AGE):
         return False
     # Une tentative plus récente a échoué : le dernier calendrier connu n'est plus
     # considéré comme vérifié pour autoriser de nouvelles entrées.
-    if erreur and int(erreur.get("t") or 0) >= int(succes):
+    if erreur_t and int(erreur_t) >= int(succes):
         return False
     return True
 
