@@ -28,7 +28,7 @@ INGEST = "a" * 64
 READ = "b" * 64
 BASE_MS = 1_800_000_000_000
 # Copié tel quel du journal des alertes TradingView (indicateur bridge, BTCUSD M15, 18/11/2026).
-REAL_TV_PAYLOAD_BTC_SWING_20261118 = r'''{"source":"ALIGN_MTF_PRO_V25","symbol":"BTCUSD","tickerid":"CRYPTO:BTCUSD","timeframe":"M15","planTimeframe":"M15","entryTimeframe":"H1","entryZoneLow":63277.56,"entryZoneHigh":63803.65,"entryDecision":63540.60,"entryBarTime":1795017600000,"entryBarOpen":63066.10,"entryBarHigh":63067.01,"entryBarLow":62233.39,"entryBarClose":62690.24,"price":63436.08,"timestamp":1795023311064,"candle_time":1795023000000,"confirmed":true,"candle_confirmed":false,"bar_confirmed":false,"signal":"SHORT","verdict":"INTÉRESSANT : attendre les conditions finales","entry":63462.39,"sl":63917.40,"tp1":62779.89,"tp2":61869.88,"rrRatio":1.50,"macro_bull":1,"macro_bear":6,"long_score":0,"short_score":82,"scalp_inverse":false,"strategy":"SWING","anticipation":"AUCUNE","zone_proche":"PLAN","volume":"OK","rsi_etat":"NORMAL","rsi_1m":73.36,"rsi_5m":62.47,"rsi_15m":49.42,"rsi_60m":40.97,"lecture_1m":"LONG","lecture_5m":"NEUTRAL","lecture_15m":"SHORT","lecture_60m":"SHORT","mtf":{"M1":{"direction":1,"rsi":73.36,"bar_time":1795023300000},"M5":{"direction":0,"rsi":62.47,"bar_time":1795023300000},"M15":{"direction":0,"rsi":49.42,"bar_time":1795023000000},"M30":{"direction":-1,"rsi":42.50,"bar_time":1795023000000},"H1":{"direction":-1,"rsi":40.97,"bar_time":1795021200000},"H2":{"direction":-1,"rsi":40.36,"bar_time":1795017600000},"H4":{"direction":-1,"rsi":36.65,"bar_time":1795017600000},"D1":{"direction":-1,"rsi":22.27,"bar_time":1794960000000},"W1":{"direction":-1,"rsi":37.09,"bar_time":1794787200000}}}'''
+REAL_TV_PAYLOAD_BTC_SWING_20261118 = r'''{"source":"ALIGN_MTF_PRO_V25","symbol":"BTCUSD","tickerid":"CRYPTO:BTCUSD","timeframe":"M15","planTimeframe":"M15","entryTimeframe":"H1","entryZoneLow":63277.56,"entryZoneHigh":63803.65,"entryDecision":63540.60,"entryBarTime":1795021200000,"entryBarOpen":63066.10,"entryBarHigh":63067.01,"entryBarLow":62233.39,"entryBarClose":62690.24,"price":63436.08,"timestamp":1795023311064,"candle_time":1795023000000,"confirmed":true,"candle_confirmed":false,"bar_confirmed":false,"signal":"SHORT","verdict":"INTÉRESSANT : attendre les conditions finales","entry":63462.39,"sl":63917.40,"tp1":62779.89,"tp2":61869.88,"rrRatio":1.50,"macro_bull":1,"macro_bear":6,"long_score":0,"short_score":82,"scalp_inverse":false,"strategy":"SWING","anticipation":"AUCUNE","zone_proche":"PLAN","volume":"OK","rsi_etat":"NORMAL","rsi_1m":73.36,"rsi_5m":62.47,"rsi_15m":49.42,"rsi_60m":40.97,"lecture_1m":"LONG","lecture_5m":"NEUTRAL","lecture_15m":"SHORT","lecture_60m":"SHORT","mtf":{"M1":{"direction":1,"rsi":73.36,"bar_time":1795023300000},"M5":{"direction":0,"rsi":62.47,"bar_time":1795023300000},"M15":{"direction":0,"rsi":49.42,"bar_time":1795023000000},"M30":{"direction":-1,"rsi":42.50,"bar_time":1795023000000},"H1":{"direction":-1,"rsi":40.97,"bar_time":1795021200000},"H2":{"direction":-1,"rsi":40.36,"bar_time":1795021200000},"H4":{"direction":-1,"rsi":36.65,"bar_time":1795021200000},"D1":{"direction":-1,"rsi":22.27,"bar_time":1794960000000},"W1":{"direction":-1,"rsi":37.09,"bar_time":1794787200000}}}'''
 
 
 def valid_payload(now_ms=BASE_MS, symbol="BTCUSD", timeframe="M1"):
@@ -121,7 +121,7 @@ class BridgeStoreTests(unittest.TestCase):
                     ),
                     msg=f"{variable} must be returned by its matching request.security() tuple",
                 )
-        self.assertIn('[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time[1]]', pine)
+        self.assertIn('[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time_close[1]]', pine)
         self.assertNotIn('[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]', pine)
         self.assertNotIn('lookahead=barmerge.lookahead_off)', pine)
 
@@ -269,7 +269,7 @@ class BridgeStoreTests(unittest.TestCase):
 
     def test_stale_entry_trigger_keeps_fresh_mtf_but_downgrades_plan_to_wait(self):
         payload = valid_payload()
-        payload["entryBarTime"] = BASE_MS - 2 * 300_000 - 60_000  # DAY → M5
+        payload["entryBarTime"] = BASE_MS - 300_000 + 60_000  # DAY → M5
         status, result = self.store.ingest(payload, INGEST, BASE_MS)
         self.assertEqual(status, 200, result)
         self.assertTrue(result["accepted"])
@@ -326,7 +326,7 @@ class BridgeStoreTests(unittest.TestCase):
 
     def test_stale_entry_trigger_rejection_emits_diagnostic_line(self):
         payload = valid_payload()
-        payload["entryBarTime"] = BASE_MS - 2 * TIMEFRAME_MS["M5"] - ENTRY_BAR_GRACE_MS - 1
+        payload["entryBarTime"] = BASE_MS - TIMEFRAME_MS["M5"] + ENTRY_BAR_GRACE_MS + 1
         output = io.StringIO()
         with redirect_stdout(output):
             status, result = self.store.ingest(payload, INGEST, BASE_MS)
@@ -341,7 +341,7 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertIn(f"entry_bar_time_ms={payload['entryBarTime']}", log_line)
         self.assertIn(f"now_ms={BASE_MS}", log_line)
         self.assertIn(f"age_ms={BASE_MS - payload['entryBarTime']}", log_line)
-        self.assertIn(f"threshold_ms={2 * TIMEFRAME_MS['M5'] + ENTRY_BAR_GRACE_MS}", log_line)
+        self.assertIn(f"threshold_ms={TIMEFRAME_MS['M5'] + ENTRY_BAR_GRACE_MS}", log_line)
         self.assertIn("received_ms=absent", log_line)
 
 
@@ -616,13 +616,13 @@ class BridgeStoreTests(unittest.TestCase):
 
                 btc = valid_payload(symbol="BTCUSD")
                 btc["tickerid"] = "BINANCE:BTCUSDT"
-                btc["entryBarTime"] = BASE_MS - 2 * TIMEFRAME_MS["M5"] - ENTRY_BAR_GRACE_MS - 1
+                btc["entryBarTime"] = BASE_MS - TIMEFRAME_MS["M5"] + ENTRY_BAR_GRACE_MS + 1
                 status, result = self.store.ingest(btc, INGEST, BASE_MS)
                 self.assertEqual(status, 200, result)
 
                 gold = valid_payload(symbol="XAUUSD")
                 gold["tickerid"] = "FOREXCOM:XAUUSD"
-                gold["entryBarTime"] = BASE_MS - 2 * TIMEFRAME_MS["M5"] - ENTRY_BAR_GRACE_MS - 2
+                gold["entryBarTime"] = BASE_MS - TIMEFRAME_MS["M5"] + ENTRY_BAR_GRACE_MS + 2
                 status, result = self.store.ingest(gold, INGEST, BASE_MS + 1_000)
                 self.assertEqual(status, 200, result)
 
@@ -643,7 +643,7 @@ class BridgeStoreTests(unittest.TestCase):
                 )
                 self.assertEqual(
                     diagnostic["triggerStale"]["BTCUSD"]["lastThresholdMs"],
-                    2 * TIMEFRAME_MS["M5"] + ENTRY_BAR_GRACE_MS,
+                    TIMEFRAME_MS["M5"] + ENTRY_BAR_GRACE_MS,
                 )
 
                 # Un snapshot frais suivant ne réinitialise pas les compteurs du run.
@@ -671,7 +671,7 @@ class BridgeStoreTests(unittest.TestCase):
                 bridge.DIAG_STARTED_AT_MS = previous_started
 
     def test_stale_or_future_entry_trigger_downgrades_plan_and_keeps_fresh_mtf(self):
-        for time_value in (BASE_MS - 2 * TIMEFRAME_MS["M5"] - MTF_BAR_GRACE_MS - 1,
+        for time_value in (BASE_MS - TIMEFRAME_MS["M5"] + MTF_BAR_GRACE_MS + 1,
                            BASE_MS + MAX_FUTURE_SKEW_MS + 1):
             with self.subTest(entryBarTime=time_value):
                 payload = valid_payload()
