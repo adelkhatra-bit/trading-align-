@@ -3315,7 +3315,12 @@ def carte_coach(m, r, cle, genre, tr=None, raison=None, declencheur=None, signal
             l += [""] + co[:2] if co else []
         except Exception:
             pass
-        action = "SIGNAL VALIDÉ — EN ATTENTE D’EXÉCUTION ROBOT V12"
+        l += [
+            "",
+            "🟢 À FAIRE : exécute manuellement ce plan sur ta plateforme, puis confirme avec le bouton ci-dessous.",
+            "ℹ️ Aucun ordre broker n'est envoyé par ALIGN."
+        ]
+        action = "SIGNAL CONFIRMÉ — EXÉCUTION MANUELLE À FAIRE PAR TOI"
     else:
         l = [f"📍 {m} - ATTENTE", "", f"⏳ Raison : {raison}"]
         if declencheur:
@@ -6616,7 +6621,7 @@ def inscrire_auto(etat, cid, m, notifier=True):
     bridge_required = bool(r and r.get("require_tv_bridge"))
     plan = plan_indicateur(r) if bridge_required else None
     if bridge_required:
-        if plan and plan.get("available"):
+        if plan and plan.get("available") and plan.get("confirmed") is True:
             d = plan["direction"]
             sens = SENS[d]
             if plan.get("triggered") and not plan.get("price_in_zone"):
@@ -6636,10 +6641,13 @@ def inscrire_auto(etat, cid, m, notifier=True):
                 "⚠️ Plan indicatif : aucune entrée n'est autorisée avant validation du garde-fou ROBOT V12.",
             ]
         else:
-            raison = str((plan or {}).get("reason") or "snapshots TradingView incomplets ou périmés")
+            if plan and plan.get("available") and plan.get("confirmed") is not True:
+                raison = "Configuration Pine détectée, mais les clôtures MTF ne sont pas encore confirmées."
+            else:
+                raison = str((plan or {}).get("reason") or "snapshots TradingView incomplets ou périmés")
             lignes = [
                 f"🎯 SUIVI ACTIVÉ — {ICONE.get(m, '')} {m}",
-                "🧭 Direction : ATTENTE — aucun sens Pine v25 frais exploitable",
+                "🧭 Direction : ATTENTE — aucun sens publiable avant confirmation MTF Pine",
                 f"⏳ Décision actuelle : {raison}",
                 "📍 Aucune zone Entry/SL/TP affichée : le coach refuse tout remplacement par un ordre local.",
             ]
@@ -6668,9 +6676,10 @@ def inscrire_auto(etat, cid, m, notifier=True):
             ]
     lignes += [
         "🔔 Je t'alerterai à la prochaine clôture utile pour débloquer la décision. Les douze unités restent consultables dans Telegram.",
-        "🤖 Si ALIGN valide une position, ton suivi interne sera activé automatiquement.",
+        "🟢 Quand le signal confirmé arrive, exécute-le manuellement sur ta plateforme.",
+        "👇 Après ton exécution, clique sur « J'ai exécuté le plan » pour démarrer ton suivi personnel.",
         "ℹ️ Aucun ordre n'est envoyé à ta plateforme : tu gardes la main sur l'exécution.",
-        "🎯 Le coach suit ensuite le SL, le passage à BE et les TP.",
+        "🎯 Le coach suit ensuite ta position enregistrée, son SL et ses objectifs.",
         "⏱ Le chronomètre indique la prochaine réévaluation, jamais une heure d'entrée garantie."
     ]
     if notifier:
@@ -7984,7 +7993,15 @@ def repondre(etat, cid, oui, mk=None):
                                   "🔔 Choisis « Suivre la prochaine position » pour recevoir le prochain signal confirmé."), reply_markup=CLAVIER)
             return
         m = cands[0]; tr = etat[m]["trade"]
-        e = prix_actuel(m) or tr["e"]
+        r_suivi = (DERNIERS or {}).get(m) or {}
+        if r_suivi.get("require_tv_bridge"):
+            tv_price = prix_tradingview_actif(r_suivi)
+            if not tv_price:
+                _envoi_sur(cid, text=f"⏳ {m} : prix TradingView indisponible ou périmé.\nAucun suivi n'est ouvert et aucun prix local ne le remplace. Attends le prochain snapshot frais.")
+                return
+            e = tv_price["price"]
+        else:
+            e = prix_actuel(m) or tr["e"]
         alerte = alerte_latence_entree(tr, e)
         if alerte.startswith("⛔"):
             # Le prix est déjà collé au stop (ou l'a dépassé) : on n'ouvre pas de suivi perdant d'avance.
@@ -8013,7 +8030,16 @@ def repondre(etat, cid, oui, mk=None):
         _envoi_sur(cid, text="👌 Pas de position ouverte. J'attends le prochain setup.", reply_markup=CLAVIER)
         return
     m = ouverts[0]; pos = etat[m]["trade"]["qui"][cid]
-    noter(etat, cid, m, pos, prix_actuel(m) or pos["e"], "🚪 Sortie manuelle")
+    r_suivi = (DERNIERS or {}).get(m) or {}
+    if r_suivi.get("require_tv_bridge"):
+        tv_price = prix_tradingview_actif(r_suivi)
+        if not tv_price:
+            _envoi_sur(cid, text=f"⏳ {m} : prix TradingView indisponible ou périmé.\nTa sortie n'est pas enregistrée : aucun prix local ne le remplace.")
+            return
+        sortie = tv_price["price"]
+    else:
+        sortie = prix_actuel(m) or pos["e"]
+    noter(etat, cid, m, pos, sortie, "🚪 Sortie manuelle")
 
 def cloturer_abonnes(etat, m, tr, sortie, motif):
     """Fin du trade : chaque abonné encore dedans est clôturé au même niveau (stop ou TP)."""
@@ -11479,7 +11505,7 @@ def destinations_regles(etat, chats):
 def boutons(m):
     """Sur une alerte d'entrée, le seul choix proposé est de suivre cette position."""
     return json.dumps({"inline_keyboard": [[
-        {"text": "🧑‍🏫 Coach : suis ma position", "callback_data": f"in:{m}"}
+        {"text": "✅ J'ai exécuté le plan — suivre ma position", "callback_data": f"in:{m}"}
     ]]})
 
 def barre_pct(pct, n=10):
@@ -12274,7 +12300,11 @@ def coach(etat, m, r, cle):
     dedans = [c for c, pos in tr.get("qui", {}).items() if isinstance(pos, dict) and not pos.get("fini")]
     if not dedans:
         return
-    d, e = tr["d"], tr["e"]; p = r["m1"][-1]["c"]
+    bridge_required = bool(r.get("require_tv_bridge"))
+    tv_price = prix_tradingview_actif(r) if bridge_required else None
+    if bridge_required and not tv_price:
+        return
+    d, e = tr["d"], tr["e"]; p = tv_price["price"] if tv_price else r["m1"][-1]["c"]
     cible = tr["tp2"] if tr["statut"] == "tp1" else tr["tp1"]
     prog = d * (p - e) / max(abs(cible - e), 1e-9)        # 1 = objectif atteint
     perte = d * (e - p) / max(abs(e - tr["sl"]), 1e-9)    # 1 = stop touché
@@ -12296,26 +12326,27 @@ def coach(etat, m, r, cle):
         if time.time() - tps.get(cle_m, 0) >= minutes * 60:
             tps[cle_m] = time.time(); return True
         return False
-    r5 = r["r5"][-1]
-    surcharge5 = (r5 >= 65) if d == -1 else (r5 <= 35)
-    grandes_ok = r["dirs"][7] == d and r["dirs"][9] == d
-    if 0.25 <= perte < 0.6 and grandes_ok and libre("perturb", 30):
-        msgs.append(f"😌 {m}\nPetite perturbation, c'est normal\n"
-                    + (f"⚡ RSI 5 min   {r5:.0f} (surcharge)\n" if surcharge5 else "")
-                    + f"✅ 1 h   {fleche}\n✅ 4 h   {fleche}\n"
-                    f"🎯 Cap sur le TP\n🛑 Stop   {px(tr['sl'])}")
-    if 0 < prog < 0.7:
-        a = r["atr"]
-        obstacle = [(v, n) for v, n in r["niveaux"] if n in ("15m", "1h", "4h") and abs(v - p) <= 0.3 * a and d * (cible - v) > 0]
-        if obstacle and libre("mur", 45):
-            v, n = obstacle[0]
-            msgs.append(f"🧱 {m}\n{'Résistance' if d == 1 else 'Support'} {n}   {px(v)}\n"
-                        f"⏸ Pause normale, patience\n🎯 S'il casse : cap sur le TP")
-    # Plan annulé : la 4h se retourne, ou la 15m ET la 1h passent contre nous
-    dirs = r["dirs"]
-    if (dirs[9] == -d or (dirs[4] == -d and dirs[7] == -d)) and "annule" not in vu and tr["statut"] == "entree":
-        vu.append("annule")
-        msgs.append(f"❌ {m}\nPlan annulé\n{'⬇️' if d == 1 else '⬆️'} Les unités de temps se retournent\n✂️ Je coupe ma position")
+    if not bridge_required:
+        r5 = r["r5"][-1]
+        surcharge5 = (r5 >= 65) if d == -1 else (r5 <= 35)
+        grandes_ok = r["dirs"][7] == d and r["dirs"][9] == d
+        if 0.25 <= perte < 0.6 and grandes_ok and libre("perturb", 30):
+            msgs.append(f"😌 {m}\nPetite perturbation, c'est normal\n"
+                        + (f"⚡ RSI 5 min   {r5:.0f} (surcharge)\n" if surcharge5 else "")
+                        + f"✅ 1 h   {fleche}\n✅ 4 h   {fleche}\n"
+                        f"🎯 Cap sur le TP\n🛑 Stop   {px(tr['sl'])}")
+        if 0 < prog < 0.7:
+            a = r["atr"]
+            obstacle = [(v, n) for v, n in r["niveaux"] if n in ("15m", "1h", "4h") and abs(v - p) <= 0.3 * a and d * (cible - v) > 0]
+            if obstacle and libre("mur", 45):
+                v, n = obstacle[0]
+                msgs.append(f"🧱 {m}\n{'Résistance' if d == 1 else 'Support'} {n}   {px(v)}\n"
+                            f"⏸ Pause normale, patience\n🎯 S'il casse : cap sur le TP")
+        # Les lectures locales ne peuvent pas annuler un plan de position issu de Pine v25.
+        dirs = r["dirs"]
+        if (dirs[9] == -d or (dirs[4] == -d and dirs[7] == -d)) and "annule" not in vu and tr["statut"] == "entree":
+            vu.append("annule")
+            msgs.append(f"❌ {m}\nPlan annulé\n{'⬇️' if d == 1 else '⬆️'} Les unités de temps se retournent\n✂️ Je coupe ma position")
     # Annonce économique pendant la position
     for ev in etat.get("cal", {}).get("ev", []):
         reste = ev["t"] - time.time()
@@ -12338,7 +12369,18 @@ def coach(etat, m, r, cle):
 def gerer_stop(etat, m, r, tr, c):
     """Vrai agent : monte le stop de l'abonné derrière chaque support (long) / résistance (short) franchi,
     stop à l'entrée dès que le trade avance, et « reste cool » quand le marché respire."""
-    pos = tr["qui"][c]; d = tr["d"]; a = r["atr"]; p = r["m1"][-1]["c"]
+    pos = tr["qui"][c]; d = tr["d"]
+    if r.get("require_tv_bridge"):
+        tv_price = prix_tradingview_actif(r)
+        if not tv_price:
+            return
+        p = tv_price["price"]
+        sl = pos.get("sl_conseil", pos["sl"])
+        if d * (p - sl) <= 0:
+            noter(etat, c, m, pos, sl, "🔒 Stop protégé touché" if d * (sl - pos["e"]) >= 0 else "🛡 Stop remonté touché")
+        # Aucun stop dynamique fondé sur les bougies locales ne doit contredire le plan Pine.
+        return
+    a = r["atr"]; p = r["m1"][-1]["c"]
     e = pos["e"]; sl = pos.get("sl_conseil", pos["sl"]); risque = max(abs(e - pos["sl"]), 1e-9)
     # Stop conseillé touché : on clôture le résultat de l'abonné à ce niveau
     if pos.get("sl_conseil") is not None:
@@ -12346,7 +12388,7 @@ def gerer_stop(etat, m, r, tr, c):
         # Seulement les 6 dernières MINUTES réelles : une vieille bougie (mémoire, redémarrage) ne doit jamais sortir
         # l'abonné à un niveau que le prix n'a pas touché (vu le 14/11 22:46 : SL 65009 « touché », plus haut réel 64941)
         extreme = min(x["l"] for x in recents) if d == 1 else max(x["h"] for x in recents)
-        if m == "GOLD" and r.get("spot_lo") is not None:     # même règle que le bot : le vrai prix spot fait foi
+        if not require_tv and m == "GOLD" and r.get("spot_lo") is not None:     # même règle que le bot : le vrai prix spot fait foi
             extreme = min(r["spot_lo"], extreme + 0.3 * a) if d == 1 else max(r["spot_hi"], extreme - 0.3 * a)
         if d * (extreme - sl) <= 0:
             noter(etat, c, m, pos, sl, "🔒 Stop protégé touché" if d * (sl - e) >= 0 else "🛡 Stop remonté touché")
@@ -13135,10 +13177,17 @@ def agent(m, r, cle, ferme):
     else:
         r5, r5p = r["r5"][-1], r["r5"][-2]
     ctx = f"Contexte : {zone_txt(r['posD'])} Daily, {zone_txt(r['posW'])} Weekly."
+    require_tv = bool(r.get("require_tv_bridge"))
+    if require_tv and tr:
+        tv_price = prix_tradingview_actif(r)
+        if not tv_price:
+            print(f"{m} : prix TradingView actif indisponible ou périmé — suivi de position suspendu sans repli local.")
+            return out
+        p = tv_price["price"]
+        hi = lo = p
     # Mode sans signal (bridge TradingView non branché) : AUCUNE alerte calculée localement
     # (manipulation, niveaux, FVG, radar, retournement, retest, après-SL) — seule la source v25 parle.
     # Une position déjà ouverte reste suivie jusqu'à sa clôture ; aucune nouvelle info de marché.
-    require_tv = bool(r.get("require_tv_bridge"))
     sans_signal = mode_sans_signal(r)
     # En mode bridge obligatoire, le plan Pine v25 est la source de direction ET de prix.
     # Ne pas imposer en amont le filtre local H1/H4 : il bloquait DAY/SCALPING pourtant
@@ -13151,7 +13200,7 @@ def agent(m, r, cle, ferme):
         cause = (r.get("tv_indicator_mtf") or {}).get("detail") or (r.get("tv_indicator_mtf") or {}).get("reason") or "inconnue"
         print(f"{m} : mode sans signal, bridge TradingView indisponible — aucune alerte locale. Cause : {cause}")
         return []
-    if not sans_signal:
+    if not sans_signal and not (require_tv and tr):
         try:
             manipulation(out, m, r, cle)
             meche_suspecte(out, m, r, cle)
@@ -13643,7 +13692,7 @@ def agent(m, r, cle, ferme):
     if m == "GOLD" and r.get("spot_lo") is not None:
         lo = min(r["spot_lo"], lo + 0.3 * r["atr"])
         hi = max(r["spot_hi"], hi - 0.3 * r["atr"])
-    if tr["statut"] == "entree" and tr["d"] * (tr["tp2"] - tr["tp1"]) <= 0 and not tr.get("tp_corrige"):
+    if not require_tv and tr["statut"] == "entree" and tr["d"] * (tr["tp2"] - tr["tp1"]) <= 0 and not tr.get("tp_corrige"):
         # TP2 avant TP1 (ancienne version) : on remet de l'ordre — TP1 atteignable, TP2 sur le grand niveau
         (n1v, n1n), (n2v, n2n) = objectifs(r, tr["d"], tr["e"], abs(tr["e"] - tr["sl"]))
         nm_ = lambda n: (("résistance " if tr["d"] == 1 else "support ") + n) if n in ("1h", "4h", "Daily") else n
@@ -13673,25 +13722,26 @@ def agent(m, r, cle, ferme):
             cle.pop("trade"); cle["aligne"] = 0; return out
         if touche_t1:
             tr["statut"] = "tp1"; tr["sl"] = e
-            out.append(cs_(m, "TP1 TOUCHÉ", [f"💰 TP1 : {px(t1)} ✅ 🎆", f"🔒 SL → BE : {px(e)} (plus de perte possible)", "☕ Va boire un café, la suite se fait sans risque", f"🏁 TP2 : {px(t2)}"] + lecture_tp1(r, d),
+            details_tp1 = [] if require_tv else lecture_tp1(r, d)
+            out.append(cs_(m, "TP1 TOUCHÉ", [f"💰 TP1 : {px(t1)} ✅ 🎆", f"🔒 SL → BE : {px(e)} (plus de perte possible)", "☕ Va boire un café, la suite se fait sans risque", f"🏁 TP2 : {px(t2)}"] + details_tp1,
                                    "Sécuriser une partie, garder le reste", r))
             return out
         # ↩ Voyants de retournement (comme l'indicateur) : 3/5 petites unités contre la position = alerte, 1 fois.
-        alerte_r = alerte_retournement(m, r, tr)
+        alerte_r = None if require_tv else alerte_retournement(m, r, tr)
         if alerte_r:
             out.append(alerte_r)
             return out
         risque_ = abs(e - sl)
-        if not tr.get("be_dit") and risque_ > 0 and d * (p - e) >= 1.2 * risque_ and d * (r["b15"][-1]["c"] - e) >= r["atr"]:
+        if not require_tv and not tr.get("be_dit") and risque_ > 0 and d * (p - e) >= 1.2 * risque_ and d * (r["b15"][-1]["c"] - e) >= r["atr"]:
             tr["be_dit"] = True; tr["sl"] = e + d * 0.05 * r["atr"]
             out.append(cs_(m, "METS-TOI À BE", [f"🛑 SL sécurisé : {px(tr['sl'])} (entrée {px(e)} • 0,05 ATR en gain)", f"🕯 Clôture 15 min {heure(r['b15'][-1]['t'])} {'au-dessus' if d == 1 else 'sous'} l'entrée",
                                                           f"💰 TP : {px(t1)}", "🙅 Le prix ne doit plus revenir à ton entrée : on encaisse 💰"], "SL à BE (plus de perte possible)", r))
             return out
-        fr_ = frole_tp(m, r, tr, d, e, t1, "TP1", p)
+        fr_ = None if require_tv else frole_tp(m, r, tr, d, e, t1, "TP1", p)
         if fr_:
             out.append(fr_)
             return out
-        re_ = retour_entree(m, r, tr, d, e, t1, p)
+        re_ = None if require_tv else retour_entree(m, r, tr, d, e, t1, p)
         if re_:
             out.append(re_)
             return out
@@ -13717,7 +13767,7 @@ def agent(m, r, cle, ferme):
 
     if tr["statut"] == "tp1":
         n_tp = int(tr.get("n_tp") or 2)                  # numéro du TP visé (TP2, puis TP3, TP4…) : la course continue tant que la tendance tient
-        cr_ = coupe_et_reprends(m, r, cle, tr, p)        # demande d'Adel : TP1 touché + retour annoncé vers l'entrée → on encaisse tout et on reprend à l'entrée
+        cr_ = None if require_tv else coupe_et_reprends(m, r, cle, tr, p)        # Pine bridge: no local-only re-entry decision
         if cr_:
             out.append(cs_(m, "COUPE ET REPRENDS", cr_, "Encaisser maintenant, reprendre à l'entrée", r))
             return out
@@ -13734,7 +13784,7 @@ def agent(m, r, cle, ferme):
             # Déplacement du TP : tendance 4h toujours dans le bon sens et RSI 15m pas en excès → on vise plus loin (jusqu'au TP5)
             suivants = sorted([z for z in r["grosses"] if d * (z[0] - t2) >= r["atr"]], key=lambda z: d * z[0])
             excès = (r["r15"] >= 70) if d == 1 else (r["r15"] <= 30)
-            if r["dirs"][9] == d and not excès and suivants and n_tp < 5:
+            if not require_tv and r["dirs"][9] == d and not excès and suivants and n_tp < 5:
                 prec = tr.get("tp_prec", t1)
                 tr["etendu"] = True; tr["sl"] = prec; tr["tp_prec"] = t2; tr["tp2"] = suivants[0][0]; tr["n_tp"] = n_tp + 1
                 out.append(cs_(m, f"TP{n_tp} TOUCHÉ", [f"💰 TP{n_tp} : {px(t2)} ✅", f"🏆 {n_tp} TP touchés sur ce trade",
