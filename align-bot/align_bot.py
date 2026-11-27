@@ -5667,7 +5667,7 @@ def texte_pourquoi(m, r, cle):
             reason = plan.get("verdict") or plan.get("reason") or (r.get("tv_indicator_mtf") or {}).get("reason") or "Plan Pine v25 indisponible"
             return "\n".join([f"❓ POURQUOI ALIGN ? — {m}", "━━━━━━━━━━━━━━━━━━━━",
                               "⏳ DIVERGENCE DES SOURCES — ATTENTE",
-                              f"Motif : {reason}",
+                              f"Motif Pine v25 : {reason}",
                               "Les lectures locales ne remplacent pas le plan TradingView canonique.",
                               "➡️ ACTION : attendre un snapshot Pine v25 frais. Aucun Entry/SL/TP local n'est publié.",
                               "ℹ️ Aucun ordre n'est envoyé au broker."])
