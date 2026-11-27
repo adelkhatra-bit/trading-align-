@@ -1,107 +1,224 @@
-# ALIGN TRADING — AGENT RULES
+ALIGN TRADING — AGENT OPERATING RULES
+Policy version: 2.0
+Repository: adelkhatra-bit/trading-align-
+Production code branch: main
+Publication-only branch: live-data
+Telegram bot: @align_mtf_adel_bot
+Before every task, read docs/ALIGN_SOURCE_DE_VERITE.md and the relevant system map/documentation. This file defines agent permissions and safety gates; the source-of-truth documentation defines the current technical architecture. Verify all repository facts from GitHub at task time.
 
-> Read `docs/ALIGN_SOURCE_DE_VERITE.md` first: canonical repository, branches, indicator, data chain and secret status.
+1. Purpose and operating principles
+ALIGN TRADING is a single, maintained trading-software project. AI assistants and human maintainers may investigate, diagnose, test, fix bugs, and make narrowly scoped improvements. The goal is reliable incremental maintenance—not a rewrite, redesign, migration, or replacement of the existing system.
 
-## Scope and identity
-- **Single project identity:** ALIGN TRADING is the canonical product name. `Trading Auto` / `trading-auto` is a historical/internal alias for the same project, not another project or code version. All maintenance, updates, issues and PRs must resolve to this single repository and its canonical branches. Do not create a parallel Trading Auto repository or branch family.
-- This repository is the canonical project: `adelkhatra-bit/trading-align-`.
-- Production code branch: `main`. Public live-data publication branch: `live-data`.
-- Markets: BTC and GOLD only. NASDAQ is fully removed from active analysis, new entries, monitoring and position follow-up. Legacy NASDAQ state is archived for audit only and must never be reactivated or replayed. Telegram bot: `@align_mtf_adel_bot`.
-- Canonical data/bridge indicator: `align-bot/pine/ALIGN_MTF_PRO_v25.pine` (TradingView title « ALIGN MTF PRO v25 (Inside) »); it is the only source allowed to publish snapshots to ROBOT V12. The exact companion `align-bot/pine/ALIGN_MTF_PRO_v24.pine` may remain on TradingView for candle-close visuals only: no `alert()`/`alertcondition()`, no webhook/bridge, and no BOT consumption. Other v24*, *_PROPOSITION* and proposal files remain historical. Before acting, every agent verifies repository, branch, PR, SHA, symbol and indicator version; if any is ambiguous or belongs to another project, it stops.
-- Apply these rules only to work explicitly identified as ALIGN/TRADING. If the account user or project context is ambiguous, ask before acting.
-- Never assume a branch name, SHA, PR state, deployment state, or runtime health. Read it from GitHub immediately before acting.
+All contributors must follow these principles:
+1. Evidence before action: inspect the live repository, exact branch, commit SHA, changed files, relevant workflows, and current source before making claims or changes.
+2. Smallest safe change: fix the demonstrated defect with the smallest practical diff. Do not refactor unrelated modules or bundle unrelated work.
+3. Preserve working behavior: keep all validated functionality, user experience, integrations, data contracts, and historical compatibility unless the owner explicitly requests a specific change.
+4. Test the actual risk: add or update regression tests for the defect and run the complete relevant validation set.
+5. Fail closed: missing, stale, contradictory, invalid, or unverified trading data must result in a safe waiting state—not a guessed signal or fabricated levels.
+6. Human-controlled release: agents may prepare branches and pull requests under the authorization rules below, but may never merge or deploy without separate explicit owner approval.
+7. Honest reporting: never claim a test, integration, deployment, or live check succeeded unless its result was actually observed and tied to the exact commit or runtime tested.
+No process can mathematically guarantee that regressions will never occur. These rules are designed to prevent avoidable regressions, detect them before release, and make every change traceable and reversible.
+2. Project identity and scope
+- Canonical product name: ALIGN TRADING.
+- Canonical repository: adelkhatra-bit/trading-align-.
+- Trading Auto / trading-auto is a historical/internal alias for this same project only. Do not create a second product, repository, runtime, or branch family.
+- Production source branch: main.
+- Public generated-data branch: live-data.
+- Active markets: BTC and GOLD only (BTCUSD and XAUUSD, subject to the exact symbol mapping in the current source-of-truth documentation).
+- NASDAQ is excluded from active analysis, new entries, monitoring, and position follow-up. Legacy NASDAQ state is archival/audit material only and must never be reactivated or replayed.
+- Telegram bot: @align_mtf_adel_bot.
+- If the repository, product, symbol, indicator, branch, or requested scope is ambiguous, stop and ask the owner. Do not infer identity from a local folder, open port, process name, browser tab, or historical branch label.
+3. Canonical architecture and sources
+Read docs/ALIGN_SOURCE_DE_VERITE.md first and follow its current architecture map. The known canonical components are:
+- Pine data/bridge indicator: align-bot/pine/ALIGN_MTF_PRO_v25.pine, TradingView title ALIGN MTF PRO v25 (Inside). It is the only indicator authorized to publish snapshots consumed by ROBOT V12.
+- Visual companion: align-bot/pine/ALIGN_MTF_PRO_v24.pine. It is candle-close visuals only: no alert(), no alertcondition(), no webhook/bridge output, and no ROBOT V12 consumption. Other v24 variants, proposals, and proposition files are historical unless the current source-of-truth document explicitly changes this.
+- TradingView bridge chain, as currently documented: TradingView Pine v25 → Cloudflare Worker align-tv-mailbox → Durable Object mailbox → align_tv_mailbox_feeder.py → align-bot/align_tv_bridge.py in the GitHub runner → ROBOT V12 MTF endpoint → align-bot/align_bot.py → Telegram and generated live data.
+- Telegram bot: @align_mtf_adel_bot.
+- Public generated data: live-data/live.json and, when produced by the bot, live-data/fermes.json.
+- Main live TradingView visual overlay: Tampermonkey userscript docs/live/align-bande-live.user.js, running on TradingView chart pages.
+- Auxiliary broadcast scene: docs/live/index.html, intended for TikTok LIVE Studio. It is not the TradingView overlay or its control panel.
+- Cloudflare Worker and Durable Object LIVE_SHOW are synchronization dependencies for the auxiliary scene/overlay where documented. Do not remove or bypass them without tracing and testing every producer and consumer.
+- The bot also depends on its AI-provider routing/fallback, news and risk filters, persistence/state handling, GitHub Actions, and publication path. Verify actual consumers before changing any shared interface.
+If this file and the current source-of-truth documentation or implementation disagree, do not guess. Record the conflict, inspect the latest relevant commits and tests, and ask the owner when the intended behavior cannot be proven.
+4. Indicator, market-data, and signal authority
+1. Pine v25 is the canonical source for TradingView bridge snapshots and the trade plan. Never substitute a local estimate, an old Pine variant, or an unverified external source for a canonical Pine plan.
+2. Keep these concepts distinct in code and user-facing messages:
+   - TradingView/Pine price and snapshot provenance;
+   - local bot price/calculations;
+   - Pine/ROBOT V12 timeframe readings;
+   - local ALIGN timeframe readings;
+   - MTF plan confirmation;
+   - closed-candle entry-trigger confirmation;
+   - actual price-in-entry-zone validation.
+3. The local price may be displayed as secondary context, but must not be presented as the TradingView reference price. Label the source clearly.
+4. Entry, SL, TP1, TP2, and entry zone must come from the valid canonical Pine v25 plan. Do not manufacture or silently replace those values with local estimates.
+5. Distinguish a valid MTF-confirmed plan from an entry trigger that has actually closed and confirmed. A prepared plan is not an executable entry signal.
+6. If the required TradingView snapshot is missing, stale, malformed, symbol-mismatched, timeframe-mismatched, internally contradictory, or outside its validity window, do not present its levels as a live confirmed plan. Use the project's safe waiting state, including DIVERGENCE DES SOURCES — ATTENTE where appropriate.
+7. Never convert a local bias, forecast, proxy candle, or AI opinion into a confirmed trade entry. AI commentary may explain verified data but may not override signal authority or invent prices/levels.
+8. Preserve closed-candle rules, MTF confirmation, per-market logic, risk/reward gates, news/session filters, deduplication, and trade-state transitions. Do not weaken safety conditions to increase signal frequency.
+9. Do not introduce NASDAQ back into active paths, replay legacy NASDAQ state, or allow one market's state/data to leak into another market.
+5. Agent authorization and permissions
+5.1 Read access
+Any assistant or AI tool may perform read-only inspection when the user requests ALIGN work and the connected integration grants access. Read access does not imply write access.
+5.2 Conditional write authorization
+The repository owner may explicitly authorize an AI coding agent to perform a specific ALIGN maintenance task. Once the owner has approved the task in the current instruction/conversation, and the agent's connected GitHub integration has the necessary repository permissions, that agent is authorized to:
+- create a new, focused branch from the latest verified main;
+- modify the minimum necessary source and test files;
+- add or update regression tests and narrowly scoped documentation;
+- commit and push to its own task branch;
+- create or update the corresponding pull request;
+- inspect checks and update the branch/PR without overwriting another contributor's work.
+This conditional authorization applies to ChatGPT and other AI coding tools only when the owner has explicitly assigned or approved the task. It does not grant an agent access to an account, credential, repository, or connector that the agent does not actually possess. Repository instructions do not bypass GitHub branch protection, review requirements, organization policy, or platform permissions.
+5.3 Actions that remain prohibited without separate explicit owner approval
+An agent must never:
+- commit directly to main;
+- merge a pull request or enable auto-merge;
+- deploy, publish, promote, or change production runtime configuration;
+- modify, reveal, copy, or rotate secrets, tokens, credentials, or private keys;
+- place real broker orders, enable live auto-trading, or alter broker account permissions;
+- rewrite shared history, force-push, hard-reset, delete branches, or take over another agent's branch;
+- make broad refactors, mass merges, mass copies, or destructive cleanups;
+- alter this policy to expand its own permissions.
+The owner must give separate explicit approval for any exceptional action not listed in section 5.2. A request to fix a bug does not imply permission to merge or deploy.
+5.4 Multiple-agent coordination
+Multiple AI agents may work on ALIGN, but they must not compete on the same branch or silently overwrite one another.
+- One issue/defect = one owner-designated task, one focused branch, one PR.
+- Each agent records its identity/tool, task, base SHA, branch, and PR in its handoff.
+- Use a unique branch per task/agent. Never assume an existing branch is available; inspect its PR, commits, owner, and purpose first.
+- Do not edit another agent's branch unless the owner explicitly assigns that handoff and the current branch owner/work is verified.
+- Before every push, fetch/check the remote branch and verify that its current head is still the commit the agent expects. If it changed unexpectedly, stop and reconcile; never force-push.
+- If two tasks touch the same shared contract or file, coordinate through the issue/PR and sequence the changes. Do not create competing implementations.
+- Each PR must state the files changed, tests run, known limitations, and any dependency on another PR.
+6. Branch and Git workflow
+1. At task start, record:
+   - repository and default branch;
+   - current main SHA;
+   - source branch and target branch;
+   - relevant PR number, base SHA, and head SHA, if any;
+   - latest relevant workflow runs and their commit SHAs;
+   - exact files/blobs to be changed;
+   - current status of any existing task branch.
+2. Never commit directly to main.
+3. Create a new branch from the latest verified main unless a verified existing PR is explicitly the same task and the owner authorizes continuing it.
+4. live-data is publication-only. Its root may contain only live.json and, when generated by the bot, fermes.json. Never put source code, Pine, JavaScript, HTML, workflows, documentation, or application files on that branch. Never develop on it or merge it into main.
+5. One issue, one focused branch, one minimal PR. Set the PR base explicitly to main unless the owner has specified a different valid target.
+6. Preserve all unrelated commits and work. No force-push, hard reset, destructive cleanup, broad revert, or unreviewed cherry-pick.
+7. Before every write, inspect the exact current file and blob SHA. After every write, read the file and commit back from GitHub and inspect the full diff.
+8. If main advances while the task is in progress, assess whether the PR branch is behind or conflicts. Update it only through a non-destructive, reviewed operation; rerun all affected tests after any rebase/merge/update. Never overwrite other work to make the branch appear current.
+7. Change protocol: diagnose, fix, prove
+For each defect or improvement:
+1. Reconfirm identity: repository, branch, SHA, symbol, indicator, relevant PRs, and current code.
+2. Reproduce/localize: identify the exact function/file/line range, inputs, failure mode, expected behavior, and affected callers. A failing workflow name alone is not a root cause.
+3. Trace dependencies: inspect direct callers, producers/consumers, payload schemas, state transitions, related tests, and relevant workflows. Do not edit only one side of a data contract.
+4. Define the minimum plan: list intended files, exact behavior, regression tests, side effects, risks, and rollback path before writing.
+5. Add a regression test: reproduce the current defect and assert the corrected behavior. Do not weaken, delete, skip, or loosen an existing test merely to obtain a green result.
+6. Implement the smallest fix: no opportunistic refactoring, renaming, redesign, or unrelated cleanup.
+7. Validate locally/through CI: run targeted tests first, then every relevant regression suite and static check. Record exact commands, exit codes, test counts, and commit SHA.
+8. Review the diff: inspect every changed line, check for accidental formatting/data changes, confirm no unrelated files were touched, and verify the branch/PR base.
+9. Read back from GitHub: confirm the pushed commit SHA, file contents, PR diff, and checks match the work just tested.
+10. Handoff: report evidence, unresolved checks, residual risks, and rollback. Do not describe the task as complete if any required gate is missing.
+8. Zero-regression and preservation requirements
+Preserve all verified and intended functionality, including:
+- Pine v25 calculations, alerts, payload schema, signal logic, closed-candle/MTF rules, Entry/SL/TP, and market-specific behavior;
+- ROBOT V12 strategy and risk controls;
+- TradingView bridge, Cloudflare mailbox, feeder, runner endpoint, and data freshness/identity checks;
+- Telegram bot commands, callbacks, buttons, user preferences, opt-in cadence, deduplication, retry behavior, and signal/message semantics;
+- AI commentary, provider routing, quotas, consent, internal fallback, and separation between market decisions and explanatory commentary;
+- state.json/memory persistence, restore/save integrity, trade lifecycle, and audit history;
+- live-data/live.json producer/consumer contract and GitHub Pages publication;
+- Tampermonkey TradingView overlay docs/live/align-bande-live.user.js and all validated Claude-era v12.2 behavior: live band, animations, bubbles/effects, controls, comments, time display, MTF dashboard, and voice behavior;
+- the distinct auxiliary TikTok LIVE Studio scene docs/live/index.html and its documented synchronization dependencies.
+Do not change the ALIGN name, established visual design, animation style, control placement, language separation, or user-facing text conventions without explicit owner approval. Keep French and English content correctly separated; do not accidentally mix translations or duplicate notifications.
 
-## Historical provenance reference - Claude Chrome and ALIGN
-- Claude Chrome is preserved as a historical provenance/source-history reference only. It is not a repository-managed agent and grants no coding agent access or write authorization. Keep historical session provenance distinct; do not substitute another source or infer unverified history.
-- The only target repository is `adelkhatra-bit/trading-align-`. `main` is the production code branch and `live-data` is only the generated public-data branch.
-- `Trading Auto` is a historical/internal alias for this exact same ALIGN TRADING project, not a separate repository, product, runtime, server, or codebase. Treat mentions of `Trading Auto`, `trading-auto`, `ALIGN`, and `ALIGN TRADING` as references to this one project when provenance points to this canonical repository. Never split work by these names or create a second source of truth. The canonical product name is `ALIGN TRADING`; the canonical repository is `adelkhatra-bit/trading-align-`; the canonical code branch is `main`.
-- Prove project identity from the canonical GitHub repository, exact branch and SHA, and file provenance. An open port, process name, folder name, browser tab, or old branch label is not proof.
-- Claude Chrome conversation history is a discovery index, not proof that a change reached GitHub. Verify source material and decisions in the actual source conversation, then independently confirm each claimed change in the canonical repository and commit history.
-- Never assume a `claude/*` branch is current or authoritative because of its name. Verify ancestry, base, SHA, changed files, dependencies, and tests before considering any source.
-- During recovery, do not delete old files, branches, projects, servers, or history without provenance. For an owner-authorized scope cleanup, preserve a complete pre-cleanup branch snapshot, prove candidate files have no production consumer, and remove only the unrelated active-tree copy through a reviewed PR. Never delete the archive snapshot.
-- No mass merge, mass copy, or replacement of the Telegram/ALIGN foundation. When the owner explicitly requests scope isolation, inventory every candidate, verify imports/workflows/runtime consumers, create an exact pre-cleanup archive, remove only proven unrelated legacy components on a dedicated PR, and run the complete ALIGN validation suite. Preserve verified Telegram, Pine, MTF, Cloudflare mailbox, ROBOT V12 bridge, AI, state, and live-overlay behavior.
-- If the Claude Chrome source conversation or exact project/branch cannot be accessed, report the missing evidence. Never fill gaps by guessing or substituting another agent's history.
+Do not treat an HTTP 200 response, a green workflow, an active process, a connected bridge, or an enabled voice toggle as proof that the full user-visible feature works. Verify the actual layer relevant to the task.
+9. Validation matrix
+Choose tests based on the changed dependency chain. Do not claim unrelated checks are required for every documentation-only change, but do not omit critical tests when shared logic or an integration is affected.
+Python/BOT
+- Python compilation and imports for changed modules.
+- Targeted unit/regression tests for the defect.
+- Relevant BOT/coach, Telegram rendering, memory/state, and MTF test suites.
+- Verify BTC and GOLD paths separately where market-specific behavior is involved.
+Pine/TradingView
+- Run repository Pine/source validators and relevant static tests.
+- Verify only canonical Pine v25 publishes bridge data.
+- Verify symbol/timeframe identity, snapshot freshness, schema, closed-candle behavior, MTF direction, plan confirmation, trigger confirmation, Entry/SL/TP1/TP2, and zone validation.
+- Do not claim TradingView compilation or chart execution unless actually tested in TradingView or through an authoritative available check.
+JavaScript/overlay
+- Run syntax and relevant userscript tests.
+- Preserve the exact TradingView target and Tampermonkey behavior.
+- When visuals/voice are touched, separately verify installed script version, execution on a TradingView chart, visible controls, animation state, AI comments, available browser voices, synthesis start, audible output where testable, and LIVE_SHOW START/STOP synchronization.
+- Do not substitute the /live/ scene for the TradingView overlay.
+Bridge/server/data
+- Verify worker/feeder/bridge endpoint agreement, HTTP/auth behavior without exposing credentials, valid payload schema, symbol/timeframe mapping, timestamps, freshness, duplicate handling, and producer/consumer URLs.
+- Verify generated live.json shape and publication path without writing application code to live-data.
+- Verify server/worker health and state restore/save where accessible.
+Telegram/AI
+- Test message formatting and callback handling with controlled test data or a designated test destination.
+- Do not send unsolicited test messages to real users or alter their opt-in preferences.
+- Confirm deduplication, retries, rate limits, market isolation, and safe fallback.
+- Do not treat an AI provider response as a trading signal or source of Entry/SL/TP.
+End-to-end and release
+- For signal/trade changes, verify the relevant chain from Pine snapshot through bridge/BOT message using safe test data and, where authorized and accessible, a real read-only runtime observation.
+- Record what is automated, what is a connectivity check, what is a simulated test, and what was verified live.
+- A green workflow on a different SHA is irrelevant. Required checks must pass on the exact PR head SHA.
+- A green workflow alone never proves production health.
+10. Trading, financial, and credential safety
+- Never place real broker orders or enable live auto-trading through this maintenance workflow.
+- Never use test procedures that can create an actual position or modify a live account.
+- TopStep constraint: at most one open position and exactly one micro-contract, where applicable. Never bypass account/platform limits.
+- Never expose, print, copy, log, commit, or place credentials in source files. Keep credentials in GitHub Secrets or the approved secret manager.
+- Do not read or dump environment variables wholesale. When checking a secret, report only whether it is configured/usable, never its value.
+- Do not change, rotate, delete, or add secrets without separate explicit owner authorization and the approved secret-management procedure.
+- Keep public data free of private identifiers, account details, tokens, or other sensitive information.
+11. Pull-request review and release gate
+A pull request is ready for owner review only when:
+1. It targets the intended base (main for source changes).
+2. It contains one focused issue and a minimal, fully reviewed diff.
+3. The root cause and reproduction are documented.
+4. Regression tests cover the original defect and relevant edge cases.
+5. All required checks pass on the exact PR head SHA; none are missing, stale, skipped unexpectedly, or tied to another commit.
+6. The PR preserves the existing architecture, user experience, protections, and unrelated work.
+7. Runtime checks are reported accurately, including those that could not be performed.
+8. A rollback path is documented.
+Agents may request review and provide a recommendation. Only the owner may authorize the merge. Only the owner may authorize deployment or publication changes outside the normal approved automation. Never enable auto-merge.
 
-## Branch and change discipline
-1. Start every task by recording repository, current default branch, source branch, target branch, PR number, exact head/base SHAs, latest relevant workflow runs, and working-tree state when available.
-2. `main` is the production code branch. Never commit directly to it. Make code changes on the existing PR branch for the same issue when its head/base and purpose are verified; otherwise create one focused branch from the latest verified `main`.
-3. `live-data` is a publication-only branch. Its root may contain only `live.json` and, when created by the bot, `fermes.json`. No source code, workflow, HTML, documentation, Pine, JavaScript, or other application files may exist there. Never develop on or merge this branch into `main`. CI verifies its remote tree on every validation run.
-4. A fix branch must target the intended base explicitly. Never infer a branch from its name. Verify the PR head, base, SHA, changed files, and workflow results.
-5. One issue, one focused branch, one minimal change. Do not bundle unrelated fixes, mass-merge PRs, or transplant modules without checking dependencies and provenance.
-6. Preserve unrelated commits and user work. No force-push, hard reset, destructive cleanup, or broad revert on code branches. The one-time `live-data` cleanup was performed only after archiving its exact old head; any future rewrite of that publication branch requires explicit owner authorization, a fresh archive, preservation of generated data, and the CI tree guard. For code rollback, use a reviewed, narrowly scoped revert on a separate branch.
-7. Before writing, inspect the exact current file and blob SHA. After writing, inspect the resulting diff and commit. Never claim a change succeeded without read-back proof.
-
-## Stable baseline and zero regression
-- The latest verified, working version is the baseline; identify its exact SHA and evidence for each task rather than hard-coding a possibly stale SHA.
-- Active runtime boundary: `align-bot/`, `cloud/align-tv-mailbox/`, `docs/live/`, `scripts/align_*.py`, `scripts/validate_align_source_of_truth.py`, and the ALIGN GitHub workflows. Read-only Topstep/MetaAPI safety checks remain only where they are explicitly connected to ALIGN; no legacy local server, generic dashboard, MT5 bridge, or second TradingView extension may be treated as a production dependency.
-- Preserve the TradingView indicator design and all validated Claude-era v12.2 behavior: live band, animations, AI commentary/bubbles, controls, time display, and MTF dashboard. Do not simplify, remove, rename, or reposition these without explicit approval.
-- Preserve Pine v24 / ROBOT V12 behavior and all established integrations. Recover only modules whose source, version, dependencies, and compatibility are verified.
-- If a change fails any required test, do not merge or deploy it. Isolate the failure, fix and retest, or revert only that change to the last verified stable state without overwriting other work.
-
-## Architecture and runtime
-Understand dependencies among Pine v24, TradingView ROBOT V12, bridge, live overlay/userscript, public `live-data/live.json`, Telegram bot, AI providers, server, `state.json` persistence, GitHub Actions, and GitHub Pages. Change only the affected component and proven dependencies.
-For relevant changes, verify:
-- Python compilation and targeted Python tests.
-- Pine/TradingView source checks and JavaScript syntax/tests.
-- Full MTF regression suite when signal, indicator, or shared logic changes.
-- Signal direction, confirmation/closed-candle rules, Entry, SL, TP1/TP2, and market-specific behavior.
-- Telegram connectivity and delivery behavior without sending unsolicited messages; opt-in preferences, deduplication, and retry handling.
-- Real AI-provider connectivity and graceful fallback.
-- TradingView bridge connectivity, data freshness, schema, and live JSON producer/consumer URL agreement.
-- Server/worker health, state restore/save integrity, GitHub Pages deployment, and actual live display where accessible.
-A green workflow is not proof that the live system works. Clearly distinguish automated tests, connectivity checks, and real end-to-end verification.
-
-## Trading and safety constraints
-- Markets: BTC and GOLD only. NASDAQ is fully excluded from analysis, entry, monitoring and position follow-up; legacy state is audit archive only and must never be replayed. Respect the documented multi-timeframe strategy and do not invent a signal when confirmation is absent. Avoid entries in the middle of a range.
-- Never place real broker orders or enable auto-trading.
-- TopStep constraint: maximum one open position and exactly one micro-contract.
-- Keep credentials in GitHub Secrets or the approved secret manager. Never print, copy into files, commit, or expose secret values. Report only whether required secrets are present/usable, never their values.
-
-## Review and release gate
-Before a PR is approved or merged:
-1. Read the complete diff and inspect affected callers, tests, and dependent modules.
-2. Confirm the PR targets the intended base and contains only the scoped fix.
-3. Run targeted tests and all relevant regression checks.
-4. Confirm all required checks pass on the exact PR head SHA.
-5. Verify no stable feature, animation, comment, user setting, memory, or unrelated change was lost.
-6. Confirm deployment and runtime behavior after merge when access permits.
-Never merge or deploy on a failed, missing, stale, or mismatched required check. Do not merge automatically; obtain explicit user approval for the merge.
-
-## Required work report
-For each task report, concisely: issue and proven root cause; repository/branch/PR/base SHA/head SHA; files changed; minimal fix; tests and exact results; runtime checks; residual risks; and rollback plan. State explicitly what was not verified. Never claim continuous background monitoring or completed work without evidence.
-
-## Human maintainer protocol
-
-This procedure applies to the repository owner and explicitly authorized human maintainers. It does not authorize a repository-managed coding agent.
-
-1. **Read-only first.** Verify the canonical repository, issue, branch, PR, base/head SHAs, changed-file list, latest checks, canonical Pine source, and working-tree state before modifying anything.
-2. **Localize the defect.** Identify the exact file, function or block, line range, root cause, reproduction scenario, and affected behavior. Do not infer a cause from a failing workflow name alone.
-3. **Minimal plan before changes.** Record the exact files and behavior to change, focused regression tests, side effects, and rollback path. Obtain owner authorization before changing shared production code.
-4. **No branch takeover.** Never replace, rewrite, rebase, reset, force-push, or bulk-synchronize an existing branch. Preserve every existing commit and unrelated change. Use an isolated branch from the current verified main when the existing work is not demonstrably the same task.
-5. **One defect, one focused change.** Do not bundle unrelated findings or opportunistic refactors. Touch only the smallest set of files required by the proven dependency chain.
-6. **Canonical TradingView indicators.** The only data/bridge indicator is align-bot/pine/ALIGN_MTF_PRO_v25.pine, titled ALIGN MTF PRO v25 (Inside). The exact align-bot/pine/ALIGN_MTF_PRO_v24.pine companion is permitted for candle-close visuals only and must never emit alerts or feed ROBOT V12. Never substitute other v24 files or proposal files. Verify both sources from current main before work.
-7. **Zero regression.** Preserve Pine calculations, signal logic, Entry/SL/TP, MTF behavior, design, Claude-era v12.2 animations, AI commentary, Telegram, bridge, server, memory, and separation of main and live-data.
-8. **Stop on uncertainty or failure.** If source, branch ownership, permissions, a live dependency, or expected behavior cannot be verified, report the blocker. Never weaken or delete a failing test to get a green result.
-9. **Evidence-based handoff.** Report exact branch and SHA, files, diff, tests and workflow URLs, runtime checks not performed, residual risks, and rollback path. Never claim a change or external process ran without evidence.
-10. No human or automated process may place a real broker order through this maintenance workflow. Production trading remains subject to the separate explicit trading safety constraints above.
-
-
-## Terminologie obligatoire — animations sur TradingView
-
-- Quand le propriétaire dit « animations », « animations ALIGN », « bulles », « bande live » ou « coach vocal sur TradingView », la cible par défaut est **l'overlay Tampermonkey `docs/live/align-bande-live.user.js` exécuté directement sur les graphiques `https://*.tradingview.com/chart/*`**. C'est la surface visuelle principale : bande animée, bulles, effets, commandes, commentaires IA et lecture vocale navigateur.
-- Ne jamais interpréter une demande d'« animations sur TradingView » comme une demande d'ouvrir, modifier ou rétablir l'interface de la page GitHub Pages `/live/`. Ne jamais présenter cette page comme l'interface quotidienne du propriétaire.
-- `docs/live/index.html` est une **scène auxiliaire de diffusion**, transparente et conçue pour TikTok LIVE Studio. Elle lit le résumé public `live-data/live.json`, publie les dialogues du duo Thomas/Leïla dans le canal `LIVE_SHOW` et anime leurs avatars/bouches à partir des événements vocaux du userscript. Elle n'est ni l'overlay TradingView ni le panneau de commande Tampermonkey.
-- Le Worker Cloudflare `align-tv-mailbox` et son Durable Object `LIVE_SHOW` sont des dépendances de synchronisation entre la scène et l'overlay. Ne pas les débrancher au motif que le propriétaire n'utilise pas la page `/live/`. Toute suppression ou migration doit d'abord prouver que le producteur de dialogues est repris ailleurs et que le coach vocal sur TradingView reste autonome et testé.
-- La voix entendue sur TradingView est prononcée par `window.speechSynthesis` dans le navigateur, uniquement après activation explicite de « COACH VOCAL ON ». Les événements START/STOP synchronisent seulement l'animation des avatars de la scène ; ils ne transportent pas l'audio vers TradingView. Distinguer impérativement « état vocal activé », « voix système compatible trouvée », « synthèse démarrée » et « son réellement entendu ».
-- À chaque tâche liée aux animations, vérifier séparément : script Tampermonkey réellement installé et version, exécution sur un graphique TradingView, contrôles visibles, animations activées, commentaires IA reçus, voix navigateur disponibles par langue/locuteur, état `LIVE_SHOW`, et synchronisation START/STOP. Une page `/live/` HTTP 200 ou un Worker sain ne prouve pas que l'overlay ni l'audio fonctionnent.
-- Ne jamais remplacer les animations TradingView par la scène `/live/`, ni modifier leur design, leur placement, leurs effets ou leur comportement sans demande explicite. Préserver toutes les fonctions Claude-era v12.2.
-
-## External code-agent access is disabled
-
-- ALIGN does not use GitHub Copilot CLI relays, Copilot cloud-agent assignment, repository custom-agent profiles, or automated code-agent handoffs.
-- The workflow watchdog and auto-repair coordinator may create or update deduplicated diagnostic issues for human maintainers only. They must never read a Copilot token, query assignable code agents, or assign an agent.
-- Runtime AI providers used by the Telegram BOT for market commentary remain a separate production feature. Keep their existing quotas, fallback, consent, market isolation, and safety controls.
-- A public repository remains readable by external services, including AI services. Repository instructions cannot prevent external reading; private visibility and GitHub permission changes must be enforced in repository settings by an authorized owner.
-- No automated coding agent may write, commit, push, merge, deploy, change secrets, or place broker orders in ALIGN. All changes continue through a focused branch, reviewed diff, green required checks, and explicit human authorization.
-- Every contributor must obtain explicit user approval before any merge.
-- All merges require explicit owner approval after diff review, required checks, and applicable runtime validation.
+If a required test or check fails, do not merge. Diagnose, correct on the task branch, and rerun. If a safe correction cannot be proven, leave the PR unmerged and report the blocker.
+12. Rollback and incident handling
+- Every code change must be reversible through a focused revert or follow-up correction.
+- Never reset or rewrite shared history to roll back a code change.
+- Before any owner-authorized cleanup or migration, inventory consumers, preserve an exact archive/snapshot, and prove the target is unused before removal.
+- Never delete archive branches or historical provenance without separate explicit owner authorization.
+- If a regression is detected after merge/deployment, stop further rollout, notify the owner with exact SHA and evidence, and propose the smallest safe revert/mitigation. Do not independently deploy a rollback without owner approval unless a separately documented emergency procedure explicitly grants that action.
+13. Claude Chrome and historical provenance
+- Claude Chrome is a historical provenance/source-history reference, not proof that a change reached the canonical repository and not an authorization mechanism.
+- Conversation history may help locate a past decision, but verify source files, branch ancestry, commit SHA, dependencies, and tests in GitHub before relying on it.
+- Never assume a claude/* branch is current or authoritative from its name.
+- If the original conversation/source cannot be accessed, state what evidence is missing. Do not invent history or substitute another tool's output.
+- During recovery, do not delete old files, branches, projects, servers, or history without provenance and explicit owner approval.
+14. Terminology and live visual components
+- When the owner says “animations”, “ALIGN animations”, “bubbles”, “live band”, or “TradingView voice coach”, the default target is docs/live/align-bande-live.user.js running directly on https://*.tradingview.com/chart/*.
+- docs/live/index.html is the auxiliary TikTok LIVE Studio broadcast scene. It is not the daily TradingView overlay or its control panel.
+- The Cloudflare Worker align-tv-mailbox and Durable Object LIVE_SHOW are synchronization dependencies where specified by the current architecture. Do not disconnect them without proving that every producer/consumer is replaced and all affected behavior is tested.
+- TradingView browser speech uses window.speechSynthesis only after the user explicitly enables the voice coach. START/STOP events may synchronize scene animations; they do not themselves transport audio to TradingView.
+- Distinguish these separate states: voice toggle enabled, compatible system voice found, synthesis started, and sound actually heard.
+- Do not change animation design, placement, effects, or behavior without explicit owner approval. Preserve all validated Claude-era v12.2 behavior.
+15. External agents, automation, and AI services
+- External coding agents (including GitHub Copilot agents or other connected AI tools) may be used only when the owner explicitly requests/approves their task and the platform/repository permissions allow it.
+- Do not assume that a GitHub Actions workflow, watchdog, automation, or market-commentary AI has coding-agent permissions. Runtime AI providers are separate from repository coding agents.
+- Diagnostic watchdogs may create/update deduplicated issues or reports only where their documented permissions allow; they must not fetch, print, or repurpose private coding tokens.
+- Do not assign external coding agents, grant repository access, change repository visibility, or alter organization policy unless the owner explicitly requests that administrative action.
+- A public repository may be readable by external services. Repository instructions do not provide confidentiality; repository visibility and access control must be configured in GitHub settings by the owner.
+16. Required completion report
+For every completed task, provide a concise, evidence-based report containing:
+- defect/improvement and proven root cause;
+- repository, base branch/SHA, task branch, PR number, and head SHA;
+- exact files changed and summary of the diff;
+- tests/commands run and exact results;
+- workflow links tied to the exact PR head SHA;
+- runtime/integration checks performed and their evidence;
+- checks not performed and why;
+- residual risks and rollback path;
+- explicit status: ready for owner review, blocked, or not verified.
+Never say “100% operational”, “fixed”, “deployed”, “live”, or “all tests pass” unless the available evidence supports that exact claim. Never claim background work or continuous monitoring unless an authorized automation actually exists and its state has been checked.
+Owner approval rule
+The owner retains final authority over production. Explicit authorization to investigate, edit code, create a branch, commit, or open a PR does not authorize merge, deployment, secret changes, broker activity, or destructive maintenance. Those actions require separate approvals as specified above.
