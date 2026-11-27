@@ -2,10 +2,12 @@ import datetime as dt
 import os
 import sys
 import unittest
+from unittest import mock
 from zoneinfo import ZoneInfo
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import economic_news as news
+import align_bot as ab
 
 
 class EconomicNewsNormalizationTest(unittest.TestCase):
@@ -122,6 +124,112 @@ class EconomicNewsNormalizationTest(unittest.TestCase):
         self.assertIn("Valeur reçue du calendrier agrégé: 0.2%", report)
         self.assertIn("Source de la valeur: Forex Factory", report)
         self.assertIn("U.S. Bureau of Labor Statistics", report)
+
+
+class EconomicNewsBotIntegrationTest(unittest.TestCase):
+    def setUp(self):
+        self.now = int(dt.datetime(2026, 11, 27, 9, 0, tzinfo=ZoneInfo("Europe/Paris")).timestamp())
+        self.schedule = [
+            {
+                "title": "Goods Trade Balance",
+                "country": "USD",
+                "date": "2026-11-27T08:30:00-05:00",
+                "impact": "Low",
+                "forecast": "-135.9B",
+                "previous": "-134.9B",
+            },
+            {
+                "title": "Prelim Wholesale Inventories m/m",
+                "country": "USD",
+                "date": "2026-11-27T08:30:00-05:00",
+                "impact": "Low",
+                "forecast": "0.5%",
+                "previous": "0.6%",
+            },
+        ]
+
+    def test_bot_calendar_keeps_low_impact_officially_relevant_usd_events(self):
+        state = {}
+        with mock.patch.object(ab, "http_json", return_value=self.schedule):
+            events = ab.calendrier(state, self.now)
+        titles = [event["titre"] for event in events]
+        self.assertIn("Goods Trade Balance", titles)
+        self.assertIn("Prelim Wholesale Inventories m/m", titles)
+        self.assertTrue(ab.calendrier_connu(state, self.now))
+        self.assertEqual(state["cal"]["source_url"], news.CALENDAR_URL)
+        self.assertEqual(state["cal"]["schema"], 2)
+
+    def test_failed_refresh_after_success_marks_calendar_unknown(self):
+        state = {
+            "cal": {
+                "schema": 2,
+                "t": self.now - 301,
+                "ev": [{"t": self.now + 3600, "titre": "CPI"}],
+            }
+        }
+        with mock.patch.object(ab, "http_json", side_effect=RuntimeError("offline")):
+            ab.calendrier(state, self.now)
+        self.assertFalse(ab.calendrier_connu(state, self.now))
+        self.assertEqual(state["cal"]["erreur"]["type"], "RuntimeError")
+
+    def test_unknown_calendar_never_claims_there_are_no_announcements(self):
+        with mock.patch.object(ab, "calendrier", return_value=[]), \\
+             mock.patch.object(ab, "minutes_avant_fermeture_gold", return_value=100), \\
+             mock.patch.object(ab, "horaires_gold", return_value=(self.now + 100 * 60, self.now + 200 * 60, self.now + 300 * 60)):
+            messages = ab.annonces_et_sessions({}, self.now, {})
+        joined = "\\n".join(messages)
+        self.assertIn("CALENDRIER ÉCONOMIQUE INDISPONIBLE", joined)
+        self.assertNotIn("Aucune annonce majeure US aujourd'hui", joined)
+
+    def test_post_event_report_separates_published_facts_from_price_reaction(self):
+        event = news.normaliser_evenement({
+            "title": "Goods Trade Balance",
+            "country": "USD",
+            "date": dt.datetime.fromtimestamp(self.now - 7 * 60, dt.timezone.utc).isoformat(),
+            "impact": "Low",
+            "forecast": "-135.9B",
+            "previous": "-134.9B",
+        }, self.now)
+        state = {"cal": {"t": self.now, "ev": [event]}}
+        bars = [{"t": event["t"] + 60, "o": 100.0, "h": 102.0, "l": 99.0, "c": 101.5}]
+        with mock.patch.object(ab, "calendrier", return_value=[event]), \\
+             mock.patch.object(ab, "minutes_avant_fermeture_gold", return_value=100), \\
+             mock.patch.object(ab, "horaires_gold", return_value=(self.now + 100 * 60, self.now + 200 * 60, self.now + 300 * 60)), \\
+             mock.patch.object(ab, "ia", return_value="Mouvement observé; confirmation M15 attendue."):
+            messages = ab.annonces_et_sessions(state, self.now, {"BTC": {"m1": bars}})
+        report = next(message for message in messages if "COMPTE RENDU APRÈS NEWS" in message)
+        self.assertIn("Valeur publiée: non reçue", report)
+        self.assertIn("Réaction de prix observée (distincte des faits publiés)", report)
+        self.assertIn("U.S. Census Bureau", report)
+        self.assertIn("census.gov", report)
+
+    def test_late_actual_value_generates_one_update_without_repeating_reaction_report(self):
+        base = {
+            "title": "Goods Trade Balance",
+            "country": "USD",
+            "date": dt.datetime.fromtimestamp(self.now - 10 * 60, dt.timezone.utc).isoformat(),
+            "impact": "Low",
+            "forecast": "-135.9B",
+            "previous": "-134.9B",
+        }
+        first = news.normaliser_evenement(base, self.now)
+        state = {"cal": {"t": self.now, "ev": [first]}}
+        common = (
+            mock.patch.object(ab, "minutes_avant_fermeture_gold", return_value=100),
+            mock.patch.object(ab, "horaires_gold", return_value=(self.now + 100 * 60, self.now + 200 * 60, self.now + 300 * 60)),
+        )
+        with mock.patch.object(ab, "calendrier", return_value=[first]), common[0], common[1]:
+            ab.annonces_et_sessions(state, self.now, {})
+        updated_raw = dict(base, actual="-137.2B")
+        updated = news.normaliser_evenement(updated_raw, self.now + 300)
+        with mock.patch.object(ab, "calendrier", return_value=[updated]), common[0], common[1]:
+            messages = ab.annonces_et_sessions(state, self.now + 300, {})
+        updates = [message for message in messages if "MISE À JOUR — VALEUR REÇUE" in message]
+        self.assertEqual(len(updates), 1)
+        self.assertIn("-137.2B", updates[0])
+        with mock.patch.object(ab, "calendrier", return_value=[updated]), common[0], common[1]:
+            again = ab.annonces_et_sessions(state, self.now + 301, {})
+        self.assertFalse(any("MISE À JOUR — VALEUR REÇUE" in message for message in again))
 
 
 if __name__ == "__main__":
