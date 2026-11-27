@@ -177,6 +177,26 @@ class EvenementsPine(unittest.TestCase):
         self.lance(etat, "BTC", self.r(bull=4))
         self.assertEqual(self.lance(etat, "BTC", self.r(bull=6), self.NOW + 700), [])          # « l'alignement monte (6/11) » : déjà dans le RADAR
 
+    def test_alignment_alerts_explain_direction_without_claiming_entry(self):
+        cases = (
+            (1, {"bull": 4, "bear": 2}, {"bull": 8, "bear": 2},
+             "LONG (orientation Pine, non confirmée)", "ce message ne signale pas un SHORT"),
+            (-1, {"bull": 2, "bear": 4}, {"bull": 2, "bear": 8},
+             "SHORT (orientation Pine, non confirmée)", "ce message ne signale pas un LONG"),
+            (0, {"bull": 4, "bear": 2}, {"bull": 8, "bear": 2},
+             "aucun sens LONG/SHORT défini par Pine", "Aucune direction de trade confirmée"),
+        )
+        for direction, before, after, expected_direction, expected_action in cases:
+            with self.subTest(direction=direction):
+                etat = {}
+                self.lance(etat, "BTC", self.r(dirPlan=direction, **before))
+                events = self.lance(etat, "BTC", self.r(dirPlan=direction, **after), self.NOW + 60)
+                self.assertEqual(self.kinds(events), ["align_haut"])
+                message = "\\n".join(ab.texte_pine({}, events[0]))
+                self.assertIn(expected_direction, message)
+                self.assertIn(expected_action, message)
+                self.assertIn("Confluence", message) if direction else self.assertIn("plan Pine", message)
+
     def test_closed_or_stale_market_never_alerts(self):
         etat = {}
         with patch.object(ab, "cme_ouvert", return_value=False):
