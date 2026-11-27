@@ -249,9 +249,9 @@ function construireCommentaireEtat(m) {
   var profil = String(m.profil || "non défini");
   var premiere;
   if (etat === "calme") {
-    premiere = nom + " reste calme. Le biais publié est " + biais + ", avec " + ut + " unités alignées sur " + seuil + ".";
+    premiere = nom + " reste calme. Le biais publié est " + biais + ", avec " + ut + " unités alignées sur 11 (seuil requis : " + seuil + ").";
   } else if (etat === "preparation") {
-    premiere = nom + " passe en préparation. Biais " + biais + ", " + ut + " unités alignées sur " + seuil + ", profil " + profil + ".";
+    premiere = nom + " passe en préparation. Biais " + biais + ", " + ut + " unités alignées sur 11 (seuil requis : " + seuil + "), profil " + profil + ".";
   } else if (etat === "entree") {
     premiere = "Le flux public indique l'état entrée sur " + nom + ". Vérifie la confirmation et les niveaux sur Telegram.";
   } else if (etat === "ferme") {
@@ -262,8 +262,8 @@ function construireCommentaireEtat(m) {
   var seconde = "Nous commentons uniquement l'état public reçu. Les points d'entrée, le stop et les objectifs restent ceux confirmés par l'indicateur et le robot.";
   var biaisEN = m.biais === "haussier" ? "bullish" : m.biais === "baissier" ? "bearish" : "neutral";
   var anglaisPremiere;
-  if (etat === "calme") anglaisPremiere = nom + " is quiet. The published bias is " + biaisEN + ", with " + ut + " timeframes aligned out of " + seuil + ".";
-  else if (etat === "preparation") anglaisPremiere = nom + " is setting up. Bias " + biaisEN + ", " + ut + " timeframes aligned out of " + seuil + ", profile " + profil + ".";
+  if (etat === "calme") anglaisPremiere = nom + " is quiet. The published bias is " + biaisEN + ", with " + ut + " timeframes aligned out of 11 (required threshold: " + seuil + ").";
+  else if (etat === "preparation") anglaisPremiere = nom + " is setting up. Bias " + biaisEN + ", " + ut + " timeframes aligned out of 11 (required threshold: " + seuil + "), profile " + profil + ".";
   else if (etat === "entree") anglaisPremiere = "The public feed reports an active signal phase on " + nom + ". Check confirmation and levels on Telegram.";
   else if (etat === "ferme") anglaisPremiere = nom + " is closed. No new market read is being announced.";
   else return null;
