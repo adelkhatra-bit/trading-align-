@@ -180,7 +180,7 @@ class PineCanonicalEntryContract(unittest.TestCase):
 
     def test_decision_line_illuminates_only_on_the_same_fresh_closed_trigger_as_bridge(self):
         self.assertIn("bridgeEntryFreshUi", self.pine)
-        self.assertIn("bridgeEntryAgeMs <= 2 * bridgeEntryTfMs + 30000", self.pine)
+        self.assertIn("bridgeEntryAgeMs <= bridgeEntryTfMs + 30000", self.pine)
         self.assertIn("bridgeEntryOhlcValidUi", self.pine)
         self.assertIn("bridgeEntryRetestedUi = bridgeEntryHigh >= zBas and bridgeEntryLow <= zHaut", self.pine)
         self.assertIn("bridgeEntryDecisionUi", self.pine)

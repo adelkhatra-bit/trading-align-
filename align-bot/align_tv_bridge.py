@@ -384,10 +384,10 @@ class BridgeStore:
                 has_plan = False
             else:
                 entry_bar_age = now_ms - entry_bar_time
-                # Le Pine envoie l'heure d'OUVERTURE de la dernière bougie CLÔTÉE (time[1]) :
-                # son âge va donc jusqu'à 2 UT (18/11 : SWING H1 refusé à 1 h 35 alors que valide).
-                if entry_bar_age < -MAX_FUTURE_SKEW_MS or entry_bar_age > 2 * entry_tf_ms + ENTRY_BAR_GRACE_MS:
-                    threshold_ms = 2 * entry_tf_ms + ENTRY_BAR_GRACE_MS
+                # Le Pine envoie l'heure de CLÔTURE de la dernière bougie validée (time_close[1]) :
+                # la tolérance couvre une UT complète (18/11 : SWING H1 refusé à 1 h 35 alors que valide).
+                if entry_bar_age < -MAX_FUTURE_SKEW_MS or entry_bar_age > entry_tf_ms + ENTRY_BAR_GRACE_MS:
+                    threshold_ms = entry_tf_ms + ENTRY_BAR_GRACE_MS
                     print(
                         f"TRIGGER_STALE symbol={_text(payload.get('symbol'), 16).upper()} entry_tf_ms={entry_tf_ms} "
                         f"entry_bar_time_ms={entry_bar_time} now_ms={now_ms} "
