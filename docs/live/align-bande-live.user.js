@@ -384,15 +384,14 @@
       mettreEtatVoix();
       // Une seule page TradingView propriétaire reçoit et prononce les commentaires.
       if (!es) { ecouter(); pingEcran(); }
+      // Nettoyer le cache avant même la synchronisation Worker : aucun ancien commentaire ne doit repartir.
+      dernierDialogueCoach = null;
+      dernierDialogueCoachTs = Date.now();
+      voixDerniere = Date.now();
       if (!publierEtatCoach(true)) {
         voixBtn.title = 'Coach vocal activé globalement ; lecture sur l’onglet TradingView propriétaire.';
         return;
       }
-      // Démarrage propre : aucune ancienne phrase IA ou dialogue mis en cache n'est relu.
-      // Le coach vocal ne prononce que les prochains commentaires reçus et encore frais.
-      dernierDialogueCoach = null;
-      dernierDialogueCoachTs = Date.now();
-      voixDerniere = Date.now();
     } else {
       try { window.speechSynthesis.cancel(); } catch (e) {}   // OFF coupe tout ce qui est en file
       voixEnAttente = null;
