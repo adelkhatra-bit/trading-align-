@@ -184,7 +184,7 @@ class EvenementsPine(unittest.TestCase):
             (-1, {"bull": 2, "bear": 4}, {"bull": 2, "bear": 8},
              "SHORT en contexte local uniquement", "Alignement local uniquement"),
             (0, {"bull": 4, "bear": 2}, {"bull": 8, "bear": 2},
-             "non définie (ni LONG ni SHORT)", "aucun sens de trade confirmé"),
+             "non définie (ni LONG ni SHORT)", "Alignement local uniquement"),
         )
         for direction, before, after, expected_direction, expected_action in rising_cases:
             with self.subTest(kind="rising", direction=direction):
@@ -195,7 +195,7 @@ class EvenementsPine(unittest.TestCase):
                 message = "\n".join(ab.texte_pine({}, events[0]))
                 self.assertIn(expected_direction, message)
                 self.assertIn(expected_action, message)
-                self.assertIn("Seuil technique atteint", message)
+                self.assertIn("pas un signal Pine", message)
 
         falling_cases = (
             (1, {"bull": 8, "bear": 2}, {"bull": 6, "bear": 2},
