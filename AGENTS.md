@@ -227,3 +227,8 @@ For every completed task, provide a concise, evidence-based report containing:
 Never say “100% operational”, “fixed”, “deployed”, “live”, or “all tests pass” unless the available evidence supports that exact claim. Never claim background work or continuous monitoring unless an authorized automation actually exists and its state has been checked.
 Owner approval rule
 The owner retains final authority over production and may revoke an agent's task authorization at any time. Code-edit authorization is limited to the specifically assigned task and ends when that task is handed off or withdrawn; it is not a standing grant of production control. The owner personally reviews and performs any merge or deployment. Agents never handle secret values and never place real broker orders. A request to fix a bug authorizes only the scoped branch/PR workflow in section 5.2.
+
+
+## Mandatory manual merge approval (legacy validation contract)
+- Contributors must obtain explicit user approval before any merge.
+- All merges require explicit owner approval after diff review, required checks, and applicable runtime validation.
