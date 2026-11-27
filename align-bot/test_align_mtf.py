@@ -2746,6 +2746,19 @@ class TestTradingViewReportRegression(unittest.TestCase):
             "confirmed": confirmed, "triggered": False, "ageMs": 5100,
         }
 
+    def test_required_bridge_card_translates_source_labels_for_english_users(self):
+        french = (
+            "📡 Prix TradingView M5 : 101,25 · actualisé il y a 2 s\\n"
+            "💹 Prix local M1 (contexte uniquement) : 99,25\\n"
+            "⏳ CONFIRMATION MTF PINE EN ATTENTE"
+        )
+        english = align_bot.traduire(french)
+        self.assertIn("📡 TradingView price M5", english)
+        self.assertIn("Local M1 price (context only)", english)
+        self.assertIn("PINE MTF CONFIRMATION PENDING", english)
+        self.assertNotIn("Prix TradingView", english)
+        self.assertNotIn("contexte uniquement", english)
+
     def test_required_bridge_card_separates_tradingview_price_from_local_m1(self):
         from unittest.mock import patch
         for market in ("BTC", "GOLD"):
