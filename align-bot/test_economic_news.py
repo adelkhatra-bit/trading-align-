@@ -16,28 +16,9 @@ class EconomicNewsNormalizationTest(unittest.TestCase):
 
     def test_usd_low_impact_trade_and_wholesale_inventory_are_kept_for_market_watch(self):
         raw = [
-            {
-                "title": "Goods Trade Balance",
-                "country": "USD",
-                "date": "2026-11-27T08:30:00-05:00",
-                "impact": "Low",
-                "forecast": "-135.9B",
-                "previous": "-134.9B",
-            },
-            {
-                "title": "Prelim Wholesale Inventories m/m",
-                "country": "USD",
-                "date": "2026-11-27T08:30:00-05:00",
-                "impact": "Low",
-                "forecast": "0.5%",
-                "previous": "0.6%",
-            },
-            {
-                "title": "Minor USD housing index",
-                "country": "USD",
-                "date": "2026-11-27T09:00:00-05:00",
-                "impact": "Low",
-            },
+            {"title": "Goods Trade Balance", "country": "USD", "date": "2026-11-27T08:30:00-05:00", "impact": "Low", "forecast": "-135.9B", "previous": "-134.9B"},
+            {"title": "Prelim Wholesale Inventories m/m", "country": "USD", "date": "2026-11-27T08:30:00-05:00", "impact": "Low", "forecast": "0.5%", "previous": "0.6%"},
+            {"title": "Minor USD housing index", "country": "USD", "date": "2026-11-27T09:00:00-05:00", "impact": "Low"},
         ]
         important, daily = news.normaliser_evenements(raw, self.now)
         titles = [event["titre"] for event in important]
@@ -47,63 +28,34 @@ class EconomicNewsNormalizationTest(unittest.TestCase):
         self.assertEqual(len(daily), 3)
 
     def test_event_time_is_converted_from_explicit_offset_to_paris(self):
-        event = news.normaliser_evenement({
-            "title": "Goods Trade Balance",
-            "country": "USD",
-            "date": "2026-11-27T08:30:00-05:00",
-            "impact": "Low",
-        }, self.now)
+        event = news.normaliser_evenement({"title": "Goods Trade Balance", "country": "USD", "date": "2026-11-27T08:30:00-05:00", "impact": "Low"}, self.now)
         self.assertEqual(event["event_at_paris"], "2026-11-27T14:30:00+01:00")
         self.assertEqual(event["currency"], "USD")
         self.assertEqual(event["importance"], "Low")
         self.assertEqual(event["official_source_name"], "U.S. Census Bureau")
 
     def test_naive_event_time_is_rejected_instead_of_assuming_runner_timezone(self):
-        event = news.normaliser_evenement({
-            "title": "CPI",
-            "country": "USD",
-            "date": "2026-11-27T08:30:00",
-            "impact": "High",
-        }, self.now)
+        event = news.normaliser_evenement({"title": "CPI", "country": "USD", "date": "2026-11-27T08:30:00", "impact": "High"}, self.now)
         self.assertIsNone(event)
 
     def test_publication_time_is_not_confused_with_event_time(self):
-        event = news.normaliser_evenement({
-            "title": "CPI",
-            "country": "USD",
-            "date": "2026-11-27T08:30:00-05:00",
-            "publishedAt": "2026-11-27T08:31:12Z",
-            "impact": "High",
-        }, self.now)
+        event = news.normaliser_evenement({"title": "CPI", "country": "USD", "date": "2026-11-27T08:30:00-05:00", "publishedAt": "2026-11-27T08:31:12Z", "impact": "High"}, self.now)
         self.assertNotEqual(event["published_at"], event["t"])
         self.assertIsNotNone(event["published_at_paris"])
 
     def test_event_identity_is_stable_across_refreshes(self):
-        raw = {
-            "title": "Goods Trade Balance",
-            "country": "USD",
-            "date": "2026-11-27T08:30:00-05:00",
-            "impact": "Low",
-        }
+        raw = {"title": "Goods Trade Balance", "country": "USD", "date": "2026-11-27T08:30:00-05:00", "impact": "Low"}
         first = news.normaliser_evenement(raw, self.now)
         second = news.normaliser_evenement(raw, self.now + 300)
         self.assertEqual(first["id"], second["id"])
 
     def test_refresh_interval_tightens_before_and_after_event(self):
-        event = {"t": self.now + 90 * 60}
-        self.assertEqual(news.intervalle_rafraichissement([event], self.now), 300)
+        self.assertEqual(news.intervalle_rafraichissement([{"t": self.now + 90 * 60}], self.now), 300)
         self.assertEqual(news.intervalle_rafraichissement([{"t": self.now + 4 * 3600}], self.now), 900)
         self.assertEqual(news.intervalle_rafraichissement([{"t": self.now + 10 * 3600}], self.now), 3600)
 
     def test_facts_report_does_not_claim_missing_actual_value(self):
-        event = news.normaliser_evenement({
-            "title": "Goods Trade Balance",
-            "country": "USD",
-            "date": "2026-11-27T08:30:00-05:00",
-            "impact": "Low",
-            "forecast": "-135.9B",
-            "previous": "-134.9B",
-        }, self.now)
+        event = news.normaliser_evenement({"title": "Goods Trade Balance", "country": "USD", "date": "2026-11-27T08:30:00-05:00", "impact": "Low", "forecast": "-135.9B", "previous": "-134.9B"}, self.now)
         report = news.facts_line(event)
         self.assertIn("Valeur publiée: non reçue", report)
         self.assertIn("aucun chiffre n'est inventé", report)
@@ -111,29 +63,13 @@ class EconomicNewsNormalizationTest(unittest.TestCase):
         self.assertIn("census.gov", report)
 
     def test_zero_is_preserved_as_a_real_published_value(self):
-        event = news.normaliser_evenement({
-            "title": "Retail Sales",
-            "country": "USD",
-            "date": "2026-11-27T08:30:00-05:00",
-            "impact": "Low",
-            "actual": 0,
-            "forecast": 0,
-            "previous": 0,
-        }, self.now)
+        event = news.normaliser_evenement({"title": "Retail Sales", "country": "USD", "date": "2026-11-27T08:30:00-05:00", "impact": "Low", "actual": 0, "forecast": 0, "previous": 0}, self.now)
         self.assertEqual(event["actual"], "0")
         self.assertEqual(event["forecast"], "0")
         self.assertEqual(event["previous"], "0")
 
     def test_actual_value_is_labelled_as_aggregator_data_not_official_data(self):
-        event = news.normaliser_evenement({
-            "title": "Core CPI m/m",
-            "country": "USD",
-            "date": "2026-11-27T08:30:00-05:00",
-            "impact": "High",
-            "actual": "0.2%",
-            "forecast": "0.3%",
-            "previous": "0.3%",
-        }, self.now)
+        event = news.normaliser_evenement({"title": "Core CPI m/m", "country": "USD", "date": "2026-11-27T08:30:00-05:00", "impact": "High", "actual": "0.2%", "forecast": "0.3%", "previous": "0.3%"}, self.now)
         report = news.facts_line(event)
         self.assertIn("Valeur reçue du calendrier agrégé: 0.2%", report)
         self.assertIn("Source de la valeur: Forex Factory", report)
@@ -144,23 +80,15 @@ class EconomicNewsBotIntegrationTest(unittest.TestCase):
     def setUp(self):
         self.now = int(dt.datetime(2026, 11, 27, 9, 0, tzinfo=ZoneInfo("Europe/Paris")).timestamp())
         self.schedule = [
-            {
-                "title": "Goods Trade Balance",
-                "country": "USD",
-                "date": "2026-11-27T08:30:00-05:00",
-                "impact": "Low",
-                "forecast": "-135.9B",
-                "previous": "-134.9B",
-            },
-            {
-                "title": "Prelim Wholesale Inventories m/m",
-                "country": "USD",
-                "date": "2026-11-27T08:30:00-05:00",
-                "impact": "Low",
-                "forecast": "0.5%",
-                "previous": "0.6%",
-            },
+            {"title": "Goods Trade Balance", "country": "USD", "date": "2026-11-27T08:30:00-05:00", "impact": "Low", "forecast": "-135.9B", "previous": "-134.9B"},
+            {"title": "Prelim Wholesale Inventories m/m", "country": "USD", "date": "2026-11-27T08:30:00-05:00", "impact": "Low", "forecast": "0.5%", "previous": "0.6%"},
         ]
+
+    def _patch_market_hours(self):
+        return (
+            mock.patch.object(ab, "minutes_avant_fermeture_gold", return_value=100),
+            mock.patch.object(ab, "horaires_gold", return_value=(self.now + 100 * 60, self.now + 200 * 60, self.now + 300 * 60)),
+        )
 
     def test_bot_calendar_keeps_low_impact_officially_relevant_usd_events(self):
         state = {}
@@ -174,42 +102,26 @@ class EconomicNewsBotIntegrationTest(unittest.TestCase):
         self.assertEqual(state["cal"]["schema"], 2)
 
     def test_failed_refresh_after_success_marks_calendar_unknown(self):
-        state = {
-            "cal": {
-                "schema": 2,
-                "t": self.now - 301,
-                "ev": [{"t": self.now + 3600, "titre": "CPI"}],
-            }
-        }
+        state = {"cal": {"schema": 2, "t": self.now - 301, "ev": [{"t": self.now + 3600, "titre": "CPI"}]}}
         with mock.patch.object(ab, "http_json", side_effect=RuntimeError("offline")):
             ab.calendrier(state, self.now)
         self.assertFalse(ab.calendrier_connu(state, self.now))
         self.assertEqual(state["cal"]["erreur"]["type"], "RuntimeError")
 
     def test_unknown_calendar_never_claims_there_are_no_announcements(self):
-        with mock.patch.object(ab, "calendrier", return_value=[]), \\
-             mock.patch.object(ab, "minutes_avant_fermeture_gold", return_value=100), \\
-             mock.patch.object(ab, "horaires_gold", return_value=(self.now + 100 * 60, self.now + 200 * 60, self.now + 300 * 60)):
+        hours_a, hours_b = self._patch_market_hours()
+        with mock.patch.object(ab, "calendrier", return_value=[]), hours_a, hours_b:
             messages = ab.annonces_et_sessions({}, self.now, {})
-        joined = "\\n".join(messages)
+        joined = "\n".join(messages)
         self.assertIn("CALENDRIER ÉCONOMIQUE INDISPONIBLE", joined)
         self.assertNotIn("Aucune annonce majeure US aujourd'hui", joined)
 
     def test_post_event_report_separates_published_facts_from_price_reaction(self):
-        event = news.normaliser_evenement({
-            "title": "Goods Trade Balance",
-            "country": "USD",
-            "date": dt.datetime.fromtimestamp(self.now - 7 * 60, dt.timezone.utc).isoformat(),
-            "impact": "Low",
-            "forecast": "-135.9B",
-            "previous": "-134.9B",
-        }, self.now)
+        event = news.normaliser_evenement({"title": "Goods Trade Balance", "country": "USD", "date": dt.datetime.fromtimestamp(self.now - 7 * 60, dt.timezone.utc).isoformat(), "impact": "Low", "forecast": "-135.9B", "previous": "-134.9B"}, self.now)
         state = {"cal": {"t": self.now, "ev": [event]}}
         bars = [{"t": event["t"] + 60, "o": 100.0, "h": 102.0, "l": 99.0, "c": 101.5}]
-        with mock.patch.object(ab, "calendrier", return_value=[event]), \\
-             mock.patch.object(ab, "minutes_avant_fermeture_gold", return_value=100), \\
-             mock.patch.object(ab, "horaires_gold", return_value=(self.now + 100 * 60, self.now + 200 * 60, self.now + 300 * 60)), \\
-             mock.patch.object(ab, "ia", return_value="Mouvement observé; confirmation M15 attendue."):
+        hours_a, hours_b = self._patch_market_hours()
+        with mock.patch.object(ab, "calendrier", return_value=[event]), hours_a, hours_b, mock.patch.object(ab, "ia", return_value="Mouvement observé; confirmation M15 attendue."):
             messages = ab.annonces_et_sessions(state, self.now, {"BTC": {"m1": bars}})
         report = next(message for message in messages if "COMPTE RENDU APRÈS NEWS" in message)
         self.assertIn("Valeur publiée: non reçue", report)
@@ -218,30 +130,21 @@ class EconomicNewsBotIntegrationTest(unittest.TestCase):
         self.assertIn("census.gov", report)
 
     def test_late_actual_value_generates_one_update_without_repeating_reaction_report(self):
-        base = {
-            "title": "Goods Trade Balance",
-            "country": "USD",
-            "date": dt.datetime.fromtimestamp(self.now - 10 * 60, dt.timezone.utc).isoformat(),
-            "impact": "Low",
-            "forecast": "-135.9B",
-            "previous": "-134.9B",
-        }
+        base = {"title": "Goods Trade Balance", "country": "USD", "date": dt.datetime.fromtimestamp(self.now - 10 * 60, dt.timezone.utc).isoformat(), "impact": "Low", "forecast": "-135.9B", "previous": "-134.9B"}
         first = news.normaliser_evenement(base, self.now)
         state = {"cal": {"t": self.now, "ev": [first]}}
-        common = (
-            mock.patch.object(ab, "minutes_avant_fermeture_gold", return_value=100),
-            mock.patch.object(ab, "horaires_gold", return_value=(self.now + 100 * 60, self.now + 200 * 60, self.now + 300 * 60)),
-        )
-        with mock.patch.object(ab, "calendrier", return_value=[first]), common[0], common[1]:
+        hours_a, hours_b = self._patch_market_hours()
+        with mock.patch.object(ab, "calendrier", return_value=[first]), hours_a, hours_b:
             ab.annonces_et_sessions(state, self.now, {})
-        updated_raw = dict(base, actual="-137.2B")
-        updated = news.normaliser_evenement(updated_raw, self.now + 300)
-        with mock.patch.object(ab, "calendrier", return_value=[updated]), common[0], common[1]:
+        updated = news.normaliser_evenement(dict(base, actual="-137.2B"), self.now + 300)
+        hours_a, hours_b = self._patch_market_hours()
+        with mock.patch.object(ab, "calendrier", return_value=[updated]), hours_a, hours_b:
             messages = ab.annonces_et_sessions(state, self.now + 300, {})
         updates = [message for message in messages if "MISE À JOUR — VALEUR REÇUE" in message]
         self.assertEqual(len(updates), 1)
         self.assertIn("-137.2B", updates[0])
-        with mock.patch.object(ab, "calendrier", return_value=[updated]), common[0], common[1]:
+        hours_a, hours_b = self._patch_market_hours()
+        with mock.patch.object(ab, "calendrier", return_value=[updated]), hours_a, hours_b:
             again = ab.annonces_et_sessions(state, self.now + 301, {})
         self.assertFalse(any("MISE À JOUR — VALEUR REÇUE" in message for message in again))
 
