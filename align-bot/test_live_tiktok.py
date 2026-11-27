@@ -1314,6 +1314,7 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         activation = bande[activation_start:activation_end]
         self.assertIn("dernierDialogueCoach = null;", activation)
         self.assertIn("dernierDialogueCoachTs = Date.now();", activation)
+        self.assertIn("dernierCommentaireIA = null;", activation)
         self.assertNotIn("parlerLive(dernier.fr, true)", activation)
         self.assertNotIn("jouerDialogueCoach(dialogue, true)", activation)
         self.assertNotIn("Le coach ALIGN est en direct", bande)
