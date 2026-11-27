@@ -48,10 +48,18 @@ class PineTpPlanStateTests(unittest.TestCase):
         self.assertIn('strat == "DAY" ? "M5"', self.source)
         self.assertIn('strat == "SCALPING" ? "M1"', self.source)
 
-    def test_strategy_and_bridge_confirmations_use_closed_timeframe_directions(self):
-        for name in ("d1Fermee", "d5Fermee", "d15Fermee", "d60Fermee", "d240Fermee", "dDFermee", "dWFermee"):
-            declaration = next(line for line in self.source.splitlines() if line.startswith(name))
-            self.assertIn("request.security(", declaration)
+    def test_all_eleven_displayed_and_bridged_directions_use_the_last_closed_candle(self):
+        for name in ("d1Fermee", "d3Fermee", "d5Fermee", "d10Fermee", "d15Fermee",
+                     "d30Fermee", "d45Fermee", "d60Fermee", "d120Fermee", "d240Fermee", "dDFermee"):
+            self.assertIn(name, self.source)
+        self.assertIn("[d3Fermee, bridgeTimeM3] = request.security(syminfo.tickerid, \"3\", f_dir_confirme(), lookahead=barmerge.lookahead_on)", self.source)
+        self.assertIn("dirsFermees = array.from(nz(d1Fermee), nz(d3Fermee), nz(d5Fermee)", self.source)
+        self.assertIn("dvLive = array.get(dirs, i)", self.source)
+        self.assertIn("dv = array.get(dirsFermees, i)", self.source)
+        self.assertIn("Bougie en formation :", self.source)
+        for name in ("d1Fermee", "d3Fermee", "d5Fermee", "d10Fermee", "d15Fermee",
+                     "d30Fermee", "d45Fermee", "d60Fermee", "d120Fermee", "d240Fermee", "dDFermee"):
+            self.assertIn(f"f_align_v25_json_int(nz({name}))", self.source)
         self.assertIn("d5Strat = nz(d5Fermee)", self.source)
         self.assertIn("d1Strat = nz(d1Fermee)", self.source)
         self.assertIn("uD  = nz(dDFermee) == dP", self.source)
