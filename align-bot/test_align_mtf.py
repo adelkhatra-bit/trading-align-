@@ -2750,12 +2750,13 @@ class TestTradingViewReportRegression(unittest.TestCase):
         french = (
             "📡 Prix TradingView M5 : 101,25 · actualisé il y a 2 s\n"
             "💹 Prix local M1 (contexte uniquement) : 99,25\n"
+            "📊 INDICATEURS ALIGN LOCAUX (CONTEXTE)\n"
             "⏳ CONFIRMATION MTF PINE EN ATTENTE"
         )
         english = align_bot.traduire(french)
         self.assertIn("📡 TradingView price M5", english)
         self.assertIn("Local M1 price (context only)", english)
-        self.assertIn("LOCAL ALIGN INDICATORS (CONTEXT)", english) if "📊 INDICATEURS ALIGN LOCAUX (CONTEXTE)" in french else None
+        self.assertIn("LOCAL ALIGN INDICATORS (CONTEXT)", english)
         self.assertIn("PINE MTF CONFIRMATION PENDING", english)
         self.assertNotIn("Prix TradingView", english)
         self.assertNotIn("contexte uniquement", english)
