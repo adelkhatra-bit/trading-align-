@@ -2932,6 +2932,53 @@ class TestTradingViewReportRegression(unittest.TestCase):
         self.assertNotIn("99,25", message)
         self.assertNotIn("%", message)
 
+    def test_required_bridge_levels_callback_ignores_stale_local_order(self):
+        from unittest.mock import patch
+        update = {"update_id": 9201, "callback_query": {
+            "id": "cb-levels-wait", "data": "levels:BTC",
+            "message": {"chat": {"id": 123, "type": "private"}}, "from": {"id": 123}
+        }}
+        r = self._required_bridge_card_fixture()
+        state = {"BTC": {"ordre": {"d": -1, "e": 123.0, "sl": 125.0, "tp1": 119.0, "tp2": 117.0}}}
+        with (
+            patch.object(align_bot, "autorise", return_value=True),
+            patch.dict(align_bot.DERNIERS, {"BTC": r}),
+            patch.object(align_bot, "texte_vision", return_value="PINE MTF WAIT — NO LOCAL LEVELS") as vision,
+            patch.object(align_bot, "fmt_trade", side_effect=AssertionError("stale local order must not be rendered")),
+            patch.object(align_bot, "_envoi_sur") as send,
+            patch.object(align_bot, "telegram"),
+        ):
+            align_bot.traiter(state, set(), [update])
+        vision.assert_called_once()
+        self.assertIn("PINE MTF WAIT — NO LOCAL LEVELS", send.call_args.kwargs["text"])
+        self.assertNotIn("123", send.call_args.kwargs["text"])
+
+    def test_required_bridge_levels_callback_uses_tv_price_for_existing_trade(self):
+        from unittest.mock import patch
+        update = {"update_id": 9202, "callback_query": {
+            "id": "cb-levels-position", "data": "levels:GOLD",
+            "message": {"chat": {"id": 123, "type": "private"}}, "from": {"id": 123}
+        }}
+        r = self._required_bridge_card_fixture()
+        r["market"] = "GOLD"
+        state = {"GOLD": {"trade": {
+            "d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0,
+            "za": 99.0, "zb": 101.0, "rr": 2.0, "n1": "TP1", "n2": "TP2",
+            "strat": "", "sl_ut": "5 min"
+        }}}
+        with (
+            patch.object(align_bot, "autorise", return_value=True),
+            patch.dict(align_bot.DERNIERS, {"GOLD": r}),
+            patch.object(align_bot, "fmt_trade", side_effect=lambda m, tr, price: f"TV_LEVEL_PRICE={price}") as fmt,
+            patch.object(align_bot, "_envoi_sur") as send,
+            patch.object(align_bot, "telegram"),
+        ):
+            align_bot.traiter(state, set(), [update])
+        fmt.assert_called_once()
+        self.assertEqual(fmt.call_args.args[2], 101.25)
+        self.assertIn("TV_LEVEL_PRICE=101.25", send.call_args.kwargs["text"])
+        self.assertNotIn("99.25", send.call_args.kwargs["text"])
+
     def test_analysis_command_maps_to_market_selection_prompt(self):
         self.assertEqual(align_bot.COMMANDES["/faire_analyse"], "📊 Faire une analyse")
         from unittest.mock import patch
