@@ -7256,16 +7256,21 @@ def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
         lecture = "👁 Le marché hésite 🤏"
     d = r.get("confirme") or 0
     tr = cle.get("trade")
-    dirs = (r.get("dirs_cloturees") or r.get("dirs")) or [0] * 11
+    dirs_source = r.get("dirs_cloturees")
+    dirs_disponibles = isinstance(dirs_source, (list, tuple)) and len(dirs_source) >= 11
+    dirs = list(dirs_source[:11]) if dirs_disponibles else [0] * 11
     noms_ut = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1")
-    lectures_ut = [(nom, dirs[i] if i < len(dirs) and dirs[i] in (-1, 1) else 0)
+    lectures_ut = [(nom, dirs[i] if dirs[i] in (-1, 1) else 0)
                    for i, nom in enumerate(noms_ut)]
     fleche_ut = lambda sens: "⬆️" if sens == 1 else "⬇️" if sens == -1 else "➡️"
-    unites = "📊 UT clôturées : " + " ".join(f"{nom}{fleche_ut(sens)}" for nom, sens in lectures_ut)
+    unites = ("📊 UT clôturées : " + " ".join(f"{nom}{fleche_ut(sens)}" for nom, sens in lectures_ut)
+              if dirs_disponibles else "📊 UT clôturées : indisponibles • aucune direction déduite")
     haut = sum(1 for _, sens in lectures_ut if sens == 1)
     bas = sum(1 for _, sens in lectures_ut if sens == -1)
     neutres = len(lectures_ut) - haut - bas
-    if d in (-1, 1):
+    if not dirs_disponibles:
+        bilan_ut = "📊 Bilan MTF : clôtures indisponibles • aucun alignement calculé"
+    elif d in (-1, 1):
         alignes = sum(1 for _, sens in lectures_ut if sens == d)
         opposes = sum(1 for _, sens in lectures_ut if sens == -d)
         bilan_ut = (f"🎯 Vs sens confirmé {'LONG' if d == 1 else 'SHORT'} : "
@@ -7400,7 +7405,9 @@ def flash_commentateur(m, r, cle):
     if abs(move) >= 0.5 * a:
         return "\n".join(["🎙 ÇA BOUGE !", f"{ICONE.get(m, '')} {m} : {px(p)}",
                           ("🔴 Les vendeurs accélèrent" if move < 0 else "🟢 Les acheteurs accélèrent"),
-                          f"📏 {'-' if move < 0 else '+'}{px(abs(move))} en 3 min"] + ligne_pos)
+                          f"📏 {'-' if move < 0 else '+'}{px(abs(move))} en 3 min",
+                          ligne_mtf,
+                          "ℹ️ Mouvement observé, pas une entrée : attendre la clôture M15"] + ligne_pos)
     b15 = (r.get("b15") or [])[-1:]
     if b15:
         x = b15[0]; rng = x["h"] - x["l"]
