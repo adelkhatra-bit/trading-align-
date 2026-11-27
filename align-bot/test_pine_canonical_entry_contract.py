@@ -189,10 +189,19 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn("line.set_color(lZH, dirPlan == 1 ? color.lime : color.red)", self.pine)
         self.assertIn("🟢 DÉCLENCHEUR LONG VALIDÉ", self.pine)
         self.assertIn("🔴 DÉCLENCHEUR SHORT VALIDÉ", self.pine)
-        self.assertIn("entryReadyUi = entryTriggeredUi and close >= zBas and close <= zHaut", self.pine)
+        self.assertIn("entryReadyUi = entryTriggeredUi and close >= zBas and close <= zHaut and (dirPlan == 1 ? close > (zBas + zHaut) / 2 : dirPlan == -1 ? close < (zBas + zHaut) / 2 : false)", self.pine)
         self.assertIn("line.set_color(lConf, dirPlan == 1 ? color.lime : color.red)", self.pine)
         self.assertIn("🟢 ZONE ATTEINTE — LONG PRÊT", self.pine)
         self.assertIn("🔴 ZONE ATTEINTE — SHORT PRÊT", self.pine)
+
+    def test_dir_stable_initialization_requires_closed_m15_or_h1_confirmation(self):
+        start = self.pine.index("var int dirStable = 0")
+        end = self.pine.index("// GOLD : aucune direction de trade", start)
+        gate = self.pine[start:end]
+        self.assertIn("if dirStable == 0", gate)
+        self.assertIn("if dirBrut != 0 and (nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut)", gate)
+        self.assertNotIn("dirStable := dirBrut\\n    else if", gate)
+        self.assertIn("dirBrut != 0 and dirBrut != dirStable and (nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut)", gate)
 
     def test_market_scope_remains_btc_and_gold_only_in_indicator(self):
         self.assertIn('bridgeMarket = isBtc ? "BTCUSD" : isGold ? "XAUUSD" : "UNSUPPORTED"', self.pine)
