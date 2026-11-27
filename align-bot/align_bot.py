@@ -7363,6 +7363,7 @@ def flash_commentateur(m, r, cle):
     p = m1[-1]["c"]
     move = p - m1[0]["o"]
     tr = cle.get("trade")
+    d_ = r.get("confirme") or 0
     ligne_pos = []
     if tr:
         dd = tr["d"]
@@ -7373,7 +7374,6 @@ def flash_commentateur(m, r, cle):
             ligne_pos = ["⚠️ Contre le bot", "🔒 SL à BE : zéro risque" if dd * (tr["e"] - tr["sl"]) <= 0 else "🧊 On garde la tête froide",
                          "⏳ La clôture 15 min décide"]
     else:
-        d_ = r.get("confirme") or 0
         ligne_pos = ["🧭 Dans le sens de la tendance" if d_ * move > 0 else "↩ Contre la tendance : rebond ?" if d_ else "➖ Pas de tendance nette",
                      "⏳ J'attends la clôture 15 min"]
     # Le commentateur ne doit jamais compter les UT en formation : il ne lit que le contrat des 11 dernières clôtures.
@@ -7408,7 +7408,7 @@ def flash_commentateur(m, r, cle):
             meche_haute = x["h"] - max(x["o"], p) >= 0.5 * rng
             meche_basse = min(x["o"], p) - x["l"] >= 0.5 * rng
             if meche_haute and meche_basse:
-                return "\\n".join([
+                return "\n".join([
                     "🎙 GRANDES MÈCHES DES DEUX CÔTÉS — INDÉCISION",
                     f"{ICONE.get(m, '')} {m} : {px(p)}",
                     "👀 M15 en formation : mèches haute et basse • aucun rejet directionnel retenu",
@@ -7416,7 +7416,7 @@ def flash_commentateur(m, r, cle):
                     "⏳ M15 non clôturée : attendre la clôture avant toute conclusion"
                 ] + ligne_pos)
             if meche_haute:
-                return "\\n".join([
+                return "\n".join([
                     "🎙 GROSSE MÈCHE — REJET BAISSIER POTENTIEL",
                     f"{ICONE.get(m, '')} {m} : {px(p)}",
                     f"👀 M15 en formation : mèche haute, rejet baissier potentiel à {px(x['h'])}",
@@ -7425,7 +7425,7 @@ def flash_commentateur(m, r, cle):
                     "⏳ M15 non clôturée : attendre la clôture avant toute conclusion"
                 ] + ligne_pos)
             if meche_basse:
-                return "\\n".join([
+                return "\n".join([
                     "🎙 GROSSE MÈCHE — REJET HAUSSIER POTENTIEL",
                     f"{ICONE.get(m, '')} {m} : {px(p)}",
                     f"👀 M15 en formation : mèche basse, rejet haussier potentiel à {px(x['l'])}",
