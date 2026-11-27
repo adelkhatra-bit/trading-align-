@@ -36,7 +36,7 @@ f_etat() =>
     kc = ta.ema(close, lenSqz)
     rng = 1.5 * ta.atr(lenSqz)
     sqz = (basis + dev) < (kc + rng) and (basis - dev) > (kc - rng)
-    [d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time[1]]
+    [d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time_close[1]]
 
 [d1, s1, r1, bridgeTimeM1]       = request.security(syminfo.tickerid, "1",   f_etat())
 [d2, s2, r2, bridgeTimeM3]       = request.security(syminfo.tickerid, "3",   f_etat())
@@ -668,7 +668,7 @@ bridgeTfSeconds = timeframe.in_seconds()
 bridgeTf = bridgeTfSeconds == 60 ? "M1" : bridgeTfSeconds == 180 ? "M3" : bridgeTfSeconds == 300 ? "M5" : bridgeTfSeconds == 600 ? "M10" : bridgeTfSeconds == 900 ? "M15" : bridgeTfSeconds == 1800 ? "M30" : bridgeTfSeconds == 2700 ? "M45" : bridgeTfSeconds == 3600 ? "H1" : bridgeTfSeconds == 7200 ? "H2" : bridgeTfSeconds == 14400 ? "H4" : bridgeTfSeconds == 86400 ? "D1" : bridgeTfSeconds == 604800 ? "W1" : "UNSUPPORTED"
 
 
-// Chaque timeframe transporte l'heure d'ouverture de SA propre bougie.
+// Chaque timeframe transporte l'heure de clôture de sa dernière bougie clôturée.
 // Sur un chart supérieur, request.security() ne restitue qu'un intrabar ;
 // request.security_lower_tf() donne les intrabars et permet de prendre le dernier clôturé.
 bridgeEntryTf = strat == "SWING" ? "60" : strat == "DAY" ? "5" : strat == "SCALPING" ? "1" : ""
@@ -679,7 +679,7 @@ float bridgeEntryClose = na
 int bridgeEntryTime = na
 if bridgeEntryTf != ""
     if timeframe.in_seconds(bridgeEntryTf) < timeframe.in_seconds()
-        [bridgeEntryOpenArray, bridgeEntryHighArray, bridgeEntryLowArray, bridgeEntryCloseArray, bridgeEntryTimeArray] = request.security_lower_tf(syminfo.tickerid, bridgeEntryTf, [open[1], high[1], low[1], close[1], time[1]])
+        [bridgeEntryOpenArray, bridgeEntryHighArray, bridgeEntryLowArray, bridgeEntryCloseArray, bridgeEntryTimeArray] = request.security_lower_tf(syminfo.tickerid, bridgeEntryTf, [open[1], high[1], low[1], close[1], time_close[1]])
         int bridgeEntryCount = array.size(bridgeEntryTimeArray)
         if bridgeEntryCount > 0
             int bridgeEntryLast = bridgeEntryCount - 1
@@ -689,7 +689,7 @@ if bridgeEntryTf != ""
             bridgeEntryClose := array.get(bridgeEntryCloseArray, bridgeEntryLast)
             bridgeEntryTime := array.get(bridgeEntryTimeArray, bridgeEntryLast)
     else
-        [bridgeEntryOpenRequested, bridgeEntryHighRequested, bridgeEntryLowRequested, bridgeEntryCloseRequested, bridgeEntryTimeRequested] = request.security(syminfo.tickerid, bridgeEntryTf, [open[1], high[1], low[1], close[1], time[1]], lookahead=barmerge.lookahead_on)
+        [bridgeEntryOpenRequested, bridgeEntryHighRequested, bridgeEntryLowRequested, bridgeEntryCloseRequested, bridgeEntryTimeRequested] = request.security(syminfo.tickerid, bridgeEntryTf, [open[1], high[1], low[1], close[1], time_close[1]], lookahead=barmerge.lookahead_on)
         bridgeEntryOpen := bridgeEntryOpenRequested
         bridgeEntryHigh := bridgeEntryHighRequested
         bridgeEntryLow := bridgeEntryLowRequested
@@ -701,7 +701,7 @@ bridgeEntryTimeSafe = bridgeEntryTf == "" ? na : bridgeEntryTime
 // dans le sens du plan et reste du bon côté du stop.
 bridgeEntryTfMs = bridgeEntryTf == "60" ? 3600000 : bridgeEntryTf == "5" ? 300000 : bridgeEntryTf == "1" ? 60000 : 0
 bridgeEntryAgeMs = not na(bridgeEntryTimeSafe) ? timenow - bridgeEntryTimeSafe : na
-bridgeEntryFreshUi = bridgeEntryTfMs > 0 and not na(bridgeEntryAgeMs) and bridgeEntryAgeMs >= -5000 and bridgeEntryAgeMs <= 2 * bridgeEntryTfMs + 30000
+bridgeEntryFreshUi = bridgeEntryTfMs > 0 and not na(bridgeEntryAgeMs) and bridgeEntryAgeMs >= -5000 and bridgeEntryAgeMs <= bridgeEntryTfMs + 30000
 bridgeEntryOhlcValidUi = not na(bridgeEntryOpen) and not na(bridgeEntryHigh) and not na(bridgeEntryLow) and not na(bridgeEntryClose) and bridgeEntryLow <= math.min(bridgeEntryOpen, bridgeEntryClose) and math.max(bridgeEntryOpen, bridgeEntryClose) <= bridgeEntryHigh
 bridgeEntryRetestedUi = bridgeEntryHigh >= zBas and bridgeEntryLow <= zHaut
 bridgeEntryDecisionUi = dirPlan == 1 ? bridgeEntryClose > (zBas + zHaut) / 2 : dirPlan == -1 ? bridgeEntryClose < (zBas + zHaut) / 2 : false
