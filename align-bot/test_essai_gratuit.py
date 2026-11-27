@@ -60,6 +60,27 @@ class ToutGratuit(EssaiGratuit):
         self.assertNotIn("111", etat.get("bienvenue", {}))
 
 
+class AutorisationGratuite(unittest.TestCase):
+    def test_tout_gratuit_bypasses_vip_gate_for_coach_and_position_follow(self):
+        with patch.object(ab, "TOUT_GRATUIT", True), \
+             patch.object(ab, "POSITIONS_GRATUITES", False), \
+             patch.object(ab, "membre", side_effect=AssertionError("VIP membership must not be required")):
+            self.assertTrue(ab.autorise({}, "111", None))
+
+    def test_vip_gate_remains_when_both_free_switches_are_off(self):
+        with patch.object(ab, "TOUT_GRATUIT", False), \
+             patch.object(ab, "POSITIONS_GRATUITES", False), \
+             patch.object(ab, "proprio", return_value=set()), \
+             patch.object(ab, "membre", return_value=False):
+            self.assertFalse(ab.autorise({}, "111", None))
+
+    def test_positions_gratuites_flag_also_allows_non_vip_follow(self):
+        with patch.object(ab, "TOUT_GRATUIT", False), \
+             patch.object(ab, "POSITIONS_GRATUITES", True), \
+             patch.object(ab, "membre", side_effect=AssertionError("membership must not be checked")):
+            self.assertTrue(ab.autorise({}, "111", None))
+
+
 class Differe(unittest.TestCase):
     def test_position_envoyee_en_differe(self):
         etat = {"lien": "https://t.me/+x", "differe": [{"t": 5, "c": "111", "txt": "🟠 BTC position"}, {"t": 10 ** 12, "c": "222", "txt": "plus tard"}]}
