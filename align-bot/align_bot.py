@@ -1749,7 +1749,8 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
     if require_tv:
         mouvement += " • flux local ALIGN"
     l = lignes_entete + ["━━━━━━━━━━━━━━━━━━", "📡 LECTURE DU MARCHÉ",
-         mouvement, "BIAIS DE FOND LOCAL (H1 / H4)" if require_tv else "BIAIS DE FOND (H1 / H4)", biais,
+         mouvement] + ([_resume_mtf_pine(r)] if require_tv else []) + [
+         "BIAIS DE FOND LOCAL (H1 / H4)" if require_tv else "BIAIS DE FOND (H1 / H4)", biais,
          "━━━━━━━━━━━━━━━━━━", "📊 INDICATEURS ALIGN LOCAUX (CONTEXTE)" if require_tv else "📊 INDICATEURS PAR UNITÉ DE TEMPS",
          "  /  ".join(f"{nom} {fl(D[i])}" for nom, i in ut),
          "━━━━━━━━━━━━━━━━━━", "📈 RSI ALIGN LOCAL (CONTEXTE)" if require_tv else "📈 RSI PAR UNITÉ DE TEMPS",
@@ -6284,7 +6285,8 @@ def texte_apercu(m, r, cle, vip=True):
         if r.get("m1"):
             lignes.append(f"💹 Prix local M1 (contexte uniquement) : {px(r['m1'][-1]['c'])}")
         biais_contexte_txt = "haussier" if maj == 1 else "baissier" if maj == -1 else "mixte"
-        lignes.append(f"🌡 Biais de fond local (non décisionnel) : {biais_contexte_txt} • {n_ok}/11 UT")
+        lignes.append(_resume_mtf_pine(r))
+        lignes.append(f"🌡 Contexte local non décisionnel : {biais_contexte_txt} (H1/H4)")
         if not tr:
             lignes.append(f"🚦 {decision}")
             lignes.append(f"🧭 Direction Pine à surveiller : {direction}" + (f" ({type_})" if type_ else ""))
@@ -13389,16 +13391,18 @@ def suivre_apres_sl(out, m, r, cle, hi, lo):
 
 def _resume_mtf_pine(r):
     snapshots = ((r or {}).get("tv_indicator_mtf") or {}).get("snapshots") or {}
+    total = len(snapshots) or 12
     directions = [
         int(snap.get("direction") or 0)
         for snap in snapshots.values()
         if isinstance(snap, dict) and snap.get("fresh") is True
     ]
-    total = len(directions) or 12
     up = sum(value == 1 for value in directions)
     down = sum(value == -1 for value in directions)
-    neutral = max(0, total - up - down)
-    return f"Contexte MTF Pine v25 : {up}/{total} haussières • {down}/{total} baissières • {neutral}/{total} neutres"
+    neutral = sum(value == 0 for value in directions)
+    stale = max(0, total - len(directions))
+    return (f"Pine v25 MTF : {up}/{total} haussières • {down}/{total} baissières • "
+            f"{neutral}/{total} neutres • {stale} périmées")
 
 
 def agent(m, r, cle, ferme):
@@ -14774,19 +14778,24 @@ def commentaires_live_de_secours(donnees):
             continue
         biais = c.get("biais_plan", "neutre")
         if biais == "haussier":
-            direction, direction_en = "Le biais reste haussier", "The bias remains bullish"
+            direction, direction_en = "Le plan Pine v25 est haussier", "The Pine v25 plan is bullish"
         elif biais == "baissier":
-            direction, direction_en = "Le biais reste baissier", "The bias remains bearish"
+            direction, direction_en = "Le plan Pine v25 est baissier", "The Pine v25 plan is bearish"
         else:
-            direction, direction_en = "Le biais reste neutre", "The bias remains neutral"
+            direction, direction_en = "Aucun plan Pine v25 n'est confirmé", "No Pine v25 plan is confirmed"
         confirmation = c.get("confirmation_4h_1h", "non alignées")
-        if confirmation == "alignées à la hausse":
-            accord, accord_en = "les unités longues confirment la hausse", "the higher timeframes confirm the rise"
+        if biais == "neutre":
+            fr1 = "Les lectures locales H1/H4 restent du contexte uniquement et n'autorisent aucune entrée."
+            en1 = "Local H1/H4 readings are context only and do not authorize an entry."
+        elif confirmation == "alignées à la hausse":
+            accord, accord_en = "les lectures locales H1/H4 vont dans le sens haussier (contexte uniquement)", "local H1/H4 readings lean bullish (context only)"
+            fr1, en1 = f"{direction} ; {accord}.", f"{direction_en}; {accord_en}."
         elif confirmation == "alignées à la baisse":
-            accord, accord_en = "les unités longues confirment la baisse", "the higher timeframes confirm the decline"
+            accord, accord_en = "les lectures locales H1/H4 vont dans le sens baissier (contexte uniquement)", "local H1/H4 readings lean bearish (context only)"
+            fr1, en1 = f"{direction} ; {accord}.", f"{direction_en}; {accord_en}."
         else:
-            accord, accord_en = "les unités longues ne confirment pas encore le mouvement", "the higher timeframes do not confirm the move yet"
-        fr1, en1 = f"{direction}, mais {accord}.", f"{direction_en}, but {accord_en}."
+            fr1 = f"{direction}. Les lectures locales H1/H4 ne confirment pas encore le mouvement."
+            en1 = f"{direction_en}. Local H1/H4 readings do not confirm the move yet."
         rsi = c.get("rsi_15m")
         if isinstance(rsi, (int, float)):
             if rsi >= 68:
