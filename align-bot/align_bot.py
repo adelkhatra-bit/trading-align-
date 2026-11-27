@@ -6108,13 +6108,14 @@ def texte_apercu(m, r, cle, vip=True):
         if r.get("tv_bridge_conflict"):
             lignes[2] = "🧭 Biais de fond à surveiller : Non confirmée par TradingView"
 
-    lignes.append(
-        (f"⏰ Réouverture : {r['ferme_txt']} (heure de Paris)" +
-         (" • ta position est en pause, je la reprends à la réouverture" if tr else ""))
-        if r.get("ferme_txt") else
-        "📍 Position ouverte : suis les alertes du coach." if tr else
-        "⚠️ Le biais n'est pas une autorisation d'entrée."
-    )
+    if require_tv:
+        lignes.append(
+            (f"⏰ Réouverture : {r['ferme_txt']} (heure de Paris)" +
+             (" • ta position est en pause, je la reprends à la réouverture" if tr else ""))
+            if r.get("ferme_txt") else
+            "📍 Position ouverte : suis les alertes du coach." if tr else
+            "⚠️ Le biais n'est pas une autorisation d'entrée."
+        )
 
     if tr:
         obj = ([f"🟨 Entrée : {px(tr['e'])} (étiquette ENTRÉE)",
