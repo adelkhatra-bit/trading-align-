@@ -177,7 +177,7 @@ class CoachPineSourceTests(unittest.TestCase):
         plan = {
             "available": True, "price": 101.0, "entry": 105.0, "sl": 95.0,
             "tp1": 115.0, "tp2": 120.0, "zone_low": 104.0, "zone_high": 106.0,
-            "strategy": "DAY", "direction": 1, "triggered": False, "price_in_zone": False,
+            "strategy": "DAY", "direction": 1, "confirmed": True, "triggered": False, "price_in_zone": False,
         }
         with patch.dict(ab.DERNIERS, {"BTC": r}, clear=True), \
              patch.object(ab, "plan_indicateur", return_value=plan), \
@@ -252,7 +252,7 @@ class CoachPineSourceTests(unittest.TestCase):
             )
         self.assertIn("🟢 PLAN D'ENTRÉE — COACH ALIGN", message)
         self.assertIn("🏷️ PROFIL : INTRADAY • DÉCLENCHEMENT M5", message)
-        self.assertIn("SIGNAL VALIDÉ — EN ATTENTE D’EXÉCUTION ROBOT V12", message)
+        self.assertIn("SIGNAL CONFIRMÉ — EXÉCUTION MANUELLE", message)
         self.assertLess(message.index("📍 Entrée :"), message.index("🛑 SL :"))
 
     def test_late_entry_guard_requires_price_inside_original_pine_zone(self):
