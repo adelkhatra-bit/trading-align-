@@ -34,7 +34,7 @@ _OFFICIAL_SOURCES = (
         "url": "https://www.bls.gov/news.release/empsit.toc.htm",
         "keywords": (
             "employment situation", "nonfarm payroll", "payrolls",
-            "unemployment rate", "employment",
+            "unemployment rate",
         ),
     },
     {
