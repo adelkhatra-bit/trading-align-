@@ -135,6 +135,9 @@ class AIProviderModelConfig(unittest.TestCase):
         content = workflow.read_text(encoding="utf-8")
         self.assertIn("run: python3 ai_healthcheck.py", content)
         self.assertNotIn("continue-on-error:", content)
+        validation = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "align-bot-validation.yml"
+        validation_content = validation.read_text(encoding="utf-8")
+        self.assertIn(".github/workflows/ai-check.yml", validation_content)
 
 
 if __name__ == "__main__":
