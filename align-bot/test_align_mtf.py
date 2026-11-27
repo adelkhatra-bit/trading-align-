@@ -4503,6 +4503,28 @@ class PineOnlyEntryGateTests(unittest.TestCase):
         self.assertIn("J'ai exécuté le plan — suivre ma position", message)
 
 
+    def test_telegram_preview_separates_background_bias_from_unconfirmed_pine_plan(self):
+        from unittest.mock import patch
+        r = self._market(current_price=100.0)
+        r["require_tv_bridge"] = True
+        plan = {
+            "available": True, "confirmed": False, "direction": 1,
+            "strategy": "DAY", "triggered": False, "price_in_zone": False,
+            "reason": "confirmation_pending"
+        }
+        with patch.object(align_bot, "alignement", return_value=(1, 9)), \
+             patch.object(align_bot, "prix_tradingview_actif", return_value={
+                 "price": 100.0, "timeframe": "M5", "ageMs": 0
+             }), \
+             patch.object(align_bot, "plan_indicateur", return_value=plan):
+            message = align_bot.texte_apercu("BTC", r, {}, vip=True)
+        self.assertIn("Biais de fond local (non décisionnel) : haussier", message)
+        self.assertIn("CONFIRMATION MTF PINE EN ATTENTE", message)
+        self.assertIn("Aucun point d'entrée n'est affiché avant confirmation MTF Pine", message)
+        self.assertNotIn("🟨 Entrée :", message)
+        self.assertNotIn("🛑 SL :", message)
+
+
 class TelegramTp1Tp2BridgeTests(unittest.TestCase):
     def _snapshot(self, robot, timeframe="M15"):
         robot = dict(robot)
