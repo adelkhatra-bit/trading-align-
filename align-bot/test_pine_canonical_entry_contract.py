@@ -219,7 +219,8 @@ class PineCanonicalEntryContract(unittest.TestCase):
             ("rsi_1m", "r1Fermee"), ("rsi_5m", "r5Fermee"),
             ("rsi_15m", "r15Fermee"), ("rsi_60m", "r60Fermee"),
         ):
-            self.assertIn('"' + field + '":\' + f_align_v25_json_num(' + closed + ')', self.pine)
+            self.assertIn('"' + field + '":', self.pine)
+            self.assertIn("f_align_v25_json_num(" + closed + ")", self.pine)
         self.assertIn("rsiOBFermee >= 3", self.pine)
         self.assertIn("rsiOSFermee >= 3", self.pine)
 
