@@ -6094,13 +6094,19 @@ def texte_apercu(m, r, cle, vip=True):
         lignes += voyants_unites(r)
     else:
         prix = r["m1"][-1]["c"]
-        lignes += [f"— {px(prix)}", f"🚦 {decision}",
-                   f"🧭 Biais de fond à surveiller : {direction}" +
-                   (f" ({type_})" if type_ and not direction.startswith(("AUCUNE", "Non confirmée", "À confirmer")) else ""),
-                   mouvement_recent_m1(r)]
+        lignes = [
+            f"{ICONE.get(m, '📊')} {m} — {px(prix)}",
+            f"🚦 {decision}",
+            f"🧭 Biais de fond à surveiller : {direction}" +
+            (f" ({type_})" if type_ and not direction.startswith(("AUCUNE", "Non confirmée", "À confirmer")) else ""),
+            mouvement_recent_m1(r),
+            (f"⏰ Réouverture : {r['ferme_txt']} (heure de Paris)" +
+             (" • ta position est en pause, je la reprends à la réouverture" if tr else ""))
+            if r.get("ferme_txt") else "⚠️ Le biais n'est pas une autorisation d'entrée." if not tr else "📍 Position ouverte : suis les alertes du coach.",
+            "",
+        ] + voyants_unites(r) + [""]
         if r.get("tv_bridge_conflict"):
-            lignes[-2] = "🧭 Biais de fond à surveiller : Non confirmée par TradingView"
-        lignes += voyants_unites(r)
+            lignes[2] = "🧭 Biais de fond à surveiller : Non confirmée par TradingView"
 
     lignes.append(
         (f"⏰ Réouverture : {r['ferme_txt']} (heure de Paris)" +
