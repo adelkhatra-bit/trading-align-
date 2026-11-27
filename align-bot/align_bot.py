@@ -9739,7 +9739,7 @@ def texte_session(etat, ev, anglais=False):
     return out[:3]
 
 _PINE_TEXTES = {   # type -> variantes (FR, EN) ; {ic} {m} {n} {c} {seuil} {sens} {strat} {u} {niv} {fleche} {ratio}
-    "align_haut": (("📈 {ic} {m} : {n}/11 UT pointent vers {sens_label}", "{sens_action}"), ("🧲 {ic} {m} : la confluence progresse ({n}/11)", "{sens_action}"),
+    "align_haut": (("📈 {ic} {m} : {n}/11 UT • orientation Pine : {sens_label}", "{sens_action}"), ("🧲 {ic} {m} : la confluence progresse ({n}/11)", "{sens_action}"),
                    ("⬆️ {ic} {m} : {n}/11 unités convergent", "{sens_action}")),
     "align_bas": (("📉 {ic} {m} : l'accord des UT baisse ({n}/11)", "{sens_baisse}"), ("⬇️ {ic} {m} : la confluence se disperse ({n}/11)", "{sens_baisse}"),
                   ("🌫 {ic} {m} : moins d'unités vont dans le même sens ({n}/11)", "{sens_baisse}")),
@@ -9760,7 +9760,7 @@ _PINE_TEXTES = {   # type -> variantes (FR, EN) ; {ic} {m} {n} {c} {seuil} {sens
                      ("🎯 {ic} {m} : {sens} confirmé à la clôture {u}", "📍 Ligne de décision {niv}")),
 }
 _PINE_TEXTES_EN = {
-    "align_haut": (("📈 {ic} {m}: {n}/11 timeframes point toward {sens_label}", "{sens_action}"), ("🧲 {ic} {m}: confluence is increasing ({n}/11)", "{sens_action}"),
+    "align_haut": (("📈 {ic} {m}: {n}/11 timeframes • Pine direction: {sens_label}", "{sens_action}"), ("🧲 {ic} {m}: confluence is increasing ({n}/11)", "{sens_action}"),
                    ("⬆️ {ic} {m}: {n}/11 timeframes converge", "{sens_action}")),
     "align_bas": (("📉 {ic} {m}: timeframe agreement is weakening ({n}/11)", "{sens_baisse}"), ("⬇️ {ic} {m}: confluence is dispersing ({n}/11)", "{sens_baisse}"),
                   ("🌫 {ic} {m}: fewer timeframes share the same direction ({n}/11)", "{sens_baisse}")),
@@ -9906,7 +9906,7 @@ def texte_pine(etat, ev, anglais=False):
     ev = dict(ev)
     direction = int(ev.get("d") or 0)
     if anglais:
-        ev["sens_label"] = "LONG (Pine direction, not confirmed)" if direction == 1 else "SHORT (Pine direction, not confirmed)" if direction == -1 else "no LONG/SHORT direction from Pine"
+        ev["sens_label"] = "LONG to watch (not confirmed)" if direction == 1 else "SHORT to watch (not confirmed)" if direction == -1 else "undefined (neither LONG nor SHORT)"
         ev["sens_action"] = "Threshold reached: confluence only — wait for Pine trigger and ROBOT V12 check." if direction else "Threshold reached, but no trade direction is confirmed — wait for a Pine plan."
         ev["sens_baisse"] = "The LONG scenario is losing support; this is not a SHORT signal." if direction == 1 else "The SHORT scenario is losing support; this is not a LONG signal." if direction == -1 else "No reversal or opposite trade direction is confirmed."
         ev["pos"] = {"au-dessus de": "above", "sous": "below"}.get(ev.get("pos"), ev.get("pos"))
@@ -9915,7 +9915,7 @@ def texte_pine(etat, ev, anglais=False):
         ev["ordre"] = {"vente": "sell", "achat": "buy"}.get(ev.get("ordre"), ev.get("ordre"))
         ev["fleche"] = str(ev.get("fleche", "")).replace("HAUSSIER", "BULLISH").replace("BAISSIER", "BEARISH")
     else:
-        ev["sens_label"] = "LONG (orientation Pine, non confirmée)" if direction == 1 else "SHORT (orientation Pine, non confirmée)" if direction == -1 else "aucun sens LONG/SHORT défini par Pine"
+        ev["sens_label"] = "LONG à surveiller (non confirmée)" if direction == 1 else "SHORT à surveiller (non confirmée)" if direction == -1 else "non définie (ni LONG ni SHORT)"
         ev["sens_action"] = "Seuil technique atteint : confluence seulement, attendre le déclencheur Pine et le contrôle ROBOT V12." if direction else "Seuil technique atteint, mais aucun sens de trade confirmé : attendre un plan Pine."
         ev["sens_baisse"] = "Le scénario LONG perd du soutien ; ce message ne signale pas un SHORT." if direction == 1 else "Le scénario SHORT perd du soutien ; ce message ne signale pas un LONG." if direction == -1 else "Aucun retournement ni sens inverse n'est confirmé par ce message."
     return [l.format(**{k: v for k, v in ev.items() if k != "kind"}) for l in lignes]
