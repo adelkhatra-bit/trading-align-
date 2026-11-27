@@ -12560,8 +12560,44 @@ def gerer_stop(etat, m, r, tr, c):
         if not tv_price:
             return
         p = tv_price["price"]
-        sl = pos.get("sl_conseil", pos["sl"])
+        sl = pos["sl"]  # Le SL personnel vient du plan Pine ou du BE validé par TP1, jamais d'une bougie locale.
         if d * (p - sl) <= 0:
+            noter(etat, c, m, pos, sl, "🔒 Stop protégé touché" if d * (sl - pos["e"]) >= 0 else "🛡 Stop remonté touché")
+            return
+        if tv_price.get("barOhlcAvailable") is not True:
+            if not pos.get("tvOhlcWarningSent"):
+                pos["tvOhlcWarningSent"] = True
+                _telegram_envoyer_commentaire_coach_prive(
+                    etat, c, m,
+                    "⚠️ Suivi des mèches suspendu : OHLC du déclencheur TradingView absent ou périmé. "
+                    "Le prix courant reste visible, mais je ne déclare aucun TP/SL sur une mèche non vérifiée.",
+                    trade=tr, position=pos, reply_markup=markup_position(m)
+                )
+            return
+        if not initialiser_base_tradingview(pos, tv_price):
+            if not pos.get("tvBaselineResetNotified"):
+                pos["tvBaselineResetNotified"] = True
+                _telegram_envoyer_commentaire_coach_prive(
+                    etat, c, m,
+                    "ℹ️ Référence OHLC initialisée sur la bougie TradingView actuelle. "
+                    "Les mèches antérieures à cette reprise ne sont pas reconstituées.",
+                    trade=tr, position=pos, reply_markup=markup_position(m)
+                )
+            return
+        extremes = extremes_tradingview_depuis_entree(tv_price, pos)
+        if extremes is None:
+            if not pos.get("tvOhlcWarningSent"):
+                pos["tvOhlcWarningSent"] = True
+                _telegram_envoyer_commentaire_coach_prive(
+                    etat, c, m,
+                    "⚠️ Historique OHLC incomplet ou changement d'unité de déclenchement. "
+                    "Je suspends les décisions sur mèches jusqu'au retour d'un flux cohérent.",
+                    trade=tr, position=pos, reply_markup=markup_position(m)
+                )
+            return
+        hi, lo = extremes
+        touche_sl = lo <= sl if d == 1 else hi >= sl
+        if touche_sl:
             noter(etat, c, m, pos, sl, "🔒 Stop protégé touché" if d * (sl - pos["e"]) >= 0 else "🛡 Stop remonté touché")
         # Aucun stop dynamique fondé sur les bougies locales ne doit contredire le plan Pine.
         return
