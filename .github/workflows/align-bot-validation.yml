@@ -58,7 +58,7 @@ jobs:
           go-version: "1.27.3"
           cache: false
       - name: Validate ALIGN workflow with actionlint
-        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/align-bot-validation.yml .github/workflows/align-bot.yml .github/workflows/align-bot-rollover.yml .github/workflows/align-workflow-watchdog.yml .github/workflows/align-auto-repair.yml .github/workflows/align-mailbox-secrets.yml .github/workflows/align-fast-healthcheck.yml
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/align-bot-validation.yml .github/workflows/align-bot.yml .github/workflows/align-bot-rollover.yml .github/workflows/align-workflow-watchdog.yml .github/workflows/align-auto-repair.yml .github/workflows/align-mailbox-secrets.yml .github/workflows/align-fast-healthcheck.yml .github/workflows/ai-check.yml
       - name: Run targeted auto-repair coordinator tests
         run: python -m unittest discover -s align-bot -p "test_align_auto_repair.py" -v
       - name: Run complete MTF regression suite
