@@ -3134,6 +3134,11 @@ TRAD.update({   # Coach, résumé principal et vues individuelles en bridge Trad
     "Le prix TradingView est hors de la zone d'entrée M15. Aucune entrée au marché.": "TradingView price is outside the M15 entry zone. No market entry.",
     "Déclencheur clôturé et prix dans la zone. Les filtres de risque, news et sécurité restent applicables.": "Closed-candle trigger and price are in the zone. Risk, news and safety filters still apply.",
     "Position et niveaux mémorisés ; les nouvelles entrées restent gouvernées par Pine v25.": "Stored position and levels; new entries remain governed by Pine v25.",
+    "📍 POSITION DÉJÀ OUVERTE": "📍 POSITION ALREADY OPEN",
+    "Direction de la position mémorisée :": "Stored position direction:",
+    "Entrée, SL et objectifs restent ceux enregistrés dans cette position.": "Entry, SL and targets remain those stored in this position.",
+    "Aucune nouvelle direction ni aucun niveau local ne remplace le plan Pine v25.": "No new direction or local level replaces the Pine v25 plan.",
+    "➡️ ACTION : suivre les alertes de gestion de cette position.": "➡️ ACTION: follow this position's management alerts.",
     "Unité du plan :": "Plan timeframe:",
     "Unité de validation :": "Validation timeframe:",
     "Clôture MTF Pine : CONFIRMÉE": "Pine MTF close: CONFIRMED",
@@ -5606,7 +5611,20 @@ def texte_unite_timeframe(m, tf, r, anglais=False):
 
 def texte_pourquoi(m, r, cle):
     """Explication courte : Pine v25 est l'autorité en bridge obligatoire."""
-    if r.get("require_tv_bridge") and not (cle or {}).get("trade"):
+    trade = (cle or {}).get("trade")
+    if r.get("require_tv_bridge") and trade:
+        sens = "LONG" if trade.get("d") == 1 else "SHORT"
+        return "\\n".join([
+            f"❓ POURQUOI ALIGN ? — {m}",
+            "━━━━━━━━━━━━━━━━━━━━",
+            "📍 POSITION DÉJÀ OUVERTE",
+            f"Direction de la position mémorisée : {sens}",
+            "Entrée, SL et objectifs restent ceux enregistrés dans cette position.",
+            "Aucune nouvelle direction ni aucun niveau local ne remplace le plan Pine v25.",
+            "➡️ ACTION : suivre les alertes de gestion de cette position.",
+            "ℹ️ Aucun ordre n'est envoyé au broker."
+        ])
+    if r.get("require_tv_bridge") and not trade:
         plan = plan_indicateur(r)
         if not plan.get("available"):
             reason = plan.get("reason") or (r.get("tv_indicator_mtf") or {}).get("reason") or "Plan Pine v25 indisponible"
