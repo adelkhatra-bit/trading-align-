@@ -7985,8 +7985,9 @@ def repondre(etat, cid, oui, mk=None):
             _envoi_sur(cid, text="✅ Ton suivi personnel est déjà actif.\n🎯 Le coach surveille ton SL, BE et TP.", reply_markup=markup_position(m))
             return
         if not cands:
-            _envoi_sur(cid, text=("🔴 Aucune position ouverte à suivre pour le moment.\n"
-                                  "🔔 Choisis « Suivre la prochaine position » pour recevoir le prochain signal confirmé."), reply_markup=CLAVIER)
+            _envoi_sur(cid, text=("🔴 Aucun signal d'entrée confirmé n'est actuellement ouvert.\n"
+                                  "🎯 Lance la recherche pour être prévenu du prochain signal Pine v25 confirmé."),
+                       reply_markup=json.dumps({"inline_keyboard": [[{"text": "🎯 Chercher une position", "callback_data": "searchpos:BOTH"}]]}))
             return
         m = cands[0]; tr = etat[m]["trade"]
         r_suivi = (DERNIERS or {}).get(m) or {}
@@ -8005,19 +8006,25 @@ def repondre(etat, cid, oui, mk=None):
             return
         tr.setdefault("qui", {})[cid] = {"e": e, "sl": tr["sl"], "tp1": tr["tp1"], "d": tr["d"], "t": int(time.time())}
         live_suivi(etat, cid, m)
+        controle = ("📡 Référence : prix TradingView actif et niveaux du plan Pine v25."
+                    if r_suivi.get("require_tv_bridge") else controle_entree(etat, m, tr["d"]))
+        entree_label = (f"📌 Entrée de suivi (prix TradingView au clic)   {px(e)}"
+                        if r_suivi.get("require_tv_bridge") else f"📌 Entrée   {px(e)}")
+        surveillance = ("📡 Je surveille le prix TradingView, ton SL personnel et TP1/TP2."
+                        if r_suivi.get("require_tv_bridge") else
+                        "🧭 15 min / 1 h / 4 h • ⚡ RSI • 🧱 niveaux • 🎤 news")
         _envoi_sur(cid, reply_markup=markup_position(m), text=(
             f"👊 SUIVI PERSONNEL ACTIVÉ — {ICONE.get(m, '')} {m}\n{SENS[tr['d']]}\n"
-            f"📌 Entrée   {px(e)}\n"
+            f"{entree_label}\n"
             f"🛑 Stop   {px(tr['sl'])}\n"
             f"💰 TP1   {px(tr['tp1'])}\n"
             f"━━━━━━━━━━━━\n"
-            f"🤖 Coach activé jusqu'au TP\n"
+            f"🤖 Coach actif jusqu'à la clôture du plan (SL, TP2 ou sortie manuelle).\n"
             + (f"{alerte}\n" if alerte else "") +
-            f"{controle_entree(etat, m, tr['d'])}\n"
+            f"{controle}\n"
             f"━━━━━━━━━━━━\n"
-            f"🔎 Je surveille toutes les 5 min :\n"
-            f"🧭 15 min / 1 h / 4 h • ⚡ RSI • 🧱 niveaux • 🎤 news\n"
-            f"📈 Résultat calculé tout seul"))
+            f"{surveillance}\n"
+            f"📈 Résultat personnel calculé depuis ton entrée de suivi."))
         return
     ouverts = [m for m in trades if isinstance(etat[m]["trade"].get("qui", {}).get(cid), dict) and not etat[m]["trade"]["qui"][cid].get("fini")]
     if not ouverts:
