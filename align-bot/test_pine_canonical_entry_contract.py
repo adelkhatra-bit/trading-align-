@@ -189,15 +189,65 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn("line.set_color(lZH, dirPlan == 1 ? color.lime : color.red)", self.pine)
         self.assertIn("🟢 DÉCLENCHEUR LONG VALIDÉ", self.pine)
         self.assertIn("🔴 DÉCLENCHEUR SHORT VALIDÉ", self.pine)
-        self.assertIn("entryReadyUi = entryTriggeredUi and close >= zBas and close <= zHaut", self.pine)
+        self.assertIn("entryReadyUi = entryTriggeredUi and close >= zBas and close <= zHaut and (dirPlan == 1 ? close > (zBas + zHaut) / 2 : dirPlan == -1 ? close < (zBas + zHaut) / 2 : false)", self.pine)
         self.assertIn("line.set_color(lConf, dirPlan == 1 ? color.lime : color.red)", self.pine)
         self.assertIn("🟢 ZONE ATTEINTE — LONG PRÊT", self.pine)
         self.assertIn("🔴 ZONE ATTEINTE — SHORT PRÊT", self.pine)
+
+    def test_reversal_zone_cannot_override_strong_opposite_macro_without_both_closes(self):
+        self.assertIn("zoneLongConfirmee = zoneHaut and (longT <= -2 ?", self.pine)
+        self.assertIn("(nz(d15Fermee) == 1 and nz(d60Fermee) == 1)", self.pine)
+        self.assertIn("zoneShortConfirmee = zoneBas and (longT >= 2 ?", self.pine)
+        self.assertIn("(nz(d15Fermee) == -1 and nz(d60Fermee) == -1)", self.pine)
+        self.assertIn("dirBrut = zoneLongConfirmee ? 1 : zoneShortConfirmee ? -1 : longT >= 2 ? 1", self.pine)
+        self.assertNotIn("dirBrut = zoneHaut ? 1 : zoneBas ? -1", self.pine)
+
+    def test_dir_stable_initialization_requires_closed_m15_or_h1_confirmation(self):
+        start = self.pine.index("var int dirStable = 0")
+        end = self.pine.index("// GOLD : aucune direction de trade", start)
+        gate = self.pine[start:end]
+        self.assertIn("if dirStable == 0", gate)
+        self.assertIn("if dirBrut != 0 and (nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut)", gate)
+        self.assertNotIn("if dirStable == 0\n        dirStable := dirBrut", gate)
+        self.assertIn("dirBrut != 0 and dirBrut != dirStable and (nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut)", gate)
 
     def test_market_scope_remains_btc_and_gold_only_in_indicator(self):
         self.assertIn('bridgeMarket = isBtc ? "BTCUSD" : isGold ? "XAUUSD" : "UNSUPPORTED"', self.pine)
         self.assertNotIn('input.string("BTCUSD", "Marché ALIGN"', self.pine)
         self.assertNotIn("NAS100", self.pine)
+
+
+    def test_bridge_rsi_matches_the_same_closed_mtf_candle_as_direction_and_timestamp(self):
+        self.assertIn(
+            "[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), ta.rsi(close, lenRsi)[1], time_close[1]]",
+            self.pine,
+        )
+        payload = self.pine.split("bridgePayload = ", 1)[1]
+        for closed, stamp in (
+            ("r1Fermee", "bridgeTimeM1"), ("r2Fermee", "bridgeTimeM3"),
+            ("r5Fermee", "bridgeTimeM5"), ("r10Fermee", "bridgeTimeM10"),
+            ("r15Fermee", "bridgeTimeM15"), ("r30Fermee", "bridgeTimeM30"),
+            ("r45Fermee", "bridgeTimeM45"), ("r60Fermee", "bridgeTimeH1"),
+            ("r120Fermee", "bridgeTimeH2"), ("r240Fermee", "bridgeTimeH4"),
+            ("rDFermee", "bridgeTimeD1"), ("rWFermee", "bridgeTimeW1"),
+        ):
+            self.assertIn("f_align_v25_json_num(" + closed + ")", payload)
+            self.assertIn("nz(" + stamp + ", 0)", payload)
+        for field, closed in (
+            ("rsi_1m", "r1Fermee"), ("rsi_5m", "r5Fermee"),
+            ("rsi_15m", "r15Fermee"), ("rsi_60m", "r60Fermee"),
+        ):
+            self.assertIn(field, payload)
+            self.assertIn("f_align_v25_json_num(" + closed + ")", payload)
+        self.assertIn("rsiOBFermee >= 3", payload)
+        self.assertIn("rsiOSFermee >= 3", payload)
+
+    def test_closed_rsi_export_does_not_change_live_chart_rsi_calculations(self):
+        self.assertIn("rsis = array.from(nz(r1, 50)", self.pine)
+        self.assertIn("[dC, sC, rC, _, _] = f_etat()", self.pine)
+        self.assertIn("rsiSig = ta.ema(rC, 9)", self.pine)
+        self.assertIn("rsiAchat =", self.pine)
+        self.assertIn("rsiVente =", self.pine)
 
 
 if __name__ == "__main__":

@@ -121,7 +121,7 @@ class BridgeStoreTests(unittest.TestCase):
                     ),
                     msg=f"{variable} must be returned by its matching request.security() tuple",
                 )
-        self.assertIn('[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time_close[1]]', pine)
+        self.assertIn('[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), ta.rsi(close, lenRsi)[1], time_close[1]]', pine)
         self.assertNotIn('[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]', pine)
         self.assertNotIn('lookahead=barmerge.lookahead_off)', pine)
 
@@ -568,6 +568,7 @@ class BridgeStoreTests(unittest.TestCase):
 
     def test_ingest_sets_entry_trigger_only_after_closed_retest_and_decision(self):
         payload = valid_payload()
+        payload["price"] = 100.25
         status, _ = self.store.ingest(payload, INGEST, BASE_MS)
         self.assertEqual(status, 200)
         _, data = self.store.read("BTCUSD", BASE_MS)
@@ -593,6 +594,62 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertEqual(status, 200)
         _, data = self.store.read("BTCUSD", BASE_MS)
         self.assertFalse(data["snapshots"]["M1"]["robotV12"]["entryTriggered"])
+
+    def test_ingest_does_not_trigger_after_live_price_has_left_long_entry_zone(self):
+        payload = valid_payload()
+        payload["price"] = 102.0
+        status, _ = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+        _, data = self.store.read("BTCUSD", BASE_MS)
+        robot = data["snapshots"]["M1"]["robotV12"]
+        self.assertFalse(robot["entryTriggered"])
+        self.assertEqual(robot["signal"], "LONG")
+
+    def test_ingest_does_not_trigger_if_live_price_returns_below_long_decision(self):
+        payload = valid_payload()
+        payload["price"] = 99.5
+        status, _ = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+        _, data = self.store.read("BTCUSD", BASE_MS)
+        self.assertFalse(data["snapshots"]["M1"]["robotV12"]["entryTriggered"])
+
+    def test_ingest_does_not_trigger_after_live_price_has_left_short_entry_zone(self):
+        payload = valid_payload()
+        payload.update({
+            "signal": "SHORT", "entry": 100.0, "sl": 105.0,
+            "tp1": 90.0, "tp2": 85.0, "long_score": 0, "short_score": 85,
+            "entryZoneLow": 99.0, "entryZoneHigh": 101.0, "entryDecision": 100.0,
+            "entryBarOpen": 100.5, "entryBarHigh": 101.0,
+            "entryBarLow": 99.0, "entryBarClose": 99.5,
+            "price": 98.0,
+        })
+        status, _ = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+        _, data = self.store.read("BTCUSD", BASE_MS)
+        self.assertFalse(data["snapshots"]["M1"]["robotV12"]["entryTriggered"])
+
+    def test_ingest_triggers_short_only_while_live_price_is_in_correct_half_of_zone(self):
+        payload = valid_payload()
+        payload.update({
+            "signal": "SHORT", "entry": 100.0, "sl": 105.0,
+            "tp1": 90.0, "tp2": 85.0, "long_score": 0, "short_score": 85,
+            "entryZoneLow": 99.0, "entryZoneHigh": 101.0, "entryDecision": 100.0,
+            "entryBarOpen": 100.5, "entryBarHigh": 101.0,
+            "entryBarLow": 99.0, "entryBarClose": 99.5,
+            "price": 99.75,
+        })
+        status, _ = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+        _, data = self.store.read("BTCUSD", BASE_MS)
+        self.assertTrue(data["snapshots"]["M1"]["robotV12"]["entryTriggered"])
+
+    def test_ingest_triggers_only_while_live_price_remains_in_correct_half_of_zone(self):
+        payload = valid_payload()
+        payload["price"] = 100.25
+        status, _ = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+        _, data = self.store.read("BTCUSD", BASE_MS)
+        self.assertTrue(data["snapshots"]["M1"]["robotV12"]["entryTriggered"])
 
     def test_stale_trigger_counters_are_written_per_market_to_runner_temp(self):
         self.assertTrue(

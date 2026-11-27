@@ -36,20 +36,20 @@ f_etat() =>
     kc = ta.ema(close, lenSqz)
     rng = 1.5 * ta.atr(lenSqz)
     sqz = (basis + dev) < (kc + rng) and (basis - dev) > (kc - rng)
-    [d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time_close[1]]
+    [d, sqz ? 1 : 0, ta.rsi(close, lenRsi), ta.rsi(close, lenRsi)[1], time_close[1]]
 
-[d1, s1, r1, bridgeTimeM1]       = request.security(syminfo.tickerid, "1",   f_etat())
-[d2, s2, r2, bridgeTimeM3]       = request.security(syminfo.tickerid, "3",   f_etat())
-[d5, s5, r5, bridgeTimeM5]       = request.security(syminfo.tickerid, "5",   f_etat())
-[d10, s10, r10, bridgeTimeM10]   = request.security(syminfo.tickerid, "10",  f_etat())
-[d15, s15, r15, bridgeTimeM15]   = request.security(syminfo.tickerid, "15",  f_etat())
-[d30, s30, r30, bridgeTimeM30]   = request.security(syminfo.tickerid, "30",  f_etat())
-[d45, s45, r45, bridgeTimeM45]   = request.security(syminfo.tickerid, "45",  f_etat())
-[d60, s60, r60, bridgeTimeH1]    = request.security(syminfo.tickerid, "60",  f_etat())
-[d120, s120, r120, bridgeTimeH2] = request.security(syminfo.tickerid, "120", f_etat())
-[d240, s240, r240, bridgeTimeH4] = request.security(syminfo.tickerid, "240", f_etat())
-[dD, sD, rD, bridgeTimeD1]       = request.security(syminfo.tickerid, "D",   f_etat())
-[dW, sW, rW, bridgeTimeW1]       = request.security(syminfo.tickerid, "W",   f_etat())
+[d1, s1, r1, r1Fermee, bridgeTimeM1]       = request.security(syminfo.tickerid, "1",   f_etat())
+[d2, s2, r2, r2Fermee, bridgeTimeM3]       = request.security(syminfo.tickerid, "3",   f_etat())
+[d5, s5, r5, r5Fermee, bridgeTimeM5]       = request.security(syminfo.tickerid, "5",   f_etat())
+[d10, s10, r10, r10Fermee, bridgeTimeM10]   = request.security(syminfo.tickerid, "10",  f_etat())
+[d15, s15, r15, r15Fermee, bridgeTimeM15]   = request.security(syminfo.tickerid, "15",  f_etat())
+[d30, s30, r30, r30Fermee, bridgeTimeM30]   = request.security(syminfo.tickerid, "30",  f_etat())
+[d45, s45, r45, r45Fermee, bridgeTimeM45]   = request.security(syminfo.tickerid, "45",  f_etat())
+[d60, s60, r60, r60Fermee, bridgeTimeH1]    = request.security(syminfo.tickerid, "60",  f_etat())
+[d120, s120, r120, r120Fermee, bridgeTimeH2] = request.security(syminfo.tickerid, "120", f_etat())
+[d240, s240, r240, r240Fermee, bridgeTimeH4] = request.security(syminfo.tickerid, "240", f_etat())
+[dD, sD, rD, rDFermee, bridgeTimeD1]       = request.security(syminfo.tickerid, "D",   f_etat())
+[dW, sW, rW, rWFermee, bridgeTimeW1]       = request.security(syminfo.tickerid, "W",   f_etat())
 
 // Sens confirmé : la valeur est décalée d'une bougie HTF et publiée avec lookahead_on.
 // Cela évite d'utiliser une H1/H4/M15/M5 encore en formation pour autoriser une entrée.
@@ -60,6 +60,14 @@ f_dir_confirme() =>
     d[1]
 
 // Contrat MTF canonique : directions des 11 dernières bougies clôturées.
+// RSI bridge distinct du RSI live utilisé par les visuels et l'anticipation.
+rsisFermees = array.from(nz(r1Fermee, 50), nz(r2Fermee, 50), nz(r5Fermee, 50), nz(r10Fermee, 50), nz(r15Fermee, 50), nz(r30Fermee, 50), nz(r45Fermee, 50), nz(r60Fermee, 50), nz(r120Fermee, 50), nz(r240Fermee, 50), nz(rDFermee, 50), nz(rWFermee, 50))
+int rsiOBFermee = 0
+int rsiOSFermee = 0
+for i = 0 to 11
+    rsiValeurFermee = array.get(rsisFermees, i)
+    rsiOBFermee += rsiValeurFermee >= 70 ? 1 : 0
+    rsiOSFermee += rsiValeurFermee <= 30 ? 1 : 0
 d1Fermee = request.security(syminfo.tickerid, "1", f_dir_confirme(), lookahead=barmerge.lookahead_on)
 d3Fermee = request.security(syminfo.tickerid, "3", f_dir_confirme(), lookahead=barmerge.lookahead_on)
 d5Fermee = request.security(syminfo.tickerid, "5", f_dir_confirme(), lookahead=barmerge.lookahead_on)
@@ -115,7 +123,7 @@ alignBas  = bear >= minAlign
 surcharge = comp >= minSqz
 
 // ═════════ UT DU GRAPHIQUE : RSI, MOMENTUM, EXPLOSION ═════════
-[dC, sC, rC, _] = f_etat()
+[dC, sC, rC, _, _] = f_etat()
 rsiSig = ta.ema(rC, 9)
 rsiCrossSigUp   = ta.crossover(rC, rsiSig)
 rsiCross30Up     = ta.crossover(rC, 30)
@@ -252,13 +260,18 @@ f_plan(d, sMin, sMax, cMin, cMax, refClose, refAtr, refLow10, refHigh10) =>
     n2 = na(c2) ? "projection " + str.tostring(gainMin + 2) + " x le risque" : (d == 1 ? "résistance " : "support ") + nc2
     [e, t1, t2, s, n1, n2]
 // Plan automatique : les grosses UT (2h, 4h, Daily) décident, sauf zone de retournement
-dirBrut = zoneHaut ? 1 : zoneBas ? -1 : longT >= 2 ? 1 : longT <= -2 ? -1 : retHaut ? 1 : retBas ? -1 : sens
+// Un retournement contre un biais macro fort exige les deux clôtures M15 et H1 dans le nouveau sens.
+zoneLongConfirmee = zoneHaut and (longT <= -2 ? (nz(d15Fermee) == 1 and nz(d60Fermee) == 1) : (nz(d15Fermee) == 1 or nz(d60Fermee) == 1))
+zoneShortConfirmee = zoneBas and (longT >= 2 ? (nz(d15Fermee) == -1 and nz(d60Fermee) == -1) : (nz(d15Fermee) == -1 or nz(d60Fermee) == -1))
+dirBrut = zoneLongConfirmee ? 1 : zoneShortConfirmee ? -1 : longT >= 2 ? 1 : longT <= -2 ? -1 : retHaut ? 1 : retBas ? -1 : sens
 // Anti-parasites (vue 1 / 3 / 5 min) : le sens ne change qu'à la CLÔTURE d'une bougie,
 // et seulement si le 15 min ou l'1h confirme le nouveau sens. Pas de LONG / SHORT qui clignote en cours de bougie.
 var int dirStable = 0
 if barstate.isconfirmed
+    // Même à l'initialisation, un retournement ne peut jamais imposer un sens sans clôture M15 ou H1 concordante.
     if dirStable == 0
-        dirStable := dirBrut
+        if dirBrut != 0 and (nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut)
+            dirStable := dirBrut
     else if dirBrut != 0 and dirBrut != dirStable and (nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut)
         dirStable := dirBrut
     else if dirBrut == 0 and nz(d15Fermee) != dirStable and nz(d60Fermee) != dirStable
@@ -707,7 +720,7 @@ bridgeEntryRetestedUi = bridgeEntryHigh >= zBas and bridgeEntryLow <= zHaut
 bridgeEntryDecisionUi = dirPlan == 1 ? bridgeEntryClose > (zBas + zHaut) / 2 : dirPlan == -1 ? bridgeEntryClose < (zBas + zHaut) / 2 : false
 bridgeEntryBeforeStopUi = dirPlan == 1 ? bridgeEntryClose > sl : dirPlan == -1 ? bridgeEntryClose < sl : false
 entryTriggeredUi = bridgeConfirmed and bridgeEntryFreshUi and bridgeEntryOhlcValidUi and bridgeEntryRetestedUi and bridgeEntryDecisionUi and bridgeEntryBeforeStopUi
-entryReadyUi = entryTriggeredUi and close >= zBas and close <= zHaut
+entryReadyUi = entryTriggeredUi and close >= zBas and close <= zHaut and (dirPlan == 1 ? close > (zBas + zHaut) / 2 : dirPlan == -1 ? close < (zBas + zHaut) / 2 : false)
 if barstate.islast and entryTriggeredUi
     if not na(lZH)
         line.set_color(lZH, dirPlan == 1 ? color.lime : color.red)
@@ -727,7 +740,7 @@ if barstate.islast and entryReadyUi
         label.set_color(eConf, dirPlan == 1 ? color.new(color.lime, 0) : color.new(color.red, 0))
         label.set_textcolor(eConf, color.white)
 
-bridgePayload = '{"source":"ALIGN_MTF_PRO_V25","symbol":"' + bridgeMarket + '","tickerid":"' + syminfo.tickerid + '","timeframe":"' + bridgeTf + '","planTimeframe":"M15","entryTimeframe":"' + (strat == "SWING" ? "H1" : strat == "DAY" ? "M5" : strat == "SCALPING" ? "M1" : "UNSUPPORTED") + '","entryZoneLow":' + f_align_v25_json_num(bridgePlanValid ? zBas : na) + ',"entryZoneHigh":' + f_align_v25_json_num(bridgePlanValid ? zHaut : na) + ',"entryDecision":' + f_align_v25_json_num(bridgePlanValid ? (zBas + zHaut) / 2 : na) + ',"entryBarTime":' + f_align_v25_json_int(bridgeEntryTimeSafe) + ',"entryBarOpen":' + f_align_v25_json_num(bridgeEntryOpen) + ',"entryBarHigh":' + f_align_v25_json_num(bridgeEntryHigh) + ',"entryBarLow":' + f_align_v25_json_num(bridgeEntryLow) + ',"entryBarClose":' + f_align_v25_json_num(bridgeEntryClose) + ',"price":' + f_align_v25_json_num(close) + ',"timestamp":' + str.tostring(timenow) + ',"candle_time":' + str.tostring(time) + ',"confirmed":' + str.tostring(bridgeConfirmed) + ',"candle_confirmed":' + str.tostring(barstate.isconfirmed) + ',"bar_confirmed":' + str.tostring(barstate.isconfirmed) + ',"signal":"' + bridgeSignal + '","verdict":"' + decisionS + '","entry":' + f_align_v25_json_num(bridgePlanValid ? ent : na) + ',"sl":' + f_align_v25_json_num(bridgePlanValid ? sl : na) + ',"tp1":' + f_align_v25_json_num(bridgePlanValid ? tp1 : na) + ',"tp2":' + f_align_v25_json_num(bridgePlanValid ? tp2 : na) + ',"rrRatio":' + f_align_v25_json_num(rr) + ',"macro_bull":' + str.tostring(bullFermee) + ',"macro_bear":' + str.tostring(bearFermee) + ',"long_score":' + str.tostring(dirPlan == 1 ? scoreV : 0) + ',"short_score":' + str.tostring(dirPlan == -1 ? scoreV : 0) + ',"scalp_inverse":false,"strategy":"' + strat + '","anticipation":"' + (retHaut ? "HAUSSIER" : retBas ? "BAISSIER" : "AUCUNE") + '","zone_proche":"' + bridgeZone + '","volume":"' + (volOk ? "OK" : "INDISPONIBLE") + '","rsi_etat":"' + (rsiOB >= 3 ? "SURACHAT" : rsiOS >= 3 ? "SURVENTE" : "NORMAL") + '","rsi_1m":' + f_align_v25_json_num(r1) + ',"rsi_5m":' + f_align_v25_json_num(r5) + ',"rsi_15m":' + f_align_v25_json_num(r15) + ',"rsi_60m":' + f_align_v25_json_num(r60) + ',"lecture_1m":' + f_align_v25_json_dir(nz(d1Fermee)) + ',"lecture_5m":' + f_align_v25_json_dir(nz(d5Fermee)) + ',"lecture_15m":' + f_align_v25_json_dir(nz(d15Fermee)) + ',"lecture_60m":' + f_align_v25_json_dir(nz(d60Fermee)) + ',"mtf":{"M1":{"direction":' + f_align_v25_json_int(nz(d1Fermee)) + ',"rsi":' + f_align_v25_json_num(r1) + ',"bar_time":' + str.tostring(nz(bridgeTimeM1, 0)) + '},"M3":{"direction":' + f_align_v25_json_int(nz(d3Fermee)) + ',"rsi":' + f_align_v25_json_num(r2) + ',"bar_time":' + str.tostring(nz(bridgeTimeM3, 0)) + '},"M5":{"direction":' + f_align_v25_json_int(nz(d5Fermee)) + ',"rsi":' + f_align_v25_json_num(r5) + ',"bar_time":' + str.tostring(nz(bridgeTimeM5, 0)) + '},"M10":{"direction":' + f_align_v25_json_int(nz(d10Fermee)) + ',"rsi":' + f_align_v25_json_num(r10) + ',"bar_time":' + str.tostring(nz(bridgeTimeM10, 0)) + '},"M15":{"direction":' + f_align_v25_json_int(nz(d15Fermee)) + ',"rsi":' + f_align_v25_json_num(r15) + ',"bar_time":' + str.tostring(nz(bridgeTimeM15, 0)) + '},"M30":{"direction":' + f_align_v25_json_int(nz(d30Fermee)) + ',"rsi":' + f_align_v25_json_num(r30) + ',"bar_time":' + str.tostring(nz(bridgeTimeM30, 0)) + '},"M45":{"direction":' + f_align_v25_json_int(nz(d45Fermee)) + ',"rsi":' + f_align_v25_json_num(r45) + ',"bar_time":' + str.tostring(nz(bridgeTimeM45, 0)) + '},"H1":{"direction":' + f_align_v25_json_int(nz(d60Fermee)) + ',"rsi":' + f_align_v25_json_num(r60) + ',"bar_time":' + str.tostring(nz(bridgeTimeH1, 0)) + '},"H2":{"direction":' + f_align_v25_json_int(nz(d120Fermee)) + ',"rsi":' + f_align_v25_json_num(r120) + ',"bar_time":' + str.tostring(nz(bridgeTimeH2, 0)) + '},"H4":{"direction":' + f_align_v25_json_int(nz(d240Fermee)) + ',"rsi":' + f_align_v25_json_num(r240) + ',"bar_time":' + str.tostring(nz(bridgeTimeH4, 0)) + '},"D1":{"direction":' + f_align_v25_json_int(nz(dDFermee)) + ',"rsi":' + f_align_v25_json_num(rD) + ',"bar_time":' + str.tostring(nz(bridgeTimeD1, 0)) + '},"W1":{"direction":' + f_align_v25_json_int(nz(dWFermee)) + ',"rsi":' + f_align_v25_json_num(rW) + ',"bar_time":' + str.tostring(nz(bridgeTimeW1, 0)) + '}}}'
+bridgePayload = '{"source":"ALIGN_MTF_PRO_V25","symbol":"' + bridgeMarket + '","tickerid":"' + syminfo.tickerid + '","timeframe":"' + bridgeTf + '","planTimeframe":"M15","entryTimeframe":"' + (strat == "SWING" ? "H1" : strat == "DAY" ? "M5" : strat == "SCALPING" ? "M1" : "UNSUPPORTED") + '","entryZoneLow":' + f_align_v25_json_num(bridgePlanValid ? zBas : na) + ',"entryZoneHigh":' + f_align_v25_json_num(bridgePlanValid ? zHaut : na) + ',"entryDecision":' + f_align_v25_json_num(bridgePlanValid ? (zBas + zHaut) / 2 : na) + ',"entryBarTime":' + f_align_v25_json_int(bridgeEntryTimeSafe) + ',"entryBarOpen":' + f_align_v25_json_num(bridgeEntryOpen) + ',"entryBarHigh":' + f_align_v25_json_num(bridgeEntryHigh) + ',"entryBarLow":' + f_align_v25_json_num(bridgeEntryLow) + ',"entryBarClose":' + f_align_v25_json_num(bridgeEntryClose) + ',"price":' + f_align_v25_json_num(close) + ',"timestamp":' + str.tostring(timenow) + ',"candle_time":' + str.tostring(time) + ',"confirmed":' + str.tostring(bridgeConfirmed) + ',"candle_confirmed":' + str.tostring(barstate.isconfirmed) + ',"bar_confirmed":' + str.tostring(barstate.isconfirmed) + ',"signal":"' + bridgeSignal + '","verdict":"' + decisionS + '","entry":' + f_align_v25_json_num(bridgePlanValid ? ent : na) + ',"sl":' + f_align_v25_json_num(bridgePlanValid ? sl : na) + ',"tp1":' + f_align_v25_json_num(bridgePlanValid ? tp1 : na) + ',"tp2":' + f_align_v25_json_num(bridgePlanValid ? tp2 : na) + ',"rrRatio":' + f_align_v25_json_num(rr) + ',"macro_bull":' + str.tostring(bullFermee) + ',"macro_bear":' + str.tostring(bearFermee) + ',"long_score":' + str.tostring(dirPlan == 1 ? scoreV : 0) + ',"short_score":' + str.tostring(dirPlan == -1 ? scoreV : 0) + ',"scalp_inverse":false,"strategy":"' + strat + '","anticipation":"' + (retHaut ? "HAUSSIER" : retBas ? "BAISSIER" : "AUCUNE") + '","zone_proche":"' + bridgeZone + '","volume":"' + (volOk ? "OK" : "INDISPONIBLE") + '","rsi_etat":"' + (rsiOBFermee >= 3 ? "SURACHAT" : rsiOSFermee >= 3 ? "SURVENTE" : "NORMAL") + '","rsi_1m":' + f_align_v25_json_num(r1Fermee) + ',"rsi_5m":' + f_align_v25_json_num(r5Fermee) + ',"rsi_15m":' + f_align_v25_json_num(r15Fermee) + ',"rsi_60m":' + f_align_v25_json_num(r60Fermee) + ',"lecture_1m":' + f_align_v25_json_dir(nz(d1Fermee)) + ',"lecture_5m":' + f_align_v25_json_dir(nz(d5Fermee)) + ',"lecture_15m":' + f_align_v25_json_dir(nz(d15Fermee)) + ',"lecture_60m":' + f_align_v25_json_dir(nz(d60Fermee)) + ',"mtf":{"M1":{"direction":' + f_align_v25_json_int(nz(d1Fermee)) + ',"rsi":' + f_align_v25_json_num(r1Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM1, 0)) + '},"M3":{"direction":' + f_align_v25_json_int(nz(d3Fermee)) + ',"rsi":' + f_align_v25_json_num(r2Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM3, 0)) + '},"M5":{"direction":' + f_align_v25_json_int(nz(d5Fermee)) + ',"rsi":' + f_align_v25_json_num(r5Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM5, 0)) + '},"M10":{"direction":' + f_align_v25_json_int(nz(d10Fermee)) + ',"rsi":' + f_align_v25_json_num(r10Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM10, 0)) + '},"M15":{"direction":' + f_align_v25_json_int(nz(d15Fermee)) + ',"rsi":' + f_align_v25_json_num(r15Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM15, 0)) + '},"M30":{"direction":' + f_align_v25_json_int(nz(d30Fermee)) + ',"rsi":' + f_align_v25_json_num(r30Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM30, 0)) + '},"M45":{"direction":' + f_align_v25_json_int(nz(d45Fermee)) + ',"rsi":' + f_align_v25_json_num(r45Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM45, 0)) + '},"H1":{"direction":' + f_align_v25_json_int(nz(d60Fermee)) + ',"rsi":' + f_align_v25_json_num(r60Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeH1, 0)) + '},"H2":{"direction":' + f_align_v25_json_int(nz(d120Fermee)) + ',"rsi":' + f_align_v25_json_num(r120Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeH2, 0)) + '},"H4":{"direction":' + f_align_v25_json_int(nz(d240Fermee)) + ',"rsi":' + f_align_v25_json_num(r240Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeH4, 0)) + '},"D1":{"direction":' + f_align_v25_json_int(nz(dDFermee)) + ',"rsi":' + f_align_v25_json_num(rDFermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeD1, 0)) + '},"W1":{"direction":' + f_align_v25_json_int(nz(dWFermee)) + ',"rsi":' + f_align_v25_json_num(rWFermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeW1, 0)) + '}}}'
 
 varip int lastBridgeSent = na
 bridgeDue = bridgeEnabled and isSupportedMarket and bridgeTf != "UNSUPPORTED" and barstate.isrealtime and (na(lastBridgeSent) or timenow - lastBridgeSent >= 20000)

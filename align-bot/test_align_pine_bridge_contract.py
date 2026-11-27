@@ -3,7 +3,7 @@ import hashlib
 import unittest
 
 PINE = Path(__file__).parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
-BASELINE_GIT_BLOB_SHA = "a6817c9187d5f7cdf6f8c733554384ee2332f4ee"  # reviewed v25 baseline after closed MTF, shared risk gate and rrS declaration-order correction
+BASELINE_GIT_BLOB_SHA = "de6f38dc8ec189fa62669a01200dbfdc639117ec"  # reviewed normalized v25 baseline after exact RSI and entry-direction blocks are restored
 SETTINGS_BLOCK = """// ═════════ BRIDGE ALIGN (optionnel, sans modification visuelle) ═════════
 grpBridge = "Bridge ALIGN (optionnel)"
 bridgeEnabled = input.bool(true, "Envoyer les snapshots au ROBOT V12", group=grpBridge)
@@ -56,6 +56,25 @@ if not tp1Ok
     tp2M := tp2
 """
         without_tp_change = self.source[:tp_start] + baseline_tp_state + self.source[tp_end:]
+        # Normalize the RSI field introduced in the five-element MTF tuple.
+        without_tp_change = without_tp_change.replace(
+            "ta.rsi(close, lenRsi), ta.rsi(close, lenRsi)[1], time_close[1]",
+            "ta.rsi(close, lenRsi), time_close[1]",
+            1,
+        )
+        for live, closed, bridge_time in (
+            ("r1", "r1Fermee", "bridgeTimeM1"), ("r2", "r2Fermee", "bridgeTimeM3"),
+            ("r5", "r5Fermee", "bridgeTimeM5"), ("r10", "r10Fermee", "bridgeTimeM10"),
+            ("r15", "r15Fermee", "bridgeTimeM15"), ("r30", "r30Fermee", "bridgeTimeM30"),
+            ("r45", "r45Fermee", "bridgeTimeM45"), ("r60", "r60Fermee", "bridgeTimeH1"),
+            ("r120", "r120Fermee", "bridgeTimeH2"), ("r240", "r240Fermee", "bridgeTimeH4"),
+            ("rD", "rDFermee", "bridgeTimeD1"), ("rW", "rWFermee", "bridgeTimeW1"),
+        ):
+            without_tp_change = without_tp_change.replace(", " + live + ", " + closed + ", " + bridge_time + "]", ", " + live + ", " + bridge_time + "]", 1)
+        without_tp_change = without_tp_change.replace("[dC, sC, rC, _, _] = f_etat()", "[dC, sC, rC, _] = f_etat()", 1)
+        closed_rsi_start = without_tp_change.index("rsisFermees = array.from(")
+        closed_rsi_end = without_tp_change.index('d1Fermee = request.security', closed_rsi_start)
+        without_tp_change = without_tp_change[:closed_rsi_start] + without_tp_change[closed_rsi_end:]
         without_tp_change = without_tp_change.replace(
             "[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time_close[1]]",
             "[d, sqz ? 1 : 0, ta.rsi(close, lenRsi)]",
@@ -156,8 +175,32 @@ o1h = d1hStrat == -dP"""
         without_export = without_settings.split(EXPORT_MARKER, 1)[0]
         if without_export.endswith("\n\n"):
             without_export = without_export[:-1]
+        # Normalize the targeted reversal-direction guard and live entry-zone gate.
+        direction_start = without_export.find("// Plan automatique : les grosses UT (2h, 4h, Daily) décident, sauf zone de retournement")
+        direction_end = without_export.find("// GOLD : aucune direction de trade", direction_start)
+        self.assertGreaterEqual(direction_start, 0)
+        self.assertGreater(direction_end, direction_start)
+        baseline_direction = """// Plan automatique : les grosses UT (2h, 4h, Daily) décident, sauf zone de retournement
+dirBrut = zoneHaut ? 1 : zoneBas ? -1 : longT >= 2 ? 1 : longT <= -2 ? -1 : retHaut ? 1 : retBas ? -1 : sens
+// Anti-parasites (vue 1 / 3 / 5 min) : le sens ne change qu'à la CLÔTURE d'une bougie,
+// et seulement si le 15 min ou l'1h confirme le nouveau sens. Pas de LONG / SHORT qui clignote en cours de bougie.
+var int dirStable = 0
+if barstate.isconfirmed
+    if dirStable == 0
+        dirStable := dirBrut
+    else if dirBrut != 0 and dirBrut != dirStable and (nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut)
+        dirStable := dirBrut
+    else if dirBrut == 0 and nz(d15Fermee) != dirStable and nz(d60Fermee) != dirStable
+        dirStable := 0
+"""
+        without_export = without_export[:direction_start] + baseline_direction + without_export[direction_end:]
+        without_export = without_export.replace(
+            "entryReadyUi = entryTriggeredUi and close >= zBas and close <= zHaut and (dirPlan == 1 ? close > (zBas + zHaut) / 2 : dirPlan == -1 ? close < (zBas + zHaut) / 2 : false)",
+            "entryReadyUi = entryTriggeredUi and close >= zBas and close <= zHaut",
+            1,
+        )
         raw = without_export.encode("utf-8")
-        git_blob = hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\\0" + raw).hexdigest()
+        git_blob = hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
         self.assertEqual(git_blob, BASELINE_GIT_BLOB_SHA)
 
     def test_rsi_crossovers_are_evaluated_unconditionally_on_every_bar(self):
@@ -168,6 +211,11 @@ o1h = d1hStrat == -dP"""
     def test_only_btc_and_gold_are_supported_for_signals_and_bridge(self):
         self.assertNotIn('input.string("BTCUSD", "Marché ALIGN"', self.source)
         self.assertIn('bridgeMarket = isBtc ? "BTCUSD" : isGold ? "XAUUSD" : "UNSUPPORTED"', self.source)
+        self.assertIn("rsisFermees = array.from(", self.source)
+        self.assertIn("rsiOBFermee += rsiValeurFermee >= 70 ? 1 : 0", self.source)
+        self.assertIn("rsiOSFermee += rsiValeurFermee <= 30 ? 1 : 0", self.source)
+        self.assertIn('rsiOBFermee >= 3 ? "SURACHAT"', self.source)
+        self.assertIn('rsiOSFermee >= 3 ? "SURVENTE"', self.source)
         export_block = self.source.split(EXPORT_MARKER, 1)[1]
         self.assertIn('bridgeMarket +', export_block)
         self.assertNotIn("NAS100", self.source)
@@ -185,46 +233,52 @@ o1h = d1hStrat == -dP"""
         self.assertIn('"source":"ALIGN_MTF_PRO_V25"', self.source)
 
     def test_active_plan_and_all_required_mtf_timeframes_are_exported(self):
-        for key in ('"entry"', '"sl"', '"tp1"', '"tp2"', '"lecture_1m"', '"lecture_5m"', '"lecture_15m"', '"lecture_60m"'):
-            self.assertIn(key, self.source)
-        for tf in ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1"):
-            self.assertIn('"' + tf + '"', self.source)
+        required_fields = ('"entry"', '"sl"', '"tp1"', '"tp2"', '"lecture_1m"', '"lecture_5m"', '"lecture_15m"', '"lecture_60m"')
+        for field in required_fields:
+            self.assertIn(field, self.source)
+        timeframes = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1")
         self.assertIn(">= 20000", self.source)
-        request_calls = self.source.count("request.security(") + self.source.count("request.security_lower_tf(")
-        self.assertLessEqual(request_calls, 40)
-        for variable, tuple_head in (
-            ("bridgeTimeM1", "d1, s1, r1"),
-            ("bridgeTimeM3", "d2, s2, r2"),
-            ("bridgeTimeM5", "d5, s5, r5"),
-            ("bridgeTimeM10", "d10, s10, r10"),
-            ("bridgeTimeM15", "d15, s15, r15"),
-            ("bridgeTimeM30", "d30, s30, r30"),
-            ("bridgeTimeM45", "d45, s45, r45"),
-            ("bridgeTimeH1", "d60, s60, r60"),
-            ("bridgeTimeH2", "d120, s120, r120"),
-            ("bridgeTimeH4", "d240, s240, r240"),
-            ("bridgeTimeD1", "dD, sD, rD"),
-            ("bridgeTimeW1", "dW, sW, rW"),
-        ):
-            self.assertIn(f"[{tuple_head}, {variable}]", self.source)
-            self.assertNotIn(f"{variable} = request.security(", self.source)
+        tuple_contracts = (
+            ("d1, s1, r1, r1Fermee", "bridgeTimeM1"),
+            ("d2, s2, r2, r2Fermee", "bridgeTimeM3"),
+            ("d5, s5, r5, r5Fermee", "bridgeTimeM5"),
+            ("d10, s10, r10, r10Fermee", "bridgeTimeM10"),
+            ("d15, s15, r15, r15Fermee", "bridgeTimeM15"),
+            ("d30, s30, r30, r30Fermee", "bridgeTimeM30"),
+            ("d45, s45, r45, r45Fermee", "bridgeTimeM45"),
+            ("d60, s60, r60, r60Fermee", "bridgeTimeH1"),
+            ("d120, s120, r120, r120Fermee", "bridgeTimeH2"),
+            ("d240, s240, r240, r240Fermee", "bridgeTimeH4"),
+            ("dD, sD, rD, rDFermee", "bridgeTimeD1"),
+            ("dW, sW, rW, rWFermee", "bridgeTimeW1"),
+        )
+        for tuple_head, closed_time in tuple_contracts:
+            self.assertIn("[" + tuple_head + ", " + closed_time + "]", self.source)
+            self.assertNotIn(closed_time + " = request.security(", self.source)
+        request_sites = self.source.count("request.security(") + self.source.count("request.security_lower_tf(")
+        self.assertLessEqual(request_sites, 40)
         self.assertIn('bridgeTfSeconds == 180 ? "M3"', self.source)
         self.assertIn('bridgeTfSeconds == 600 ? "M10"', self.source)
         self.assertIn('bridgeTfSeconds == 2700 ? "M45"', self.source)
         export_block = self.source.split(EXPORT_MARKER, 1)[1]
-        expected_m3 = '''"M3":{"direction":' + f_align_v25_json_int(nz(d3Fermee)) + ',"rsi":' + f_align_v25_json_num(r2)'''
-        wrong_m3 = '''"M3":{"direction":' + f_align_v25_json_int(d2) + ',"rsi":' + f_align_v25_json_num(r2)'''
-        self.assertIn(expected_m3, export_block)
-        self.assertNotIn(wrong_m3, export_block)
-        for missing_value_fallback in ("f_align_v25_json_num(nz(r1, 50))", "f_align_v25_json_num(nz(r5, 50))", "f_align_v25_json_num(nz(r15, 50))", "f_align_v25_json_num(nz(r60, 50))", "str.tostring(nz(d1))"):
-            self.assertNotIn(missing_value_fallback, export_block)
+        for timeframe in timeframes:
+            with self.subTest(timeframe=timeframe):
+                marker = '"' + timeframe + '":{"direction":'
+                self.assertIn(marker, export_block)
+                timeframe_block = export_block.split(marker, 1)[1].split("}", 1)[0]
+                closed_rsi = {"M1":"r1Fermee", "M3":"r2Fermee", "M5":"r5Fermee", "M10":"r10Fermee", "M15":"r15Fermee", "M30":"r30Fermee", "M45":"r45Fermee", "H1":"r60Fermee", "H2":"r120Fermee", "H4":"r240Fermee", "D1":"rDFermee", "W1":"rWFermee"}[timeframe]
+                self.assertIn("f_align_v25_json_num(" + closed_rsi + ")", timeframe_block)
+        m3_marker = '"M3":{"direction":'
+        m3_block = export_block.split(m3_marker, 1)[1].split("}", 1)[0]
+        self.assertIn("f_align_v25_json_int(nz(d3Fermee))", m3_block)
+        self.assertNotIn("f_align_v25_json_int(d2)", m3_block)
         self.assertIn('na(v) ? "null" : str.tostring(v)', export_block)
         self.assertIn('na(v) ? "null" : v == 1', export_block)
 
     def test_bridge_bar_timestamps_match_the_closed_mtf_candle(self):
         # The exported direction is based on the previous, fully closed candle.
         # Its bar_time must identify that same candle, not the currently forming one.
-        self.assertIn("[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time_close[1]]", self.source)
+        self.assertIn("[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), ta.rsi(close, lenRsi)[1], time_close[1]]", self.source)
         self.assertNotIn("[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]", self.source)
 
     def test_robot_v12_exports_closed_mtf_directions_for_entry_confirmation(self):
@@ -313,8 +367,8 @@ o1h = d1hStrat == -dP"""
             self.assertNotIn(field + " = request.security", self.source)
         request_sites = self.source.count("request.security(") + self.source.count("request.security_lower_tf(")
         self.assertLessEqual(request_sites, 40)
-        self.assertIn("[d1, s1, r1, bridgeTimeM1]", self.source)
-        self.assertIn("[dW, sW, rW, bridgeTimeW1]", self.source)
+        self.assertIn("[d1, s1, r1, r1Fermee, bridgeTimeM1]", self.source)
+        self.assertIn("[dW, sW, rW, rWFermee, bridgeTimeW1]", self.source)
 
     def test_no_secret_is_embedded_in_pine(self):
         self.assertNotIn("ALIGN_TV_INGEST_TOKEN", self.source)
