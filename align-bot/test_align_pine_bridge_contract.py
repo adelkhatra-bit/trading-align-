@@ -63,11 +63,13 @@ if not tp1Ok
             "ta.rsi(close, lenRsi), time_close[1]",
             1,
         )
-        for closed_rsi in (
-            "r1Fermee", "r2Fermee", "r5Fermee", "r10Fermee", "r15Fermee", "r30Fermee",
-            "r45Fermee", "r60Fermee", "r120Fermee", "r240Fermee", "rDFermee", "rWFermee",
+        for live, closed in (
+            ("r1", "r1Fermee"), ("r2", "r2Fermee"), ("r5", "r5Fermee"),
+            ("r10", "r10Fermee"), ("r15", "r15Fermee"), ("r30", "r30Fermee"),
+            ("r45", "r45Fermee"), ("r60", "r60Fermee"), ("r120", "r120Fermee"),
+            ("r240", "r240Fermee"), ("rD", "rDFermee"), ("rW", "rWFermee"),
         ):
-            without_tp_change = without_tp_change.replace(", " + closed_rsi + ",", ",", 1)
+            without_tp_change = without_tp_change.replace(", " + live + ", " + closed + ",", ", " + live + ",", 1)
         closed_rsi_start = without_tp_change.index("rsisFermees = array.from(")
         closed_rsi_end = without_tp_change.index('d1Fermee = request.security', closed_rsi_start)
         without_tp_change = without_tp_change[:closed_rsi_start] + without_tp_change[closed_rsi_end:]
