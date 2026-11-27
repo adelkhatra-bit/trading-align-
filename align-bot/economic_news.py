@@ -188,8 +188,10 @@ def normaliser_evenement(raw, retrieved_at):
         "previous": previous,
         "actual": actual or None,
         "actual_source": CALENDAR_SOURCE if actual else None,
+        "actual_verified_officially": False,
         "actual_first_seen_at": int(retrieved_at) if actual else None,
         "published_at": published_ts,
+        "published_at_source": CALENDAR_SOURCE if published_ts is not None else None,
         "published_at_paris": (
             dt.datetime.fromtimestamp(published_ts, PARIS).isoformat()
             if published_ts is not None else None
@@ -257,7 +259,7 @@ def facts_line(event):
     forecast = _clean(forecast_raw, 100)
     previous = _clean(previous_raw, 100)
     if actual:
-        line = f"📌 Valeur reçue du calendrier agrégé: {actual}"
+        line = f"📌 Valeur reçue du calendrier agrégé (non vérifiée directement auprès de l’organisme): {actual}"
     else:
         line = "📌 Valeur publiée: non reçue dans le flux au moment du contrôle; aucun chiffre n'est inventé."
     if forecast:
