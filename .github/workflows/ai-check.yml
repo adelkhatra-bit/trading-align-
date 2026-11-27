@@ -24,7 +24,6 @@ jobs:
         with:
           sparse-checkout: align-bot
       - name: Contrôle IA réel (même chaîne que le bot)
-        continue-on-error: true
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
