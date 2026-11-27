@@ -151,14 +151,22 @@ def normaliser_evenement(raw, retrieved_at):
     official = _official_source(title)
     event_utc = dt.datetime.fromtimestamp(event_ts, UTC)
     event_paris = event_utc.astimezone(PARIS)
+    # updated_at décrit la mise à jour de la fiche calendrier, pas la publication économique.
+    # Ne jamais le présenter comme l'heure réelle de publication de la statistique.
     published_value = next(
         (raw.get(key) for key in (
             "published_at", "publishedAt", "publication_time", "publicationTime",
-            "pubDate", "updated_at", "updatedAt",
+            "pubDate", "datePublished",
         ) if raw.get(key) not in (None, "")),
         None,
     )
     published_ts = _timestamp(published_value)
+    updated_value = next(
+        (raw.get(key) for key in ("updated_at", "updatedAt", "last_updated", "lastUpdated")
+         if raw.get(key) not in (None, "")),
+        None,
+    )
+    updated_ts = _timestamp(updated_value)
     actual_raw = next(
         (raw.get(key) for key in ("actual", "actualValue", "result")
          if raw.get(key) not in (None, "")),
@@ -196,6 +204,11 @@ def normaliser_evenement(raw, retrieved_at):
         "published_at_paris": (
             dt.datetime.fromtimestamp(published_ts, PARIS).isoformat()
             if published_ts is not None else None
+        ),
+        "source_updated_at": updated_ts,
+        "source_updated_at_paris": (
+            dt.datetime.fromtimestamp(updated_ts, PARIS).isoformat()
+            if updated_ts is not None else None
         ),
         "source_name": CALENDAR_SOURCE,
         "source_url": CALENDAR_URL,
