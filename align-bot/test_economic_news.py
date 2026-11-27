@@ -109,7 +109,7 @@ class EconomicNewsBotIntegrationTest(unittest.TestCase):
         self.assertIn("Prelim Wholesale Inventories m/m", watch_titles)
         self.assertTrue(ab.calendrier_connu(state, self.now))
         self.assertEqual(state["cal"]["source_url"], news.CALENDAR_URL)
-        self.assertEqual(state["cal"]["schema"], 2)
+        self.assertEqual(state["cal"]["schema"], 3)
 
     def test_low_impact_watch_does_not_trigger_the_automatic_entry_pause(self):
         low = news.normaliser_evenement({"title": "Goods Trade Balance", "country": "USD", "date": dt.datetime.fromtimestamp(self.now, dt.timezone.utc).isoformat(), "impact": "Low"}, self.now)
@@ -125,6 +125,13 @@ class EconomicNewsBotIntegrationTest(unittest.TestCase):
             ab.calendrier(state, self.now)
         self.assertFalse(ab.calendrier_connu(state, self.now))
         self.assertEqual(state["cal"]["erreur"]["type"], "RuntimeError")
+
+    def test_watch_tier_also_drives_five_minute_refresh_near_release(self):
+        state = {"cal": {"schema": 3, "t": self.now - 301, "ev": [], "veille": [{"t": self.now + 90 * 60, "titre": "Goods Trade Balance"}]}}
+        with mock.patch.object(ab, "http_json", return_value=[] ) as fetch:
+            ab.calendrier(state, self.now)
+        fetch.assert_called_once()
+        self.assertEqual(state["cal"]["t"], self.now)
 
     def test_unknown_calendar_never_claims_there_are_no_announcements(self):
         hours_a, hours_b = self._patch_market_hours()
