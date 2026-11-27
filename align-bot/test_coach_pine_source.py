@@ -252,7 +252,7 @@ class CoachPineSourceTests(unittest.TestCase):
             )
         self.assertIn("🟢 PLAN D'ENTRÉE — COACH ALIGN", message)
         self.assertIn("🏷️ PROFIL : INTRADAY • DÉCLENCHEMENT M5", message)
-        self.assertIn("SIGNAL CONFIRMÉ — EXÉCUTION MANUELLE", message)
+        self.assertIn("ENTRÉE AUTORISÉE — EXÉCUTION MANUELLE", message)
         self.assertLess(message.index("📍 Entrée :"), message.index("🛑 SL :"))
 
     def test_late_entry_guard_requires_price_inside_original_pine_zone(self):
