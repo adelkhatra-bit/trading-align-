@@ -120,7 +120,7 @@ class EconomicNewsBotIntegrationTest(unittest.TestCase):
         self.assertTrue(ab.annonce_proche(state_high, self.now))
 
     def test_failed_refresh_after_success_marks_calendar_unknown(self):
-        state = {"cal": {"schema": 2, "t": self.now - 301, "ev": [{"t": self.now + 3600, "titre": "CPI"}]}}
+        state = {"cal": {"schema": 3, "t": self.now - 301, "ev": [{"t": self.now + 3600, "titre": "CPI"}], "veille": []}}
         with mock.patch.object(ab, "http_json", side_effect=RuntimeError("offline")):
             ab.calendrier(state, self.now)
         self.assertFalse(ab.calendrier_connu(state, self.now))
