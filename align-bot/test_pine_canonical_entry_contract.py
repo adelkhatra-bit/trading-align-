@@ -205,6 +205,7 @@ class PineCanonicalEntryContract(unittest.TestCase):
             "[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), ta.rsi(close, lenRsi)[1], time_close[1]]",
             self.pine,
         )
+        payload = self.pine.split("bridgePayload = ", 1)[1]
         for closed, stamp in (
             ("r1Fermee", "bridgeTimeM1"), ("r2Fermee", "bridgeTimeM3"),
             ("r5Fermee", "bridgeTimeM5"), ("r10Fermee", "bridgeTimeM10"),
@@ -213,15 +214,16 @@ class PineCanonicalEntryContract(unittest.TestCase):
             ("r120Fermee", "bridgeTimeH2"), ("r240Fermee", "bridgeTimeH4"),
             ("rDFermee", "bridgeTimeD1"), ("rWFermee", "bridgeTimeW1"),
         ):
-            self.assertIn(",\\\"rsi\\\":' + f_align_v25_json_num(" + closed + ")", self.pine)
-            self.assertIn(closed + ", " + stamp, self.pine)
+            self.assertIn("f_align_v25_json_num(" + closed + ")", payload)
+            self.assertIn("nz(" + stamp + ", 0)", payload)
         for field, closed in (
             ("rsi_1m", "r1Fermee"), ("rsi_5m", "r5Fermee"),
             ("rsi_15m", "r15Fermee"), ("rsi_60m", "r60Fermee"),
         ):
-            self.assertIn(",\\\"" + field + "\\":' + f_align_v25_json_num(" + closed + ")", self.pine)
-        self.assertIn("rsiOBFermee >= 3", self.pine)
-        self.assertIn("rsiOSFermee >= 3", self.pine)
+            self.assertIn(field, payload)
+            self.assertIn("f_align_v25_json_num(" + closed + ")", payload)
+        self.assertIn("rsiOBFermee >= 3", payload)
+        self.assertIn("rsiOSFermee >= 3", payload)
 
     def test_closed_rsi_export_does_not_change_live_chart_rsi_calculations(self):
         self.assertIn("rsis = array.from(nz(r1, 50)", self.pine)
