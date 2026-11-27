@@ -11590,8 +11590,8 @@ def calendrier_connu(etat, maintenant):
 
 
 def annonce_proche(etat, maintenant):
-    """Vrai si une annonce est à ±15 min, OU si le calendrier est inconnu (jamais lu ou trop ancien).
-    Règle d'Adel : zéro signal plutôt qu'un mauvais signal — « inconnu » n'est jamais « aucune news »."""
+    """Bloque à ±15 min des annonces High/Medium, ou si le calendrier est inconnu.
+    Les annonces Low pertinentes sont surveillées sans blocage automatique. « Inconnu » n'est jamais « aucune news »."""
     if not calendrier_connu(etat, maintenant):
         return True
     return any(abs(e["t"] - maintenant) <= 15 * 60 for e in etat.get("cal", {}).get("ev", []))
