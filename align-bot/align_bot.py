@@ -7402,7 +7402,9 @@ def flash_commentateur(m, r, cle):
     if abs(move) >= 0.5 * a:
         return "\n".join(["🎙 ÇA BOUGE !", f"{ICONE.get(m, '')} {m} : {px(p)}",
                           ("🔴 Les vendeurs accélèrent" if move < 0 else "🟢 Les acheteurs accélèrent"),
-                          f"📏 {'-' if move < 0 else '+'}{px(abs(move))} en 3 min"] + ligne_pos)
+                          f"📏 {'-' if move < 0 else '+'}{px(abs(move))} en 3 min",
+                          ligne_mtf,
+                          "ℹ️ Mouvement observé, pas une entrée : attendre la clôture M15"] + ligne_pos)
     b15 = (r.get("b15") or [])[-1:]
     if b15:
         x = b15[0]; rng = x["h"] - x["l"]
