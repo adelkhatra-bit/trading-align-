@@ -4409,6 +4409,48 @@ class PineOnlyEntryGateTests(unittest.TestCase):
         self.assertIs(state["trade"], trade)
 
 
+    def test_coach_progress_is_personalized_for_each_subscriber_entry(self):
+        from unittest.mock import patch
+        r = self._market(current_price=103.0)
+        r["require_tv_bridge"] = True
+        r["m1"][-1]["c"] = 99.25  # local feed differs from TradingView
+        trade = {
+            "d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0,
+            "statut": "entree",
+            "qui": {
+                "user-one": {"d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0},
+                "user-two": {"d": 1, "e": 102.0, "sl": 99.0, "tp1": 104.0},
+            }
+        }
+        state = {"cal": {"ev": []}}
+        with patch.object(align_bot, "gerer_stop"), \
+             patch.object(align_bot, "_telegram_envoyer_commentaire_coach_prive") as send:
+            align_bot.coach(state, "BTC", r, {"trade": trade})
+        messages = {call.args[1]: call.args[3] for call in send.call_args_list}
+        self.assertIn("Tiens bon, presque arrivé", messages["user-one"])
+        self.assertIn("Ça part dans le bon sens", messages["user-two"])
+        self.assertIn("presqueentree", trade["qui"]["user-one"]["coach"])
+        self.assertIn("bon", trade["qui"]["user-two"]["coach"])
+
+    def test_personal_break_even_uses_each_users_actual_entry_after_pine_tp1(self):
+        from unittest.mock import patch
+        r = self._market(current_price=104.5)
+        r["require_tv_bridge"] = True
+        r["m1"][-1]["c"] = 99.25
+        pos = {"d": 1, "e": 101.25, "sl": 98.0, "tp1": 104.0}
+        trade = {
+            "d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0,
+            "statut": "tp1", "qui": {"user-one": pos}
+        }
+        with patch.object(align_bot, "gerer_stop"), \
+             patch.object(align_bot, "_telegram_envoyer_commentaire_coach_prive") as send:
+            align_bot.coach({"cal": {"ev": []}}, "BTC", r, {"trade": trade})
+        self.assertEqual(pos["sl"], 101.25)
+        self.assertTrue(pos["be_notified"])
+        self.assertIn("stop de suivi est remonté à ton entrée", send.call_args.args[3])
+        self.assertIn("101,25", send.call_args.args[3])
+
+
 class TelegramTp1Tp2BridgeTests(unittest.TestCase):
     def _snapshot(self, robot, timeframe="M15"):
         robot = dict(robot)
