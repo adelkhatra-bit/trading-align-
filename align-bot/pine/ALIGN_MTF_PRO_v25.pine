@@ -38,39 +38,27 @@ f_etat() =>
     sqz = (basis + dev) < (kc + rng) and (basis - dev) > (kc - rng)
     [d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]
 
-[d1, s1, r1, bridgeTimeM1]       = request.security(syminfo.tickerid, "1",   f_etat())
-[d2, s2, r2, bridgeTimeM3]       = request.security(syminfo.tickerid, "3",   f_etat())
-[d5, s5, r5, bridgeTimeM5]       = request.security(syminfo.tickerid, "5",   f_etat())
-[d10, s10, r10, bridgeTimeM10]   = request.security(syminfo.tickerid, "10",  f_etat())
-[d15, s15, r15, bridgeTimeM15]   = request.security(syminfo.tickerid, "15",  f_etat())
-[d30, s30, r30, bridgeTimeM30]   = request.security(syminfo.tickerid, "30",  f_etat())
-[d45, s45, r45, bridgeTimeM45]   = request.security(syminfo.tickerid, "45",  f_etat())
-[d60, s60, r60, bridgeTimeH1]    = request.security(syminfo.tickerid, "60",  f_etat())
-[d120, s120, r120, bridgeTimeH2] = request.security(syminfo.tickerid, "120", f_etat())
-[d240, s240, r240, bridgeTimeH4] = request.security(syminfo.tickerid, "240", f_etat())
-[dD, sD, rD, bridgeTimeD1]       = request.security(syminfo.tickerid, "D",   f_etat())
-[dW, sW, rW, bridgeTimeW1]       = request.security(syminfo.tickerid, "W",   f_etat())
-
 // Sens confirmé : la valeur est décalée d'une bougie HTF et publiée avec lookahead_on.
 // Cela évite d'utiliser une H1/H4/M15/M5 encore en formation pour autoriser une entrée.
 f_dir_confirme() =>
     ef = ta.ema(close, lenFast)
     es = ta.ema(close, lenSlow)
     d = close > ef and ef > es ? 1 : close < ef and ef < es ? -1 : 0
-    d[1]
+    [d[1], time_close[1]]
 
-d1Fermee   = request.security(syminfo.tickerid, "1",   f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d3Fermee   = request.security(syminfo.tickerid, "3",   f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d5Fermee   = request.security(syminfo.tickerid, "5",   f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d10Fermee  = request.security(syminfo.tickerid, "10",  f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d15Fermee  = request.security(syminfo.tickerid, "15",  f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d30Fermee  = request.security(syminfo.tickerid, "30",  f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d45Fermee  = request.security(syminfo.tickerid, "45",  f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d60Fermee  = request.security(syminfo.tickerid, "60",  f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d120Fermee = request.security(syminfo.tickerid, "120", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d240Fermee = request.security(syminfo.tickerid, "240", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-dDFermee   = request.security(syminfo.tickerid, "D",   f_dir_confirme(), lookahead=barmerge.lookahead_on)
-dWFermee   = request.security(syminfo.tickerid, "W",   f_dir_confirme(), lookahead=barmerge.lookahead_on)
+// Contrat MTF canonique : direction ET horodatage de la dernière bougie clôturée pour les 11 UT.
+[d1Fermee, bridgeTimeM1] = request.security(syminfo.tickerid, "1", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+[d3Fermee, bridgeTimeM3] = request.security(syminfo.tickerid, "3", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+[d5Fermee, bridgeTimeM5] = request.security(syminfo.tickerid, "5", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+[d10Fermee, bridgeTimeM10] = request.security(syminfo.tickerid, "10", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+[d15Fermee, bridgeTimeM15] = request.security(syminfo.tickerid, "15", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+[d30Fermee, bridgeTimeM30] = request.security(syminfo.tickerid, "30", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+[d45Fermee, bridgeTimeM45] = request.security(syminfo.tickerid, "45", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+[d60Fermee, bridgeTimeH1] = request.security(syminfo.tickerid, "60", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+[d120Fermee, bridgeTimeH2] = request.security(syminfo.tickerid, "120", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+[d240Fermee, bridgeTimeH4] = request.security(syminfo.tickerid, "240", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+[dDFermee, bridgeTimeD1] = request.security(syminfo.tickerid, "D", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+[dWFermee, bridgeTimeW1] = request.security(syminfo.tickerid, "W", f_dir_confirme(), lookahead=barmerge.lookahead_on)
 noms  = array.from("1", "3", "5", "10", "15", "30", "45", "1h", "2h", "4h", "D")
 nomsL = array.from("1 min", "3 min", "5 min", "10 min", "15 min", "30 min", "45 min", "1 heure", "2 heures", "4 heures", "Daily")
 dirs = array.from(nz(d1), nz(d2), nz(d5), nz(d10), nz(d15), nz(d30), nz(d45), nz(d60), nz(d120), nz(d240), nz(dD))
@@ -386,6 +374,8 @@ bridgePlanGeometryOk = dirPlan == 1 ? (
 ) : dirPlan == -1 ? (
      tp1 < zBas and ent >= zBas and ent <= zHaut and sl > zHaut and tp2 < tp1
 ) : false
+planClosedMtfOkUi = strat == "SWING" ? (nz(dDFermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) != -dirPlan and nz(dWFermee) != -dirPlan) : strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d240Fermee) != -dirPlan) : strat == "SCALPING" ? (nz(d60Fermee) != -dirPlan and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan) : false
+planConfirmedUi = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and planRiskRewardOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2) and etatS == "CONFIRMÉ" and scoreV >= 75 and planClosedMtfOkUi
 
 
 // ═════════ SIGNAUX ═════════
@@ -455,7 +445,7 @@ if barstate.islast
     label.delete(eTP1)
     label.delete(eTP2)
     label.delete(eSL)
-    if voirPlan and dirPlan != 0
+    if voirPlan and planConfirmedUi
         x1 = bar_index - 25
         x2 = bar_index + 3
         lTP1 := line.new(x1, tp1, x2, tp1, color=color.aqua, width=2, extend=extend.right)
@@ -509,8 +499,7 @@ if barstate.islast
         table.cell(t, i, 0, array.get(noms, i), width=largCol, bgcolor=rv >= 70 ?  color.rgb(120, 20, 30) : rv <= 30 ?  color.rgb(0, 90, 50) :  color.rgb(30, 34, 45), text_color=rv >= 70 or rv <= 30 ?  color.white :  color.gray, text_size=size.small, tooltip=tip)
         table.cell(t, i, 1, sym, width=largCol, bgcolor=bg, text_color= color.white, text_size=size.normal, tooltip=tip)
 // État de confirmation calculé pour l'affichage ; les champs d'export restent dans le bloc bridge canonique.
-planClosedMtfOkUi = strat == "SWING" ? (nz(dDFermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) != -dirPlan and nz(dWFermee) != -dirPlan) : strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d240Fermee) != -dirPlan) : strat == "SCALPING" ? (nz(d60Fermee) != -dirPlan and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan) : false
-planConfirmedUi = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and planRiskRewardOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2) and etatS == "CONFIRMÉ" and scoreV >= 75 and planClosedMtfOkUi
+
     titre = zoneBas ? "RETOURNEMENT ▼" : zoneHaut ? "REBOND ▲" : fortHaut ? "★ ACHAT FORT" : fortBas ? "★ VENTE FORTE" : retHaut ? "RETOURNEMENT ▲" : retBas ? "RETOURNEMENT ▼" : rsiOB >= 3 ? "RSI SURACHAT " + str.tostring(rsiOB) + "/11" : rsiOS >= 3 ? "RSI SURVENTE " + str.tostring(rsiOS) + "/11" : surcharge ? "⚡ SURCHARGE" : sens == 1 ? "HAUSSE" : sens == -1 ? "BAISSE" : "ATTENDRE"
     statutPlan = planConfirmedUi ? (dirPlan == 1 ? "▲ PLAN LONG VALIDÉ — ATTENTE ENTRÉE" : "▼ PLAN SHORT VALIDÉ — ATTENTE ENTRÉE") : strat != "" and dirPlan != 0 ? (dirPlan == 1 ? "⏳ BIAIS LONG — EN ATTENTE" : "⏳ BIAIS SHORT — EN ATTENTE") : "ATTENDRE • AUCUNE STRATÉGIE"
     ligne = (retDir != 0 and not retConf ? "↩ RETOURNEMENT  " : nVoy >= 3 ? "↩ " + str.tostring(nVoy) + "/5  " : "") + statutPlan + (planConfirmedUi ? " • " + (strat == "SCALPING" ? "SCALP" : strat) + " • TP " + px(tp1) + " • SL " + px(sl) : strat != "" and dirPlan != 0 ? " • " + strat + " • confirmation requise" : "   " + titre)
@@ -616,7 +605,7 @@ if not tp1Ok and dirPlan != 0 and not na(tp1M) and
      ((dirPlan == 1 and high >= tp1M) or (dirPlan == -1 and low <= tp1M))
     tp1Ok := true
 // Les deux objectifs restent visibles dès qu'un plan existe. Après TP1, l'option accentue TP2 sans recréer de lignes superposées.
-if barstate.islast and voirTP2 and tp1Ok and voirPlan and dirPlan != 0
+if barstate.islast and voirTP2 and tp1Ok and voirPlan and planConfirmedUi
     if not na(lTP1)
         line.set_color(lTP1, color.lime)
     if not na(lTP2)
@@ -639,7 +628,7 @@ if barstate.islast
     label.delete(eRet)
     line.delete(lConf)
     label.delete(eConf)
-    if voirPlan and dirPlan != 0 and not na(sl) and not na(ent)
+    if voirPlan and planConfirmedUi and not na(sl) and not na(ent)
         lRet := line.new(bar_index, sl, bar_index + 30, sl, color= color.new(color.white, 30), style=line.style_dotted, width=1)
         eRet := label.new(bar_index + 30, sl, "↩ RETOURNEMENT", style=label.style_label_left, color= color.rgb(30, 34, 45), textcolor= color.white, size=size.small, tooltip="↩ LIGNE DE RETOURNEMENT : " + px(sl) + "\n\nSi une bougie " + (strat == "SWING" ? "1h" : strat == "DAY" ? "5 min" : strat == "SCALPING" ? "1 min" : "15 min") + " CLÔTURE " + (dirPlan == -1 ? "AU-DESSUS" : "EN DESSOUS") + " de cette ligne :\n⛔ le " + (dirPlan == -1 ? "SHORT" : "LONG") + " est annulé\n↩ retournement possible vers le " + (dirPlan == -1 ? "LONG" : "SHORT") + "\n\nEntrée dans l'autre sens SEULEMENT si le 15 min et la 1h confirment\n(et les unités de la stratégie SWING / DAY / SCALP)\n\n⏱ Prochaine clôture " + (strat == "SWING" ? "1h" : strat == "DAY" ? "5 min" : strat == "SCALPING" ? "1 min" : "15 min") + " dans " + f_mmss(f_reste((strat == "SWING" ? 60 : strat == "DAY" ? 5 : strat == "SCALPING" ? 1 : 15))) + (retTxt != "" ? "\n\n" + retTxt : ""))
         lConf := line.new(bar_index, ent, bar_index + 30, ent, color= color.new(color.white, 30), style=line.style_dotted, width=1)
