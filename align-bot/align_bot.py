@@ -8357,6 +8357,8 @@ def traiter(etat, chats, updates):
                     pass
                 continue
             if choix == "searchpos" and mk == "BOTH":
+                # Une réponse à la sollicitation quotidienne vaut réponse pour toute la journée.
+                etat.setdefault("reponse_jour", {})[qui] = datetime.datetime.now(PARIS).strftime("%Y-%m-%d")
                 marches_recherche = demarrer_recherche_positions(etat, qui)
                 if not marches_recherche:
                     try:
@@ -15156,10 +15158,12 @@ def question_quotidienne(etat, chats, now=None, creneau=None):
                for m in MARCHES):
             continue
         clavier = json.dumps({"inline_keyboard": [
-            [{"text": "✅ Oui, je trade", "callback_data": "trade:yes"}],
-            [{"text": "❌ Non, pas aujourd'hui", "callback_data": "trade:no"}]
+            [{"text": "🔎 Search the coach", "callback_data": "searchpos:BOTH"}] if cid in LANG_EN else
+             [{"text": "🔎 Rechercher le coach", "callback_data": "searchpos:BOTH"}],
+            [{"text": "❌ Not today", "callback_data": "trade:no"}] if cid in LANG_EN else
+             [{"text": "❌ Pas aujourd'hui", "callback_data": "trade:no"}]
         ]})
-        texte = "Are you trading today?" if cid in LANG_EN else "Vas-tu trader aujourd'hui ?"
+        texte = "Are you around? Planning to trade today?" if cid in LANG_EN else "Tu es là ? Tu comptes trader aujourd'hui ?"
         resultat = _envoi_sur(cid, text=texte, reply_markup=clavier)
         if isinstance(resultat, dict) and resultat.get("ok") is True:
             deja[cid] = cle_jour
