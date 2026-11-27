@@ -42,7 +42,7 @@ TradingView · Pine v25 · 2 alertes (BTCUSD et XAUUSD)
   → bande live (texte, animations, voix)
 ```
 
-Le script compagnon `ALIGN_MTF_PRO_v24.pine` peut rester chargé sur le graphique pour ses visuels de clôture de bougie. Il ne fait pas partie de la chaîne de données : aucune alerte sortante, aucun webhook, aucun bridge et aucune lecture par ROBOT V12. Le v25 reste l'unique source des snapshots et décisions transmises au BOT.
+Le script compagnon `ALIGN_MTF_PRO_v24.pine` peut rester chargé sur le graphique pour ses visuels de clôture de bougie. Il ne fait pas partie de la chaîne de données : aucune alerte sortante, aucun webhook, aucun bridge et aucune lecture par ROBOT V12. Son tableau MTF reprend les directions clôturées du v25 et signale séparément les divergences en formation. Ses niveaux Entry/SL/TP, zones Fibonacci et signaux indépendants sont désactivés par défaut pour éviter un second plan concurrent. Le v25 reste l'unique source des snapshots et décisions transmises au BOT.
 
 Le bridge Python est éphémère dans le runner du workflow : **4100 n'est pas un service permanent du PC** et ne doit pas être exposé par un tunnel public. Le Worker ne remplace pas le bridge : il transporte et conserve le JSON brut. Le feeder le transmet sans compléter ni réécrire ses champs ; `BridgeStore` dans `align_tv_bridge.py` est l'unique validateur MTF.
 
@@ -89,9 +89,10 @@ Règle : quand `ALIGN_REQUIRE_TV_BRIDGE=1`, **aucun repli** sur des niveaux calc
 - Le **plan** (Entry / SL / TP1 / TP2) est calculé sur **M15 clôturé**.
 - Le **déclencheur** dépend de la stratégie : SCALPING = M1, DAY = M5, SWING = H1.
 - Un même timeframe ne doit avoir **qu'une seule** direction dans un message.
-  Écart connu à corriger (non encore prouvé en direct) : dans le payload bridge du v25,
-  `lecture_5m` / `lecture_15m` utilisent la bougie clôturée (`d5Fermee`, `d15Fermee`)
-  alors que `mtf.M5` / `mtf.M15` utilisent `d5Strat` / `d15Strat`, la bougie courante pour BTC.
+  Correctif en PR #1131 : le tableau v25 affiche les directions des 11 dernières bougies clôturées
+  et indique séparément le sens de la bougie en formation. Les 12 directions du payload bridge,
+  leurs horodatages de clôture et les compteurs macro sont calculés sur les dernières clôtures ;
+  aucune direction MTF en formation n'est présentée comme une confirmation Telegram.
 - Un TP déjà touché ne redevient jamais un objectif ; un signal dont le SL est dépassé n'est jamais réémis.
 
 ## 4. Fusion : qui peut fusionner quoi

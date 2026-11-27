@@ -38,6 +38,19 @@ f_etat() =>
     sqz = (basis + dev) < (kc + rng) and (basis - dev) > (kc - rng)
     [d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]
 
+[d1, s1, r1, bridgeTimeM1]       = request.security(syminfo.tickerid, "1",   f_etat())
+[d2, s2, r2, bridgeTimeM3]       = request.security(syminfo.tickerid, "3",   f_etat())
+[d5, s5, r5, bridgeTimeM5]       = request.security(syminfo.tickerid, "5",   f_etat())
+[d10, s10, r10, bridgeTimeM10]   = request.security(syminfo.tickerid, "10",  f_etat())
+[d15, s15, r15, bridgeTimeM15]   = request.security(syminfo.tickerid, "15",  f_etat())
+[d30, s30, r30, bridgeTimeM30]   = request.security(syminfo.tickerid, "30",  f_etat())
+[d45, s45, r45, bridgeTimeM45]   = request.security(syminfo.tickerid, "45",  f_etat())
+[d60, s60, r60, bridgeTimeH1]    = request.security(syminfo.tickerid, "60",  f_etat())
+[d120, s120, r120, bridgeTimeH2] = request.security(syminfo.tickerid, "120", f_etat())
+[d240, s240, r240, bridgeTimeH4] = request.security(syminfo.tickerid, "240", f_etat())
+[dD, sD, rD, bridgeTimeD1]       = request.security(syminfo.tickerid, "D",   f_etat())
+[dW, sW, rW, bridgeTimeW1]       = request.security(syminfo.tickerid, "W",   f_etat())
+
 // Sens confirmé : la valeur est décalée d'une bougie HTF et publiée avec lookahead_on.
 // Cela évite d'utiliser une H1/H4/M15/M5 encore en formation pour autoriser une entrée.
 f_dir_confirme() =>
@@ -46,29 +59,29 @@ f_dir_confirme() =>
     d = close > ef and ef > es ? 1 : close < ef and ef < es ? -1 : 0
     d[1]
 
-[d1, s1, r1, bridgeTimeM1]       = request.security(syminfo.tickerid, "1",   f_etat())
-[d2, s2, r2, bridgeTimeM3]       = request.security(syminfo.tickerid, "3",   f_etat())
-[d5, s5, r5, bridgeTimeM5]       = request.security(syminfo.tickerid, "5",   f_etat())
-[d10, s10, r10, bridgeTimeM10]    = request.security(syminfo.tickerid, "10",  f_etat())
-[d15, s15, r15, bridgeTimeM15]    = request.security(syminfo.tickerid, "15",  f_etat())
-[d30, s30, r30, bridgeTimeM30]    = request.security(syminfo.tickerid, "30",  f_etat())
-[d45, s45, r45, bridgeTimeM45]    = request.security(syminfo.tickerid, "45",  f_etat())
-[d60, s60, r60, bridgeTimeH1]    = request.security(syminfo.tickerid, "60",  f_etat())
-[d120, s120, r120, bridgeTimeH2] = request.security(syminfo.tickerid, "120", f_etat())
-[d240, s240, r240, bridgeTimeH4] = request.security(syminfo.tickerid, "240", f_etat())
-[dD, sD, rD, bridgeTimeD1]       = request.security(syminfo.tickerid, "D",   f_etat())
-[dW, sW, rW, bridgeTimeW1]       = request.security(syminfo.tickerid, "W",   f_etat())
-d1Fermee   = request.security(syminfo.tickerid, "1",   f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d5Fermee   = request.security(syminfo.tickerid, "5",   f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d15Fermee  = request.security(syminfo.tickerid, "15",  f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d60Fermee  = request.security(syminfo.tickerid, "60",  f_dir_confirme(), lookahead=barmerge.lookahead_on)
+// Contrat MTF canonique : directions des 11 dernières bougies clôturées.
+d1Fermee = request.security(syminfo.tickerid, "1", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d3Fermee = request.security(syminfo.tickerid, "3", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d5Fermee = request.security(syminfo.tickerid, "5", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d10Fermee = request.security(syminfo.tickerid, "10", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d15Fermee = request.security(syminfo.tickerid, "15", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d30Fermee = request.security(syminfo.tickerid, "30", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d45Fermee = request.security(syminfo.tickerid, "45", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d60Fermee = request.security(syminfo.tickerid, "60", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d120Fermee = request.security(syminfo.tickerid, "120", f_dir_confirme(), lookahead=barmerge.lookahead_on)
 d240Fermee = request.security(syminfo.tickerid, "240", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-dDFermee   = request.security(syminfo.tickerid, "D",   f_dir_confirme(), lookahead=barmerge.lookahead_on)
-dWFermee   = request.security(syminfo.tickerid, "W",   f_dir_confirme(), lookahead=barmerge.lookahead_on)
-
+dDFermee = request.security(syminfo.tickerid, "D", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+dWFermee = request.security(syminfo.tickerid, "W", f_dir_confirme(), lookahead=barmerge.lookahead_on)
 noms  = array.from("1", "3", "5", "10", "15", "30", "45", "1h", "2h", "4h", "D")
 nomsL = array.from("1 min", "3 min", "5 min", "10 min", "15 min", "30 min", "45 min", "1 heure", "2 heures", "4 heures", "Daily")
 dirs = array.from(nz(d1), nz(d2), nz(d5), nz(d10), nz(d15), nz(d30), nz(d45), nz(d60), nz(d120), nz(d240), nz(dD))
+dirsFermees = array.from(nz(d1Fermee), nz(d3Fermee), nz(d5Fermee), nz(d10Fermee), nz(d15Fermee), nz(d30Fermee), nz(d45Fermee), nz(d60Fermee), nz(d120Fermee), nz(d240Fermee), nz(dDFermee))
+int bullFermee = 0
+int bearFermee = 0
+for i = 0 to 10
+    dFermee = array.get(dirsFermees, i)
+    bullFermee += dFermee == 1 ? 1 : 0
+    bearFermee += dFermee == -1 ? 1 : 0
 sqzs = array.from(nz(s1), nz(s2), nz(s5), nz(s10), nz(s15), nz(s30), nz(s45), nz(s60), nz(s120), nz(s240), nz(sD))
 rsis = array.from(nz(r1, 50), nz(r2, 50), nz(r5, 50), nz(r10, 50), nz(r15, 50), nz(r30, 50), nz(r45, 50), nz(r60, 50), nz(r120, 50), nz(r240, 50), nz(rD, 50))
 wts  = array.from(1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 3.0, 3.0, 4.0, 5.0)
@@ -374,6 +387,8 @@ bridgePlanGeometryOk = dirPlan == 1 ? (
 ) : dirPlan == -1 ? (
      tp1 < zBas and ent >= zBas and ent <= zHaut and sl > zHaut and tp2 < tp1
 ) : false
+planClosedMtfOkUi = strat == "SWING" ? (nz(dDFermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) != -dirPlan and nz(dWFermee) != -dirPlan) : strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d240Fermee) != -dirPlan) : strat == "SCALPING" ? (nz(d60Fermee) != -dirPlan and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan) : false
+planConfirmedUi = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and planRiskRewardOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2) and etatS == "CONFIRMÉ" and scoreV >= 75 and planClosedMtfOkUi
 
 
 // ═════════ SIGNAUX ═════════
@@ -443,7 +458,7 @@ if barstate.islast
     label.delete(eTP1)
     label.delete(eTP2)
     label.delete(eSL)
-    if voirPlan and dirPlan != 0
+    if voirPlan and planConfirmedUi
         x1 = bar_index - 25
         x2 = bar_index + 3
         lTP1 := line.new(x1, tp1, x2, tp1, color=color.aqua, width=2, extend=extend.right)
@@ -478,25 +493,26 @@ clignote = animer and tick % 2 == 0
 if barstate.islast
     int nVoy = 0
     for k = 0 to 4
-        nVoy += dirPlan != 0 and array.get(dirs, k) == -dirPlan ? 1 : 0
+        nVoy += dirPlan != 0 and array.get(dirsFermees, k) == -dirPlan ? 1 : 0
     for i = 0 to 10
-        dv = array.get(dirs, i)
+        dvLive = array.get(dirs, i)
+        dv = array.get(dirsFermees, i)
         sq = array.get(sqzs, i) == 1
         rv = array.get(rsis, i)
         bg = sq ?  color.rgb(230, 130, 0) : dv == 1 ?  color.rgb(0, 140, 70) : dv == -1 ?  color.rgb(190, 30, 45) :  color.rgb(90, 90, 90)
-        sym = (dv == 1 ? "▲" : dv == -1 ? "▼" : "—") + (rv >= 70 ? "!" : rv <= 30 ? "!" : "") + (dirPlan != 0 and dv == -dirPlan and i <= 4 ? "↩" : "")
+        sym = (dv == 1 ? "▲" : dv == -1 ? "▼" : "—") + (rv >= 70 ? "!" : rv <= 30 ? "!" : "") + (dirPlan != 0 and dv == -dirPlan and i <= 4 ? "↩" : "") + (dvLive != dv ? "~" : "")
         roleUT = array.get(array.from("déclenchement SCALP", "timing très court", "déclenchement DAY • structure SCALP", "préparation", "direction SCALP • retracement DAY", "intermédiaire", "intermédiaire", "contexte SCALP • direction DAY • confirmation SWING", "intermédiaire", "contexte DAY • retracement SWING", "direction SWING"), i)
         minUT = array.get(array.from(1, 3, 5, 10, 15, 30, 45, 60, 120, 240, 0), i)
         sensUT = dv == 1 ? "HAUSSE ▲" : dv == -1 ? "BAISSE ▼" : "NEUTRE —"
+        sensLive = dvLive == 1 ? "HAUSSE ▲" : dvLive == -1 ? "BAISSE ▼" : "NEUTRE —"
         tendUT = dv == 1 ? "prix au-dessus de l'EMA 20, EMA 20 au-dessus de l'EMA 50" : dv == -1 ? "prix sous l'EMA 20, EMA 20 sous l'EMA 50" : "prix entre les moyennes : pas de sens net"
         rsiUT = rv >= 70 ? "SURACHAT (risque de baisse)" : rv <= 30 ? "SURVENTE (risque de rebond)" : rv >= 55 ? "acheteurs plus forts" : rv <= 45 ? "vendeurs plus forts" : "équilibré"
         planUT = dirPlan == 0 ? "pas de plan en cours" : dv == dirPlan ? "✅ va dans le sens du plan " + (dirPlan == 1 ? "LONG" : "SHORT") : dv == -dirPlan ? "⛔ contre le plan " + (dirPlan == 1 ? "LONG" : "SHORT") + " : attendre qu'elle se retourne" : "⏳ neutre : pas encore de confirmation"
-        tip = array.get(nomsL, i) + " — " + sensUT + "\n━━━━━━━━━━━━\nTendance : " + tendUT + "\nRSI : " + str.tostring(rv, "#") + " — " + rsiUT + "\nCompression : " + (sq ? "OUI ⚡ prêt à exploser (attendre la direction)" : "non") + "\nRôle : " + roleUT + (minUT > 0 ? "\nClôture dans : " + f_mmss(f_reste(minUT)) : "") + "\n━━━━━━━━━━━━\n" + planUT + (dirPlan != 0 and dv == -dirPlan and i <= 4 ? "\n↩ VOYANT RETOURNEMENT allumé : " + str.tostring(nVoy) + "/5 petites unités (1 à 15 min) ont tourné contre le plan\n3/5 = le retournement se prépare • confirmé quand le 15 min ET la 1h clôturent dans le nouveau sens" : "")
+        tip = array.get(nomsL, i) + " — clôture : " + sensUT + "\nBougie en formation : " + sensLive + (dvLive != dv ? " • divergence temporaire (~)" : " • cohérente avec la clôture") + "\n━━━━━━━━━━━━\nTendance : " + tendUT + "\nRSI : " + str.tostring(rv, "#") + " — " + rsiUT + "\nCompression : " + (sq ? "OUI ⚡ prêt à exploser (attendre la direction)" : "non") + "\nRôle : " + roleUT + (minUT > 0 ? "\nClôture dans : " + f_mmss(f_reste(minUT)) : "") + "\n━━━━━━━━━━━━\n" + planUT + (dirPlan != 0 and dv == -dirPlan and i <= 4 ? "\n↩ VOYANT RETOURNEMENT allumé : " + str.tostring(nVoy) + "/5 petites unités (1 à 15 min) ont tourné contre le plan\n3/5 = le retournement se prépare • confirmé quand le 15 min ET la 1h clôturent dans le nouveau sens" : "")
         table.cell(t, i, 0, array.get(noms, i), width=largCol, bgcolor=rv >= 70 ?  color.rgb(120, 20, 30) : rv <= 30 ?  color.rgb(0, 90, 50) :  color.rgb(30, 34, 45), text_color=rv >= 70 or rv <= 30 ?  color.white :  color.gray, text_size=size.small, tooltip=tip)
         table.cell(t, i, 1, sym, width=largCol, bgcolor=bg, text_color= color.white, text_size=size.normal, tooltip=tip)
 // État de confirmation calculé pour l'affichage ; les champs d'export restent dans le bloc bridge canonique.
-planClosedMtfOkUi = strat == "SWING" ? (nz(dDFermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) != -dirPlan and nz(dWFermee) != -dirPlan) : strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d240Fermee) != -dirPlan) : strat == "SCALPING" ? (nz(d60Fermee) != -dirPlan and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan) : false
-planConfirmedUi = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and planRiskRewardOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2) and etatS == "CONFIRMÉ" and scoreV >= 75 and planClosedMtfOkUi
+
     titre = zoneBas ? "RETOURNEMENT ▼" : zoneHaut ? "REBOND ▲" : fortHaut ? "★ ACHAT FORT" : fortBas ? "★ VENTE FORTE" : retHaut ? "RETOURNEMENT ▲" : retBas ? "RETOURNEMENT ▼" : rsiOB >= 3 ? "RSI SURACHAT " + str.tostring(rsiOB) + "/11" : rsiOS >= 3 ? "RSI SURVENTE " + str.tostring(rsiOS) + "/11" : surcharge ? "⚡ SURCHARGE" : sens == 1 ? "HAUSSE" : sens == -1 ? "BAISSE" : "ATTENDRE"
     statutPlan = planConfirmedUi ? (dirPlan == 1 ? "▲ PLAN LONG VALIDÉ — ATTENTE ENTRÉE" : "▼ PLAN SHORT VALIDÉ — ATTENTE ENTRÉE") : strat != "" and dirPlan != 0 ? (dirPlan == 1 ? "⏳ BIAIS LONG — EN ATTENTE" : "⏳ BIAIS SHORT — EN ATTENTE") : "ATTENDRE • AUCUNE STRATÉGIE"
     ligne = (retDir != 0 and not retConf ? "↩ RETOURNEMENT  " : nVoy >= 3 ? "↩ " + str.tostring(nVoy) + "/5  " : "") + statutPlan + (planConfirmedUi ? " • " + (strat == "SCALPING" ? "SCALP" : strat) + " • TP " + px(tp1) + " • SL " + px(sl) : strat != "" and dirPlan != 0 ? " • " + strat + " • confirmation requise" : "   " + titre)
@@ -602,7 +618,7 @@ if not tp1Ok and dirPlan != 0 and not na(tp1M) and
      ((dirPlan == 1 and high >= tp1M) or (dirPlan == -1 and low <= tp1M))
     tp1Ok := true
 // Les deux objectifs restent visibles dès qu'un plan existe. Après TP1, l'option accentue TP2 sans recréer de lignes superposées.
-if barstate.islast and voirTP2 and tp1Ok and voirPlan and dirPlan != 0
+if barstate.islast and voirTP2 and tp1Ok and voirPlan and planConfirmedUi
     if not na(lTP1)
         line.set_color(lTP1, color.lime)
     if not na(lTP2)
@@ -625,7 +641,7 @@ if barstate.islast
     label.delete(eRet)
     line.delete(lConf)
     label.delete(eConf)
-    if voirPlan and dirPlan != 0 and not na(sl) and not na(ent)
+    if voirPlan and planConfirmedUi and not na(sl) and not na(ent)
         lRet := line.new(bar_index, sl, bar_index + 30, sl, color= color.new(color.white, 30), style=line.style_dotted, width=1)
         eRet := label.new(bar_index + 30, sl, "↩ RETOURNEMENT", style=label.style_label_left, color= color.rgb(30, 34, 45), textcolor= color.white, size=size.small, tooltip="↩ LIGNE DE RETOURNEMENT : " + px(sl) + "\n\nSi une bougie " + (strat == "SWING" ? "1h" : strat == "DAY" ? "5 min" : strat == "SCALPING" ? "1 min" : "15 min") + " CLÔTURE " + (dirPlan == -1 ? "AU-DESSUS" : "EN DESSOUS") + " de cette ligne :\n⛔ le " + (dirPlan == -1 ? "SHORT" : "LONG") + " est annulé\n↩ retournement possible vers le " + (dirPlan == -1 ? "LONG" : "SHORT") + "\n\nEntrée dans l'autre sens SEULEMENT si le 15 min et la 1h confirment\n(et les unités de la stratégie SWING / DAY / SCALP)\n\n⏱ Prochaine clôture " + (strat == "SWING" ? "1h" : strat == "DAY" ? "5 min" : strat == "SCALPING" ? "1 min" : "15 min") + " dans " + f_mmss(f_reste((strat == "SWING" ? 60 : strat == "DAY" ? 5 : strat == "SCALPING" ? 1 : 15))) + (retTxt != "" ? "\n\n" + retTxt : ""))
         lConf := line.new(bar_index, ent, bar_index + 30, ent, color= color.new(color.white, 30), style=line.style_dotted, width=1)
@@ -711,7 +727,7 @@ if barstate.islast and entryReadyUi
         label.set_color(eConf, dirPlan == 1 ? color.new(color.lime, 0) : color.new(color.red, 0))
         label.set_textcolor(eConf, color.white)
 
-bridgePayload = '{"source":"ALIGN_MTF_PRO_V25","symbol":"' + bridgeMarket + '","tickerid":"' + syminfo.tickerid + '","timeframe":"' + bridgeTf + '","planTimeframe":"M15","entryTimeframe":"' + (strat == "SWING" ? "H1" : strat == "DAY" ? "M5" : strat == "SCALPING" ? "M1" : "UNSUPPORTED") + '","entryZoneLow":' + f_align_v25_json_num(bridgePlanValid ? zBas : na) + ',"entryZoneHigh":' + f_align_v25_json_num(bridgePlanValid ? zHaut : na) + ',"entryDecision":' + f_align_v25_json_num(bridgePlanValid ? (zBas + zHaut) / 2 : na) + ',"entryBarTime":' + f_align_v25_json_int(bridgeEntryTimeSafe) + ',"entryBarOpen":' + f_align_v25_json_num(bridgeEntryOpen) + ',"entryBarHigh":' + f_align_v25_json_num(bridgeEntryHigh) + ',"entryBarLow":' + f_align_v25_json_num(bridgeEntryLow) + ',"entryBarClose":' + f_align_v25_json_num(bridgeEntryClose) + ',"price":' + f_align_v25_json_num(close) + ',"timestamp":' + str.tostring(timenow) + ',"candle_time":' + str.tostring(time) + ',"confirmed":' + str.tostring(bridgeConfirmed) + ',"candle_confirmed":' + str.tostring(barstate.isconfirmed) + ',"bar_confirmed":' + str.tostring(barstate.isconfirmed) + ',"signal":"' + bridgeSignal + '","verdict":"' + decisionS + '","entry":' + f_align_v25_json_num(bridgePlanValid ? ent : na) + ',"sl":' + f_align_v25_json_num(bridgePlanValid ? sl : na) + ',"tp1":' + f_align_v25_json_num(bridgePlanValid ? tp1 : na) + ',"tp2":' + f_align_v25_json_num(bridgePlanValid ? tp2 : na) + ',"rrRatio":' + f_align_v25_json_num(rr) + ',"macro_bull":' + str.tostring(bull) + ',"macro_bear":' + str.tostring(bear) + ',"long_score":' + str.tostring(dirPlan == 1 ? scoreV : 0) + ',"short_score":' + str.tostring(dirPlan == -1 ? scoreV : 0) + ',"scalp_inverse":false,"strategy":"' + strat + '","anticipation":"' + (retHaut ? "HAUSSIER" : retBas ? "BAISSIER" : "AUCUNE") + '","zone_proche":"' + bridgeZone + '","volume":"' + (volOk ? "OK" : "INDISPONIBLE") + '","rsi_etat":"' + (rsiOB >= 3 ? "SURACHAT" : rsiOS >= 3 ? "SURVENTE" : "NORMAL") + '","rsi_1m":' + f_align_v25_json_num(r1) + ',"rsi_5m":' + f_align_v25_json_num(r5) + ',"rsi_15m":' + f_align_v25_json_num(r15) + ',"rsi_60m":' + f_align_v25_json_num(r60) + ',"lecture_1m":' + f_align_v25_json_dir(d1) + ',"lecture_5m":' + f_align_v25_json_dir(nz(d5Fermee)) + ',"lecture_15m":' + f_align_v25_json_dir(nz(d15Fermee)) + ',"lecture_60m":' + f_align_v25_json_dir(nz(d60Fermee)) + ',"mtf":{"M1":{"direction":' + f_align_v25_json_int(d1) + ',"rsi":' + f_align_v25_json_num(r1) + ',"bar_time":' + str.tostring(nz(bridgeTimeM1, 0)) + '},"M3":{"direction":' + f_align_v25_json_int(d2) + ',"rsi":' + f_align_v25_json_num(r2) + ',"bar_time":' + str.tostring(nz(bridgeTimeM3, 0)) + '},"M5":{"direction":' + f_align_v25_json_int(d5Strat) + ',"rsi":' + f_align_v25_json_num(r5) + ',"bar_time":' + str.tostring(nz(bridgeTimeM5, 0)) + '},"M10":{"direction":' + f_align_v25_json_int(d10) + ',"rsi":' + f_align_v25_json_num(r10) + ',"bar_time":' + str.tostring(nz(bridgeTimeM10, 0)) + '},"M15":{"direction":' + f_align_v25_json_int(d15Strat) + ',"rsi":' + f_align_v25_json_num(r15) + ',"bar_time":' + str.tostring(nz(bridgeTimeM15, 0)) + '},"M30":{"direction":' + f_align_v25_json_int(d30) + ',"rsi":' + f_align_v25_json_num(r30) + ',"bar_time":' + str.tostring(nz(bridgeTimeM30, 0)) + '},"M45":{"direction":' + f_align_v25_json_int(d45) + ',"rsi":' + f_align_v25_json_num(r45) + ',"bar_time":' + str.tostring(nz(bridgeTimeM45, 0)) + '},"H1":{"direction":' + f_align_v25_json_int(d1hStrat) + ',"rsi":' + f_align_v25_json_num(r60) + ',"bar_time":' + str.tostring(nz(bridgeTimeH1, 0)) + '},"H2":{"direction":' + f_align_v25_json_int(d120) + ',"rsi":' + f_align_v25_json_num(r120) + ',"bar_time":' + str.tostring(nz(bridgeTimeH2, 0)) + '},"H4":{"direction":' + f_align_v25_json_int(d4Strat) + ',"rsi":' + f_align_v25_json_num(r240) + ',"bar_time":' + str.tostring(nz(bridgeTimeH4, 0)) + '},"D1":{"direction":' + f_align_v25_json_int(dD) + ',"rsi":' + f_align_v25_json_num(rD) + ',"bar_time":' + str.tostring(nz(bridgeTimeD1, 0)) + '},"W1":{"direction":' + f_align_v25_json_int(dW) + ',"rsi":' + f_align_v25_json_num(rW) + ',"bar_time":' + str.tostring(nz(bridgeTimeW1, 0)) + '}}}'
+bridgePayload = '{"source":"ALIGN_MTF_PRO_V25","symbol":"' + bridgeMarket + '","tickerid":"' + syminfo.tickerid + '","timeframe":"' + bridgeTf + '","planTimeframe":"M15","entryTimeframe":"' + (strat == "SWING" ? "H1" : strat == "DAY" ? "M5" : strat == "SCALPING" ? "M1" : "UNSUPPORTED") + '","entryZoneLow":' + f_align_v25_json_num(bridgePlanValid ? zBas : na) + ',"entryZoneHigh":' + f_align_v25_json_num(bridgePlanValid ? zHaut : na) + ',"entryDecision":' + f_align_v25_json_num(bridgePlanValid ? (zBas + zHaut) / 2 : na) + ',"entryBarTime":' + f_align_v25_json_int(bridgeEntryTimeSafe) + ',"entryBarOpen":' + f_align_v25_json_num(bridgeEntryOpen) + ',"entryBarHigh":' + f_align_v25_json_num(bridgeEntryHigh) + ',"entryBarLow":' + f_align_v25_json_num(bridgeEntryLow) + ',"entryBarClose":' + f_align_v25_json_num(bridgeEntryClose) + ',"price":' + f_align_v25_json_num(close) + ',"timestamp":' + str.tostring(timenow) + ',"candle_time":' + str.tostring(time) + ',"confirmed":' + str.tostring(bridgeConfirmed) + ',"candle_confirmed":' + str.tostring(barstate.isconfirmed) + ',"bar_confirmed":' + str.tostring(barstate.isconfirmed) + ',"signal":"' + bridgeSignal + '","verdict":"' + decisionS + '","entry":' + f_align_v25_json_num(bridgePlanValid ? ent : na) + ',"sl":' + f_align_v25_json_num(bridgePlanValid ? sl : na) + ',"tp1":' + f_align_v25_json_num(bridgePlanValid ? tp1 : na) + ',"tp2":' + f_align_v25_json_num(bridgePlanValid ? tp2 : na) + ',"rrRatio":' + f_align_v25_json_num(rr) + ',"macro_bull":' + str.tostring(bullFermee) + ',"macro_bear":' + str.tostring(bearFermee) + ',"long_score":' + str.tostring(dirPlan == 1 ? scoreV : 0) + ',"short_score":' + str.tostring(dirPlan == -1 ? scoreV : 0) + ',"scalp_inverse":false,"strategy":"' + strat + '","anticipation":"' + (retHaut ? "HAUSSIER" : retBas ? "BAISSIER" : "AUCUNE") + '","zone_proche":"' + bridgeZone + '","volume":"' + (volOk ? "OK" : "INDISPONIBLE") + '","rsi_etat":"' + (rsiOB >= 3 ? "SURACHAT" : rsiOS >= 3 ? "SURVENTE" : "NORMAL") + '","rsi_1m":' + f_align_v25_json_num(r1) + ',"rsi_5m":' + f_align_v25_json_num(r5) + ',"rsi_15m":' + f_align_v25_json_num(r15) + ',"rsi_60m":' + f_align_v25_json_num(r60) + ',"lecture_1m":' + f_align_v25_json_dir(nz(d1Fermee)) + ',"lecture_5m":' + f_align_v25_json_dir(nz(d5Fermee)) + ',"lecture_15m":' + f_align_v25_json_dir(nz(d15Fermee)) + ',"lecture_60m":' + f_align_v25_json_dir(nz(d60Fermee)) + ',"mtf":{"M1":{"direction":' + f_align_v25_json_int(nz(d1Fermee)) + ',"rsi":' + f_align_v25_json_num(r1) + ',"bar_time":' + str.tostring(nz(bridgeTimeM1, 0)) + '},"M3":{"direction":' + f_align_v25_json_int(nz(d3Fermee)) + ',"rsi":' + f_align_v25_json_num(r2) + ',"bar_time":' + str.tostring(nz(bridgeTimeM3, 0)) + '},"M5":{"direction":' + f_align_v25_json_int(nz(d5Fermee)) + ',"rsi":' + f_align_v25_json_num(r5) + ',"bar_time":' + str.tostring(nz(bridgeTimeM5, 0)) + '},"M10":{"direction":' + f_align_v25_json_int(nz(d10Fermee)) + ',"rsi":' + f_align_v25_json_num(r10) + ',"bar_time":' + str.tostring(nz(bridgeTimeM10, 0)) + '},"M15":{"direction":' + f_align_v25_json_int(nz(d15Fermee)) + ',"rsi":' + f_align_v25_json_num(r15) + ',"bar_time":' + str.tostring(nz(bridgeTimeM15, 0)) + '},"M30":{"direction":' + f_align_v25_json_int(nz(d30Fermee)) + ',"rsi":' + f_align_v25_json_num(r30) + ',"bar_time":' + str.tostring(nz(bridgeTimeM30, 0)) + '},"M45":{"direction":' + f_align_v25_json_int(nz(d45Fermee)) + ',"rsi":' + f_align_v25_json_num(r45) + ',"bar_time":' + str.tostring(nz(bridgeTimeM45, 0)) + '},"H1":{"direction":' + f_align_v25_json_int(nz(d60Fermee)) + ',"rsi":' + f_align_v25_json_num(r60) + ',"bar_time":' + str.tostring(nz(bridgeTimeH1, 0)) + '},"H2":{"direction":' + f_align_v25_json_int(nz(d120Fermee)) + ',"rsi":' + f_align_v25_json_num(r120) + ',"bar_time":' + str.tostring(nz(bridgeTimeH2, 0)) + '},"H4":{"direction":' + f_align_v25_json_int(nz(d240Fermee)) + ',"rsi":' + f_align_v25_json_num(r240) + ',"bar_time":' + str.tostring(nz(bridgeTimeH4, 0)) + '},"D1":{"direction":' + f_align_v25_json_int(nz(dDFermee)) + ',"rsi":' + f_align_v25_json_num(rD) + ',"bar_time":' + str.tostring(nz(bridgeTimeD1, 0)) + '},"W1":{"direction":' + f_align_v25_json_int(nz(dWFermee)) + ',"rsi":' + f_align_v25_json_num(rW) + ',"bar_time":' + str.tostring(nz(bridgeTimeW1, 0)) + '}}}'
 
 varip int lastBridgeSent = na
 bridgeDue = bridgeEnabled and isSupportedMarket and bridgeTf != "UNSUPPORTED" and barstate.isrealtime and (na(lastBridgeSent) or timenow - lastBridgeSent >= 20000)

@@ -4,6 +4,7 @@ import unittest
 
 
 PINE = Path(__file__).resolve().parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
+PINE_V24 = Path(__file__).resolve().parent / "pine" / "ALIGN_MTF_PRO_v24.pine"
 TIMEFRAMES = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1")
 
 
@@ -11,6 +12,7 @@ class PineTpPlanStateTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.source = PINE.read_text(encoding="utf-8")
+        cls.source_v24 = PINE_V24.read_text(encoding="utf-8")
 
     def test_tp_touch_state_is_bound_to_current_plan_levels(self):
         start = self.source.index("// TP1 touché :")
@@ -21,6 +23,26 @@ class PineTpPlanStateTests(unittest.TestCase):
         self.assertIn("(na(tp1) != na(tp1M))", block)
         self.assertIn("(na(tp2) != na(tp2M))", block)
         self.assertLess(block.index("if planTpChange"), block.index("if not tp1Ok and dirPlan"))
+
+    def test_v24_is_a_context_only_companion_and_does_not_publish_a_second_plan_by_default(self):
+        self.assertIn('voirPlan = input.bool(false, "Afficher le plan (TP / SL)"', self.source_v24)
+        self.assertIn('voirFibo = input.bool(false, "Zone d\'entrée + Fibonacci"', self.source_v24)
+        self.assertIn('voirSignauxV24 = input.bool(false, "Signaux indépendants v24 (désactivés par défaut)"', self.source_v24)
+        self.assertIn("sigHaut = voirSignauxV24 and sigHaut0", self.source_v24)
+        self.assertIn("sigBas  = voirSignauxV24 and sigBas0", self.source_v24)
+        self.assertIn("CONTEXTE MTF v24 — plan Entry / SL / TP sur v25", self.source_v24)
+        self.assertIn("dirsFermees = array.from(nz(d1Fermee), nz(d3Fermee)", self.source_v24)
+        self.assertIn("dv = array.get(dirsFermees, i)", self.source_v24)
+        self.assertIn("Bougie en formation :", self.source_v24)
+        self.assertIn("visuel MTF d'accompagnement", self.source_v24)
+        self.assertLessEqual(self.source_v24.count("request.security("), 40)
+        self.assertNotIn('E " + px(ent) + "  TP " + px(tp1) + "  SL " + px(sl)', self.source_v24)
+
+    def test_entry_sl_tp_visuals_are_hidden_until_the_plan_is_confirmed(self):
+        self.assertIn("planConfirmedUi = dirPlan != 0 and strat != \"\" and dirPlan == dirFig", self.source)
+        self.assertIn("if voirPlan and planConfirmedUi", self.source)
+        self.assertNotIn("if voirPlan and dirPlan != 0", self.source)
+        self.assertIn("voirTP2 and tp1Ok and voirPlan and planConfirmedUi", self.source)
 
     def test_visual_confirmation_line_and_label_are_preserved_without_entry_marker(self):
         self.assertIn("lConf := line.new(bar_index, ent, bar_index + 30, ent", self.source)
@@ -48,10 +70,21 @@ class PineTpPlanStateTests(unittest.TestCase):
         self.assertIn('strat == "DAY" ? "M5"', self.source)
         self.assertIn('strat == "SCALPING" ? "M1"', self.source)
 
-    def test_strategy_and_bridge_confirmations_use_closed_timeframe_directions(self):
-        for name in ("d1Fermee", "d5Fermee", "d15Fermee", "d60Fermee", "d240Fermee", "dDFermee", "dWFermee"):
-            declaration = next(line for line in self.source.splitlines() if line.startswith(name))
-            self.assertIn("request.security(", declaration)
+    def test_all_eleven_displayed_and_bridged_directions_use_the_last_closed_candle(self):
+        for name in ("d1Fermee", "d3Fermee", "d5Fermee", "d10Fermee", "d15Fermee",
+                     "d30Fermee", "d45Fermee", "d60Fermee", "d120Fermee", "d240Fermee", "dDFermee"):
+            self.assertIn(name, self.source)
+        self.assertIn('d3Fermee = request.security(syminfo.tickerid, "3", f_dir_confirme(), lookahead=barmerge.lookahead_on)', self.source)
+        self.assertIn("dirsFermees = array.from(nz(d1Fermee), nz(d3Fermee), nz(d5Fermee)", self.source)
+        self.assertIn("dvLive = array.get(dirs, i)", self.source)
+        self.assertIn("dv = array.get(dirsFermees, i)", self.source)
+        self.assertIn("Bougie en formation :", self.source)
+        for name in ("d1Fermee", "d3Fermee", "d5Fermee", "d10Fermee", "d15Fermee",
+                     "d30Fermee", "d45Fermee", "d60Fermee", "d120Fermee", "d240Fermee", "dDFermee", "dWFermee"):
+            self.assertIn(f"f_align_v25_json_int(nz({name}))", self.source)
+        self.assertIn("f_align_v25_json_dir(nz(d1Fermee))", self.source)
+        self.assertIn("str.tostring(bullFermee)", self.source)
+        self.assertIn("str.tostring(bearFermee)", self.source)
         self.assertIn("d5Strat = nz(d5Fermee)", self.source)
         self.assertIn("d1Strat = nz(d1Fermee)", self.source)
         self.assertIn("uD  = nz(dDFermee) == dP", self.source)

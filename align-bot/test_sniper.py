@@ -350,7 +350,7 @@ alertcondition(sigBas, "Signal VENTE", "Signal VENTE ALIGN MTF")
         self.assertEqual(v24.count(self.VISUAL_ONLY_MARKER), 1)
         normalized = v24.replace(self.RSI_CROSSOVER_BLOCK, self.RSI_CROSSOVER_BASELINE_BLOCK, 1)
         normalized = normalized.replace(self.VISUAL_ONLY_MARKER, self.BASELINE_ALERT_BLOCK, 1)
-        self.assertEqual(hashlib.sha256(normalized.encode("utf-8")).hexdigest(), "0f1216cbb261eaaa3e019524071b67777cbecd0f5d10689cedf5727a06921085")  # toutes les zones hors RSI et sorties d'alerte restent identiques au v24 publié
+        self.assertEqual(hashlib.sha256(normalized.encode("utf-8")).hexdigest(), "ff45aaa9684b011d89f5761f7a0bb047221448f63a4f12413167ead6d03a25c0")  # toutes les zones hors RSI et sorties d'alerte restent identiques au v24 publié
 
         diff = (self.RACINE / "PROPOSITION_v25_sniper.diff").read_text(encoding="utf-8").splitlines()
         modifs = [l[1:] for l in diff if l[:1] in "+-" and not l.startswith(("+++", "---"))]

@@ -3043,6 +3043,26 @@ TRAD.update({
     " en 3 min": " in 3 min",
     "🎙 GROSSE MÈCHE !": "🎙 BIG WICK!",
     "👀 15 min en cours : rejet à ": "👀 15-min candle forming: rejection at ",
+    "🎙 GROSSE MÈCHE — REJET BAISSIER POTENTIEL": "🎙 BIG WICK — POTENTIAL BEARISH REJECTION",
+    "🎙 GROSSE MÈCHE — REJET HAUSSIER POTENTIEL": "🎙 BIG WICK — POTENTIAL BULLISH REJECTION",
+    "🎙 GRANDES MÈCHES DES DEUX CÔTÉS — INDÉCISION": "🎙 LONG WICKS ON BOTH SIDES — INDECISION",
+    "👀 M15 en formation : mèche haute, rejet baissier potentiel à ": "👀 M15 forming: upper wick, potential bearish rejection at ",
+    "👀 M15 en formation : mèche basse, rejet haussier potentiel à ": "👀 M15 forming: lower wick, potential bullish rejection at ",
+    "👀 M15 en formation : mèches haute et basse • aucun rejet directionnel retenu": "👀 M15 forming: upper and lower wicks • no directional rejection retained",
+    "🔴 Vendeurs rejettent le haut — non confirmé": "🔴 Sellers reject the high — unconfirmed",
+    "🟢 Acheteurs défendent le bas — non confirmé": "🟢 Buyers defend the low — unconfirmed",
+    "⏳ M15 non clôturée : attendre la clôture avant toute conclusion": "⏳ M15 not closed: wait for the close before any conclusion",
+    "🎯 Clôtures vs sens confirmé ": "🎯 Closed candles vs confirmed direction ",
+    "🧭 Biais de contexte : SHORT dominant • ": "🧭 Context bias: SHORT dominant • ",
+    "🧭 Biais de contexte : LONG dominant • ": "🧭 Context bias: LONG dominant • ",
+    "🧭 Biais de contexte : MIXTE • ": "🧭 Context bias: MIXED • ",
+    "📊 Clôtures MTF : indisponibles ou incomplètes • aucune direction déduite": "📊 MTF closes: unavailable or incomplete • no direction inferred",
+    "baissières": "bearish",
+    "haussières": "bullish",
+    "neutres": "neutral",
+    "(pas un signal)": "(not a signal)",
+    "alignées": "aligned",
+    "opposées": "opposed",
     "🔴 Les vendeurs repoussent le prix": "🔴 Sellers are pushing price down",
     "🟢 Les acheteurs rachètent": "🟢 Buyers are buying the dip",
     "✅ Dans le sens du bot": "✅ With the bot's direction",
@@ -7343,6 +7363,7 @@ def flash_commentateur(m, r, cle):
     p = m1[-1]["c"]
     move = p - m1[0]["o"]
     tr = cle.get("trade")
+    d_ = r.get("confirme") or 0
     ligne_pos = []
     if tr:
         dd = tr["d"]
@@ -7353,21 +7374,69 @@ def flash_commentateur(m, r, cle):
             ligne_pos = ["⚠️ Contre le bot", "🔒 SL à BE : zéro risque" if dd * (tr["e"] - tr["sl"]) <= 0 else "🧊 On garde la tête froide",
                          "⏳ La clôture 15 min décide"]
     else:
-        d_ = r.get("confirme") or 0
         ligne_pos = ["🧭 Dans le sens de la tendance" if d_ * move > 0 else "↩ Contre la tendance : rebond ?" if d_ else "➖ Pas de tendance nette",
                      "⏳ J'attends la clôture 15 min"]
+    # Comparer les UT au trade réel s'il existe, sinon au sens Pine confirmé.
+    sens_reference = tr.get("d") if tr and tr.get("d") in (-1, 1) else d_
+    # Le commentateur ne doit jamais compter les UT en formation : il ne lit que le contrat des 11 dernières clôtures.
+    dirs_cloturees = r.get("dirs_cloturees")
+    if isinstance(dirs_cloturees, (list, tuple)) and len(dirs_cloturees) >= 11:
+        lectures = list(dirs_cloturees[:11])
+        nb_long = sum(1 for v in lectures if v == 1)
+        nb_short = sum(1 for v in lectures if v == -1)
+        nb_neutres = sum(1 for v in lectures if v not in (-1, 1))
+        if sens_reference in (-1, 1):
+            nb_alignes = nb_short if sens_reference == -1 else nb_long
+            nb_opposes = nb_long if sens_reference == -1 else nb_short
+            direction_txt = "SHORT" if sens_reference == -1 else "LONG"
+            ligne_mtf = (f"🎯 Clôtures vs sens confirmé {direction_txt} : "
+                         f"{nb_alignes}/11 alignées • {nb_opposes} opposées • {nb_neutres} neutres")
+        elif nb_short > nb_long:
+            ligne_mtf = f"🧭 Biais de contexte : SHORT dominant • {nb_short}/11 baissières • {nb_long} haussières • {nb_neutres} neutres (pas un signal)"
+        elif nb_long > nb_short:
+            ligne_mtf = f"🧭 Biais de contexte : LONG dominant • {nb_long}/11 haussières • {nb_short} baissières • {nb_neutres} neutres (pas un signal)"
+        else:
+            ligne_mtf = f"🧭 Biais de contexte : MIXTE • {nb_long}/11 haussières • {nb_short} baissières • {nb_neutres} neutres (pas un signal)"
+    else:
+        ligne_mtf = "📊 Clôtures MTF : indisponibles ou incomplètes • aucune direction déduite"
     if abs(move) >= 0.5 * a:
         return "\n".join(["🎙 ÇA BOUGE !", f"{ICONE.get(m, '')} {m} : {px(p)}",
                           ("🔴 Les vendeurs accélèrent" if move < 0 else "🟢 Les acheteurs accélèrent"),
-                          f"📏 {'-' if move < 0 else '+'}{px(abs(move))} en 3 min"] + ligne_pos)
+                          f"📏 {'-' if move < 0 else '+'}{px(abs(move))} en 3 min",
+                          ligne_mtf,
+                          "ℹ️ Mouvement observé, pas une entrée : attendre la clôture M15"] + ligne_pos)
     b15 = (r.get("b15") or [])[-1:]
     if b15:
         x = b15[0]; rng = x["h"] - x["l"]
         if rng >= 0.6 * a:
-            if x["h"] - max(x["o"], p) >= 0.5 * rng:
-                return "\n".join(["🎙 GROSSE MÈCHE !", f"{ICONE.get(m, '')} {m} : {px(p)}", f"👀 15 min en cours : rejet à {px(x['h'])}", "🔴 Les vendeurs repoussent le prix"] + ligne_pos)
-            if min(x["o"], p) - x["l"] >= 0.5 * rng:
-                return "\n".join(["🎙 GROSSE MÈCHE !", f"{ICONE.get(m, '')} {m} : {px(p)}", f"👀 15 min en cours : rejet à {px(x['l'])}", "🟢 Les acheteurs rachètent"] + ligne_pos)
+            meche_haute = x["h"] - max(x["o"], p) >= 0.5 * rng
+            meche_basse = min(x["o"], p) - x["l"] >= 0.5 * rng
+            if meche_haute and meche_basse:
+                return "\n".join([
+                    "🎙 GRANDES MÈCHES DES DEUX CÔTÉS — INDÉCISION",
+                    f"{ICONE.get(m, '')} {m} : {px(p)}",
+                    "👀 M15 en formation : mèches haute et basse • aucun rejet directionnel retenu",
+                    ligne_mtf,
+                    "⏳ M15 non clôturée : attendre la clôture avant toute conclusion"
+                ] + ligne_pos)
+            if meche_haute:
+                return "\n".join([
+                    "🎙 GROSSE MÈCHE — REJET BAISSIER POTENTIEL",
+                    f"{ICONE.get(m, '')} {m} : {px(p)}",
+                    f"👀 M15 en formation : mèche haute, rejet baissier potentiel à {px(x['h'])}",
+                    "🔴 Vendeurs rejettent le haut — non confirmé",
+                    ligne_mtf,
+                    "⏳ M15 non clôturée : attendre la clôture avant toute conclusion"
+                ] + ligne_pos)
+            if meche_basse:
+                return "\n".join([
+                    "🎙 GROSSE MÈCHE — REJET HAUSSIER POTENTIEL",
+                    f"{ICONE.get(m, '')} {m} : {px(p)}",
+                    f"👀 M15 en formation : mèche basse, rejet haussier potentiel à {px(x['l'])}",
+                    "🟢 Acheteurs défendent le bas — non confirmé",
+                    ligne_mtf,
+                    "⏳ M15 non clôturée : attendre la clôture avant toute conclusion"
+                ] + ligne_pos)
     return None
 
 

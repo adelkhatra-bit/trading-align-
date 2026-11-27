@@ -581,7 +581,7 @@ class AffichageTPGraphique(unittest.TestCase):
         with open(chemin, encoding="utf-8") as f:
             pine = f.read()
         bloc = pine[pine.index("// ═════════ LIGNES DU PLAN (TP1, TP2, STOP)"):pine.index("// ═════════ BARRE (en bas")]
-        self.assertIn("if voirPlan and dirPlan != 0", bloc)
+        self.assertIn("if voirPlan and planConfirmedUi", bloc)
         self.assertIn("lTP1 := line.new(x1, tp1", bloc)
         self.assertIn('eTP1 := label.new(x1, tp1, "TP1 "', bloc)
         self.assertNotIn("lTP2 := line.new(x1, tp2", bloc)
@@ -597,12 +597,12 @@ class AffichageTPGraphique(unittest.TestCase):
 
 
 class AffichageTPGraphique(unittest.TestCase):
-    def test_v25_trace_tp1_et_tp2_des_qu_un_plan_est_actif(self):
+    def test_v25_trace_tp1_et_tp2_uniquement_apres_confirmation_mtf(self):
         chemin = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pine", "ALIGN_MTF_PRO_v25.pine")
         with open(chemin, encoding="utf-8") as f:
             pine = f.read()
         bloc = pine[pine.index("// ═════════ LIGNES DU PLAN (TP1, TP2, STOP)"):pine.index("// ═════════ BARRE (en bas")]
-        self.assertIn("if voirPlan and dirPlan != 0", bloc)
+        self.assertIn("if voirPlan and planConfirmedUi", bloc)
         self.assertIn("lTP1 := line.new(x1, tp1", bloc)
         self.assertIn("lTP2 := line.new(x1, tp2", bloc)
         self.assertIn('eTP1 := label.new(x1, tp1, "TP1 "', bloc)

@@ -4,7 +4,7 @@ import re
 import unittest
 
 PINE = Path(__file__).parent / "pine" / "ALIGN_MTF_PRO_v24.pine"
-BASELINE_GIT_BLOB_SHA = "e6acb7aa8499c06bc0b6f97f3756b69382b8c97f"
+BASELINE_GIT_BLOB_SHA = "36c119821e948299b85cdfd9da80bef44716a608"
 
 RSI_CROSSOVER_BLOCK = """rsiCrossSigUp   = ta.crossover(rC, rsiSig)
 rsiCross30Up     = ta.crossover(rC, 30)
