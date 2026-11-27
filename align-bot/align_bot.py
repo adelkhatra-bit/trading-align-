@@ -13413,7 +13413,7 @@ def agent(m, r, cle, ferme):
                 libelle_sl = "SL → BE"
             out.append(cs_(m, "TP1 TOUCHÉ", [f"💰 TP1 : {px(t1)} ✅ 🎆",
                                            f"🔒 {libelle_sl} : {px(sl_protege)} (entrée {px(e)} • protection jamais relâchée)",
-                                           "☕ Va boire un café, la suite se fait sans risque", f"🏁 TP2 : {px(t2)}"] + lecture_tp1(r, d),
+                                           "☕ Le reste de la position reste exposé : SL actif, TP2 visé", f"🏁 TP2 : {px(t2)}"] + lecture_tp1(r, d),
                                    "Sécuriser une partie, garder le reste", r))
             return out
         # ↩ Voyants de retournement (comme l'indicateur) : 3/5 petites unités contre la position = alerte, 1 fois.

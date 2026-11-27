@@ -140,6 +140,8 @@ class BreakEvenStopLevelReportingTest(unittest.TestCase):
                 joined = "\n".join(str(message) for message in messages)
                 self.assertIn(label, joined)
                 self.assertIn(align_bot.px(expected), joined)
+                self.assertIn("SL actif, TP2 visé", joined)
+                self.assertNotIn("sans risque", joined)
 
 
 
