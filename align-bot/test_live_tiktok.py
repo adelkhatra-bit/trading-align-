@@ -1279,7 +1279,7 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         self.assertNotIn("dansLangue[0]", bande)
         self.assertIn("if (!v) {", bande)
         self.assertIn("if (voixActive) {\n          voixEnAttente = { item, apresLecture };", bande)
-        self.assertIn("return 0;   // reprise à voiceschanged, callback conservé pour ne pas perdre la deuxième voix", bande)
+        self.assertIn("return 0;   // reprise à voiceschanged ou après les tentatives temporisées", bande)
         self.assertIn("utterance.voice = v;", bande)
 
     def test_bande_off_coupe_toute_la_parole(self):
