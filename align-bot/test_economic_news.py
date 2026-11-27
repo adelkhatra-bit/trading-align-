@@ -20,11 +20,13 @@ class EconomicNewsNormalizationTest(unittest.TestCase):
             {"title": "Prelim Wholesale Inventories m/m", "country": "USD", "date": "2026-11-27T08:30:00-05:00", "impact": "Low", "forecast": "0.5%", "previous": "0.6%"},
             {"title": "Minor USD housing index", "country": "USD", "date": "2026-11-27T09:00:00-05:00", "impact": "Low"},
         ]
-        important, daily = news.normaliser_evenements(raw, self.now)
-        titles = [event["titre"] for event in important]
-        self.assertIn("Goods Trade Balance", titles)
-        self.assertIn("Prelim Wholesale Inventories m/m", titles)
-        self.assertNotIn("Minor USD housing index", titles)
+        blocking, watch, daily = news.normaliser_evenements(raw, self.now)
+        blocking_titles = [event["titre"] for event in blocking]
+        watch_titles = [event["titre"] for event in watch]
+        self.assertNotIn("Goods Trade Balance", blocking_titles)
+        self.assertIn("Goods Trade Balance", watch_titles)
+        self.assertIn("Prelim Wholesale Inventories m/m", watch_titles)
+        self.assertNotIn("Minor USD housing index", watch_titles)
         self.assertEqual(len(daily), 3)
 
     def test_event_time_is_converted_from_explicit_offset_to_paris(self):
@@ -101,11 +103,21 @@ class EconomicNewsBotIntegrationTest(unittest.TestCase):
         with mock.patch.object(ab, "http_json", return_value=self.schedule):
             events = ab.calendrier(state, self.now)
         titles = [event["titre"] for event in events]
-        self.assertIn("Goods Trade Balance", titles)
-        self.assertIn("Prelim Wholesale Inventories m/m", titles)
+        watch_titles = [event["titre"] for event in state["cal"]["veille"]]
+        self.assertEqual(titles, [])
+        self.assertIn("Goods Trade Balance", watch_titles)
+        self.assertIn("Prelim Wholesale Inventories m/m", watch_titles)
         self.assertTrue(ab.calendrier_connu(state, self.now))
         self.assertEqual(state["cal"]["source_url"], news.CALENDAR_URL)
         self.assertEqual(state["cal"]["schema"], 2)
+
+    def test_low_impact_watch_does_not_trigger_the_automatic_entry_pause(self):
+        low = news.normaliser_evenement({"title": "Goods Trade Balance", "country": "USD", "date": dt.datetime.fromtimestamp(self.now, dt.timezone.utc).isoformat(), "impact": "Low"}, self.now)
+        high = news.normaliser_evenement({"title": "CPI", "country": "USD", "date": dt.datetime.fromtimestamp(self.now, dt.timezone.utc).isoformat(), "impact": "High"}, self.now)
+        state_low = {"cal": {"t": self.now, "ev": [], "veille": [low]}}
+        state_high = {"cal": {"t": self.now, "ev": [high], "veille": []}}
+        self.assertFalse(ab.annonce_proche(state_low, self.now))
+        self.assertTrue(ab.annonce_proche(state_high, self.now))
 
     def test_failed_refresh_after_success_marks_calendar_unknown(self):
         state = {"cal": {"schema": 2, "t": self.now - 301, "ev": [{"t": self.now + 3600, "titre": "CPI"}]}}
@@ -124,10 +136,10 @@ class EconomicNewsBotIntegrationTest(unittest.TestCase):
 
     def test_post_event_report_separates_published_facts_from_price_reaction(self):
         event = news.normaliser_evenement({"title": "Goods Trade Balance", "country": "USD", "date": dt.datetime.fromtimestamp(self.now - 7 * 60, dt.timezone.utc).isoformat(), "impact": "Low", "forecast": "-135.9B", "previous": "-134.9B"}, self.now)
-        state = {"cal": {"t": self.now, "ev": [event]}}
+        state = {"cal": {"t": self.now, "ev": [], "veille": [event]}}
         bars = [{"t": event["t"] + 60, "o": 100.0, "h": 102.0, "l": 99.0, "c": 101.5}]
         hours_a, hours_b = self._patch_market_hours()
-        with mock.patch.object(ab, "calendrier", return_value=[event]), hours_a, hours_b, mock.patch.object(ab, "ia", return_value="Mouvement observé; confirmation M15 attendue."):
+        with mock.patch.object(ab, "calendrier", return_value=[]), hours_a, hours_b, mock.patch.object(ab, "ia", return_value="Mouvement observé; confirmation M15 attendue."):
             messages = ab.annonces_et_sessions(state, self.now, {"BTC": {"m1": bars}})
         report = next(message for message in messages if "COMPTE RENDU APRÈS NEWS" in message)
         self.assertIn("Valeur publiée: non reçue", report)
@@ -138,19 +150,20 @@ class EconomicNewsBotIntegrationTest(unittest.TestCase):
     def test_late_actual_value_generates_one_update_without_repeating_reaction_report(self):
         base = {"title": "Goods Trade Balance", "country": "USD", "date": dt.datetime.fromtimestamp(self.now - 10 * 60, dt.timezone.utc).isoformat(), "impact": "Low", "forecast": "-135.9B", "previous": "-134.9B"}
         first = news.normaliser_evenement(base, self.now)
-        state = {"cal": {"t": self.now, "ev": [first]}}
+        state = {"cal": {"t": self.now, "ev": [], "veille": [first]}}
         hours_a, hours_b = self._patch_market_hours()
-        with mock.patch.object(ab, "calendrier", return_value=[first]), hours_a, hours_b:
+        with mock.patch.object(ab, "calendrier", return_value=[]), hours_a, hours_b:
             ab.annonces_et_sessions(state, self.now, {})
         updated = news.normaliser_evenement(dict(base, actual="-137.2B"), self.now + 300)
+        state["cal"]["veille"] = [updated]
         hours_a, hours_b = self._patch_market_hours()
-        with mock.patch.object(ab, "calendrier", return_value=[updated]), hours_a, hours_b:
+        with mock.patch.object(ab, "calendrier", return_value=[]), hours_a, hours_b:
             messages = ab.annonces_et_sessions(state, self.now + 300, {})
         updates = [message for message in messages if "MISE À JOUR — VALEUR REÇUE" in message]
         self.assertEqual(len(updates), 1)
         self.assertIn("-137.2B", updates[0])
         hours_a, hours_b = self._patch_market_hours()
-        with mock.patch.object(ab, "calendrier", return_value=[updated]), hours_a, hours_b:
+        with mock.patch.object(ab, "calendrier", return_value=[]), hours_a, hours_b:
             again = ab.annonces_et_sessions(state, self.now + 301, {})
         self.assertFalse(any("MISE À JOUR — VALEUR REÇUE" in message for message in again))
 
