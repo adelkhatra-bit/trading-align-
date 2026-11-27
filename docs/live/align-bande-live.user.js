@@ -302,7 +302,9 @@
     if (!voixActive || !attente || !attente.item) return;
     const item = attente.item;
     if (item.source === 'ia' && (!item.market || item.market !== codeMarche())) return;
+    if (item.source === 'coach') coachDialogueActive = true;
     const dureeFR = parlerLive(item, true, attente.apresLecture);
+    if (item.source === 'coach' && dureeFR <= 0) coachDialogueActive = false;
     if (dureeFR > 0 && item.replayEN && item.replayEN.anglaisTraduit) parlerLive(item.replayEN, true);
   }
   if ('speechSynthesis' in window) {
@@ -487,15 +489,17 @@
       const jouer = index => {
         if (!vivant || !voixActive || codeMarche() !== marcheDialogue || index >= utterances.length) { coachDialogueActive = false; return; }
         const item = utterances[index];
-        if (!['t', 'l'].includes(item.speaker)) return;
-        parlerLive(
+        if (!['t', 'l'].includes(item.speaker)) { coachDialogueActive = false; return; }
+        const duree = parlerLive(
           { texte: item.texte, source: 'coach', speaker: item.speaker, en: item.en, market: marcheDialogue },
           true,
           () => {
-            if (!vivant || !voixActive || codeMarche() !== marcheDialogue) return;
+            if (!vivant || !voixActive || codeMarche() !== marcheDialogue) { coachDialogueActive = false; return; }
             coachPairTimers.push(setTimeout(() => jouer(index + 1), 500));
           }
         );
+        // Un navigateur sans voix compatible ne doit pas verrouiller les autres commentaires.
+        if (duree <= 0) coachDialogueActive = false;
       };
       jouer(0);
     }, attendre));
