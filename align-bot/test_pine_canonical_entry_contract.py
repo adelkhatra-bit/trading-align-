@@ -194,6 +194,14 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn("🟢 ZONE ATTEINTE — LONG PRÊT", self.pine)
         self.assertIn("🔴 ZONE ATTEINTE — SHORT PRÊT", self.pine)
 
+    def test_reversal_zone_cannot_override_strong_opposite_macro_without_both_closes(self):
+        self.assertIn("zoneLongConfirmee = zoneHaut and (longT <= -2 ?", self.pine)
+        self.assertIn("(nz(d15Fermee) == 1 and nz(d60Fermee) == 1)", self.pine)
+        self.assertIn("zoneShortConfirmee = zoneBas and (longT >= 2 ?", self.pine)
+        self.assertIn("(nz(d15Fermee) == -1 and nz(d60Fermee) == -1)", self.pine)
+        self.assertIn("dirBrut = zoneLongConfirmee ? 1 : zoneShortConfirmee ? -1 : longT >= 2 ? 1", self.pine)
+        self.assertNotIn("dirBrut = zoneHaut ? 1 : zoneBas ? -1", self.pine)
+
     def test_dir_stable_initialization_requires_closed_m15_or_h1_confirmation(self):
         start = self.pine.index("var int dirStable = 0")
         end = self.pine.index("// GOLD : aucune direction de trade", start)
