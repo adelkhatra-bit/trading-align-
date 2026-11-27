@@ -287,11 +287,16 @@ o1h = d1hStrat == -dP"""
         self.assertTrue(geometry_ok(-1, 3515.12, 3527.0, 3490.0, 3470.0, 3506.34, 3515.12))
         self.assertTrue(geometry_ok(1, 3515.12, 3495.0, 3540.0, 3570.0, 3510.0, 3520.0))
 
-    def test_higher_chart_uses_last_closed_lower_timeframe_intrabar_for_entry_trigger(self):
+    def test_active_and_last_closed_trigger_ohlc_are_exported_for_position_follow(self):
         export_block = self.source.split(EXPORT_MARKER, 1)[1]
         self.assertIn("timeframe.in_seconds(bridgeEntryTf) < timeframe.in_seconds()", export_block)
-        self.assertIn("request.security_lower_tf(syminfo.tickerid, bridgeEntryTf", export_block)
+        self.assertIn("request.security_lower_tf(syminfo.tickerid, bridgeEntryTf, [open[1], high[1], low[1], close[1], time[1]])", export_block)
         self.assertIn("array.get(bridgeEntryTimeArray, bridgeEntryLast)", export_block)
+        self.assertIn("request.security_lower_tf(syminfo.tickerid, bridgeEntryTf, [open, high, low, close, time])", export_block)
+        self.assertIn("array.get(bridgeActiveEntryTimeArray, bridgeActiveEntryLast)", export_block)
+        self.assertIn("request.security(syminfo.tickerid, bridgeEntryTf, [open, high, low, close, time], lookahead=barmerge.lookahead_off)", export_block)
+        for key in ("activeEntryBarTime", "activeEntryBarOpen", "activeEntryBarHigh", "activeEntryBarLow", "activeEntryBarClose"):
+            self.assertIn('"' + key + '":', export_block)
         self.assertIn('bridgeEntryTimeSafe = bridgeEntryTf == "" ? na : bridgeEntryTime', export_block)
 
     def test_bridge_reuses_mtf_time_requests_and_stays_below_tv_request_budget(self):
