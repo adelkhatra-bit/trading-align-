@@ -5357,6 +5357,8 @@ def texte_position(m, r, cle, cid):
         "ℹ️ ALIGN ne passe aucun ordre sur ton broker : toute modification se fait sur ta plateforme."
     ]
     return "\n".join(lignes)
+UT_VISION = (("1m", 0), ("3m", 1), ("5m", 2), ("15m", 4), ("1h", 7), ("4h", 9), ("D", 10))
+
 def texte_vision(m, r, cle, anglais=False):
     """Vue de niveaux ; en bridge obligatoire, seuls les niveaux Pine v25 confirmés sont autorisés."""
     r = r or {}
@@ -6040,6 +6042,12 @@ def texte_apercu(m, r, cle, vip=True):
             else:
                 decision = "🟡 PLAN PINE CONFIRMÉ — DÉCLENCHEUR EN ATTENTE"
                 raison = "Le plan M15 est confirmé, mais la clôture de l'unité de validation n'a pas encore déclenché l'entrée."
+    elif require_tv and tr:
+        decision = "📍 POSITION EN COURS"
+        direction = "LONG ⬆️" if tr["d"] == 1 else "SHORT ⬇️"
+        raison = "Position et niveaux mémorisés ; les nouvelles entrées restent gouvernées par Pine v25."
+        sens = tr["d"]
+        type_ = str(tr.get("strategie") or tr.get("strat") or "")
     else:
         titre, raison = verdict(r, cle)
         if tr:
@@ -6138,6 +6146,15 @@ def texte_apercu(m, r, cle, vip=True):
     lignes += ["", "👇 Détails : boutons ci-dessous",
                "ℹ️ Cette carte ne passe aucun ordre. Le module broker est séparé et dépend de ses réglages ADMIN / TEST / RÉEL."]
     return "\n".join(lignes)
+DERNIERS = {}               # dernière analyse de chaque marché (pour le chrono)
+DERNIER_ETAT = {}           # état courant (calendrier des news) lu par les cartes d'analyse
+CHRONO_MAX = 4 * 3600        # délai max d'attente d'une position réservée
+SL_RISQUE_MIN_ATR = 1.4      # stop jamais plus serré que 1,4 ATR 15 min (évite les SL pris par une simple mèche)
+SL_RISQUE_MIN_PCT = 0.0012   # ni plus serré que 0,12 % du prix
+CHRONO_REFRESH_SEC = 30      # 1 édition / 30 s par chrono : au-delà, Telegram bloque le chat pendant des heures (429)
+JAUGE_REFRESH_SEC = 60       # la jauge de prix n'est rééditée qu'une fois par minute au maximum
+CHRONO_LOCK = threading.RLock()  # un seul éditeur Telegram par chronomètre, même pendant l'analyse réseau
+
 def prochaine_cloture(ts, interval_sec=300):
     """Retourne la prochaine clôture strictement future (horodatage UTC)."""
     if interval_sec < 1:
