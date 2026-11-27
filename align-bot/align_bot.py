@@ -1553,7 +1553,10 @@ def prix_tradingview_actif(r):
         return None
     if not math.isfinite(price) or price <= 0:
         return None
-    robot = snapshot.get("robotV12") or {}
+    # Les niveaux et l'OHLC du déclencheur appartiennent au plan canonique M15,
+    # même lorsque le prix courant provient d'un autre snapshot actif.
+    plan_snapshot = (bridge.get("snapshots") or {}).get("M15") or {}
+    robot = plan_snapshot.get("robotV12") or {}
     def _num(key):
         try:
             value = float(robot.get(key))
@@ -1575,7 +1578,7 @@ def prix_tradingview_actif(r):
     previous_high = _num("entryBarHigh")
     previous_low = _num("entryBarLow")
     ohlc_available = (
-        snapshot.get("robotFresh") is True
+        plan_snapshot.get("robotFresh") is True
         and robot.get("activeEntryBarOhlcAvailable") is True
         and active_time is not None
         and None not in (active_open, active_high, active_low, active_close)
