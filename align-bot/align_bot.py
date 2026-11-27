@@ -1648,7 +1648,6 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
           "ZONE DAILY LOCALE" if require_tv else "ZONE DAILY", zone_txt(r['posD']),
           "ZONE WEEKLY LOCALE" if require_tv else "ZONE WEEKLY", zone_txt(r['posW']),
           "━━━━━━━━━━━━━━━━━━", "🧭 LECTURE MULTI-TIMEFRAME LOCALE" if require_tv else "🧭 PLAN MULTI-TIMEFRAME"] + strategie_mtf(r)
-    l = [line for line in l if line != ""]
     nc = dict((n, v) for v, n in (r.get("niv_cles") or []))
     ph_, pb_ = nc.get("plus haut d'hier"), nc.get("plus bas d'hier")
     contexte = []
@@ -1694,7 +1693,7 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
     if r.get("accum"):
         contexte.append("⚠️ Accumulation possible : soutien en zone basse (divergence RSI)")
     if contexte:
-        l += ["━━━━━━━━━━━━━━━━━━", "🌍 NIVEAUX & CONTEXTE"] + contexte
+        l += ["━━━━━━━━━━━━━━━━━━", "🌍 NIVEAUX & CONTEXTE (prix local M1)" if require_tv else "🌍 NIVEAUX & CONTEXTE"] + contexte
     o = (cle or {}).get("ordre")
     tr = (cle or {}).get("trade")
     if not require_tv and r["confirme"] and o and not tr:
