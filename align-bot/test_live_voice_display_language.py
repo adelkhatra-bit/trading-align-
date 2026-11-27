@@ -80,6 +80,12 @@ class LiveVoiceDisplayLanguage(unittest.TestCase):
         self.assertIn("!voixWorkerConfirmee", source)
         self.assertIn("if (!voixActive && !estProprietaireEcran() && !prendreLeaseHeartbeat())", click)
         self.assertIn("voixWorkerConfirmee = false;", publisher)
+        storage_start = source.index("window.addEventListener('storage', event => {")
+        storage_end = source.index("  });", storage_start)
+        storage = source[storage_start:storage_end]
+        self.assertIn("if (!ok) {", storage)
+        self.assertIn("voixActive = false;", storage)
+        self.assertIn("COACH VOCAL NON CONNECTÉ", storage)
 
 
 
