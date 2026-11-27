@@ -8991,8 +8991,16 @@ def traiter(etat, chats, updates):
                                                                                  [{"text": "↩️ Retour à l'analyse", "callback_data": f"resume:{mk}"}]]}))
                 else:
                     tr_detail = cle_detail.get("trade")
+                    bridge_required = r_detail.get("require_tv_bridge") is True
+                    tv_price = prix_tradingview_actif(r_detail) if bridge_required else None
                     if tr_detail:
-                        txt_niveaux = fmt_trade(mk, tr_detail, r_detail["m1"][-1]["c"])
+                        prix_detail = tv_price["price"] if tv_price else (None if bridge_required else r_detail["m1"][-1]["c"])
+                        txt_niveaux = fmt_trade(mk, tr_detail, prix_detail)
+                        if bridge_required and tv_price is None:
+                            txt_niveaux += "\n⏳ Prix TradingView indisponible : l'évolution du trade n'est pas affichée."
+                    elif bridge_required:
+                        # En mode Pine obligatoire, ne jamais réafficher un ordre mémorisé après disparition ou invalidation du plan.
+                        txt_niveaux = texte_vision(mk, r_detail, cle_detail, anglais=str(qui) in LANG_EN)
                     elif cle_detail.get("ordre"):
                         txt_niveaux = ("🟨 ZONE DE PRÉPARATION\n" + statut_txt(0, cle_detail["ordre"]).strip()
                                        + "\n⏳ Aucun déclenchement confirmé : attendre la clôture prévue.")
