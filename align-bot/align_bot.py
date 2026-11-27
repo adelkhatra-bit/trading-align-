@@ -9205,10 +9205,18 @@ def traiter(etat, chats, updates):
                     except Exception:
                         pass
                     _deja = (etat.get(mk) or {}).get("trade")
-                    _envoi_sur(qui, text=(f"🧑‍🏫 COACH ACTIVÉ : {mk}\n" + (f"📍 Une position {'🟢 LONG' if _deja['d'] == 1 else '🔴 SHORT'} est déjà ouverte : je surveille SL, BE et TP\n🔔 Et je te préviens avant la prochaine entrée" if _deja else "🎯 Tu recevras UNIQUEMENT la prochaine position confirmée\n📍 Entrée, SL et TP dès qu'elle est validée, pas avant\n🔕 Je me coupe tout seul après le TP / SL")
+                    _envoi_sur(qui, text=(f"🧑‍🏫 COACH ACTIVÉ : {mk}\n" + (
+                                              f"📍 Une position {'🟢 LONG' if _deja['d'] == 1 else '🔴 SHORT'} est déjà en cours.\n"
+                                              "⛔ Je ne te ferai pas entrer en retard. Je cherche la prochaine entrée confirmée.\n"
+                                              "👇 Ton suivi personnel démarre après ton exécution et le clic « J'ai exécuté le plan »."
+                                              if _deja else
+                                              "🎯 Tu recevras la prochaine position confirmée.\n"
+                                              "📍 Entrée, SL et TP seulement après validation Pine et contrôle du prix.\n"
+                                              "👇 Exécute manuellement, puis clique « J'ai exécuté le plan » pour activer ton suivi.\n"
+                                              "🔕 Aucun ordre broker n'est envoyé.")
                                           + "\n🔕 Tu peux me couper à tout moment : « Mon bot »"
                                           if qui not in LANG_EN else
-                                          f"🔔 FOLLOWING {mk}\nI'll alert you when an entry is confirmed."))
+                                          f"🔔 FOLLOWING {mk}\nI'll alert you only when Pine confirms an entry. Execute manually, then confirm to start your personal tracking. No broker order is sent."))
                     # Demande d'Adel : le coach demande UNE fois la plateforme (Topstep ou FundedNext / FTMO)
                     # pour donner les bons prix et montants.
                     if str(qui) not in (etat.get("plateforme") or {}):
