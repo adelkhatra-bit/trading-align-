@@ -4445,9 +4445,10 @@ class PineOnlyEntryGateTests(unittest.TestCase):
         with patch.object(align_bot, "gerer_stop"), \
              patch.object(align_bot, "_telegram_envoyer_commentaire_coach_prive") as send:
             align_bot.coach({"cal": {"ev": []}}, "BTC", r, {"trade": trade})
-        self.assertEqual(pos["sl"], 101.25)
+        self.assertEqual(pos["sl"], 98.0)
+        self.assertEqual(pos["sl_conseil"], 101.25)
         self.assertTrue(pos["be_notified"])
-        self.assertIn("stop de suivi est remonté à ton entrée", send.call_args.args[3])
+        self.assertIn("stop de suivi est remonté au break-even", send.call_args.args[3])
         self.assertIn("101,25", send.call_args.args[3])
 
 
