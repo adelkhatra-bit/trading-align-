@@ -398,6 +398,7 @@
       voixBtn.title = 'Attente de confirmation du Worker vocal.';
       mettreEtatVoix();
       if (!es) { ecouter(); pingEcran(); }
+      // Nettoyer le cache avant même la synchronisation Worker : aucun ancien commentaire ne doit repartir.
       dernierDialogueCoach = null;
       dernierDialogueCoachTs = Date.now();
       dernierCommentaireIA = null;
