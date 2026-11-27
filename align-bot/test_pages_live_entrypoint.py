@@ -35,6 +35,19 @@ class PagesLiveEntrypointTests(unittest.TestCase):
         self.assertNotIn("tv_price", builder)
         self.assertNotIn("entry", builder.lower().replace("entrée", ""))
 
+    def test_coach_commentary_separates_timeframe_count_from_required_threshold(self):
+        page = (ROOT / "docs" / "live" / "index.html").read_text(encoding="utf-8")
+        start = page.index("function construireCommentaireEtat(m) {")
+        end = page.index("function echange()", start)
+        builder = page[start:end]
+        self.assertIn("var totalUT = 11;", builder)
+        self.assertIn('" unités alignées sur " + totalUT + " (seuil requis : " + seuil + ")."', builder)
+        self.assertIn('" timeframes aligned out of " + totalUT + " (required threshold: " + seuil + ")."', builder)
+        self.assertIn('" unités alignées sur " + totalUT + " (seuil requis : " + seuil + "), profil " + profil', builder)
+        self.assertIn('" timeframes aligned out of " + totalUT + " (required threshold: " + seuil + "), profile " + profil', builder)
+        self.assertNotIn('" unités alignées sur " + seuil', builder)
+        self.assertNotIn('" timeframes aligned out of " + seuil', builder)
+
     def test_live_dashboard_target_exists(self):
         self.assertTrue((ROOT / "docs" / "live" / "index.html").is_file())
 
