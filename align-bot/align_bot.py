@@ -296,8 +296,7 @@ def plan_indicateur(r):
 
     def indisponible(reason):
         result = {"timeframe": plan_tf, "available": False, "reason": reason}
-        if (snap.get("fresh") is True and snap.get("robotFresh") is True
-                and pine_verdict and pine_verdict.upper() not in {"LONG", "SHORT", "WAIT"}):
+        if snap.get("fresh") is True and snap.get("robotFresh") is True and pine_verdict:
             result["verdict"] = pine_verdict
         return result
     try:
@@ -1618,7 +1617,15 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
             if trade_ouvert:
                 etat_pos = "🟢 POSITION ALIGN EN COURS — exécution manuelle, suivi personnel après confirmation"
             elif not tv_plan or tv_plan.get("available") is not True:
-                etat_pos = "⏳ ATTENTE — plan TradingView/Pine v25 indisponible"
+                verdict = str((tv_plan or {}).get("verdict") or "").upper()
+                if "SHORT" in verdict or "BAISSE" in verdict:
+                    etat_pos = "⏳ ATTENTE — biais SHORT, aucun plan confirmé par Pine v25"
+                elif "LONG" in verdict or "HAUSSE" in verdict:
+                    etat_pos = "⏳ ATTENTE — biais LONG, aucun plan confirmé par Pine v25"
+                elif verdict in {"WAIT", "ATTENDRE", "ATTENTE"}:
+                    etat_pos = "⏳ ATTENTE — aucun biais LONG/SHORT confirmé par Pine v25"
+                else:
+                    etat_pos = "⏳ ATTENTE — données Pine v25 absentes ou périmées"
             elif not plan_confirme:
                 etat_pos = "⏳ ATTENTE — confirmation MTF Pine non validée"
             else:
@@ -2982,6 +2989,10 @@ TRAD.update({
     "🟢 Bougie en hausse": "🟢 Candle rising",
     "🔴 Bougie en baisse": "🔴 Candle falling",
     "⚪ Bougie à plat": "⚪ Flat candle",
+    "⏳ ATTENTE — biais SHORT, aucun plan confirmé par Pine v25": "⏳ WAITING — SHORT bias, no plan confirmed by Pine v25",
+    "⏳ ATTENTE — biais LONG, aucun plan confirmé par Pine v25": "⏳ WAITING — LONG bias, no plan confirmed by Pine v25",
+    "⏳ ATTENTE — aucun biais LONG/SHORT confirmé par Pine v25": "⏳ WAITING — no LONG/SHORT bias confirmed by Pine v25",
+    "⏳ ATTENTE — données Pine v25 absentes ou périmées": "⏳ WAITING — Pine v25 data missing or stale",
     "👁 Mèche haute : rejet": "👁 Upper wick: rejection",
     "👁 Mèche basse : rejet": "👁 Lower wick: rejection",
     "👁 Mèche haute : rejet vendeur potentiel (biais SHORT)": "👁 Upper wick: potential seller rejection (SHORT bias)",

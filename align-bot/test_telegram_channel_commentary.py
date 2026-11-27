@@ -273,6 +273,51 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
             self.assertIn("aucun biais LONG/SHORT déduit", unavailable)
             self.assertNotIn("11/11", unavailable)
 
+    def test_free_market_status_explains_waiting_long_short_or_missing_pine_data(self):
+        cases = (
+            ("ATTENDRE BAISSE", "biais SHORT, aucun plan confirmé", "SHORT bias, no plan confirmed"),
+            ("ATTENDRE HAUSSE", "biais LONG, aucun plan confirmé", "LONG bias, no plan confirmed"),
+            ("WAIT", "aucun biais LONG/SHORT confirmé", "no LONG/SHORT bias confirmed"),
+        )
+        price = {"timeframe": "M15", "price": 60000.0, "ageMs": 1000}
+        market = {"require_tv_bridge": True, "m1": [{"c": 60000.0}]}
+        for verdict, french_label, english_label in cases:
+            with (
+                patch.object(ab, "prix_tradingview_actif", return_value=price),
+                patch.object(ab, "plan_indicateur", return_value={"available": False, "verdict": verdict}),
+            ):
+                message = ab.texte_etat("BTC", market, vip=False)
+            with self.subTest(verdict=verdict):
+                self.assertIn(french_label, message)
+                self.assertNotIn("plan TradingView/Pine v25 indisponible", message)
+                self.assertIn(english_label, ab.traduire(message))
+
+        missing = {"available": False, "reason": "plan M15 / zone / bougie de validation Pine incomplets"}
+        with (
+            patch.object(ab, "prix_tradingview_actif", return_value=price),
+            patch.object(ab, "plan_indicateur", return_value=missing),
+        ):
+            message = ab.texte_etat("BTC", market, vip=False)
+        self.assertIn("données Pine v25 absentes ou périmées", message)
+        self.assertIn("Pine v25 data missing or stale", ab.traduire(message))
+
+    def test_fresh_wait_verdict_is_preserved_when_pine_plan_levels_are_absent(self):
+        market = {
+            "tv_indicator_mtf": {
+                "activeTimeframe": "M15",
+                "snapshots": {
+                    "M15": {
+                        "fresh": True,
+                        "robotFresh": True,
+                        "robotV12": {"verdict": "WAIT"},
+                    }
+                },
+            }
+        }
+        plan = ab.plan_indicateur(market)
+        self.assertIs(plan["available"], False)
+        self.assertEqual(plan["verdict"], "WAIT")
+
     def test_position_followup_allows_levels_only_for_exact_active_position_owner(self):
         position = {"fini": False, "e": 100.0, "sl": 95.0}
         trade = {"qui": {"101": position}}
