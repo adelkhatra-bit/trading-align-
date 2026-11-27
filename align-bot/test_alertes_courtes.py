@@ -283,7 +283,8 @@ class EvenementsPine(unittest.TestCase):
     def test_every_alignment_message_variant_keeps_direction_and_timeframe_breakdown(self):
         ev = {"kind": "align_haut", "m": "BTC", "ic": "₿", "d": 1, "n": 8,
               "tf_total": 12, "pine_confirmed": True,
-              "tf_lines": ["🟢 UT favorables au LONG (8/12) : 1 min, 3 min, 5 min"]}
+              "tf_lines": ["🟢 UT favorables au LONG (8/12) : 1 min, 3 min, 5 min"],
+              "tf_lines_en": ["🟢 LONG support (8/12): 1 min, 3 min, 5 min"]}
         etat, messages = {}, []
         for _ in range(3):
             messages.append("\n".join(ab.texte_pine(etat, ev)))
