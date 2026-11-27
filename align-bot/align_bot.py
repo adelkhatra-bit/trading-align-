@@ -1539,7 +1539,7 @@ def mouvement_recent_m1(r, nb=5):
 
 
 def prix_tradingview_actif(r):
-    """Retourne uniquement le prix actif du snapshot TradingView/Pine frais et explicitement disponible."""
+    """Prix et OHLC du déclencheur issus du même snapshot Pine v25 frais."""
     bridge = (r or {}).get("tv_indicator_mtf") or {}
     if bridge.get("available") is not True:
         return None
@@ -1553,6 +1553,36 @@ def prix_tradingview_actif(r):
         return None
     if not math.isfinite(price) or price <= 0:
         return None
+    robot = snapshot.get("robotV12") or {}
+    def _num(key):
+        try:
+            value = float(robot.get(key))
+            return value if math.isfinite(value) else None
+        except (TypeError, ValueError):
+            return None
+    def _ms(key):
+        try:
+            value = int(robot.get(key))
+            return value if value > 0 else None
+        except (TypeError, ValueError):
+            return None
+    active_open = _num("activeEntryBarOpen")
+    active_high = _num("activeEntryBarHigh")
+    active_low = _num("activeEntryBarLow")
+    active_close = _num("activeEntryBarClose")
+    active_time = _ms("activeEntryBarTime")
+    previous_time = _ms("entryBarTime")
+    previous_high = _num("entryBarHigh")
+    previous_low = _num("entryBarLow")
+    ohlc_available = (
+        snapshot.get("robotFresh") is True
+        and robot.get("activeEntryBarOhlcAvailable") is True
+        and active_time is not None
+        and None not in (active_open, active_high, active_low, active_close)
+        and active_low <= min(active_open, active_close) <= max(active_open, active_close) <= active_high
+        and previous_time is not None
+        and None not in (previous_high, previous_low)
+    )
     age_ms = bridge.get("activeTimeframeAgeMs")
     if age_ms is None:
         age_ms = snapshot.get("robotAgeMs")
@@ -1561,7 +1591,71 @@ def prix_tradingview_actif(r):
         "timeframe": timeframe,
         "ageMs": age_ms,
         "timestamp": snapshot.get("robotTimestamp") or snapshot.get("timestamp"),
+        "entryTimeframe": str(robot.get("entryTimeframe") or "").upper(),
+        "barOhlcAvailable": bool(ohlc_available),
+        "activeEntryBarTime": active_time,
+        "activeEntryBarOpen": active_open,
+        "activeEntryBarHigh": active_high,
+        "activeEntryBarLow": active_low,
+        "activeEntryBarClose": active_close,
+        "entryBarTime": previous_time,
+        "entryBarHigh": previous_high,
+        "entryBarLow": previous_low,
     }
+
+
+def extremes_tradingview_depuis_entree(tv, trade):
+    """Extrêmes Pine observés après l'entrée, sans compter les mèches antérieures à l'entrée."""
+    if not isinstance(tv, dict) or tv.get("barOhlcAvailable") is not True:
+        return None
+    try:
+        price = float(tv["price"])
+        active_time = int(tv["activeEntryBarTime"])
+        entry_time = int(trade["tvEntryBarTime"])
+        baseline_high = float(trade["tvEntryBarHigh"])
+        baseline_low = float(trade["tvEntryBarLow"])
+        active_high = float(tv["activeEntryBarHigh"])
+        active_low = float(tv["activeEntryBarLow"])
+        previous_time = int(tv["entryBarTime"])
+        previous_high = float(tv["entryBarHigh"])
+        previous_low = float(tv["entryBarLow"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if active_time < entry_time:
+        return None
+    hi = lo = price
+    if active_time == entry_time:
+        # Même bougie que l'entrée : seules les nouvelles extensions au-delà du baseline comptent.
+        if active_high > baseline_high:
+            hi = max(hi, active_high)
+        if active_low < baseline_low:
+            lo = min(lo, active_low)
+    else:
+        # Bougie d'entrée clôturée : comparer ses extrêmes au baseline enregistré au clic.
+        if previous_time == entry_time:
+            if previous_high > baseline_high:
+                hi = max(hi, previous_high)
+            if previous_low < baseline_low:
+                lo = min(lo, previous_low)
+        elif previous_time > entry_time:
+            hi = max(hi, previous_high)
+            lo = min(lo, previous_low)
+        hi = max(hi, active_high)
+        lo = min(lo, active_low)
+    return hi, lo
+
+
+def initialiser_base_tradingview(trade, tv):
+    """Initialise une seule fois le baseline de la bougie active au moment de l'entrée."""
+    if not isinstance(tv, dict) or tv.get("barOhlcAvailable") is not True:
+        return False
+    if trade.get("tvEntryBarTime") and trade.get("tvEntryBarHigh") is not None and trade.get("tvEntryBarLow") is not None:
+        return True
+    trade["tvEntryBarTime"] = tv["activeEntryBarTime"]
+    trade["tvEntryBarHigh"] = tv["activeEntryBarHigh"]
+    trade["tvEntryBarLow"] = tv["activeEntryBarLow"]
+    trade["tvEntryTimeframe"] = tv.get("entryTimeframe")
+    return False
 
 
 def texte_etat(nom_marche, r, cle=None, vip=True):
