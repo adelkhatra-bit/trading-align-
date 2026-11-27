@@ -379,6 +379,12 @@
     if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
       voixBtn.textContent = '⚠️ Voix indisponible'; return;
     }
+    if (!voixActive && !estProprietaireEcran() && !prendreLeaseHeartbeat()) {
+      voixBtn.textContent = '🔊 COACH VOCAL SUR AUTRE ONGLET';
+      voixBtn.setAttribute('aria-pressed', 'false');
+      voixBtn.title = 'Le coach vocal est déjà contrôlé par un autre onglet TradingView.';
+      return;
+    }
     voixActive = !voixActive;
     try { localStorage.setItem('alignVoixActive', voixActive ? '1' : '0'); } catch (e) {}
     if (voixActive) {
@@ -473,6 +479,7 @@
   let vivant = true;
   function publierEtatCoach(enabled, forceOwner = false, callback = null) {
     const sequence = ++voixSyncSeq;
+    voixWorkerConfirmee = false;
     const owner = enabled ? prendreLeaseHeartbeat() : (forceOwner || estProprietaireEcran());
     const terminer = ok => {
       if (sequence !== voixSyncSeq) return;
@@ -1365,6 +1372,7 @@
       const etaitProprietaire = estProprietaireEcran();
       if (ecouteRetryTimer) { clearTimeout(ecouteRetryTimer); ecouteRetryTimer = null; }
       if (etaitProprietaire) {
+        voixWorkerConfirmee = false;
         try { window.speechSynthesis.cancel(); } catch (e) {}
         voixEnAttente = null;
         annulerReprisesVoix();
