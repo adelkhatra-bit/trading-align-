@@ -3104,6 +3104,22 @@ TRAD.update({   # Provenance explicite des sources dans les cartes Telegram ALIG
     "🎯 POINT VISÉ : déclencheur Pine validé, sous réserve des filtres de sécurité ALIGN": "🎯 TARGET: Pine trigger validated, subject to ALIGN safety filters",
     "🎯 POINT VISÉ : attente du retour dans la zone Pine M15": "🎯 TARGET: waiting for price to return to the Pine M15 zone",
     "🎯 POINT VISÉ : plan Pine confirmé, déclencheur clôturé en attente": "🎯 TARGET: Pine plan confirmed, waiting for the closed-candle trigger",
+    "snapshot TradingView canonique M15 périmé": "canonical M15 TradingView snapshot is stale",
+    "plan ROBOT V12 M15 périmé": "ROBOT V12 M15 plan is stale",
+    "prix TradingView actif absent ou périmé": "active TradingView price is missing or stale",
+    "prix TradingView actif absent": "active TradingView price is missing",
+    "prix TradingView actif invalide": "active TradingView price is invalid",
+    "référence du plan différente de M15": "plan timeframe is not M15",
+    "unité de validation incohérente avec la stratégie": "validation timeframe does not match the strategy",
+    "direction ou niveaux M15 invalides": "M15 direction or levels are invalid",
+    "géométrie zone / entrée / SL / TP incohérente": "zone / entry / SL / TP geometry is inconsistent",
+    "bougie de validation OHLC incohérente": "validation candle OHLC is inconsistent",
+    "plan M15 / zone / bougie de validation Pine incomplets": "M15 / zone / Pine validation candle plan is incomplete",
+    "bridge inaccessible": "bridge unreachable",
+    "bridge TradingView non configuré": "TradingView bridge is not configured",
+    "réponse bridge invalide": "invalid bridge response",
+    "📈 Mouvement court terme (": "📈 Short-term move (",
+    " clôtures M1) : ": " M1 closes): ",
 })
 
 _CLES = sorted(TRAD, key=len, reverse=True)
