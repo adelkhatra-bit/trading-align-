@@ -180,11 +180,11 @@ class EvenementsPine(unittest.TestCase):
     def test_alignment_alerts_explain_direction_without_claiming_entry(self):
         rising_cases = (
             (1, {"bull": 4, "bear": 2}, {"bull": 8, "bear": 2},
-             "LONG (orientation Pine, non confirmée)", "confluence seulement"),
+             "LONG à surveiller (non confirmée)", "confluence seulement"),
             (-1, {"bull": 2, "bear": 4}, {"bull": 2, "bear": 8},
-             "SHORT (orientation Pine, non confirmée)", "confluence seulement"),
+             "SHORT à surveiller (non confirmée)", "confluence seulement"),
             (0, {"bull": 4, "bear": 2}, {"bull": 8, "bear": 2},
-             "aucun sens LONG/SHORT défini par Pine", "aucun sens de trade confirmé"),
+             "non définie (ni LONG ni SHORT)", "aucun sens de trade confirmé"),
         )
         for direction, before, after, expected_direction, expected_action in rising_cases:
             with self.subTest(kind="rising", direction=direction):
