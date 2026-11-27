@@ -79,6 +79,8 @@ class FlashCommentateur(unittest.TestCase):
         r = {"atr": 100, "m1": [dict(o=1000, c=990), dict(o=990, c=960), dict(o=960, c=930)], "b15": []}
         t = ab.flash_commentateur("BTC", r, {"trade": {"d": -1}})
         self.assertIn("ÇA BOUGE", t); self.assertIn("vendeurs", t); self.assertIn("Dans le sens du bot", t)
+        self.assertIn("Clôtures MTF : indisponibles", t)
+        self.assertIn("pas une entrée", t)
 
     def test_grosse_meche_haute_est_clairement_un_rejet_baissier_non_confirme(self):
         r = {
