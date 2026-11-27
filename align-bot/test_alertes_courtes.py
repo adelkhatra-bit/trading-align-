@@ -263,12 +263,12 @@ class EvenementsPine(unittest.TestCase):
                            "⏳ UT absentes ou périmées (1) : 1 semaine",
                            "🎯 Plan DAY M15 confirmé : attendre la clôture M5 ; aucune entrée pour l'instant."]}
         alignment = ab.texte_pine({}, ev)
-        grouped = "\\n".join(ab.regrouper_alertes([alignment, ["⚡ Compression relâchée", "Autre information"]]))
+        grouped = "\n".join(ab.regrouper_alertes([alignment, ["⚡ Compression relâchée", "Autre information"]]))
         self.assertIn("LONG", grouped)
         self.assertIn("8/12", grouped)
         self.assertIn("UT contraires", grouped)
         self.assertIn("attendre la clôture M5", grouped)
-        self.assertLessEqual(len(grouped.split("\\n")), 9)
+        self.assertLessEqual(len(grouped.split("\n")), 9)
 
     def test_unconfirmed_pine_plan_never_creates_long_or_short_alignment_alert(self):
         plan = {"available": True, "confirmed": False, "direction": 1}
