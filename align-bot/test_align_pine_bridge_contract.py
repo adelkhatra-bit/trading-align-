@@ -199,6 +199,35 @@ if barstate.isconfirmed
             "entryReadyUi = entryTriggeredUi and close >= zBas and close <= zHaut",
             1,
         )
+        # Normalize only the approved MTF table presentation changes; the dedicated
+        # visual contract test asserts the new 1W column and closed-RSI semantics.
+        without_export = without_export.replace(
+            "var table t = table.new(pos, 12, 3",
+            "var table t = table.new(pos, 11, 3",
+            1,
+        )
+        without_export = without_export.replace(
+            "rv = array.get(rsisFermees, i)",
+            "rv = array.get(rsis, i)",
+            1,
+        )
+        without_export = without_export.replace("RSI clôturé :", "RSI :", 1)
+        without_export = without_export.replace("Compression en formation :", "Compression :", 1)
+        without_export = without_export.replace(
+            "OUI ⚡ (information provisoire)",
+            "OUI ⚡ prêt à exploser (attendre la direction)",
+            1,
+        )
+        weekly_start = without_export.find("    // Weekly : contexte clôturé affiché séparément")
+        weekly_end = without_export.find("// État de confirmation calculé pour l'affichage", weekly_start)
+        self.assertGreaterEqual(weekly_start, 0)
+        self.assertGreater(weekly_end, weekly_start)
+        without_export = without_export[:weekly_start] + without_export[weekly_end:]
+        without_export = without_export.replace(
+            "table.merge_cells(t, 0, 2, 11, 2)",
+            "table.merge_cells(t, 0, 2, 10, 2)",
+            1,
+        )
         raw = without_export.encode("utf-8")
         git_blob = hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
         self.assertEqual(git_blob, BASELINE_GIT_BLOB_SHA)
