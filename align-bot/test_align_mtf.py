@@ -1172,7 +1172,7 @@ class AlignMtfRulesTest(unittest.TestCase):
     def test_news_announcement_warns_40_minutes_before_once(self):
         from unittest.mock import patch
         now = align_bot.datetime.datetime(2026, 11, 11, 12, 0, tzinfo=align_bot.PARIS).timestamp()
-        event = {"t": int(now + 40 * 60), "titre": "Discours Fed", "prev": "?", "avant": "?"}
+        event = {"t": int(now + 40 * 60), "titre": "Discours Fed", "impact": "High", "entry_block": True, "prev": "?", "avant": "?"}
         state = {"cal": {"t": now, "ev": [event]}}
         with patch.object(align_bot, "calendrier", return_value=[event]), \
              patch.object(align_bot, "minutes_avant_fermeture_gold", return_value=100), \
@@ -1188,7 +1188,7 @@ class AlignMtfRulesTest(unittest.TestCase):
         from unittest.mock import patch
         now = align_bot.datetime.datetime(2026, 11, 11, 12, 10, tzinfo=align_bot.PARIS).timestamp()
         event_time = int(now - 7 * 60)
-        event = {"t": event_time, "titre": "Discours Fed", "prev": "?", "avant": "?"}
+        event = {"t": event_time, "titre": "Discours Fed", "impact": "High", "entry_block": True, "prev": "?", "avant": "?"}
         bars = [candle(event_time + 60, o=100.0, h=102.0, l=99.0, c=101.5)]
         with patch.object(align_bot, "calendrier", return_value=[event]), \
              patch.object(align_bot, "minutes_avant_fermeture_gold", return_value=100), \
