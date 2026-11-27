@@ -319,7 +319,7 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         self.assertIn("Score candidat SHORT : 74/100", reason)
         english = ab.traduire(title + "\n" + reason)
         self.assertIn("candidate SHORT bias", english)
-        self.assertIn("no plan confirmed", english)
+        self.assertIn("No plan confirmed", english)
 
     def test_pine_wait_status_distinguishes_incomplete_data_and_confirmed_direction(self):
         title, reason = ab.statut_attente_pine({"available": False, "signal": "SHORT"})
@@ -334,6 +334,9 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         self.assertIn("CONFIRMATION MTF PINE EN ATTENTE", title)
         self.assertIn("Configuration LONG M15 détectée", reason)
         self.assertIn("Aucune entrée autorisée", reason)
+        english = ab.traduire(title + "\\n" + reason)
+        self.assertIn("LONG M15 setup detected", english)
+        self.assertIn("Wait for MTF confirmation and the closed trigger", english)
 
     def test_position_followup_allows_levels_only_for_exact_active_position_owner(self):
         position = {"fini": False, "e": 100.0, "sl": 95.0}
