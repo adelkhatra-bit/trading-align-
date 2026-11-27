@@ -123,21 +123,21 @@ class BreakEvenStopLevelReportingTest(unittest.TestCase):
                     "niveaux": [], "require_tv_bridge": False,
                 }
                 state = {"trade": trade}
-                with mock.patch.object(align_bot, "mode_sans_signal", return_value=False), \\
-                     mock.patch.object(align_bot, "manipulation", return_value=None), \\
-                     mock.patch.object(align_bot, "meche_suspecte", return_value=None), \\
-                     mock.patch.object(align_bot, "niveaux_cles", return_value=None), \\
-                     mock.patch.object(align_bot, "resistance_fvg", return_value=None), \\
-                     mock.patch.object(align_bot, "suivre_apres_sl", return_value=None), \\
-                     mock.patch.object(align_bot, "radar_climax", return_value=None), \\
-                     mock.patch.object(align_bot, "retournement_marche", return_value=None), \\
-                     mock.patch.object(align_bot, "lecture_tp1", return_value=[]), \\
-                     mock.patch.object(align_bot, "carte_suivi", side_effect=lambda market, title, lines, *args, **kwargs: "\\n".join([title] + lines)):
+                with mock.patch.object(align_bot, "mode_sans_signal", return_value=False), \
+                     mock.patch.object(align_bot, "manipulation", return_value=None), \
+                     mock.patch.object(align_bot, "meche_suspecte", return_value=None), \
+                     mock.patch.object(align_bot, "niveaux_cles", return_value=None), \
+                     mock.patch.object(align_bot, "resistance_fvg", return_value=None), \
+                     mock.patch.object(align_bot, "suivre_apres_sl", return_value=None), \
+                     mock.patch.object(align_bot, "radar_climax", return_value=None), \
+                     mock.patch.object(align_bot, "retournement_marche", return_value=None), \
+                     mock.patch.object(align_bot, "lecture_tp1", return_value=[]), \
+                     mock.patch.object(align_bot, "carte_suivi", side_effect=lambda market, title, lines, *args, **kwargs: "\n".join([title] + lines)):
                     messages = align_bot.agent("BTC", market_data, state, "")
 
                 self.assertEqual(trade["statut"], "tp1")
                 self.assertAlmostEqual(trade["sl"], expected)
-                joined = "\\n".join(str(message) for message in messages)
+                joined = "\n".join(str(message) for message in messages)
                 self.assertIn(label, joined)
                 self.assertIn(align_bot.px(expected), joined)
 
