@@ -2899,6 +2899,17 @@ class TestTradingViewReportRegression(unittest.TestCase):
         self.assertIn("Aucun sens de trade ni niveau Entry/SL/TP n'est autorisé.", message)
         self.assertNotIn("Direction à surveiller", message)
 
+    def test_required_bridge_why_view_keeps_open_trade_and_never_calls_local_verdict(self):
+        from unittest.mock import patch
+        r = self._required_bridge_card_fixture()
+        state = {"trade": {"d": -1, "e": 100.0, "sl": 102.0, "tp1": 96.0, "tp2": 94.0}}
+        with patch.object(align_bot, "verdict", side_effect=AssertionError("local verdict must not be used")):
+            message = align_bot.texte_pourquoi("GOLD", r, state)
+        self.assertIn("POSITION DÉJÀ OUVERTE", message)
+        self.assertIn("Direction de la position mémorisée : SHORT", message)
+        self.assertIn("Entrée, SL et objectifs restent ceux enregistrés", message)
+        self.assertNotIn("biais local", message.lower())
+
     def test_required_bridge_position_uses_tv_price_and_preserves_personal_trade_levels(self):
         r = self._required_bridge_card_fixture()
         state = {"trade": {
