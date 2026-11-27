@@ -177,6 +177,44 @@ class EvenementsPine(unittest.TestCase):
         self.lance(etat, "BTC", self.r(bull=4))
         self.assertEqual(self.lance(etat, "BTC", self.r(bull=6), self.NOW + 700), [])          # « l'alignement monte (6/11) » : déjà dans le RADAR
 
+    def test_alignment_alerts_explain_direction_without_claiming_entry(self):
+        rising_cases = (
+            (1, {"bull": 4, "bear": 2}, {"bull": 8, "bear": 2},
+             "LONG à surveiller (non confirmée)", "confluence seulement"),
+            (-1, {"bull": 2, "bear": 4}, {"bull": 2, "bear": 8},
+             "SHORT à surveiller (non confirmée)", "confluence seulement"),
+            (0, {"bull": 4, "bear": 2}, {"bull": 8, "bear": 2},
+             "non définie (ni LONG ni SHORT)", "aucun sens de trade confirmé"),
+        )
+        for direction, before, after, expected_direction, expected_action in rising_cases:
+            with self.subTest(kind="rising", direction=direction):
+                etat = {}
+                self.lance(etat, "BTC", self.r(dirPlan=direction, **before))
+                events = self.lance(etat, "BTC", self.r(dirPlan=direction, **after), self.NOW + 60)
+                self.assertEqual(self.kinds(events), ["align_haut"])
+                message = "\n".join(ab.texte_pine({}, events[0]))
+                self.assertIn(expected_direction, message)
+                self.assertIn(expected_action, message)
+                self.assertIn("Seuil technique atteint", message)
+
+        falling_cases = (
+            (1, {"bull": 8, "bear": 2}, {"bull": 6, "bear": 2},
+             "Le scénario LONG perd du soutien", "ne signale pas un SHORT"),
+            (-1, {"bull": 2, "bear": 8}, {"bull": 2, "bear": 6},
+             "Le scénario SHORT perd du soutien", "ne signale pas un LONG"),
+            (0, {"bull": 8, "bear": 2}, {"bull": 6, "bear": 2},
+             "Aucun retournement", "sens inverse n'est confirmé"),
+        )
+        for direction, before, after, expected_direction, expected_action in falling_cases:
+            with self.subTest(kind="falling", direction=direction):
+                etat = {}
+                self.lance(etat, "BTC", self.r(dirPlan=direction, **before))
+                events = self.lance(etat, "BTC", self.r(dirPlan=direction, **after), self.NOW + 60)
+                self.assertEqual(self.kinds(events), ["align_bas"])
+                message = "\n".join(ab.texte_pine({}, events[0]))
+                self.assertIn(expected_direction, message)
+                self.assertIn(expected_action, message)
+
     def test_closed_or_stale_market_never_alerts(self):
         etat = {}
         with patch.object(ab, "cme_ouvert", return_value=False):

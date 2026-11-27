@@ -384,21 +384,14 @@
       mettreEtatVoix();
       // Une seule page TradingView propriétaire reçoit et prononce les commentaires.
       if (!es) { ecouter(); pingEcran(); }
+      // Nettoyer le cache avant même la synchronisation Worker : aucun ancien commentaire ne doit repartir.
+      dernierDialogueCoach = null;
+      dernierDialogueCoachTs = Date.now();
+      dernierCommentaireIA = null;
+      voixDerniere = Date.now();
       if (!publierEtatCoach(true)) {
         voixBtn.title = 'Coach vocal activé globalement ; lecture sur l’onglet TradingView propriétaire.';
         return;
-      }
-      // Pas de phrase d'accueil : relire le dernier commentaire IA affiché, dans la langue FR puis EN.
-      voixDerniere = Date.now();
-      const dialogue = dernierDialogueCoach;
-      if (dialogue && Date.now() - Number(dialogue.ts || 0) < 30000) {
-        jouerDialogueCoach(dialogue, true);
-      } else {
-        const dernier = dernierCommentaireIA;
-        if (dernier && dernier.market && dernier.market === codeMarche()) {
-          const dureeFR = dernier.fr ? parlerLive(dernier.fr, true) : 0;
-          if (dureeFR > 0 && dernier.en && dernier.en.anglaisTraduit) parlerLive(dernier.en, true);
-        }
       }
     } else {
       try { window.speechSynthesis.cancel(); } catch (e) {}   // OFF coupe tout ce qui est en file
@@ -1333,13 +1326,12 @@
     }
     if (!estProprietaireEcran()) return;
     if (voixActive) {
+      // Activation synchronisée depuis un autre onglet : repartir sans commentaire ancien.
+      dernierDialogueCoach = null;
+      dernierDialogueCoachTs = Date.now();
+      dernierCommentaireIA = null;
       publierEtatCoach(true);
       if (!coachPollTimer) ecouterDialoguesCoach();
-      const dernier = dernierCommentaireIA;
-      if (dernier && dernier.market && dernier.market === codeMarche()) {
-        const dureeFR = dernier.fr ? parlerLive(dernier.fr, true) : 0;
-        if (dureeFR > 0 && dernier.en && dernier.en.anglaisTraduit) parlerLive(dernier.en, true);
-      }
     } else {
       try { window.speechSynthesis.cancel(); } catch (e) {}
       voixEnAttente = null;
