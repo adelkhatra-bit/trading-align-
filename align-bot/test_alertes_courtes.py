@@ -240,7 +240,7 @@ class EvenementsPine(unittest.TestCase):
             events = self.lance(etat, "BTC", second, self.NOW + 60)
 
         self.assertEqual(self.kinds(events), ["align_haut"])
-        message = "\\n".join(ab.texte_pine({}, events[0]))
+        message = "\n".join(ab.texte_pine({}, events[0]))
         self.assertIn("LONG à surveiller (plan Pine M15 confirmé)", message)
         self.assertIn("8/12", message)
         self.assertIn("UT favorables au LONG (8/12)", message)
@@ -267,12 +267,12 @@ class EvenementsPine(unittest.TestCase):
               "tf_lines": ["🟢 UT favorables au LONG (8/12) : 1 min, 3 min, 5 min"]}
         etat, messages = {}, []
         for _ in range(3):
-            messages.append("\\n".join(ab.texte_pine(etat, ev)))
+            messages.append("\n".join(ab.texte_pine(etat, ev)))
         for message in messages:
             self.assertIn("LONG", message)
             self.assertIn("8/12", message)
             self.assertIn("1 min", message)
-        english = "\\n".join(ab.texte_pine({}, ev, True))
+        english = "\n".join(ab.texte_pine({}, ev, True))
         self.assertIn("LONG", english)
         self.assertIn("8/12", english)
         self.assertIn("1 min", english)
