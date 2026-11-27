@@ -8124,6 +8124,27 @@ def repondre(etat, cid, oui, mk=None):
             if not tv_price:
                 _envoi_sur(cid, text=f"⏳ {m} : prix TradingView indisponible ou périmé.\nAucun suivi n'est ouvert et aucun prix local ne le remplace. Attends le prochain snapshot frais.")
                 return
+            if tv_price.get("barOhlcAvailable") is not True:
+                _envoi_sur(cid, text=f"⏳ {m} : OHLC de la bougie déclencheuse indisponible.\nJe ne peux pas garantir le suivi des mèches SL/TP. Aucun suivi n'est ouvert.")
+                return
+            plan_courant = plan_indicateur(r_suivi)
+            if not plan_courant.get("available") or plan_courant.get("triggered") is not True:
+                _envoi_sur(cid, text=f"⛔ {m} : le déclencheur Pine v25 n'est plus confirmé.\nN'ouvre pas cette position tardivement ; attends un nouveau signal.")
+                return
+            niveaux_ok = all(abs(float(plan_courant[k]) - float(tr[t])) <= 0.02
+                             for k, t in (("entry", "e"), ("sl", "sl"), ("tp1", "tp1")))
+            if not niveaux_ok:
+                _envoi_sur(cid, text=f"⛔ {m} : les niveaux du plan ont changé sur TradingView.\nLe suivi de l'ancien plan est refusé.")
+                return
+            d_plan = int(tr["d"])
+            deja_touche = (
+                tv_price["activeEntryBarLow"] <= tr["sl"] or tv_price["activeEntryBarHigh"] >= tr["tp1"]
+                if d_plan == 1 else
+                tv_price["activeEntryBarHigh"] >= tr["sl"] or tv_price["activeEntryBarLow"] <= tr["tp1"]
+            )
+            if deja_touche:
+                _envoi_sur(cid, text=f"⛔ {m} : la bougie déclencheuse a déjà touché le SL ou le TP1.\nN'entre pas après coup ; attends une nouvelle configuration.")
+                return
             e = tv_price["price"]
         else:
             e = prix_actuel(m) or tr["e"]
@@ -8132,7 +8153,15 @@ def repondre(etat, cid, oui, mk=None):
             # Le prix est déjà collé au stop (ou l'a dépassé) : on n'ouvre pas de suivi perdant d'avance.
             _envoi_sur(cid, text=f"{ICONE.get(m, '')} {m}\n{alerte}", reply_markup=markup_position(m))
             return
-        tr.setdefault("qui", {})[cid] = {"e": e, "sl": tr["sl"], "tp1": tr["tp1"], "d": tr["d"], "t": int(time.time())}
+        pos_suivi = {"e": e, "sl": tr["sl"], "tp1": tr["tp1"], "d": tr["d"], "t": int(time.time())}
+        if r_suivi.get("require_tv_bridge"):
+            pos_suivi.update({
+                "tvEntryBarTime": tv_price["activeEntryBarTime"],
+                "tvEntryBarHigh": tv_price["activeEntryBarHigh"],
+                "tvEntryBarLow": tv_price["activeEntryBarLow"],
+                "tvEntryTimeframe": tv_price.get("entryTimeframe"),
+            })
+        tr.setdefault("qui", {})[cid] = pos_suivi
         live_suivi(etat, cid, m)
         controle = ("📡 Référence : prix TradingView actif et niveaux du plan Pine v25."
                     if r_suivi.get("require_tv_bridge") else controle_entree(etat, m, tr["d"]))
