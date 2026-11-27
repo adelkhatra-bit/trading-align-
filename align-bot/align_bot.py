@@ -1653,7 +1653,16 @@ def extremes_tradingview_depuis_entree(tv, trade):
         previous_low = float(tv["entryBarLow"])
     except (KeyError, TypeError, ValueError):
         return None
+    expected_tf = str(trade.get("tvEntryTimeframe") or tv.get("entryTimeframe") or "").upper()
+    current_tf = str(tv.get("entryTimeframe") or "").upper()
+    if expected_tf and current_tf and expected_tf != current_tf:
+        return None
+    tf_ms = {"M1": 60_000, "M5": 300_000, "H1": 3_600_000}.get(expected_tf or current_tf)
     if active_time < entry_time:
+        return None
+    # Une bougie précédente doit être adjacente à la bougie active. Un trou de données
+    # (arrêt du worker, changement de timeframe ou fermeture de marché) suspend le suivi.
+    if tf_ms and not (0 < active_time - previous_time <= int(tf_ms * 1.5)):
         return None
     hi = lo = price
     if active_time == entry_time:
@@ -8131,8 +8140,11 @@ def repondre(etat, cid, oui, mk=None):
             if not plan_courant.get("available") or plan_courant.get("triggered") is not True:
                 _envoi_sur(cid, text=f"⛔ {m} : le déclencheur Pine v25 n'est plus confirmé.\nN'ouvre pas cette position tardivement ; attends un nouveau signal.")
                 return
-            niveaux_ok = all(abs(float(plan_courant[k]) - float(tr[t])) <= 0.02
-                             for k, t in (("entry", "e"), ("sl", "sl"), ("tp1", "tp1")))
+            try:
+                niveaux_ok = all(abs(float(plan_courant[k]) - float(tr[t])) <= 0.02
+                                 for k, t in (("entry", "e"), ("sl", "sl"), ("tp1", "tp1")))
+            except (KeyError, TypeError, ValueError):
+                niveaux_ok = False
             if not niveaux_ok:
                 _envoi_sur(cid, text=f"⛔ {m} : les niveaux du plan ont changé sur TradingView.\nLe suivi de l'ancien plan est refusé.")
                 return
@@ -13558,6 +13570,9 @@ def _agent_pine_v25(m, r, cle, ferme):
         "cree": now, "ouvert_t": now, "encore": 0,
         "atr_e": None, "qui": {}, "source": "PINE_V25",
         "src": "Pine v25 M15", "sl_ut": plan["entry_timeframe"],
+        "entry_timeframe": plan["entry_timeframe"],
+        "strat": plan.get("strategy") or r.get("strategy") or r.get("profil") or "DAY",
+        "strategy": plan.get("strategy") or r.get("strategy") or r.get("profil") or "DAY",
         "sl_h": "Pine v25", "rr": abs(tp1 - entry) / risk,
         "tvEntryBarTime": plan["active_entry_bar_time"],
         "tvEntryBarHigh": plan["active_entry_bar_high"],
@@ -14475,9 +14490,18 @@ def live_pnl(etat, m, cle, r, now=None):
         if montre:
             etat.setdefault("pnl_montre", {})[m] = False
             live_publier(f"CMD:pnl:off:{m}")
-    if not tr or not r.get("m1"):
+    if not tr:
         return eteindre()
-    p, e, t1, d = r["m1"][-1]["c"], tr["e"], tr["tp1"], tr["d"]
+    if r.get("require_tv_bridge"):
+        tv_price = prix_tradingview_actif(r)
+        if not tv_price:
+            return eteindre()
+        p = tv_price["price"]
+    else:
+        if not r.get("m1"):
+            return eteindre()
+        p = r["m1"][-1]["c"]
+    e, t1, d = tr["e"], tr["tp1"], tr["d"]
     if abs(t1 - e) <= 0 or d * (p - e) / abs(t1 - e) < 0.5:
         return eteindre()
     if now - _LIVE_DERNIER.get(cle_, 0) < 60:
