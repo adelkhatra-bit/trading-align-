@@ -10862,23 +10862,133 @@ def marche_autorise(etat, cid, marche):
 
 NOMS_MARCHES = {"BTC": "🟠 BTC", "GOLD": "🥇 GOLD"}
 
-def _ou_en_est(etat, m, anglais=False):
-    """Une ligne « où ça en est » à partir des vraies données du dernier cycle (jamais inventée)."""
+def _ou_en_est(etat, m, anglais=False, now=None, cid=None):
+    """État du suivi : Pine v25 est l'unique référence en mode bridge obligatoire."""
     try:
-        tr = (etat.get(m) or {}).get("trade")
+        cle = etat.get(m) or {}
+        tr = cle.get("trade")
         r = (DERNIERS or {}).get(m) or {}
+        if not r:
+            return "waiting for fresh TradingView data" if anglais else "attente de données TradingView fraîches"
+
+        if r.get("require_tv_bridge"):
+            pos = (tr.get("qui") or {}).get(str(cid)) if isinstance(tr, dict) and cid is not None else None
+            prix = _prix_tv_actif(r)
+
+            if isinstance(tr, dict) and tr.get("sl") is not None:
+                d = int(pos.get("d", tr.get("d", 0))) if isinstance(pos, dict) else int(tr.get("d", 0))
+                entree = pos.get("e", tr.get("e")) if isinstance(pos, dict) else tr.get("e")
+                stop = pos.get("sl_conseil", pos.get("sl", tr.get("sl"))) if isinstance(pos, dict) else tr.get("sl")
+                tp1 = pos.get("tp1", tr.get("tp1")) if isinstance(pos, dict) else tr.get("tp1")
+                tp2 = tr.get("tp2")
+                sens = SENS.get(d, "LONG" if d == 1 else "SHORT")
+                if isinstance(pos, dict) and pos.get("fini"):
+                    return "personal position closed" if anglais else "position personnelle clôturée"
+                prix_txt = (f"TradingView {px(prix)} • " if anglais else f"prix TradingView {px(prix)} • ") if prix else ""
+                if isinstance(pos, dict):
+                    entree_txt = f"personal entry {px(entree)}" if anglais else f"entrée personnelle {px(entree)}"
+                else:
+                    entree_txt = f"Entry {px(entree)}" if anglais else f"entrée {px(entree)}"
+                objectifs = f"TP1 {px(tp1)}" + (f" • TP2 {px(tp2)}" if tp2 is not None else "")
+                if not prix:
+                    return (f"{sens} • {entree_txt} • SL {px(stop)} • {objectifs} • TradingView price stale; follow paused, no local fallback"
+                            if anglais else
+                            f"{sens} • {entree_txt} • SL {px(stop)} • {objectifs} • prix TradingView périmé : suivi suspendu, aucun repli local")
+                return f"{prix_txt}{sens} • {entree_txt} • SL {px(stop)} • {objectifs}"
+
+            plan = plan_indicateur(r)
+            total = len(TELEGRAM_TF_VIEWS)
+            if not plan.get("available"):
+                up = _radar_n_ut(r, 1)
+                down = _radar_n_ut(r, -1)
+                bridge = r.get("tv_indicator_mtf") or {}
+                snapshots = bridge.get("snapshots") if isinstance(bridge.get("snapshots"), dict) else {}
+                fresh = sum(1 for tf, _ in TELEGRAM_TF_VIEWS
+                            if isinstance(snapshots.get(tf), dict) and snapshots[tf].get("fresh") is True)
+                reason = str(plan.get("reason") or "plan M15 indisponible")
+                if anglais:
+                    return (f"Pine context: {up}/{total} bullish • {down}/{total} bearish • {fresh}/{total} fresh. "
+                            f"M15 plan unavailable: {reason}. No entry or local-price fallback.")
+                return (f"Contexte Pine v25 : {up}/{total} UT haussières • {down}/{total} baissières • "
+                        f"{fresh}/{total} données fraîches. Plan M15 indisponible : {reason}. "
+                        "Aucune entrée ni substitution par un prix local.")
+
+            d = int(plan["direction"])
+            sens = "LONG" if d == 1 else "SHORT"
+            n = _radar_n_ut(r, d)
+            profil = str(plan.get("strategy") or "")
+            tf = str(plan.get("entry_timeframe") or "")
+            now = time.time() if now is None else float(now)
+            seconds = {"M1": 60, "M5": 300, "H1": 3600}.get(tf)
+            quand = ""
+            if seconds:
+                reste = seconds - int(now) % seconds
+                unite = {"M1": "1 min", "M5": "5 min", "H1": "1 h"}[tf]
+                quand = (f" • next {unite} review close in {reste // 60:02d}:{reste % 60:02d}"
+                         if anglais else f" • prochaine clôture de contrôle {unite} dans {reste // 60:02d}:{reste % 60:02d}")
+
+            if not plan.get("confirmed"):
+                bridge = r.get("tv_indicator_mtf") or {}
+                snapshots = bridge.get("snapshots") if isinstance(bridge.get("snapshots"), dict) else {}
+                non_alignees = [tf_name for tf_name, _ in TELEGRAM_TF_VIEWS
+                                if not isinstance(snapshots.get(tf_name), dict)
+                                or snapshots[tf_name].get("fresh") is not True
+                                or snapshots[tf_name].get("direction") != d]
+                liste = ", ".join(non_alignees[:5])
+                if len(non_alignees) > 5:
+                    liste += f" +{len(non_alignees) - 5}"
+                if anglais:
+                    return (f"Pine v25 setup {sens} in preparation, not confirmed • {n}/{total} aligned "
+                            f"(reference threshold {MIN_ALIGN}/{total}) • waiting for closed MTF confirmation"
+                            + (f" • not aligned/stale: {liste}" if liste else "") +
+                            f"{quand}. No entry is authorized; no Entry/SL/TP is published yet.")
+                return (f"Configuration Pine v25 {sens} en préparation, non confirmée • {n}/{total} UT alignées "
+                        f"(seuil de référence {MIN_ALIGN}/{total}) • attente des clôtures MTF"
+                        + (f" • UT non alignées ou périmées : {liste}" if liste else "") +
+                        f"{quand}. Aucune entrée autorisée ; aucun Entry/SL/TP publié à ce stade.")
+
+            entry = plan["entry"]
+            stop = plan["sl"]
+            tp1 = plan["tp1"]
+            tp2 = plan.get("tp2")
+            niveaux = f"Entry {px(entry)} • SL {px(stop)} • TP1 {px(tp1)}" + (f" • TP2 {px(tp2)}" if tp2 is not None else "")
+            zone = f"{px(plan['zone_low'])} → {px(plan['zone_high'])}"
+            prix_plan = px(plan["price"])
+
+            if not plan.get("triggered"):
+                if anglais:
+                    return (f"Pine v25 plan confirmed: {sens} • {n}/{total} aligned • {profil} / {tf} • "
+                            f"{niveaux} • entry zone {zone} • current TradingView price {prix_plan} • "
+                            f"waiting for retest and a closed {tf} trigger{quand}. Preparation only; do not enter yet.")
+                return (f"Plan Pine v25 confirmé : {sens} • {n}/{total} UT alignées • {profil} / {tf} • "
+                        f"{niveaux} • zone d'entrée {zone} • prix TradingView {prix_plan} • "
+                        f"attente du retest et d'une clôture {tf} de déclenchement{quand}. Préparation uniquement : ne pas entrer.")
+
+            if not plan.get("price_in_zone"):
+                if anglais:
+                    return (f"Pine {tf} trigger confirmed, but TradingView price {prix_plan} is outside zone {zone}. "
+                            f"Wait for price to return to the zone; no market entry. {niveaux}")
+                return (f"Déclencheur Pine {tf} confirmé, mais le prix TradingView {prix_plan} est hors zone {zone}. "
+                        f"Attendre le retour dans la zone ; aucune entrée au marché. {niveaux}")
+
+            if anglais:
+                return (f"Pine {tf} trigger confirmed and TradingView price is inside the zone. "
+                        f"Final ALIGN safety checks pending; wait for the explicit ENTRY AUTHORIZED message. {niveaux}")
+            return (f"Déclencheur Pine {tf} confirmé et prix TradingView dans la zone. "
+                    f"Contrôles finaux ALIGN en attente ; attendre le message explicite ENTRÉE AUTORISÉE. {niveaux}")
+
+        # Compatibilité historique hors bridge obligatoire : comportement conservé.
         prix = r.get("prix") or (r.get("m1") or [{}])[-1].get("c")
         if isinstance(tr, dict) and tr.get("sl") is not None:
             base = (f"price {px(prix)} • " if anglais else f"prix {px(prix)} • ") if prix else ""
             return base + f"SL {px(tr['sl'])} • TP1 {px(tr['tp1'])}"
-        if not r:
-            return ""
         h = hb_etat_surveille(r)
         if not h["d"]:
             return "no clear direction yet" if anglais else "pas encore de sens clair"
         profil = f" • {h['strat']}" if h["strat"] else ""
-        minutes = {"SWING": 60, "DAY": 5, "SCALPING": 1}.get(h["strat"], 15)     # unité de validation (comme l'indicateur)
-        reste = minutes * 60 - int(time.time()) % (minutes * 60)
+        minutes = {"SWING": 60, "DAY": 5, "SCALPING": 1}.get(h["strat"], 15)
+        now = time.time() if now is None else float(now)
+        reste = minutes * 60 - int(now) % (minutes * 60)
         unite = {60: "1h", 5: "5 min", 1: "1 min"}.get(minutes, "15 min")
         quand = (f" • next {unite} close in {reste // 60:02d}:{reste % 60:02d}" if anglais
                  else f" • prochaine clôture {unite} dans {reste // 60:02d}:{reste % 60:02d}")
@@ -10887,34 +10997,41 @@ def _ou_en_est(etat, m, anglais=False):
         print("où en est", m, ex)
         return ""
 
-def texte_suivi(etat, cid):
-    """Bloc « 📡 JE SURVEILLE POUR TOI » : marché par marché, ce que le bot suit pour cette personne.
-    Une seule source de vérité (marches_choisis / en_position / etat['auto']) réutilisée partout."""
+
+def texte_suivi(etat, cid, now=None):
+    """Bloc de suivi personnel : distingue surveillance, signal autorisé et position réellement suivie."""
     cid = str(cid)
     anglais = cid in LANG_EN
     dedans = set(en_position(etat, cid))
     choisis = marches_choisis(etat, cid)
     lignes = ["📡 I'M WATCHING FOR YOU" if anglais else "📡 JE SURVEILLE POUR TOI", "━━━━━━━━━━━━━━━"]
     for m in MARCHES:
+        cle = etat.get(m) or {}
+        tr = cle.get("trade")
+        pos = (tr.get("qui") or {}).get(cid) if isinstance(tr, dict) else None
         if m in dedans:
-            etat_m = "🎯 in a position (followed to TP / SL)" if anglais else "🎯 en position (suivi jusqu'au TP / SL)"
+            etat_m = "🎯 your personal position is being followed to closure" if anglais else "🎯 ta position personnelle est suivie jusqu'à clôture"
+        elif isinstance(pos, dict) and pos.get("fini"):
+            etat_m = "🏁 your personal position is closed; waiting for the next setup" if anglais else "🏁 ta position personnelle est clôturée ; attente du prochain setup"
+        elif isinstance(tr, dict) and m in choisis:
+            etat_m = "🟢 confirmed signal — manual execution required; personal tracking not started" if anglais else "🟢 signal confirmé — exécution manuelle à effectuer ; suivi personnel pas encore démarré"
         elif m in choisis:
-            etat_m = "⏳ waiting for a confirmed entry" if anglais else "⏳ j'attends une entrée confirmée"
+            etat_m = "⏳ active monitoring — waiting for Pine v25 confirmation" if anglais else "⏳ surveillance active — attente de confirmation Pine v25"
         else:
             etat_m = "⬜ not followed" if anglais else "⬜ non suivi"
         lignes.append(f"{NOMS_MARCHES[m]} : {etat_m}")
-        if m in dedans or m in choisis:
-            detail = _ou_en_est(etat, m, anglais)
+        if m in dedans or (m in choisis and not (isinstance(pos, dict) and pos.get("fini"))):
+            detail = _ou_en_est(etat, m, anglais, now=now, cid=cid)
             if detail:
                 lignes.append(f"   ↳ {detail}")
     if not bot_on(etat, cid):
         lignes.append("⏸ Your bot is paused: 🤖 My bot to restart" if anglais
                       else "⏸ Ton bot est en pause : 🤖 Mon bot pour le relancer")
     else:
-        lignes.append("🔔 I'll alert you as soon as an entry is confirmed" if anglais
-                      else "🔔 Je te préviens dès qu'une entrée est confirmée")
+        lignes.append("🔔 I alert you only after Pine v25 confirms the setup and ALIGN safety checks pass. A candle close is a review point, not a guaranteed entry time."
+                      if anglais else
+                      "🔔 Je t'alerte uniquement après confirmation Pine v25 et validation des contrôles ALIGN. Une clôture de bougie est un point de contrôle, pas une heure d'entrée garantie.")
     return "\n".join(lignes)
-
 def menu_marches(etat, cid, message_id=None):
     """Cases à cocher : les nouveaux abonnés choisissent explicitement leurs marchés; les anciens réglages restent inchangés."""
     cid = str(cid)
