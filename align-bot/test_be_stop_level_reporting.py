@@ -96,5 +96,54 @@ class BreakEvenStopLevelReportingTest(unittest.TestCase):
         self.assertNotIn(f"SL → BE : {expected_entry}", text)
 
 
+    def test_tp1_never_relaxes_an_already_protected_stop(self):
+        now = int(time.time())
+        cases = (
+            # LONG : un stop déjà au-dessus de l'entrée doit rester au-dessus.
+            (1, 100.0, 100.1, 110.0, 115.0, 109.0, 110.5, 108.5, 110.2, 100.1, "SL conservé (plus protecteur)"),
+            # SHORT : un stop déjà sous l'entrée ne doit pas remonter vers l'entrée.
+            (-1, 100.0, 99.9, 90.0, 85.0, 91.0, 91.5, 89.5, 89.8, 99.9, "SL conservé (plus protecteur)"),
+            # LONG : un stop encore sous l'entrée est resserré à l'entrée.
+            (1, 100.0, 95.0, 110.0, 115.0, 109.0, 110.5, 108.5, 110.2, 100.0, "SL → BE"),
+            # SHORT : un stop encore au-dessus de l'entrée est resserré à l'entrée.
+            (-1, 100.0, 105.0, 90.0, 85.0, 91.0, 91.5, 89.5, 89.8, 100.0, "SL → BE"),
+        )
+        for direction, entry, old_sl, tp1, tp2, opening, high, low, close, expected, label in cases:
+            with self.subTest(direction=direction, old_sl=old_sl):
+                trade = {
+                    "d": direction, "e": entry, "sl": old_sl, "tp1": tp1, "tp2": tp2,
+                    "statut": "entree", "cree": now - 900, "encore": 0,
+                    "be_dit": direction * (old_sl - entry) > 0,
+                }
+                market_data = {
+                    "m1": [{"t": now, "o": opening, "h": high, "l": low, "c": close}],
+                    "r5": [50.0, 50.0], "confirme": direction, "t": now,
+                    "posD": 0.5, "posW": 0.5, "dirs": [direction] * 11,
+                    "atr": 2.0, "b15": [{"t": now - 900, "o": entry, "c": close}],
+                    "niveaux": [], "require_tv_bridge": False,
+                }
+                state = {"trade": trade}
+                with mock.patch.object(align_bot, "mode_sans_signal", return_value=False), \
+                     mock.patch.object(align_bot, "manipulation", return_value=None), \
+                     mock.patch.object(align_bot, "meche_suspecte", return_value=None), \
+                     mock.patch.object(align_bot, "niveaux_cles", return_value=None), \
+                     mock.patch.object(align_bot, "resistance_fvg", return_value=None), \
+                     mock.patch.object(align_bot, "suivre_apres_sl", return_value=None), \
+                     mock.patch.object(align_bot, "radar_climax", return_value=None), \
+                     mock.patch.object(align_bot, "retournement_marche", return_value=None), \
+                     mock.patch.object(align_bot, "lecture_tp1", return_value=[]), \
+                     mock.patch.object(align_bot, "carte_suivi", side_effect=lambda market, title, lines, *args, **kwargs: "\n".join([title] + lines)):
+                    messages = align_bot.agent("BTC", market_data, state, "")
+
+                self.assertEqual(trade["statut"], "tp1")
+                self.assertAlmostEqual(trade["sl"], expected)
+                joined = "\n".join(str(message) for message in messages)
+                self.assertIn(label, joined)
+                self.assertIn(align_bot.px(expected), joined)
+                self.assertIn("SL actif, TP2 visé", joined)
+                self.assertNotIn("sans risque", joined)
+
+
+
 if __name__ == "__main__":
     unittest.main()
