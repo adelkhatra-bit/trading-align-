@@ -11306,8 +11306,9 @@ def maj_jauge(etat, m, r, cle, chats, canal=None):
 def calendrier(etat, maintenant):
     """Calendrier USD avec provenance, priorité macro et rafraîchissement rapproché autour des annonces."""
     cache = etat.setdefault("cal", {})
-    intervalle = economic_news.intervalle_rafraichissement(cache.get("ev") or [], maintenant)
-    besoin_schema = cache.get("schema") != 2
+    evenements = (cache.get("ev") or []) + (cache.get("veille") or [])
+    intervalle = economic_news.intervalle_rafraichissement(evenements, maintenant)
+    besoin_schema = cache.get("schema") != 3
     if (besoin_schema or maintenant - cache.get("t", 0) > intervalle) and maintenant >= cache.get("retry_after", 0):
         cache["last_attempt_at"] = int(maintenant)
         try:
@@ -11319,7 +11320,7 @@ def calendrier(etat, maintenant):
             cache["veille"] = veille
             cache["jour"] = jour
             cache["t"] = int(maintenant)
-            cache["schema"] = 2
+            cache["schema"] = 3
             cache["source"] = economic_news.CALENDAR_SOURCE
             cache["source_url"] = economic_news.CALENDAR_URL
             cache["statut"] = "ok"
@@ -11366,7 +11367,7 @@ def annonces_et_sessions(etat, maintenant, derniers):
             vus.append(f"calinconnu{cle_j}")
             out.append("⚠️ CALENDRIER ÉCONOMIQUE INDISPONIBLE — la source ne répond pas ou le dernier relevé n'est plus vérifié. Aucune absence d'annonce n'est confirmée ; les nouvelles entrées restent bloquées.")
     else:
-        ev = list(ev or []) + list((etat.get("cal") or {}).get("veille") or [])
+        ev = sorted(list(ev or []) + list((etat.get("cal") or {}).get("veille") or []), key=lambda event: int(event.get("t") or 0))
     # Programme du jour : « aucune annonce » uniquement après une récupération vérifiée.
     if cal_known and jour.hour >= 7 and f"prog{cle_j}" not in vus:
         vus.append(f"prog{cle_j}")
