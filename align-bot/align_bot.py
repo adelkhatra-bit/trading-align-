@@ -13401,228 +13401,62 @@ def _resume_mtf_pine(r):
     return f"Contexte MTF Pine v25 : {up}/{total} haussières • {down}/{total} baissières • {neutral}/{total} neutres"
 
 
-def _agent_pine_v25(m, r, cle, ferme):
-    """Seul chemin décisionnel en production bridge : plan Pine, prix TradingView et OHLC du déclencheur."""
-    out = []
-    tv = prix_tradingview_actif(r)
-    tr = cle.get("trade")
-    if not tv:
-        if tr and not tr.get("tvDataWarningSent"):
-            tr["tvDataWarningSent"] = True
-            out.append(f"⚠️ {ICONE.get(m, '')} {m} : données TradingView absentes ou périmées. "
-                       "Le coach suspend les décisions de suivi ; aucun prix local ne remplace le bridge." + (ferme or ""))
-        return out
-
-    if tr:
-        p = tv["price"]
-        d = int(tr["d"])
-        sl = float(tr["sl"])
-        if d * (p - sl) <= 0:
-            cle["fin"] = [tr, sl, "🔒 Stop Pine touché au prix courant"]
-            cle["stop_t"] = int(time.time())
-            cle.pop("trade", None)
-            cle["aligne"] = 0
-            out.append(f"🛑 {ICONE.get(m, '')} {m} — STOP TOUCHÉ\n{SENS[d]}\n"
-                       f"Prix TradingView : {px(p)} • SL : {px(sl)}\n"
-                       "Le suivi est clôturé. Aucun ordre broker n'a été envoyé." + (ferme or ""))
-            return out
-
-        if tv.get("barOhlcAvailable") is not True:
-            if not tr.get("tvOhlcWarningSent"):
-                tr["tvOhlcWarningSent"] = True
-                out.append(f"⚠️ {ICONE.get(m, '')} {m} : OHLC de la bougie déclencheuse indisponible. "
-                           "Le prix courant reste visible, mais le suivi des mèches SL/TP est suspendu." + (ferme or ""))
-            return out
-
-        if not initialiser_base_tradingview(tr, tv):
-            if not tr.get("tvBaselineResetNotified"):
-                tr["tvBaselineResetNotified"] = True
-                out.append(f"ℹ️ {ICONE.get(m, '')} {m} : référence OHLC réinitialisée sur la bougie actuelle. "
-                           "Les mèches antérieures à cette reprise ne sont pas reconstituées." + (ferme or ""))
-            return out
-
-        extremes = extremes_tradingview_depuis_entree(tv, tr)
-        if extremes is None:
-            if not tr.get("tvOhlcWarningSent"):
-                tr["tvOhlcWarningSent"] = True
-                out.append(f"⚠️ {ICONE.get(m, '')} {m} : séquence OHLC du déclencheur incohérente ou incomplète. "
-                           "Le coach suspend les décisions sur mèches jusqu'au retour d'un flux cohérent." + (ferme or ""))
-            return out
-        hi, lo = extremes
-        t1 = float(tr["tp1"])
-        t2 = float(tr["tp2"]) if tr.get("tp2") not in (None, "") else None
-        touche_sl = lo <= sl if d == 1 else hi >= sl
-        touche_t1 = hi >= t1 if d == 1 else lo <= t1
-        touche_t2 = (hi >= t2 if d == 1 else lo <= t2) if t2 is not None else False
-
-        # Si SL et TP sont touchés dans la même bougie, l'ordre intrabar est inconnu :
-        # convention conservatrice, le SL est considéré touché en premier.
-        if touche_sl:
-            cle["fin"] = [tr, sl, "🛑 Stop touché — priorité conservatrice sur bougie ambiguë"]
-            cle["stop_t"] = int(time.time())
-            cle.pop("trade", None)
-            cle["aligne"] = 0
-            out.append(f"🛑 {ICONE.get(m, '')} {m} — STOP TOUCHÉ\n{SENS[d]}\n"
-                       f"Extrêmes du déclencheur : {px(lo)} – {px(hi)}\nSL : {px(sl)}\n"
-                       "Le coach clôture le suivi. Aucun ordre broker n'a été envoyé." + (ferme or ""))
-            return out
-
-        if tr.get("statut") == "entree" and touche_t1:
-            tr["statut"] = "tp1"
-            tr["sl"] = float(tr["e"])
-            for pos in tr.get("qui", {}).values():
-                if isinstance(pos, dict) and not pos.get("fini"):
-                    pos["sl"] = pos.get("e", tr["e"])
-                    pos.pop("sl_conseil", None)
-            out.append(f"💰 {ICONE.get(m, '')} {m} — TP1 TOUCHÉ\n{SENS[d]}\n"
-                       f"TP1 : {px(t1)} • SL sécurisé à BE : {px(tr['sl'])}\n"
-                       + (f"🏁 TP2 restant : {px(t2)}\n" if t2 is not None else "Objectif final atteint.\n")
-                       + "Le coach continue le suivi jusqu'à TP2 ou sortie au BE." + (ferme or ""))
-            if t2 is None:
-                cle["fin"] = [tr, t1, "🏁 Objectif final TP1 atteint"]
-                cle.pop("trade", None)
-                cle["aligne"] = 0
-                return out
-            if touche_t2:
-                cle["fin"] = [tr, t2, "🏁 TP2 atteint après TP1"]
-                cle.pop("trade", None)
-                cle["aligne"] = 0
-                out.append(f"🏁 {ICONE.get(m, '')} {m} — TP2 TOUCHÉ : {px(t2)}. Position clôturée." + (ferme or ""))
-                return out
-            tr["lastCoachUpdate"] = time.time()
-            return out
-
-        if tr.get("statut") == "tp1" and touche_t2:
-            cle["fin"] = [tr, t2, "🏁 TP2 atteint"]
-            cle.pop("trade", None)
-            cle["aligne"] = 0
-            out.append(f"🏁 {ICONE.get(m, '')} {m} — TP2 TOUCHÉ : {px(t2)}\n"
-                       "Position clôturée ; le coach termine le suivi." + (ferme or ""))
-            return out
-
-        progress = d * (p - float(tr["e"])) / max(abs(t1 - float(tr["e"])), 1e-9)
-        if progress >= 0.8 and not tr.get("approche_tp1_sent"):
-            tr["approche_tp1_sent"] = True
-            out.append(f"🎯 {ICONE.get(m, '')} {m} : TP1 approche ({progress:.0%})\n"
-                       f"Prix TradingView : {px(p)} • TP1 : {px(t1)} • SL : {px(tr['sl'])}\n"
-                       "Ne déplace pas le stop manuellement ; le coach poursuit le suivi." + (ferme or ""))
-            tr["lastCoachUpdate"] = time.time()
-            return out
-        if time.time() - float(tr.get("lastCoachUpdate") or tr.get("cree") or time.time()) >= 900:
-            tr["lastCoachUpdate"] = time.time()
-            objectif = t2 if tr.get("statut") == "tp1" and t2 is not None else t1
-            out.append(f"🧭 SUIVI EN COURS — {ICONE.get(m, '')} {m} {SENS[d]}\n"
-                       f"Prix TradingView : {px(p)}\nEntrée : {px(tr['e'])} • SL : {px(tr['sl'])}\n"
-                       f"TP1 : {px(t1)}" + (f" • TP2 : {px(t2)}" if t2 is not None else "") + "\n"
-                       f"Progression vers l'objectif : {progress:.0%}. Le coach reste actif jusqu'à clôture." + (ferme or ""))
-        return out
-
-    # Aucun trade ouvert : seul un plan Pine v25 confirmé peut créer une carte d'entrée.
-    plan = plan_indicateur(r)
-    if not plan.get("available") or plan.get("confirmed") is not True:
-        cle.pop("plan_wait_key", None)
-        return out
-    if tv.get("barOhlcAvailable") is not True:
-        return out
-    if plan.get("triggered") is not True:
-        direction = int(plan["direction"])
-        phase = "ZONE" if plan.get("price_in_zone") else "WAIT_ZONE"
-        if plan.get("active_bar_safe") is False:
-            phase = "INVALIDATED"
-        key = ":".join(str(x) for x in (
-            direction, plan["entry"], plan["sl"], plan["tp1"], plan.get("tp2"),
-            plan["entry_timeframe"], phase
-        ))
-        if cle.get("plan_wait_key") != key:
-            cle["plan_wait_key"] = key
-            if phase == "INVALIDATED":
-                explanation = "La bougie active du déclencheur a déjà touché le SL ou le TP1. Aucun nouvel ordre d'entrée n'est autorisé."
-            elif phase == "ZONE":
-                threshold = "au-dessus" if direction == 1 else "en dessous"
-                explanation = (f"Le prix est dans la zone. J'attends la clôture {plan['entry_timeframe']} "
-                               f"après retest, {threshold} du seuil {px(plan['decision'])}. "
-                               "La confirmation n'est pas encore acquise.")
-            else:
-                explanation = (f"Le prix n'a pas encore rejoint la zone {px(plan['zone_low'])} – "
-                               f"{px(plan['zone_high'])}. Nous attendons le retest puis la clôture "
-                               f"{plan['entry_timeframe']} de confirmation.")
-            out.append(
-                f"🟡 PLAN EN ATTENTE — {ICONE.get(m, '')} {m}\n{SENS[direction]}\n"
-                f"{_resume_mtf_pine(r)}\n"
-                f"Plan M15 confirmé • Déclencheur : {plan['entry_timeframe']}\n"
-                f"Zone : {px(plan['zone_low'])} – {px(plan['zone_high'])}\n"
-                f"Entrée indicative : {px(plan['entry'])} • SL : {px(plan['sl'])}\n"
-                f"TP1 : {px(plan['tp1'])}" + (f" • TP2 : {px(plan['tp2'])}" if plan.get("tp2") is not None else "") + "\n"
-                f"Prix TradingView : {px(plan['price'])}\n{explanation}\n"
-                "⛔ PAS D'ENTRÉE POUR L'INSTANT. Le bouton de suivi n'apparaît qu'après confirmation." + (ferme or "")
-            )
-        return out
-
-    entry = float(plan["entry"])
-    sl = float(plan["sl"])
-    tp1 = float(plan["tp1"])
-    tp2 = float(plan["tp2"]) if plan.get("tp2") is not None else None
-    risk = max(abs(entry - sl), 1e-9)
-    now = time.time()
-    tr = {
-        "e": entry, "sl": sl, "sl0": sl, "tp1": tp1, "tp2": tp2,
-        "d": int(plan["direction"]), "statut": "entree",
-        "cree": now, "ouvert_t": now, "encore": 0,
-        "atr_e": None, "qui": {}, "source": "PINE_V25",
-        "src": "Pine v25 M15", "sl_ut": plan["entry_timeframe"],
-        "entry_timeframe": plan["entry_timeframe"],
-        "strat": plan.get("strategy") or r.get("strategy") or r.get("profil") or "DAY",
-        "strategy": plan.get("strategy") or r.get("strategy") or r.get("profil") or "DAY",
-        "sl_h": "Pine v25", "rr": abs(tp1 - entry) / risk,
-        "tvEntryBarTime": plan["active_entry_bar_time"],
-        "tvEntryBarHigh": plan["active_entry_bar_high"],
-        "tvEntryBarLow": plan["active_entry_bar_low"],
-        "tvEntryTimeframe": plan["entry_timeframe"],
-        "lastCoachUpdate": now,
-    }
-    cle["trade"] = tr
-    cle.pop("plan_wait_key", None)
-    out.append((
-        carte_coach(m, r, cle, "signal", tr=tr,
-                    signal=f"Clôture de confirmation {plan['entry_timeframe']} validée par Pine v25"),
-        boutons(m)
-    ))
-    return out
-
-
 def agent(m, r, cle, ferme):
     """BTC conserve H4/H1 + déclencheur M5 ; GOLD exige M5/M15/H1/H4 clôturés concordants."""
     if m not in MARCHES:
         return []
     r.setdefault("market", m)
     r.setdefault("confirme", 0)
-    if r.get("require_tv_bridge"):
-        return _agent_pine_v25(m, r, cle, ferme)
-    # Sans flux M1, l'agent ne peut ni calculer le prix ni valider une entrée ; il reste silencieux et ne plante pas.
-    if not (r.get("m1") or []) or len(r.get("r5") or []) < 2:
+    require_tv = bool(r.get("require_tv_bridge"))
+    m1_data = r.get("m1") or []
+    r5_data = r.get("r5") or []
+    if not require_tv and (not m1_data or len(r5_data) < 2):
         print(f"{m}: flux M1/RSI5 indisponible — aucune nouvelle position")
         return []
     out = []
     tr = cle.get("trade")
-    depuis = cle.get("t1m", 0)
-    bougies = ([x for x in r["m1"] if x["t"] > depuis][-10:] if depuis else []) or r["m1"][-1:]   # seulement les minutes depuis le dernier tour
-    cle["t1m"] = r["m1"][-1]["t"]
-    p = r["m1"][-1]["c"]
-    hi = max(x["h"] for x in bougies); lo = min(x["l"] for x in bougies)
-    d = r["confirme"]
-    if m == "GOLD":
-        r5, r5p = (r["r5"][-2], r["r5"][-3]) if len(r.get("r5") or []) >= 3 else (50, 50)
+    tv_price = prix_tradingview_actif(r) if require_tv else None
+    if require_tv and not tv_price:
+        print(f"{m} : prix TradingView actif indisponible ou périmé — aucune décision ni repli local.")
+        return out
+    if m1_data:
+        depuis = cle.get("t1m", 0)
+        bougies = ([x for x in m1_data if x["t"] > depuis][-10:] if depuis else []) or m1_data[-1:]
+        cle["t1m"] = m1_data[-1]["t"]
+        p = m1_data[-1]["c"]
+        hi = max(x["h"] for x in bougies); lo = min(x["l"] for x in bougies)
     else:
-        r5, r5p = r["r5"][-1], r["r5"][-2]
-    ctx = f"Contexte : {zone_txt(r['posD'])} Daily, {zone_txt(r['posW'])} Weekly."
-    require_tv = bool(r.get("require_tv_bridge"))
-    if require_tv and tr:
-        tv_price = prix_tradingview_actif(r)
-        if not tv_price:
-            print(f"{m} : prix TradingView actif indisponible ou périmé — suivi de position suspendu sans repli local.")
-            return out
+        bougies = []
+        p = tv_price["price"] if tv_price else 0
+        hi = lo = p
+    if require_tv:
         p = tv_price["price"]
         hi = lo = p
+        if tr:
+            if tv_price.get("barOhlcAvailable") is True:
+                if not initialiser_base_tradingview(tr, tv_price):
+                    if not tr.get("tvBaselineResetNotified"):
+                        tr["tvBaselineResetNotified"] = True
+                        out.append(f"ℹ️ {m} : référence OHLC réinitialisée sur la bougie déclencheuse actuelle. Les mèches antérieures ne sont pas reconstituées.")
+                    return out
+                extremes = extremes_tradingview_depuis_entree(tv_price, tr)
+                if extremes is None:
+                    if not tr.get("tvOhlcWarningSent"):
+                        tr["tvOhlcWarningSent"] = True
+                        out.append(f"⚠️ {m} : séquence OHLC TradingView incomplète ; décisions sur mèches suspendues.")
+                    return out
+                hi, lo = extremes
+            elif not tr.get("tvOhlcWarningSent"):
+                tr["tvOhlcWarningSent"] = True
+                out.append(f"⚠️ {m} : OHLC du déclencheur absent/périmé ; suivi limité au prix courant TradingView.")
+    d = int(r.get("confirme") or 0)
+    if m == "GOLD" and len(r5_data) >= 3:
+        r5, r5p = r5_data[-2], r5_data[-3]
+    elif len(r5_data) >= 2:
+        r5, r5p = r5_data[-1], r5_data[-2]
+    else:
+        r5 = r5p = 50
+    ctx = f"Contexte local : {zone_txt(r.get('posD'))} Daily, {zone_txt(r.get('posW'))} Weekly."
     # Mode sans signal (bridge TradingView non branché) : AUCUNE alerte calculée localement
     # (manipulation, niveaux, FVG, radar, retournement, retest, après-SL) — seule la source v25 parle.
     # Une position déjà ouverte reste suivie jusqu'à sa clôture ; aucune nouvelle info de marché.
@@ -13638,7 +13472,7 @@ def agent(m, r, cle, ferme):
         cause = (r.get("tv_indicator_mtf") or {}).get("detail") or (r.get("tv_indicator_mtf") or {}).get("reason") or "inconnue"
         print(f"{m} : mode sans signal, bridge TradingView indisponible — aucune alerte locale. Cause : {cause}")
         return []
-    if not sans_signal and not (require_tv and tr):
+    if not require_tv and not sans_signal:
         try:
             manipulation(out, m, r, cle)
             meche_suspecte(out, m, r, cle)
@@ -13679,6 +13513,14 @@ def agent(m, r, cle, ferme):
     if require_tv and not tr:
         if r.get("fermeture"):
             return out
+        if not plan_tv or not plan_tv.get("available"):
+            k = str((plan_tv or {}).get("reason") or "plan Pine M15 absent")
+            if cle.get("tv_bridge_wait_reason") != k:
+                cle["tv_bridge_wait_reason"] = k
+                out.append(f"⏳ {ICONE.get(m, '')} {m} : attente du plan TradingView M15\\n{k}\\nAucun niveau local ne sera substitué.")
+            return out
+        d = int(plan_tv["direction"])
+        p = float(plan_tv["price"])
         if not d:
             cle["aligne"] = 0
             cle["prep"] = False
@@ -13698,13 +13540,8 @@ def agent(m, r, cle, ferme):
             cle["aligne"] = d
             out.append(f"⏳ {ICONE.get(m, '')} {m} : ENTRÉES EN PAUSE\n{pause_}\nAucun nouveau signal avant stabilisation.")
             return out
-        if bloque_dw(r, d, p):
-            cle["prep"] = False
-            cle.pop("ordre", None)
-            if alerte_extreme_due(cle, d, r["t"]):
-                out.append(texte_zone_extreme(m, r, d))
-            cle["aligne"] = d
-            return out
+        # Les extrêmes Daily/Weekly décisionnels sont déjà intégrés au plan Pine v25 ;
+        # ne pas appliquer un second veto local qui désynchroniserait Telegram du graphique.
 
         if not plan_tv.get("available"):
             cle["prep"] = False
@@ -13717,11 +13554,7 @@ def agent(m, r, cle, ferme):
                 cle["tv_bridge_wait_reason"] = k
                 out.append(f"⏳ {ICONE.get(m, '')} {m} : attente du plan TradingView M15\n{k}\nAucun plan Python local ne sera substitué.")
             return out
-        if plan_tv["direction"] != d:
-            cle["prep"] = False
-            cle.pop("ordre", None)
-            out.append(f"⏳ {ICONE.get(m, '')} {m} : sens Pine M15 différent de la lecture locale ; aucune entrée.")
-            return out
+        # La direction Pine v25 est la seule direction de décision ; les lectures locales restent du contexte.
         # Ne jamais publier un plan directionnel ni ses niveaux avant la confirmation MTF de Pine.
         if not plan_tv.get("confirmed"):
             cle["prep"] = False
@@ -13815,6 +13648,10 @@ def agent(m, r, cle, ferme):
             strategie=plan_tv["strategy"],
             strat=plan_tv["strategy"],
             entry_timeframe=plan_tv["entry_timeframe"],
+            tvEntryBarTime=plan_tv["active_entry_bar_time"],
+            tvEntryBarHigh=plan_tv["active_entry_bar_high"],
+            tvEntryBarLow=plan_tv["active_entry_bar_low"],
+            tvEntryTimeframe=plan_tv["entry_timeframe"],
         )
         tr.update(strategie_trade(r, d))
         # La stratégie et l'UT d'exécution du trade suivent le plan Pine v25.
@@ -14127,7 +13964,7 @@ def agent(m, r, cle, ferme):
     cs_ = lambda *a_, **k_: carte_suivi(*a_, d=tr["d"], **k_)     # LONG / SHORT en premier sur chaque carte de suivi
     # GOLD : les mèches PAXG (marché 24/7, peu liquide le soir) peuvent dépasser le vrai prix XAUUSD.
     # Le SL / TP ne compte que si le VRAI prix spot l'a touché (ou si PAXG l'a nettement dépassé).
-    if m == "GOLD" and r.get("spot_lo") is not None:
+    if not require_tv and m == "GOLD" and r.get("spot_lo") is not None:
         lo = min(r["spot_lo"], lo + 0.3 * r["atr"])
         hi = max(r["spot_hi"], hi - 0.3 * r["atr"])
     if not require_tv and tr["statut"] == "entree" and tr["d"] * (tr["tp2"] - tr["tp1"]) <= 0 and not tr.get("tp_corrige"):
@@ -14143,7 +13980,7 @@ def agent(m, r, cle, ferme):
     d, e, sl, t1, t2 = tr["d"], tr["e"], tr["sl"], tr["tp1"], tr["tp2"]
     touche_sl = (lo <= sl) if d == 1 else (hi >= sl)
     touche_t1 = (hi >= t1) if d == 1 else (lo <= t1)
-    touche_t2 = (hi >= t2) if d == 1 else (lo <= t2)
+    touche_t2 = ((hi >= t2) if d == 1 else (lo <= t2)) if t2 is not None else False
     progres = d * (p - e) / max(abs(t1 - e), 1e-9)
 
     if tr["statut"] == "entree":
@@ -14190,7 +14027,10 @@ def agent(m, r, cle, ferme):
             return out
         if progres >= 0.8 and not tr.get("cafe_dit"):
             tr["cafe_dit"] = True
-            out.append(approche_tp(m, r, d, t1, "TP1"))
+            if require_tv:
+                out.append(cs_(m, "TP1 APPROCHE", [f"📡 Prix TradingView : {px(p)}", f"🎯 TP1 : {px(t1)}", f"🛑 SL : {px(sl)}", "Le coach poursuit le suivi du déclencheur Pine jusqu'à clôture."], "Rester en position", r))
+            else:
+                out.append(approche_tp(m, r, d, t1, "TP1"))
             return out
         if progres < 0.25:
             if tr["encore"] < 1 and r["t"] - tr["cree"] >= 900:
@@ -14245,6 +14085,9 @@ def agent(m, r, cle, ferme):
             cle["fin"] = [tr, t1 if d * (tr["sl"] - t1) < 0 else tr["sl"], f"💰 {n_ok} TP encaissé{'s' if n_ok > 1 else ''}"]
             cle.pop("trade"); cle["aligne"] = 0; return out
     return out
+
+# ───────── Programme ─────────
+
 
 # ───────── Programme ─────────
 def _menu_analyse_rapide(cid):
