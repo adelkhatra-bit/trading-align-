@@ -1588,7 +1588,7 @@ def texte_etat(nom_marche, r, cle=None, vip=True):
     lignes_entete = [entete] + ([prix_local_ligne] if prix_local_ligne else [])
     if not vip:
         etat_pos = ("🟢 Une position VIP est actuellement ouverte" if (cle or {}).get("trade") else
-                    "🟡 Une opportunité VIP se prépare" if (cle or {}).get("ordre") and r["confirme"] else
+                    "🟡 Une opportunité VIP se prépare" if not require_tv and (cle or {}).get("ordre") and r["confirme"] else
                     "⚪ Aucune position VIP pour le moment")
         return "\n".join(lignes_entete + ["━━━━━━━━━━━━━━━━━━", "📡 POINT DE MARCHÉ",
                             etat_pos, r.get("news") or "📰 Calendrier économique indisponible",
@@ -3061,6 +3061,51 @@ TRAD.update({   # cartes reliées au graphique (mêmes mots que l'indicateur)
     "🍽 Zone mangée à 100 % : traversée en entier, on attend la clôture": "🍽 Zone 100 % eaten: fully crossed, we wait for the close", "· mangée à": "· eaten", "· intacte": "· untouched", "🧲 La zone est une ": "🧲 The zone is a ", "order block + ": "order block + ",
     "FVG : le prix rebondit souvent dessus, on attend le rejet": "FVG: price often bounces there, we wait for the rejection", "l'étiquette ENTRÉE": "the « ENTRÉE » label",
 })
+TRAD.update({   # Provenance explicite des sources dans les cartes Telegram ALIGN
+    "📡 Prix TradingView ": "📡 TradingView price ",
+    "📡 Prix TradingView : indisponible — ATTENTE": "📡 TradingView price: unavailable — WAIT",
+    " · actualisé il y a ": " · updated ",
+    "💹 Prix local M1 (contexte uniquement) :": "💹 Local M1 price (context only):",
+    " • flux local ALIGN": " • local ALIGN feed",
+    "🟢 Biais haussier local (contexte)": "🟢 Local bullish bias (context)",
+    "🔴 Biais baissier local (contexte)": "🔴 Local bearish bias (context)",
+    "🟠 Pas de biais local confirmé en 1h / 4h": "🟠 No confirmed local 1h / 4h bias",
+    "BIAIS DE FOND LOCAL (H1 / H4)": "LOCAL MAIN BIAS (1h / 4h)",
+    "📊 INDICATEURS ALIGN LOCAUX (CONTEXTE)": "📊 LOCAL ALIGN INDICATORS (CONTEXT)",
+    "📈 RSI ALIGN LOCAL (CONTEXTE)": "📈 LOCAL ALIGN RSI (CONTEXT)",
+    " · âge plan M15 : ": " · M15 plan age: ",
+    "Plan de niveaux : M15 (indépendant de l'unité du graphique)": "Level plan: M15 (independent of chart timeframe)",
+    "Unité de validation :": "Validation timeframe:",
+    "Clôture MTF Pine : CONFIRMÉE": "Pine MTF close: CONFIRMED",
+    "Déclencheur clôturé : ": "Closed-candle trigger: ",
+    "Zone verte :": "Green zone:",
+    " • Décision : ": " • Decision: ",
+    "⚠️ Les filtres de sécurité ALIGN peuvent refuser l'entrée sans modifier les niveaux Pine.": "⚠️ ALIGN safety filters may still reject entry without changing Pine levels.",
+    "Configuration M15 détectée — confirmation MTF en attente.": "M15 setup detected — waiting for MTF confirmation.",
+    "Aucun niveau Entry / SL / TP n'est publié avant confirmation MTF.": "No Entry / SL / TP levels are published before MTF confirmation.",
+    "⏳ DIVERGENCE DES SOURCES — ATTENTE": "⏳ SOURCE DIVERGENCE — WAIT",
+    "Plan Pine v25 indisponible :": "Pine v25 plan unavailable:",
+    "Aucun plan local ne remplace le plan TradingView canonique.": "No local plan replaces the canonical TradingView plan.",
+    "🧭 CONFIRMATION LOCALE (CONTEXTE, NON DÉCISIONNELLE)": "🧭 LOCAL CONFIRMATION (CONTEXT, NOT DECISIONAL)",
+    "ALIGNEMENT LOCAL 1H + 4H": "LOCAL 1h + 4h ALIGNMENT",
+    "✅ ALIGNÉS": "✅ ALIGNED",
+    "ZONE DAILY LOCALE": "LOCAL DAILY ZONE",
+    "ZONE WEEKLY LOCALE": "LOCAL WEEKLY ZONE",
+    "🧭 LECTURE MULTI-TIMEFRAME LOCALE": "🧭 LOCAL MULTI-TIMEFRAME VIEW",
+    "⏳ CONFIRMATION MTF PINE EN ATTENTE": "⏳ PINE MTF CONFIRMATION PENDING",
+    " Les lectures locales ALIGN restent du contexte uniquement. Aucun sens de trade ni niveau Entry/SL/TP n'est autorisé.": " Local ALIGN readings are context only. No trade direction or Entry/SL/TP levels are authorized.",
+    "🟢 DÉCLENCHEUR PINE VALIDÉ — PRIX DANS LA ZONE": "🟢 PINE TRIGGER VALIDATED — PRICE IN ZONE",
+    "Validation technique Pine acquise. Les filtres de risque, news et sécurité ALIGN restent applicables.": "Pine technical validation acquired. ALIGN risk, news and safety filters still apply.",
+    "🟡 DÉCLENCHEUR PINE VALIDÉ — PRIX HORS ZONE": "🟡 PINE TRIGGER VALIDATED — PRICE OUTSIDE ZONE",
+    "Attendre le retour du prix TradingView dans la zone d'entrée M15. Aucune entrée au marché.": "Wait for TradingView price to return to the M15 entry zone. No market entry.",
+    "🟡 PLAN PINE CONFIRMÉ — DÉCLENCHEUR EN ATTENTE": "🟡 PINE PLAN CONFIRMED — TRIGGER PENDING",
+    "Attendre la clôture de l'unité de validation Pine. Un plan confirmé n'est pas encore une entrée.": "Wait for the Pine validation timeframe to close. A confirmed plan is not yet an entry.",
+    "🎯 POINT VISÉ : aucun — confirmation MTF Pine non validée": "🎯 TARGET: none — Pine MTF confirmation not validated",
+    "🎯 POINT VISÉ : déclencheur Pine validé, sous réserve des filtres de sécurité ALIGN": "🎯 TARGET: Pine trigger validated, subject to ALIGN safety filters",
+    "🎯 POINT VISÉ : attente du retour dans la zone Pine M15": "🎯 TARGET: waiting for price to return to the Pine M15 zone",
+    "🎯 POINT VISÉ : plan Pine confirmé, déclencheur clôturé en attente": "🎯 TARGET: Pine plan confirmed, waiting for the closed-candle trigger",
+})
+
 _CLES = sorted(TRAD, key=len, reverse=True)
 
 def traduire(t):
