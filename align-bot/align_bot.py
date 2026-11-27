@@ -9580,7 +9580,8 @@ def membre(etat, user_id):
         print("membre", ex); return False
 
 def autorise(etat, cid, user_id):
-    if POSITIONS_GRATUITES:
+    # TOUT_GRATUIT est le commutateur global de gratuité ; il doit primer sur le verrou VIP.
+    if TOUT_GRATUIT or POSITIONS_GRATUITES:
         return True
     return cid in proprio(etat) or cid in etat.get("offerts", []) or membre(etat, user_id)
 
