@@ -9859,17 +9859,19 @@ def evenements_pine(etat, m, r, cle, now):
     if bridge_required:
         plan_tv = plan_indicateur(r)
         detail_tv = resume_alignement_tradingview(r, plan_tv)
+        detail_tv_en = resume_alignement_tradingview(r, plan_tv, anglais=True) if detail_tv else None
         align_d = detail_tv["direction"] if detail_tv else 0
         align_n = detail_tv["count"] if detail_tv else 0
         align_total = detail_tv["total"] if detail_tv else len(TELEGRAM_TF_VIEWS)
         align_lines = detail_tv["lines"] if detail_tv else []
+        align_lines_en = detail_tv_en["lines"] if detail_tv_en else []
         align_available = detail_tv is not None
         sens_label = ("LONG à surveiller (plan Pine M15 confirmé)" if align_d == 1 else
                       "SHORT à surveiller (plan Pine M15 confirmé)" if align_d == -1 else
                       "non définie : plan Pine M15 non confirmé")
     else:
         align_d, align_n, align_total = d, n, 11
-        align_lines, align_available = [], True
+        align_lines, align_lines_en, align_available = [], [], True
         sens_label = ("LONG à surveiller (contexte local non décisionnel)" if d == 1 else
                       "SHORT à surveiller (contexte local non décisionnel)" if d == -1 else
                       "non définie : aucune direction LONG/SHORT")
@@ -9884,7 +9886,7 @@ def evenements_pine(etat, m, r, cle, now):
             franchit_haut = align_n >= MIN_ALIGN and (prev_n < MIN_ALIGN or sens_change)
             franchit_bas = align_n < MIN_ALIGN <= prev_n and prev_d == align_d
             align_base = dict(base, d=align_d, n=align_n, tf_total=align_total,
-                              tf_lines=align_lines, sens_label=sens_label,
+                              tf_lines=align_lines, tf_lines_en=align_lines_en, sens_label=sens_label,
                               pine_confirmed=bool(bridge_required and align_available))
             if franchit_haut:
                 ev.append(dict(kind="align_haut", **align_base, etat_seuil="atteint ✅", etat_seuil_court="Seuil atteint")); mem["t_align"] = now
@@ -10014,7 +10016,7 @@ def texte_pine(etat, ev, anglais=False):
         ev["sens_baisse"] = "Le scénario LONG perd du soutien ; ce message ne signale pas un SHORT." if direction == 1 else "Le scénario SHORT perd du soutien ; ce message ne signale pas un LONG." if direction == -1 else "Aucun retournement ni sens inverse n'est confirmé par ce message."
     out = [l.format(**{k: v for k, v in ev.items() if k not in {"kind", "tf_lines"}}) for l in lignes]
     if ev.get("kind") in {"align_haut", "align_bas"}:
-        out.extend(ev.get("tf_lines") or [])
+        out.extend((ev.get("tf_lines_en") if anglais else ev.get("tf_lines")) or [])
     return out
 
 def regrouper_alertes(blocs):
