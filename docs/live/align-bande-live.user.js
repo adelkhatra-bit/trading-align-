@@ -1426,7 +1426,24 @@
       dernierCommentaireIA = null;
       if (!coachPollTimer) ecouterDialoguesCoach();
       publierEtatCoach(true, false, ok => {
-        if (!voixActive || !ok) return;
+        if (!voixActive) return;
+        if (!ok) {
+          voixActive = false;
+          voixWorkerConfirmee = false;
+          try { localStorage.setItem('alignVoixActive', '0'); } catch (e) {}
+          try { window.speechSynthesis.cancel(); } catch (e) {}
+          voixEnAttente = null;
+          annulerReprisesVoix();
+          voixUtterances.clear(); voixUtterance = null;
+          annulerDialogueCoach();
+          if (voixBtn) {
+            voixBtn.disabled = false;
+            voixBtn.textContent = '⚠️ COACH VOCAL NON CONNECTÉ';
+            voixBtn.setAttribute('aria-pressed', 'false');
+            voixBtn.title = "Le Worker n'a pas confirmé l'activation depuis l'autre onglet.";
+          }
+          return;
+        }
         if (voixBtn) {
           voixBtn.disabled = false;
           voixBtn.textContent = '🔊 COACH VOCAL ON';
