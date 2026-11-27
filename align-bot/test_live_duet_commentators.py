@@ -24,7 +24,7 @@ class LiveDuetCommentators(unittest.TestCase):
     def test_voice_state_is_shared_between_tabs_and_only_owner_publishes(self):
         self.assertIn("function estProprietaireEcran()", self.js)
         self.assertIn("const owner = enabled ? prendreLeaseHeartbeat() : (forceOwner || estProprietaireEcran());", self.js)
-        self.assertIn("if (!owner) return false;", self.js)
+        self.assertIn("if (!owner) { terminer(false); return false; }", self.js)
         self.assertIn("window.addEventListener('storage', event => {", self.js)
         self.assertIn("event.key !== 'alignVoixActive'", self.js)
         self.assertIn("voixActive = event.newValue === '1';", self.js)
@@ -66,7 +66,7 @@ class LiveDuetCommentators(unittest.TestCase):
         self.assertIn("const source = new EventSource('https://ntfy.sh/' + SUJET + '/sse');", self.js)
         self.assertIn("if (txt.startsWith('IA:')) { recuIA(txt.slice(3)); return; }", self.js)
         self.assertIn("const dureeFR = parlerLive(fr);", self.js)
-        self.assertIn("publierEtatCoach(true)", self.js)
+        self.assertIn("publierEtatCoach(true, false, ok => {", self.js)
 
     def test_runtime_state_is_initialized_before_first_coach_poll(self):
         vivant = self.js.index("let vivant = true;")
@@ -105,8 +105,8 @@ class LiveDuetCommentators(unittest.TestCase):
         self.assertIn("if (!vivant || !item || !voixActive", self.js)
         self.assertIn("['ia', 'marche', 'coach'].includes(item.source)", self.js)
         self.assertIn("if (voixActive) jouerDialogueCoach(show)", self.js)
-        self.assertIn("publierEtatCoach(true)", self.js)
-        self.assertIn("publierEtatCoach(false)", self.js)
+        self.assertIn("publierEtatCoach(true, false, ok => {", self.js)
+        self.assertIn("publierEtatCoach(false, false, ok => {", self.js)
         self.assertIn("if (!anglais && item.source !== 'coach') {", self.js)
 
     def test_voice_events_move_the_matching_avatar_not_alternate_randomly(self):

@@ -267,10 +267,8 @@ def tout_fermer(journal=print):
     return fait
 
 
-# ── Prix Topstep pour les utilisateurs (demande d'Adel 15/11) ──────────────────────────────────────────
-# Le graphique TradingView (CFD : BTCUSD / XAUUSD / NAS100) et les futures Topstep (MBT / MGC / MNQ) n'ont pas
-# le même prix (écart de base). Le bot lit le VRAI dernier prix du micro-contrat et décale les niveaux du plan
-# du même écart : l'utilisateur qui a choisi « Topstep » reçoit des niveaux directement utilisables.
+# ── Prix Topstep BTC + GOLD ───────────────────────────────────────────────────────────────────────────
+# ALIGN ne publie et ne traite que BTC et GOLD. Le mapping ci-dessous utilise les micro-contrats autorisés.
 TICKS = {"GOLD": 0.1, "BTC": 5.0}
 VALEUR_TICK = {"GOLD": 1.0, "BTC": 0.5}   # $ par tick pour 1 micro-contrat (MNQ / MGC / MBT)
 RISQUE_MAX_CONSEILLE = 100.0                              # règle d'Adel (15/11) : jamais plus de 100 $ de SL par position (compte 100K)
