@@ -27,6 +27,7 @@ class LiveVoiceNarration(unittest.TestCase):
         activation = self.source[start:end]
         self.assertIn("dernierDialogueCoach = null;", activation)
         self.assertIn("dernierDialogueCoachTs = Date.now();", activation)
+        self.assertIn("dernierCommentaireIA = null;", activation)
         self.assertNotIn("jouerDialogueCoach(dialogue, true)", activation)
         self.assertNotIn("parlerLive(dernier.fr, true)", activation)
 
@@ -34,6 +35,7 @@ class LiveVoiceNarration(unittest.TestCase):
         storage_end = self.source.index("\n    } else {", storage)
         synced_activation = self.source[storage:storage_end]
         self.assertIn("dernierDialogueCoachTs = Date.now();", synced_activation)
+        self.assertIn("dernierCommentaireIA = null;", synced_activation)
         self.assertNotIn("parlerLive(dernier.fr, true)", synced_activation)
 
     def test_ai_comments_still_spoken(self):
