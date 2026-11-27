@@ -318,6 +318,7 @@ if __name__ == "__main__":
 
 
 class ForensicStopTransitionTest(unittest.TestCase):
+    """Ensure bot and subscriber SL moves remain auditable within one M5 candle."""
     @staticmethod
     def _fixture():
         trade = {
