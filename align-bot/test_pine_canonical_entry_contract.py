@@ -200,7 +200,7 @@ class PineCanonicalEntryContract(unittest.TestCase):
         gate = self.pine[start:end]
         self.assertIn("if dirStable == 0", gate)
         self.assertIn("if dirBrut != 0 and (nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut)", gate)
-        self.assertNotIn("if dirStable == 0\\n        dirStable := dirBrut", gate)
+        self.assertNotIn("if dirStable == 0\n        dirStable := dirBrut", gate)
         self.assertIn("dirBrut != 0 and dirBrut != dirStable and (nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut)", gate)
 
     def test_market_scope_remains_btc_and_gold_only_in_indicator(self):
