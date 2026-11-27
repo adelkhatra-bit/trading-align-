@@ -1217,31 +1217,60 @@ def niveaux_structure_ut(r):
     return {nom: niveaux_ut(bars) for nom, bars in uts.items()}
 
 def _rejet(bars, d, niveau, a):
-    """Rejet confirmé sur les 3 dernières bougies clôturées : mèche qui touche (ou frôle) le niveau, CLÔTURE du bon côté, et (mèche franche OU
-    clôture hors de la bande de Bollinger OU chandelle de retournement). Retourne la bougie de rejet la plus récente ou None."""
-    cl = [x["c"] for x in bars[-20:]]
-    bb = None
-    if len(cl) == 20:
-        m = sum(cl) / 20
-        sd = (sum((v - m) ** 2 for v in cl) / 20) ** 0.5
-        bb = m + 2 * sd if d == -1 else m - 2 * sd
+    """Rejet sur bougie clôturée : retour du prix du bon côté du niveau + motif identifié."""
     for k in range(len(bars) - 1, max(len(bars) - 4, 0), -1):
         x, pre = bars[k], bars[k - 1]
         rng = max(x["h"] - x["l"], 1e-9)
+        cl = [y["c"] for y in bars[max(0, k - 20):k]]
+        bb = None
+        if len(cl) == 20:
+            moyenne = sum(cl) / 20
+            ecart = (sum((v - moyenne) ** 2 for v in cl) / 20) ** 0.5
+            bb = moyenne + 2 * ecart if d == -1 else moyenne - 2 * ecart
         if d == -1:
             ok = x["h"] >= niveau - 0.5 * a and x["c"] < niveau
-            meche = (x["h"] - max(x["o"], x["c"])) >= 0.4 * rng
-            hors_bb = bb is not None and x["c"] < bb
-            retour = x["c"] < x["o"] and x["o"] >= pre["c"] and x["c"] < pre["o"]
+            ratio_meche = (x["h"] - max(x["o"], x["c"])) / rng
+            meche = ratio_meche >= 0.4
+            reintegre_bb = bb is not None and x["h"] > bb and x["c"] < bb
+            englobante = x["c"] < x["o"] and x["o"] >= pre["c"] and x["c"] < pre["o"]
+            type_meche = "mèche haute de rejet baissier"
+            type_bb = "balayage de la bande haute puis réintégration"
+            type_englobante = "bougie englobante baissière"
         else:
             ok = x["l"] <= niveau + 0.5 * a and x["c"] > niveau
-            meche = (min(x["o"], x["c"]) - x["l"]) >= 0.4 * rng
-            hors_bb = bb is not None and x["c"] > bb
-            retour = x["c"] > x["o"] and x["o"] <= pre["c"] and x["c"] > pre["o"]
-        if ok and (meche or hors_bb or retour):
-            return x
+            ratio_meche = (min(x["o"], x["c"]) - x["l"]) / rng
+            meche = ratio_meche >= 0.4
+            reintegre_bb = bb is not None and x["l"] < bb and x["c"] > bb
+            englobante = x["c"] > x["o"] and x["o"] <= pre["c"] and x["c"] > pre["o"]
+            type_meche = "mèche basse de rejet haussier"
+            type_bb = "balayage de la bande basse puis réintégration"
+            type_englobante = "bougie englobante haussière"
+        if not ok or not (meche or reintegre_bb or englobante):
+            continue
+        motifs = []
+        if meche:
+            motifs.append(f"{type_meche} ({ratio_meche * 100:.0f}% de l'amplitude)")
+        if reintegre_bb:
+            motifs.append(type_bb)
+        if englobante:
+            motifs.append(type_englobante)
+        return dict(x, rejection_type=" + ".join(motifs))
     return None
 
+
+def _rejet_anglais(label):
+    """Traduit le motif de rejet pour ne jamais mélanger les langues dans Telegram."""
+    for fr, en in (
+        ("mèche haute de rejet baissier", "upper bearish rejection wick"),
+        ("mèche basse de rejet haussier", "lower bullish rejection wick"),
+        ("balayage de la bande haute puis réintégration", "upper Bollinger sweep and re-entry"),
+        ("balayage de la bande basse puis réintégration", "lower Bollinger sweep and re-entry"),
+        ("bougie englobante baissière", "bearish engulfing candle"),
+        ("bougie englobante haussière", "bullish engulfing candle"),
+        ("de l'amplitude", "of candle range"),
+    ):
+        label = label.replace(fr, en)
+    return label
 def entree_sniper(r):
     return _sniper(r)[0]
 
@@ -1312,7 +1341,10 @@ def _sniper(r):
     za, zb = sorted((e, L))
     return (dict(d=d, ut=ut, e=e, za=za, zb=zb, sl=sl, tp1=tp1, n1=n1, tp2=tp_final, n2=("plan " + (r.get("strat") or "")).strip() if tp_plan is not None else "projection",
                 rr=abs(tp1 - e) / risque, rr_plan=abs(tp_final - e) / risque, niveau=L, src="dernier " + ("plus haut " if d == -1 else "plus bas ") + ut, meche=meche,
-                rejets=[n for n, x in rej.items() if x is not None], marche=True, t=m1[-1]["t"]), "")
+                rejets=[n for n, x in rej.items() if x is not None],
+                rejets_detail=[f"{n} : {x['rejection_type']}" for n, x in rej.items() if x is not None],
+                rejets_detail_en=[f"{n}: {_rejet_anglais(x['rejection_type'])}" for n, x in rej.items() if x is not None],
+                marche=True, t=m1[-1]["t"]), "")
 
 def simuler_sniper(sn, m1_futur, duree_min=240):
     """Que serait-il arrivé ? Entrée « au rejet » (marché) rempli à l'ouverture de la bougie suivante ; sinon ordre limite touché ; SL prioritaire si SL et TP1 dans la même bougie."""
@@ -9753,9 +9785,9 @@ _PINE_TEXTES = {   # type -> variantes (FR, EN) ; {ic} {m} {n} {c} {seuil} {sens
                  ("🏁 {ic} {m} : retournement confirmé, direction {sens}", "🧭 {strat}")),
     "ret_cancel": (("⛔ {ic} {m} : SL cassé à la clôture", "↩ Retournement en cours, j'attends 15 min / 1h"), ("🛑 {ic} {m} : le stop du plan est franchi", "🔄 Je guette la confirmation 15 min / 1h"),
                    ("🚧 {ic} {m} : plan annulé (stop cassé)", "👀 Retournement possible, rien n'est validé")),
-    "sniper": (("🎯 SNIPER VALIDÉ — {profil} {ic} {m} : {ordre} Pine {entree} • zone {za}–{zb}", "🛑 SL Pine {sl} • TP1 Pine {tp1} • TP2 Pine {tp}", "📐 R/R {rr}/{rrp} • timing {ut} • plan {ut_plan} • validation ROBOT V12 avant position ouverte"),
-               ("🔫 {ic} {m} : déclencheur SNIPER {profil} validé • {ordre} Pine {entree}", "🛑 Stop Pine {sl} • 🎯 TP1 {tp1}, puis TP2 {tp}", "📐 R/R {rr}/{rrp} • rejet {rejets} • confirmation finale ROBOT V12 requise"),
-               ("🎯 SNIPER {profil} {ic} {m} : rejet M1/M3 confirmé {rejets}", "📍 {ordre} Pine {entree} • zone {za}–{zb} • plan {ut_plan}", "🛑 SL {sl} • TP1 {tp1} • TP2 {tp} • position ouverte uniquement après validation bot")),
+    "sniper": (("🎯 SNIPER VALIDÉ — {profil} {ic} {m} : {ordre} Pine {entree} • zone {za}–{zb}", "🛑 SL Pine {sl} • TP1 Pine {tp1} • TP2 Pine {tp}", "📐 R/R {rr}/{rrp} • timing {ut} • plan {ut_plan} • détection : {rejets} • validation ROBOT V12 avant position ouverte"),
+               ("🔫 {ic} {m} : déclencheur SNIPER {profil} validé • {ordre} Pine {entree}", "🛑 Stop Pine {sl} • 🎯 TP1 {tp1}, puis TP2 {tp}", "📐 R/R {rr}/{rrp} • détection : {rejets} • confirmation finale ROBOT V12 requise"),
+               ("🎯 SNIPER {profil} {ic} {m} : motifs M1/M3 confirmés : {rejets}", "📍 {ordre} Pine {entree} • zone {za}–{zb} • plan {ut_plan}", "🛑 SL {sl} • TP1 {tp1} • TP2 {tp} • position ouverte uniquement après validation bot")),
     "confirmation": (("✅ {ic} {m} : CONFIRMATION {sens}", "🕯 Clôture {u} {pos} {niv}"), ("🔔 {ic} {m} : confirmation {sens} validée", "🕯 {u} clôturée {pos} {niv}"),
                      ("🎯 {ic} {m} : {sens} confirmé à la clôture {u}", "📍 Ligne de décision {niv}")),
 }
@@ -9774,9 +9806,9 @@ _PINE_TEXTES_EN = {
                  ("🏁 {ic} {m}: reversal confirmed, direction {sens}", "🧭 {strat}")),
     "ret_cancel": (("⛔ {ic} {m}: SL broken at the close", "↩ Reversal in progress, waiting for 15 min / 1h"), ("🛑 {ic} {m}: the plan's stop is crossed", "🔄 Watching for the 15 min / 1h confirmation"),
                    ("🚧 {ic} {m}: plan cancelled (stop broken)", "👀 Reversal possible, nothing validated")),
-    "sniper": (("🎯 SNIPER CONFIRMED — {profil} {ic} {m}: Pine {ordre} {entree} • zone {za}–{zb}", "🛑 Pine SL {sl} • TP1 {tp1} • TP2 {tp}", "📐 R/R {rr}/{rrp} • timing {ut} • plan {ut_plan} • ROBOT V12 final check before position opens"),
-               ("🔫 {ic} {m}: {profil} SNIPER trigger validated • Pine {ordre} {entree}", "🛑 Stop {sl} • 🎯 TP1 {tp1}, then TP2 {tp}", "📐 R/R {rr}/{rrp} • rejection {rejets} • ROBOT V12 final confirmation required"),
-               ("🎯 {profil} SNIPER {ic} {m}: confirmed M1/M3 rejection {rejets}", "📍 Pine {ordre} {entree} • zone {za}–{zb} • plan {ut_plan}", "🛑 SL {sl} • TP1 {tp1} • TP2 {tp} • bot validation required before position opens")),
+    "sniper": (("🎯 SNIPER CONFIRMED — {profil} {ic} {m}: Pine {ordre} {entree} • zone {za}–{zb}", "🛑 Pine SL {sl} • TP1 {tp1} • TP2 {tp}", "📐 R/R {rr}/{rrp} • timing {ut} • plan {ut_plan} • detected pattern: {rejets} • ROBOT V12 final check before position opens"),
+               ("🔫 {ic} {m}: {profil} SNIPER trigger validated • Pine {ordre} {entree}", "🛑 Stop {sl} • 🎯 TP1 {tp1}, then TP2 {tp}", "📐 R/R {rr}/{rrp} • detected pattern: {rejets} • ROBOT V12 final confirmation required"),
+               ("🎯 {profil} SNIPER {ic} {m}: confirmed M1/M3 patterns: {rejets}", "📍 Pine {ordre} {entree} • zone {za}–{zb} • plan {ut_plan}", "🛑 SL {sl} • TP1 {tp1} • TP2 {tp} • bot validation required before position opens")),
     "confirmation": (("✅ {ic} {m}: CONFIRMATION {sens}", "🕯 {u} close {pos} {niv}"), ("🔔 {ic} {m}: {sens} confirmation validated", "🕯 {u} closed {pos} {niv}"),
                      ("🎯 {ic} {m}: {sens} confirmed at the {u} close", "📍 Decision line {niv}")),
 }
@@ -9967,7 +9999,9 @@ def evenements_pine(etat, m, r, cle, now):
                     ut_plan=str(plan_tv.get("entry_timeframe") or "—").upper(),
                     entree=px(pine_entry), za=px(pine_zone_low), zb=px(pine_zone_high),
                     sl=px(pine_sl), tp1=px(pine_tp1), tp=px(pine_tp2) if pine_tp2 is not None else "—",
-                    ut=str(sn.get("ut") or "M1/M3"), rejets="+".join(sn.get("rejets") or []),
+                    ut=str(sn.get("ut") or "M1/M3"),
+                    rejets=" ; ".join(sn.get("rejets_detail") or sn.get("rejets") or []),
+                    rejets_en=" ; ".join(sn.get("rejets_detail_en") or sn.get("rejets_detail") or sn.get("rejets") or []),
                     rr=fmt_rr(rr_tp1), rrp=fmt_rr(rr_tp2),
                 ))
     # scalp_inverse() reste disponible pour les simulations et diagnostics locaux.
@@ -9997,6 +10031,8 @@ def texte_pine(etat, ev, anglais=False):
     lignes = list(var[_tournante(etat, f"p:{ev['kind']}:{ev['m']}", len(var))])
     ev = dict(ev)
     direction = int(ev.get("d") or 0)
+    if anglais and ev.get("rejets_en"):
+        ev["rejets"] = ev["rejets_en"]
     ev.setdefault("tf_total", 11)
     pine_confirme = ev.get("pine_confirmed") is True
     if anglais:
@@ -12849,9 +12885,9 @@ def meche_suspecte(out, m, r, cle):
         return
     cle["pre_manip"] = {"t15": debut, "d": dm}
     out.append(f"⚠️ MÈCHE SUSPECTE EN COURS — {ICONE.get(m, '')} {m}\n"
-               f"🕯 Vue 15 min : la bougie de {heure(debut)} a piqué {'SOUS le dernier plus bas' if dm == 1 else 'AU-DESSUS du dernier plus haut'} ≈ {px(niv)}\n"
-               f"🎣 Les stops viennent d'être pris et le prix revient\n"
-               f"🙅 N'entre pas maintenant\n⏳ J'attends la CLÔTURE de cette bougie ({heure(debut + 900)}) pour confirmer la manipulation")
+               f"🕯 Type : mèche {'basse en formation sous le dernier plus bas' if dm == 1 else 'haute en formation au-dessus du dernier plus haut'} ≈ {px(niv)}\n"
+               f"🔎 Balayage de liquidité POSSIBLE : le prix réintègre le niveau, mais la clôture n'a pas confirmé le rejet\n"
+               f"🙅 N'entre pas maintenant\n⏳ Attendre la CLÔTURE M15 ({heure(debut + 900)}) avant de qualifier la manipulation")
 
 def macro(etat):
     """Contexte macro GRATUIT : Dollar (DXY recalculé depuis 6 paires Swissquote, toutes les 4 min)
