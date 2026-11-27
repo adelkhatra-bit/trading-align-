@@ -119,6 +119,19 @@ class EconomicNewsBotIntegrationTest(unittest.TestCase):
         self.assertFalse(ab.annonce_proche(state_low, self.now))
         self.assertTrue(ab.annonce_proche(state_high, self.now))
 
+    def test_news_summary_includes_relevant_low_impact_watch_events(self):
+        low = news.normaliser_evenement({
+            "title": "Goods Trade Balance", "country": "USD",
+            "date": dt.datetime.fromtimestamp(self.now + 60 * 60, dt.timezone.utc).isoformat(),
+            "impact": "Low",
+        }, self.now)
+        state = {"cal": {"t": self.now, "ev": [], "veille": [low]}}
+        with mock.patch.object(ab.time, "time", return_value=self.now):
+            summary = ab.news_txt(state)
+        self.assertIn("Goods Trade Balance", summary)
+        self.assertIn("impact Low", summary)
+        self.assertNotIn("Plus aucune annonce", summary)
+
     def test_failed_refresh_after_success_marks_calendar_unknown(self):
         state = {"cal": {"schema": 3, "t": self.now - 301, "ev": [{"t": self.now + 3600, "titre": "CPI"}], "veille": []}}
         with mock.patch.object(ab, "http_json", side_effect=RuntimeError("offline")):
