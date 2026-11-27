@@ -2835,6 +2835,103 @@ class TestTradingViewReportRegression(unittest.TestCase):
         r["tv_indicator_mtf"]["snapshots"]["M5"]["price"] = float("nan")
         self.assertIsNone(align_bot.prix_tradingview_actif(r))
 
+    def test_required_bridge_overview_waits_for_pine_and_suppresses_local_order(self):
+        from unittest.mock import patch
+        r = self._required_bridge_card_fixture()
+        r["tv_indicator_mtf"]["available"] = False
+        plan = {"available": False, "reason": "snapshot TradingView canonique M15 périmé"}
+        stale_order = {"d": -1, "e": 123.0, "sl": 125.0, "tp1": 119.0, "tp2": 117.0}
+        with patch.object(align_bot, "plan_indicateur", return_value=plan), \
+             patch.object(align_bot, "verdict", side_effect=AssertionError("local verdict must not authorize")), \
+             patch.object(align_bot, "news_du_jour", return_value=[]):
+            message = align_bot.texte_apercu("BTC", r, {"ordre": stale_order})
+        self.assertIn("Prix TradingView : indisponible — ATTENTE", message)
+        self.assertIn("Prix local M1 (contexte uniquement) : 99,25", message)
+        self.assertIn("DIVERGENCE DES SOURCES — ATTENTE", message)
+        self.assertIn("Non confirmée par TradingView", message)
+        self.assertNotIn("123", message)
+        self.assertNotIn("Cible probable", message)
+        self.assertNotIn("Zone de retournement visée", message)
+
+    def test_required_bridge_overview_uses_confirmed_pine_direction_without_local_targets(self):
+        from unittest.mock import patch
+        r = self._required_bridge_card_fixture()
+        plan = self._confirmed_or_waiting_pine_plan(True)
+        plan["direction"] = 1
+        with patch.object(align_bot, "plan_indicateur", return_value=plan), \
+             patch.object(align_bot, "verdict", side_effect=AssertionError("Pine must own the decision")), \
+             patch.object(align_bot, "news_du_jour", return_value=[]):
+            message = align_bot.texte_apercu("GOLD", r, {})
+        self.assertIn("Prix TradingView M5 : 101,25", message)
+        self.assertIn("Direction Pine à surveiller : LONG", message)
+        self.assertIn("Zone d'entrée Pine M15 : 99,00 → 101,00", message)
+        self.assertIn("PLAN PINE CONFIRMÉ — DÉCLENCHEUR EN ATTENTE", message)
+        self.assertNotIn("Cible probable", message)
+        self.assertNotIn("Zone de retournement visée", message)
+        self.assertLess(len(message), 4096)
+
+    def test_required_bridge_vision_does_not_substitute_local_levels(self):
+        from unittest.mock import patch
+        r = self._required_bridge_card_fixture()
+        pending = self._confirmed_or_waiting_pine_plan(False)
+        with patch.object(align_bot, "plan_indicateur", return_value=pending):
+            message = align_bot.texte_vision("BTC", r, {}, anglais=False)
+        self.assertIn("CONFIRMATION MTF PINE EN ATTENTE", message)
+        self.assertNotIn("Entrée :", message)
+        self.assertNotIn("SL :", message)
+        self.assertNotIn("TP1 :", message)
+        confirmed = self._confirmed_or_waiting_pine_plan(True)
+        with patch.object(align_bot, "plan_indicateur", return_value=confirmed):
+            message = align_bot.texte_vision("BTC", r, {}, anglais=True)
+        self.assertIn("TradingView · Pine v25", message)
+        self.assertIn("Entry: 100,00", message)
+        self.assertIn("SL: 98,00", message)
+        self.assertIn("TP1: 104,00", message)
+
+    def test_required_bridge_why_view_never_calls_local_verdict(self):
+        from unittest.mock import patch
+        r = self._required_bridge_card_fixture()
+        pending = self._confirmed_or_waiting_pine_plan(False)
+        with patch.object(align_bot, "plan_indicateur", return_value=pending), \
+             patch.object(align_bot, "verdict", side_effect=AssertionError("local verdict must not be used")):
+            message = align_bot.texte_pourquoi("GOLD", r, {})
+        self.assertIn("CONFIRMATION MTF PINE EN ATTENTE", message)
+        self.assertIn("Aucun sens de trade ni niveau Entry/SL/TP n'est autorisé.", message)
+        self.assertNotIn("Direction à surveiller", message)
+
+    def test_required_bridge_position_uses_tv_price_and_preserves_personal_trade_levels(self):
+        r = self._required_bridge_card_fixture()
+        state = {"trade": {
+            "d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0,
+            "qui": {"123": {"e": 100.0, "sl": 99.0, "sl_conseil": 100.1, "tp1": 104.0}}
+        }}
+        before = dict(state["trade"])
+        message = align_bot.texte_position("BTC", r, state, "123")
+        self.assertIn("Prix TradingView M5 : 101,25", message)
+        self.assertIn("Ton entrée : 100", message)
+        self.assertIn("Ton SL actuel : 100,10", message)
+        self.assertIn("TP1 : 104", message)
+        self.assertIn("TP2 : 108", message)
+        self.assertIn("+1.25 %", message)
+        self.assertNotIn("99,25", message)
+        self.assertEqual(state["trade"]["e"], before["e"])
+        self.assertEqual(state["trade"]["sl"], before["sl"])
+        self.assertEqual(state["trade"]["tp1"], before["tp1"])
+        self.assertEqual(state["trade"]["tp2"], before["tp2"])
+
+    def test_required_bridge_position_omits_pnl_when_tradingview_price_is_unavailable(self):
+        r = self._required_bridge_card_fixture()
+        r["tv_indicator_mtf"] = {"available": False, "reason": "bridge inaccessible", "snapshots": {}}
+        state = {"trade": {
+            "d": -1, "e": 100.0, "sl": 102.0, "tp1": 96.0, "tp2": 94.0,
+            "qui": {"123": {"e": 100.0, "sl": 102.0, "tp1": 96.0}}
+        }}
+        message = align_bot.texte_position("GOLD", r, state, "123")
+        self.assertIn("Prix TradingView : indisponible", message)
+        self.assertIn("Évolution indisponible", message)
+        self.assertNotIn("99,25", message)
+        self.assertNotIn("%", message)
+
     def test_analysis_command_maps_to_market_selection_prompt(self):
         self.assertEqual(align_bot.COMMANDES["/faire_analyse"], "📊 Faire une analyse")
         from unittest.mock import patch
