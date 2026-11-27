@@ -3315,12 +3315,7 @@ def carte_coach(m, r, cle, genre, tr=None, raison=None, declencheur=None, signal
             l += [""] + co[:2] if co else []
         except Exception:
             pass
-        l += [
-            "",
-            "🟢 À FAIRE : exécute manuellement ce plan sur ta plateforme, puis confirme avec le bouton ci-dessous.",
-            "ℹ️ Aucun ordre broker n'est envoyé par ALIGN."
-        ]
-        action = "SIGNAL CONFIRMÉ — EXÉCUTION MANUELLE À FAIRE PAR TOI"
+        action = "SIGNAL CONFIRMÉ — EXÉCUTION MANUELLE"
     else:
         l = [f"📍 {m} - ATTENTE", "", f"⏳ Raison : {raison}"]
         if declencheur:
@@ -6647,7 +6642,7 @@ def inscrire_auto(etat, cid, m, notifier=True):
                 raison = str((plan or {}).get("reason") or "snapshots TradingView incomplets ou périmés")
             lignes = [
                 f"🎯 SUIVI ACTIVÉ — {ICONE.get(m, '')} {m}",
-                "🧭 Direction : ATTENTE — aucun sens publiable avant confirmation MTF Pine",
+                "🧭 Direction : ATTENTE — aucun sens Pine v25 frais publiable avant confirmation MTF",
                 f"⏳ Décision actuelle : {raison}",
                 "📍 Aucune zone Entry/SL/TP affichée : le coach refuse tout remplacement par un ordre local.",
             ]
@@ -6679,7 +6674,7 @@ def inscrire_auto(etat, cid, m, notifier=True):
         "🟢 Quand le signal confirmé arrive, exécute-le manuellement sur ta plateforme.",
         "👇 Après ton exécution, clique sur « J'ai exécuté le plan » pour démarrer ton suivi personnel.",
         "ℹ️ Aucun ordre n'est envoyé à ta plateforme : tu gardes la main sur l'exécution.",
-        "🎯 Le coach suit ensuite ta position enregistrée, son SL et ses objectifs.",
+        "🎯 Le coach suit ensuite ta position enregistrée, ses niveaux de protection et ses objectifs.",
         "⏱ Le chronomètre indique la prochaine réévaluation, jamais une heure d'entrée garantie."
     ]
     if notifier:
@@ -12370,7 +12365,8 @@ def gerer_stop(etat, m, r, tr, c):
     """Vrai agent : monte le stop de l'abonné derrière chaque support (long) / résistance (short) franchi,
     stop à l'entrée dès que le trade avance, et « reste cool » quand le marché respire."""
     pos = tr["qui"][c]; d = tr["d"]
-    if r.get("require_tv_bridge"):
+    require_tv = bool(r.get("require_tv_bridge"))
+    if require_tv:
         tv_price = prix_tradingview_actif(r)
         if not tv_price:
             return
