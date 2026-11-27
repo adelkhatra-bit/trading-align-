@@ -11314,8 +11314,9 @@ def calendrier(etat, maintenant):
             brut = http_json(economic_news.CALENDAR_URL, timeout=HTTP_NEWS_TIMEOUT_SEC, attempts=1)
             if not isinstance(brut, list):
                 raise ValueError("réponse calendrier non-list")
-            ev, jour = economic_news.normaliser_evenements(brut, maintenant)
+            ev, veille, jour = economic_news.normaliser_evenements(brut, maintenant)
             cache["ev"] = ev
+            cache["veille"] = veille
             cache["jour"] = jour
             cache["t"] = int(maintenant)
             cache["schema"] = 2
@@ -11364,6 +11365,8 @@ def annonces_et_sessions(etat, maintenant, derniers):
         if f"calinconnu{cle_j}" not in vus:
             vus.append(f"calinconnu{cle_j}")
             out.append("⚠️ CALENDRIER ÉCONOMIQUE INDISPONIBLE — la source ne répond pas ou le dernier relevé n'est plus vérifié. Aucune absence d'annonce n'est confirmée ; les nouvelles entrées restent bloquées.")
+    else:
+        ev = list(ev or []) + list((etat.get("cal") or {}).get("veille") or [])
     # Programme du jour : « aucune annonce » uniquement après une récupération vérifiée.
     if cal_known and jour.hour >= 7 and f"prog{cle_j}" not in vus:
         vus.append(f"prog{cle_j}")
@@ -11371,13 +11374,15 @@ def annonces_et_sessions(etat, maintenant, derniers):
         if aujourdhui:
             lignes = []
             for e in aujourdhui:
+                bloque = bool(e.get("entry_block", e.get("impact") in ("High", "Medium")))
+                mode = "PAUSE ENTRÉE ±15 min" if bloque else "VEILLE seule — pas de blocage automatique"
                 lignes.append(
-                    f"• {heure(e['t'])} {e['titre']} — impact {e.get('impact', '?')} "
+                    f"• {heure(e['t'])} {e['titre']} — impact {e.get('impact', '?')} • {mode} "
                     f"(prévu {e.get('prev') or '?'}, avant {e.get('avant') or '?'})\n"
                     f"  {economic_news.source_line(e)}"
                 )
-            out.append("📅 Annonces importantes aujourd'hui (heure de Paris) :\n" + "\n".join(lignes)
-                       + "\n→ Pas de nouvelle entrée 15 min avant et après. Volatilité forte possible.")
+            out.append("📅 Annonces USD à surveiller aujourd'hui (heure de Paris) :\n" + "\n".join(lignes)
+                       + "\n→ Pause automatique ±15 min réservée aux annonces High/Medium ; les annonces Low pertinentes restent en veille.")
         elif jour.weekday() < 5:
             out.append("📅 Aucune annonce majeure US aujourd'hui.")
     for e in ev:
@@ -11385,18 +11390,27 @@ def annonces_et_sessions(etat, maintenant, derniers):
         fin = heure(e["t"] + 15 * 60)
         trace = economic_news.source_line(e)
         cle_evt = economic_news.event_key(e)
+        bloque = bool(e.get("entry_block", e.get("impact") in ("High", "Medium")))
         if 55 * 60 < reste <= 60 * 60 and f"ev60{e['t']}{e['titre']}" not in vus:
             vus.append(f"ev60{e['t']}{e['titre']}")
-            out.append(f"📰 NEWS USA DANS 1 H — {heure(e['t'])}\n🗞 {e['titre']}\n"
-                       f"🚦 ⏳ JE N'ENTRE PAS ENCORE\n"
-                       f"🛑 Pas de nouvelle position à partir de {heure(e['t'] - 15 * 60)}\n"
-                       f"🔒 En position ? Vérifie ton SL ; ne le déplace pas sans validation du coach\n"
-                       f"📊 Prévu : {e.get('prev') or '?'} • avant : {e.get('avant') or '?'}\n🔎 {trace}")
+            if bloque:
+                out.append(f"📰 NEWS USA DANS 1 H — {heure(e['t'])}\n🗞 {e['titre']}\n"
+                           f"🚦 ⏳ JE N'ENTRE PAS ENCORE\n"
+                           f"🛑 Pas de nouvelle position à partir de {heure(e['t'] - 15 * 60)}\n"
+                           f"🔒 En position ? Vérifie ton SL ; ne le déplace pas sans validation du coach\n"
+                           f"📊 Prévu : {e.get('prev') or '?'} • avant : {e.get('avant') or '?'}\n🔎 {trace}")
+            else:
+                out.append(f"🔎 VEILLE MACRO USD DANS 1 H — {heure(e['t'])}\n🗞 {e['titre']} (impact {e.get('impact', 'Low')})\n"
+                           f"⚠️ Surveillance renforcée ; pas de blocage automatique des entrées pour cette annonce Low.\n🔎 {trace}")
         if 35 * 60 < reste <= 40 * 60 and f"ev40{e['t']}{e['titre']}" not in vus:
             vus.append(f"ev40{e['t']}{e['titre']}")
-            out.append(f"⚠️ NEWS USA DANS 40 MIN — {heure(e['t'])}\n📰 {e['titre']}\n"
-                       f"🛡 Évite toute nouvelle entrée à l’approche de l’annonce. Vérifie ton SL si tu es déjà en position.\n"
-                       f"🔎 {trace}")
+            if bloque:
+                out.append(f"⚠️ NEWS USA DANS 40 MIN — {heure(e['t'])}\n📰 {e['titre']}\n"
+                           f"🛡 Évite toute nouvelle entrée à l’approche de l’annonce. Vérifie ton SL si tu es déjà en position.\n"
+                           f"🔎 {trace}")
+            else:
+                out.append(f"🔎 VEILLE MACRO — {e['titre']} dans 40 min ({heure(e['t'])})\n"
+                           f"Impact agrégateur Low : information suivie, sans pause automatique des entrées.\n🔎 {trace}")
         # Rapport après publication : on le garde jusqu'à 45 min pour survivre à un redémarrage.
         if 5 * 60 <= -reste <= 45 * 60 and f"evr{e['t']}{e['titre']}" not in vus:
             vus.append(f"evr{e['t']}{e['titre']}")
@@ -11437,17 +11451,28 @@ def annonces_et_sessions(etat, maintenant, derniers):
                       {"annonce": e["titre"], "prévu": e.get("prev"), "avant": e.get("avant"),
                        "source": trace, "impact": e.get("impact")},
                       cle_cache=cle_news, duree=3600, premium=True, recherche=True)
-            out.append(f"⚠️⚠️ NEWS USA dans {round(reste / 60)} min ({heure(e['t'])})\n📰 {e['titre']}\n\n"
-                       f"🟥 N'ouvre AUCUN trade\n🛡 Déjà en position ? Vérifie que ton STOP est bien placé\n"
-                       f"💥 Le prix peut bouger très fort dans les 2 sens\n⏳ On reprend à {fin}\n🔎 {trace}"
-                       + (f"\n\n🧠 L'avis de l'IA ALIGN\n{avis}{ligne_sources(etat, cle_news)}" if avis else ""))
+            if bloque:
+                texte_alerte = (f"⚠️⚠️ NEWS USA dans {round(reste / 60)} min ({heure(e['t'])})\n📰 {e['titre']}\n\n"
+                                f"🟥 N'ouvre AUCUN trade\n🛡 Déjà en position ? Vérifie que ton STOP est bien placé\n"
+                                f"💥 Le prix peut bouger très fort dans les 2 sens\n⏳ On reprend à {fin}\n🔎 {trace}")
+            else:
+                texte_alerte = (f"🔎 VEILLE MACRO dans {round(reste / 60)} min ({heure(e['t'])})\n📰 {e['titre']} — impact Low\n"
+                                f"⚠️ Surveillance de la volatilité ; aucune pause automatique n'est appliquée à cette annonce.\n🔎 {trace}")
+            out.append(texte_alerte + (f"\n\n🧠 L'avis de l'IA ALIGN\n{avis}{ligne_sources(etat, cle_news)}" if avis else ""))
         if 0 <= reste <= 6 * 60 and f"ev5{e['t']}{e['titre']}" not in vus:
             vus.append(f"ev5{e['t']}{e['titre']}")
-            out.append(f"🚨🚨🚨 NEWS DANS {max(1, round(reste / 60))} MIN — {e['titre']}\n"
-                       f"🟥 Ne touche à rien\n🛡 Stop en place ? OK, on attend\n🔎 {trace}")
+            if bloque:
+                out.append(f"🚨🚨🚨 NEWS DANS {max(1, round(reste / 60))} MIN — {e['titre']}\n"
+                           f"🟥 Ne touche à rien\n🛡 Stop en place ? OK, on attend\n🔎 {trace}")
+            else:
+                out.append(f"🔎 ANNONCE MACRO LOW DANS {max(1, round(reste / 60))} MIN — {e['titre']}\n"
+                           f"Surveille la volatilité ; attends toujours une confirmation MTF avant toute décision.\n🔎 {trace}")
         if 15 * 60 <= -reste <= 25 * 60 and f"evfin{e['t']}{e['titre']}" not in vus:
             vus.append(f"evfin{e['t']}{e['titre']}")
-            out.append(f"✅ News passée ({e['titre']}). 🟩 Le bot reprend la recherche d'entrées.")
+            if bloque:
+                out.append(f"✅ News passée ({e['titre']}). 🟩 Le bot reprend la recherche d'entrées.")
+            else:
+                out.append(f"✅ Surveillance terminée après ({e['titre']}).")
     # Fermeture du Gold : 1 h avant et 40 min avant (jours de semaine)
     if jour.weekday() < 5:
         f_ = minutes_avant_fermeture_gold(maintenant)
