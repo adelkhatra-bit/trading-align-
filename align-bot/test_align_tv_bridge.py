@@ -91,7 +91,7 @@ class BridgeStoreTests(unittest.TestCase):
     def setUp(self):
         self.store = BridgeStore(INGEST, READ)
 
-    def test_pine_bridge_uses_latest_intrabar_clock_for_bar_timestamps(self):
+    def test_pine_bridge_uses_closed_candle_clock_for_bar_timestamps(self):
         pine_path = Path(__file__).resolve().parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
         pine = pine_path.read_text(encoding="utf-8")
         expected = {
@@ -121,7 +121,8 @@ class BridgeStoreTests(unittest.TestCase):
                     ),
                     msg=f"{variable} must be returned by its matching request.security() tuple",
                 )
-        self.assertIn('[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]', pine)
+        self.assertIn('[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time[1]]', pine)
+        self.assertNotIn('[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]', pine)
         self.assertNotIn('lookahead=barmerge.lookahead_off)', pine)
 
     def test_accepts_snapshot_and_exposes_workflow_contract(self):
