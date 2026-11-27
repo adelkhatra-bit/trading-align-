@@ -180,9 +180,9 @@ class EvenementsPine(unittest.TestCase):
     def test_alignment_alerts_explain_direction_without_claiming_entry(self):
         rising_cases = (
             (1, {"bull": 4, "bear": 2}, {"bull": 8, "bear": 2},
-             "LONG à surveiller (non confirmée)", "confluence seulement"),
+             "LONG en contexte local uniquement", "Alignement local uniquement"),
             (-1, {"bull": 2, "bear": 4}, {"bull": 2, "bear": 8},
-             "SHORT à surveiller (non confirmée)", "confluence seulement"),
+             "SHORT en contexte local uniquement", "Alignement local uniquement"),
             (0, {"bull": 4, "bear": 2}, {"bull": 8, "bear": 2},
              "non définie (ni LONG ni SHORT)", "aucun sens de trade confirmé"),
         )
@@ -214,6 +214,68 @@ class EvenementsPine(unittest.TestCase):
                 message = "\n".join(ab.texte_pine({}, events[0]))
                 self.assertIn(expected_direction, message)
                 self.assertIn(expected_action, message)
+
+    def test_alignment_alert_includes_all_fresh_tradingview_timeframes_and_plan_direction(self):
+        def snapshots(count):
+            values = {}
+            for index, (tf, _label) in enumerate(ab.TELEGRAM_TF_VIEWS):
+                if index < count:
+                    values[tf] = {"fresh": True, "direction": 1}
+                elif index < 10:
+                    values[tf] = {"fresh": True, "direction": -1}
+                elif index == 10:
+                    values[tf] = {"fresh": True, "direction": 0}
+                else:
+                    values[tf] = {"fresh": False, "direction": 1}
+            return values
+
+        plan = {"available": True, "confirmed": True, "direction": 1,
+                "strategy": "DAY", "entry_timeframe": "M5",
+                "triggered": False, "price_in_zone": False}
+        etat = {}
+        with patch.object(ab, "plan_indicateur", return_value=plan):
+            first = self.r(require_tv_bridge=True, tv_indicator_mtf={"available": True, "snapshots": snapshots(7)})
+            self.assertEqual(self.lance(etat, "BTC", first), [])
+            second = self.r(require_tv_bridge=True, tv_indicator_mtf={"available": True, "snapshots": snapshots(8)})
+            events = self.lance(etat, "BTC", second, self.NOW + 60)
+
+        self.assertEqual(self.kinds(events), ["align_haut"])
+        message = "\\n".join(ab.texte_pine({}, events[0]))
+        self.assertIn("LONG à surveiller (plan Pine M15 confirmé)", message)
+        self.assertIn("8/12", message)
+        self.assertIn("UT favorables au LONG (8/12)", message)
+        self.assertIn("1 min", message)
+        self.assertIn("UT contraires", message)
+        self.assertIn("UT neutres", message)
+        self.assertIn("UT absentes ou périmées", message)
+        self.assertIn("attendre la clôture M5", message)
+        self.assertNotIn("entrée autorisée", message.lower())
+
+    def test_unconfirmed_pine_plan_never_creates_long_or_short_alignment_alert(self):
+        plan = {"available": True, "confirmed": False, "direction": 1}
+        snapshots = {tf: {"fresh": True, "direction": 1} for tf, _ in ab.TELEGRAM_TF_VIEWS}
+        etat = {}
+        with patch.object(ab, "plan_indicateur", return_value=plan):
+            first = self.r(require_tv_bridge=True, bull=10, tv_indicator_mtf={"available": True, "snapshots": snapshots})
+            self.assertEqual(self.lance(etat, "BTC", first), [])
+            second = self.r(require_tv_bridge=True, bull=11, tv_indicator_mtf={"available": True, "snapshots": snapshots})
+            self.assertEqual(self.lance(etat, "BTC", second, self.NOW + 60), [])
+
+    def test_every_alignment_message_variant_keeps_direction_and_timeframe_breakdown(self):
+        ev = {"kind": "align_haut", "m": "BTC", "ic": "₿", "d": 1, "n": 8,
+              "tf_total": 12, "pine_confirmed": True,
+              "tf_lines": ["🟢 UT favorables au LONG (8/12) : 1 min, 3 min, 5 min"]}
+        etat, messages = {}, []
+        for _ in range(3):
+            messages.append("\\n".join(ab.texte_pine(etat, ev)))
+        for message in messages:
+            self.assertIn("LONG", message)
+            self.assertIn("8/12", message)
+            self.assertIn("1 min", message)
+        english = "\\n".join(ab.texte_pine({}, ev, True))
+        self.assertIn("LONG", english)
+        self.assertIn("8/12", english)
+        self.assertIn("1 min", english)
 
     def test_closed_or_stale_market_never_alerts(self):
         etat = {}
