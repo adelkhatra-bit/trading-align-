@@ -200,5 +200,41 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertNotIn("NAS100", self.pine)
 
 
+    def test_bridge_rsi_matches_the_same_closed_mtf_candle_as_direction_and_timestamp(self):
+        self.assertIn(
+            "[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), ta.rsi(close, lenRsi)[1], time_close[1]]",
+            self.pine,
+        )
+        for live, closed, stamp in (
+            ("r1", "r1Fermee", "bridgeTimeM1"),
+            ("r2", "r2Fermee", "bridgeTimeM3"),
+            ("r5", "r5Fermee", "bridgeTimeM5"),
+            ("r10", "r10Fermee", "bridgeTimeM10"),
+            ("r15", "r15Fermee", "bridgeTimeM15"),
+            ("r30", "r30Fermee", "bridgeTimeM30"),
+            ("r45", "r45Fermee", "bridgeTimeM45"),
+            ("r60", "r60Fermee", "bridgeTimeH1"),
+            ("r120", "r120Fermee", "bridgeTimeH2"),
+            ("r240", "r240Fermee", "bridgeTimeH4"),
+            ("rD", "rDFermee", "bridgeTimeD1"),
+            ("rW", "rWFermee", "bridgeTimeW1"),
+        ):
+            self.assertIn(f'"rsi":' + " + f_align_v25_json_num(" + closed + ")", self.pine)
+            self.assertIn(f"{closed}, {stamp}", self.pine)
+        self.assertIn('"rsi_1m":' + " + f_align_v25_json_num(r1Fermee)", self.pine)
+        self.assertIn('"rsi_5m":' + " + f_align_v25_json_num(r5Fermee)", self.pine)
+        self.assertIn('"rsi_15m":' + " + f_align_v25_json_num(r15Fermee)", self.pine)
+        self.assertIn('"rsi_60m":' + " + f_align_v25_json_num(r60Fermee)", self.pine)
+        self.assertIn("rsiOBFermee >= 3", self.pine)
+        self.assertIn("rsiOSFermee >= 3", self.pine)
+
+    def test_closed_rsi_export_does_not_change_live_chart_rsi_calculations(self):
+        self.assertIn("rsis = array.from(nz(r1, 50)", self.pine)
+        self.assertIn("[dC, sC, rC, _, _] = f_etat()", self.pine)
+        self.assertIn("rsiSig = ta.ema(rC, 9)", self.pine)
+        self.assertIn("rsiAchat =", self.pine)
+        self.assertIn("rsiVente =", self.pine)
+
+
 if __name__ == "__main__":
     unittest.main()
