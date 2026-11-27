@@ -1278,7 +1278,7 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         self.assertNotIn("utterance.voice = dansLangue[0]", bande)
         self.assertNotIn("dansLangue[0]", bande)
         self.assertIn("if (!v) {", bande)
-        self.assertIn("if (voixActive) { voixEnAttente = { item, apresLecture };", bande)
+        self.assertIn("if (voixActive) {\n          voixEnAttente = { item, apresLecture };", bande)
         self.assertIn("return 0;   // reprise à voiceschanged, callback conservé pour ne pas perdre la deuxième voix", bande)
         self.assertIn("utterance.voice = v;", bande)
 
