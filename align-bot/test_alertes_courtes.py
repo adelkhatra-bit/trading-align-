@@ -250,6 +250,10 @@ class EvenementsPine(unittest.TestCase):
         self.assertIn("UT absentes ou périmées", message)
         self.assertIn("attendre la clôture M5", message)
         self.assertNotIn("entrée autorisée", message.lower())
+        english = "\\n".join(ab.texte_pine({}, events[0], True))
+        self.assertIn("Against LONG / SHORT pressure", english)
+        self.assertIn("1 min", english)
+        self.assertNotIn("UT favorables", english)
 
     def test_unconfirmed_pine_plan_never_creates_long_or_short_alignment_alert(self):
         plan = {"available": True, "confirmed": False, "direction": 1}
