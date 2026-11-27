@@ -22,7 +22,7 @@ class LiveVoiceNarration(unittest.TestCase):
         self.assertIn("parleNarration ? 'marche' : undefined", self.source)
 
     def test_enabling_voice_never_replays_cached_old_commentary(self):
-        start = self.source.index("// Démarrage propre : aucune ancienne phrase IA")
+        start = self.source.index("// Nettoyer le cache avant même la synchronisation Worker")
         end = self.source.index("\n    } else {", start)
         activation = self.source[start:end]
         self.assertIn("dernierDialogueCoach = null;", activation)
