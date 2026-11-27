@@ -178,8 +178,8 @@ class BridgeStoreTests(unittest.TestCase):
 
     def test_stale_active_entry_bar_invalidates_plan(self):
         payload = valid_payload()
-        payload["entryBarTime"] = BASE_MS - 900_000
-        payload["activeEntryBarTime"] = BASE_MS - 600_000
+        payload["entryBarTime"] = BASE_MS - 600_000
+        payload["activeEntryBarTime"] = BASE_MS - 400_000
         status, result = self.store.ingest(payload, INGEST, BASE_MS)
         self.assertEqual(status, 200)
         self.assertEqual(result["diagnosticRejection"]["error"], "stale_or_future_active_entry_bar")
