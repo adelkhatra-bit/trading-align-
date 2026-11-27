@@ -28,8 +28,8 @@ class PineTpPlanStateTests(unittest.TestCase):
         self.assertIn('voirPlan = input.bool(false, "Afficher le plan (TP / SL)"', self.source_v24)
         self.assertIn('voirFibo = input.bool(false, "Zone d\'entrée + Fibonacci"', self.source_v24)
         self.assertIn('voirSignauxV24 = input.bool(false, "Signaux indépendants v24 (désactivés par défaut)"', self.source_v24)
-        self.assertIn("sigHaut = voirSignauxV24 and isSupportedMarket", self.source_v24)
-        self.assertIn("sigBas  = voirSignauxV24 and isSupportedMarket", self.source_v24)
+        self.assertIn("sigHaut = voirSignauxV24 and sigHaut0", self.source_v24)
+        self.assertIn("sigBas  = voirSignauxV24 and sigBas0", self.source_v24)
         self.assertIn("CONTEXTE MTF v24 — plan Entry / SL / TP sur v25", self.source_v24)
         self.assertNotIn('E " + px(ent) + "  TP " + px(tp1) + "  SL " + px(sl)', self.source_v24)
 

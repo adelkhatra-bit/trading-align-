@@ -28,7 +28,7 @@ class FibonacciCommentateurLive(unittest.TestCase):
         cls.js = LIVE_JS.read_text(encoding="utf-8")
 
     def test_no_new_fibonacci_indicator_is_added_to_the_chart(self):
-        self.assertIn("voirFibo = input.bool(true, \"Zone d'entrée + Fibonacci\"", self.pine)
+        self.assertIn("voirFibo = input.bool(false, \"Zone d'entrée + Fibonacci\"", self.pine)
         self.assertNotIn("voirFiboProgression", self.pine)
         self.assertNotIn("FIBO —", self.pine)
         self.assertFalse((ROOT / "pine" / "ALIGN_MTF_PRO_v24_5_FIBO_PROPOSITION.pine").exists())
