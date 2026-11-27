@@ -69,8 +69,8 @@ class CoachStopPolicy(unittest.TestCase):
             ab.coach(etat, "BTC", r, cle)
         news = [message for message in sent if "News dans" in message]
         self.assertEqual(len(news), 1)
-        self.assertIn("Vérifie ton SL actuel", news[0])
-        self.assertIn("Ne le déplace pas à BE", news[0])
+        self.assertIn("Vérifie ton stop personnel actuel", news[0])
+        self.assertIn("Ne le déplace pas sans validation", news[0])
         self.assertNotIn("Mets ton SL à BE", news[0])
 
 
