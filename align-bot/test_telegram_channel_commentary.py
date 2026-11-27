@@ -287,7 +287,39 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
             with self.subTest(plan=plan):
                 self.assertIn(expected_title, title)
                 self.assertIn(expected_reason, reason)
-                self.assertNotIn("Aucune entrée autorisée", reason) if "aucun biais" in title else self.assertIn("aucune entrée", reason.lower())
+                if "aucun biais" in title:
+                    self.assertIn("Aucune entrée autorisée", reason)
+                else:
+                    self.assertIn("aucune entrée", reason.lower())
+
+    def test_plan_indicateur_preserves_wait_signal_and_candidate_scores(self):
+        market = {
+            "tv_indicator_mtf": {
+                "activeTimeframe": "M15",
+                "snapshots": {
+                    "M15": {
+                        "fresh": True,
+                        "robotFresh": True,
+                        "robotV12": {
+                            "signal": "WAIT",
+                            "verdict": "À SURVEILLER : confirmation manquante",
+                            "long_score": 0,
+                            "short_score": 74,
+                        },
+                    }
+                },
+            }
+        }
+        plan = ab.plan_indicateur(market)
+        self.assertIs(plan["available"], False)
+        self.assertEqual(plan["signal"], "WAIT")
+        self.assertEqual(plan["short_score"], 74)
+        title, reason = ab.statut_attente_pine(plan)
+        self.assertIn("biais candidat SHORT", title)
+        self.assertIn("Score candidat SHORT : 74/100", reason)
+        english = ab.traduire(title + "\n" + reason)
+        self.assertIn("candidate SHORT bias", english)
+        self.assertIn("no plan confirmed", english)
 
     def test_pine_wait_status_distinguishes_incomplete_data_and_confirmed_direction(self):
         title, reason = ab.statut_attente_pine({"available": False, "signal": "SHORT"})
