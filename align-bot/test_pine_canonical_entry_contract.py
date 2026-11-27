@@ -219,12 +219,12 @@ class PineCanonicalEntryContract(unittest.TestCase):
             ("rD", "rDFermee", "bridgeTimeD1"),
             ("rW", "rWFermee", "bridgeTimeW1"),
         ):
-            self.assertIn(f'"rsi":' + " + f_align_v25_json_num(" + closed + ")", self.pine)
+            self.assertIn(',"rsi":\' + f_align_v25_json_num(' + closed + ')', self.pine)
             self.assertIn(f"{closed}, {stamp}", self.pine)
-        self.assertIn('"rsi_1m":' + " + f_align_v25_json_num(r1Fermee)", self.pine)
-        self.assertIn('"rsi_5m":' + " + f_align_v25_json_num(r5Fermee)", self.pine)
-        self.assertIn('"rsi_15m":' + " + f_align_v25_json_num(r15Fermee)", self.pine)
-        self.assertIn('"rsi_60m":' + " + f_align_v25_json_num(r60Fermee)", self.pine)
+        self.assertIn('"rsi_1m":\' + f_align_v25_json_num(r1Fermee)', self.pine)
+        self.assertIn('"rsi_5m":\' + f_align_v25_json_num(r5Fermee)', self.pine)
+        self.assertIn('"rsi_15m":\' + f_align_v25_json_num(r15Fermee)', self.pine)
+        self.assertIn('"rsi_60m":\' + f_align_v25_json_num(r60Fermee)', self.pine)
         self.assertIn("rsiOBFermee >= 3", self.pine)
         self.assertIn("rsiOSFermee >= 3", self.pine)
 
