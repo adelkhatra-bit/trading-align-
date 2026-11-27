@@ -9928,8 +9928,8 @@ FOCUS_NOMS = {"dans_zone": "dans la zone d'entrée", "proche": "proche de la zon
               "bloque": "bloqué (zone extrême Daily/Weekly)", "sans_plan": "pas de plan fixé", "ferme": "marché fermé", "position": "déjà en position"}
 
 
-def prix_tradingview_actif(r):
-    """Prix et provenance du snapshot actif TradingView v25 ; aucun repli local en bridge obligatoire."""
+def prix_tradingview_actif(r, now_ms=None):
+    """Prix actif et dernière bougie de déclenchement clôturée du snapshot TradingView v25."""
     bridge = (r or {}).get("tv_indicator_mtf") or {}
     if bridge.get("available") is not True:
         return None
@@ -9951,11 +9951,43 @@ def prix_tradingview_actif(r):
         age_ms = snap.get("robotAgeMs")
     if not isinstance(age_ms, (int, float)) or not math.isfinite(float(age_ms)) or age_ms < 0:
         age_ms = None
+
+    # ROBOT V12 transporte aussi l'OHLC de la dernière bougie clôturée de l'UT de déclenchement.
+    # Elle permet de détecter un SL/TP traversé pendant la bougie, même si le prix est revenu ensuite.
+    bar = {"bar_fresh": False, "bar_timeframe": None, "bar_time": None,
+           "bar_open": None, "bar_high": None, "bar_low": None, "bar_close": None}
+    robot = snap.get("robotV12") if snap.get("robotFresh") is True else None
+    if isinstance(robot, dict):
+        entry_tf = str(robot.get("entryTimeframe") or "").upper()
+        tf_ms = {"M1": 60_000, "M5": 300_000, "H1": 3_600_000}.get(entry_tf)
+        try:
+            bar_time = int(robot.get("entryBarTime"))
+            bar_open = float(robot.get("entryBarOpen"))
+            bar_high = float(robot.get("entryBarHigh"))
+            bar_low = float(robot.get("entryBarLow"))
+            bar_close = float(robot.get("entryBarClose"))
+            now = int(now_ms if now_ms is not None else time.time() * 1000)
+            bar_age = now - bar_time
+            ohlc_valid = (
+                all(math.isfinite(x) and x > 0 for x in (bar_open, bar_high, bar_low, bar_close))
+                and bar_low <= min(bar_open, bar_close) <= max(bar_open, bar_close) <= bar_high
+            )
+            bar_fresh = bool(
+                tf_ms and ohlc_valid
+                and -5_000 <= bar_age <= 2 * tf_ms + 30_000
+            )
+            if bar_fresh:
+                bar = {"bar_fresh": True, "bar_timeframe": entry_tf, "bar_time": bar_time,
+                       "bar_open": bar_open, "bar_high": bar_high, "bar_low": bar_low,
+                       "bar_close": bar_close}
+        except (TypeError, ValueError, OverflowError):
+            pass
     return {
         "price": price,
         "timeframe": timeframe,
         "ageMs": age_ms,
         "timestamp": snap.get("robotTimestamp"),
+        **bar,
     }
 
 
@@ -12561,7 +12593,12 @@ def gerer_stop(etat, m, r, tr, c):
             return
         p = tv_price["price"]
         sl = pos.get("sl_conseil", pos["sl"])
-        if d * (p - sl) <= 0:
+        bar_touch = (
+            tv_price.get("bar_fresh") is True
+            and ((tv_price["bar_low"] <= sl) if d == 1 else (tv_price["bar_high"] >= sl))
+        )
+        current_touch = d * (p - sl) <= 0
+        if bar_touch or current_touch:
             noter(etat, c, m, pos, sl, "🔒 Stop protégé touché" if d * (sl - pos["e"]) >= 0 else "🛡 Stop remonté touché")
         # Aucun stop dynamique fondé sur les bougies locales ne doit contredire le plan Pine.
         return
@@ -13345,31 +13382,46 @@ def agent(m, r, cle, ferme):
         return []
     r.setdefault("market", m)
     r.setdefault("confirme", 0)
-    # Sans flux M1, l'agent ne peut ni calculer le prix ni valider une entrée ; il reste silencieux et ne plante pas.
-    if not (r.get("m1") or []) or len(r.get("r5") or []) < 2:
+    require_tv = bool(r.get("require_tv_bridge"))
+    tr = cle.get("trade")
+    local_bars = r.get("m1") or []
+    local_r5 = r.get("r5") or []
+    # Un trade déjà ouvert en bridge obligatoire se suit exclusivement sur TradingView :
+    # l'absence du flux local M1/RSI5 ne doit pas interrompre son suivi personnel.
+    if not (require_tv and tr) and (not local_bars or len(local_r5) < 2):
         print(f"{m}: flux M1/RSI5 indisponible — aucune nouvelle position")
         return []
     out = []
-    tr = cle.get("trade")
-    depuis = cle.get("t1m", 0)
-    bougies = ([x for x in r["m1"] if x["t"] > depuis][-10:] if depuis else []) or r["m1"][-1:]   # seulement les minutes depuis le dernier tour
-    cle["t1m"] = r["m1"][-1]["t"]
-    p = r["m1"][-1]["c"]
-    hi = max(x["h"] for x in bougies); lo = min(x["l"] for x in bougies)
-    d = r["confirme"]
-    if m == "GOLD":
-        r5, r5p = (r["r5"][-2], r["r5"][-3]) if len(r.get("r5") or []) >= 3 else (50, 50)
+    if require_tv and tr:
+        p = 0.0
+        hi = lo = 0.0
+        d = int(tr.get("d") or 0)
+        r5 = r5p = 50.0
+        ctx = ""
     else:
-        r5, r5p = r["r5"][-1], r["r5"][-2]
-    ctx = f"Contexte : {zone_txt(r['posD'])} Daily, {zone_txt(r['posW'])} Weekly."
-    require_tv = bool(r.get("require_tv_bridge"))
+        depuis = cle.get("t1m", 0)
+        bougies = ([x for x in local_bars if x["t"] > depuis][-10:] if depuis else []) or local_bars[-1:]
+        cle["t1m"] = local_bars[-1]["t"]
+        p = local_bars[-1]["c"]
+        hi = max(x["h"] for x in bougies)
+        lo = min(x["l"] for x in bougies)
+        d = r.get("confirme", 0)
+        if m == "GOLD":
+            r5, r5p = (local_r5[-2], local_r5[-3]) if len(local_r5) >= 3 else (50, 50)
+        else:
+            r5, r5p = local_r5[-1], local_r5[-2]
+        ctx = f"Contexte : {zone_txt(r['posD'])} Daily, {zone_txt(r['posW'])} Weekly."
     if require_tv and tr:
         tv_price = prix_tradingview_actif(r)
         if not tv_price:
             print(f"{m} : prix TradingView actif indisponible ou périmé — suivi de position suspendu sans repli local.")
             return out
         p = tv_price["price"]
-        hi = lo = p
+        if tv_price.get("bar_fresh") is True:
+            hi = float(tv_price["bar_high"])
+            lo = float(tv_price["bar_low"])
+        else:
+            hi = lo = p
     # Mode sans signal (bridge TradingView non branché) : AUCUNE alerte calculée localement
     # (manipulation, niveaux, FVG, radar, retournement, retest, après-SL) — seule la source v25 parle.
     # Une position déjà ouverte reste suivie jusqu'à sa clôture ; aucune nouvelle info de marché.
@@ -13874,7 +13926,7 @@ def agent(m, r, cle, ferme):
     cs_ = lambda *a_, **k_: carte_suivi(*a_, d=tr["d"], **k_)     # LONG / SHORT en premier sur chaque carte de suivi
     # GOLD : les mèches PAXG (marché 24/7, peu liquide le soir) peuvent dépasser le vrai prix XAUUSD.
     # Le SL / TP ne compte que si le VRAI prix spot l'a touché (ou si PAXG l'a nettement dépassé).
-    if m == "GOLD" and r.get("spot_lo") is not None:
+    if not require_tv and m == "GOLD" and r.get("spot_lo") is not None:
         lo = min(r["spot_lo"], lo + 0.3 * r["atr"])
         hi = max(r["spot_hi"], hi - 0.3 * r["atr"])
     if not require_tv and tr["statut"] == "entree" and tr["d"] * (tr["tp2"] - tr["tp1"]) <= 0 and not tr.get("tp_corrige"):
