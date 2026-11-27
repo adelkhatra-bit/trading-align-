@@ -84,6 +84,22 @@ class EconomicNewsNormalizationTest(unittest.TestCase):
         self.assertIn("U.S. Bureau of Labor Statistics", report)
 
 
+    def test_calendar_updated_at_is_not_mislabelled_as_publication_time(self):
+        raw = {
+            "title": "Core CPI m/m",
+            "country": "USD",
+            "date": "2026-11-27T08:30:00-05:00",
+            "impact": "High",
+            "updated_at": "2026-11-27T08:31:00-05:00",
+        }
+        event = news.normaliser_evenement(raw, self.now)
+        self.assertIsNone(event["published_at"])
+        self.assertIsNone(event["published_at_paris"])
+        self.assertIsNone(event["published_at_source"])
+        self.assertEqual(event["source_updated_at"], news._timestamp(raw["updated_at"]))
+        self.assertIsNotNone(event["source_updated_at_paris"])
+
+
 class EconomicNewsBotIntegrationTest(unittest.TestCase):
     def setUp(self):
         self.now = int(dt.datetime(2026, 11, 27, 9, 0, tzinfo=ZoneInfo("Europe/Paris")).timestamp())
