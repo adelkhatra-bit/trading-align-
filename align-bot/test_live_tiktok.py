@@ -827,6 +827,9 @@ class LiveOutbox(unittest.TestCase):
              mock.patch.object(ab, "live_publier", side_effect=lambda message: sent.append(message) or True):
             self.assertTrue(ab.live_phrases_ia(state, 1000, {}))
             ia_mock.assert_called_with(mock.ANY, mock.ANY, mock.ANY, cle_cache="live_commentary", duree=ab.LIVE_IA_INTERVALLE, premium=True, prefer_paid=True)
+            prompt = ia_mock.call_args.args[1]
+            self.assertIn("phase_plan", prompt)
+            self.assertIn("carte Telegram ENTRÉE AUTORISÉE", prompt)
             self.assertFalse(ab.live_phrases_ia(state, 1599, {}))
             self.assertTrue(ab.live_phrases_ia(state, 1600, {}))
         self.assertEqual(len(sent), 2)
@@ -1169,6 +1172,59 @@ class LiveClosedCandleContext(unittest.TestCase):
         context = ab.contexte_technique_live({"BTC": latest})
         self.assertEqual(context["marches"]["BTC"]["surveillance_retournement"]["direction"], 1)
         self.assertEqual(context["marches"]["BTC"]["surveillance_retournement"]["type"], "reprise_haussiere_apres_chasse")
+
+
+class LivePlanBiasUsesPineV25(unittest.TestCase):
+    def _context(self, plan):
+        latest = {
+            "require_tv_bridge": True,
+            "confirme": 1,  # local context says bullish; it must not override Pine
+            "dirs": [1] * 11,
+            "b15_long": [],
+            "b15": [],
+            "b5": [],
+            "m1": [{"c": 100.0}],
+            "atr": 1.0,
+            "rC": 55.0,
+            "niveaux": [],
+        }
+        with mock.patch.object(ab, "plan_indicateur", return_value=plan):
+            return ab.contexte_technique_live({"BTC": latest})["marches"]["BTC"]
+
+    def test_local_bullish_context_cannot_create_unconfirmed_pine_plan_bias(self):
+        context = self._context({
+            "available": True, "confirmed": False, "direction": 1,
+            "strategy": "DAY", "triggered": False, "price_in_zone": False
+        })
+        self.assertEqual(context["biais_plan"], "neutre")
+        self.assertEqual(context["phase_plan"], "attente_confirmation_mtf")
+        self.assertFalse(context["plan_confirme"])
+        self.assertEqual(context["strategie"], "aucune stratégie Pine confirmée")
+
+    def test_confirmed_pine_short_overrides_opposite_local_context(self):
+        context = self._context({
+            "available": True, "confirmed": True, "direction": -1,
+            "strategy": "DAY", "triggered": False, "price_in_zone": False
+        })
+        self.assertEqual(context["biais_plan"], "baissier")
+        self.assertEqual(context["phase_plan"], "attente_declencheur")
+        self.assertTrue(context["plan_confirme"])
+        self.assertEqual(context["strategie"], "DAY")
+
+    def test_triggered_plan_outside_zone_waits_for_retest(self):
+        context = self._context({
+            "available": True, "confirmed": True, "direction": 1,
+            "strategy": "DAY", "triggered": True, "price_in_zone": False
+        })
+        self.assertEqual(context["phase_plan"], "attente_retour_zone")
+
+    def test_triggered_plan_inside_zone_still_waits_for_final_bot_checks(self):
+        context = self._context({
+            "available": True, "confirmed": True, "direction": 1,
+            "strategy": "DAY", "triggered": True, "price_in_zone": True
+        })
+        self.assertEqual(context["phase_plan"], "verification_finale")
+        self.assertNotIn("entree_autorisee", context)
 
 
 class LiveNarrationPrioritizesM5M15Conflict(unittest.TestCase):
