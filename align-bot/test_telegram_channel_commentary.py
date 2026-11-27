@@ -194,7 +194,8 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
             "m1": [{"c": 101.0}],
             "b15": [candle, {"o": 100.0, "h": 102.0, "l": 99.0, "c": 101.0, "t": 2000}],
             "confirme": 1,
-            "dirs": [1] * 11,
+            "dirs": [-1] * 11,  # valeurs live volontairement opposées : elles ne doivent pas être utilisées
+            "dirs_cloturees": [1] * 11,
             "sqzs": [0] * 11,
         }
         with patch.object(ab, "prochaine_cloture_bougie", return_value=3000):
@@ -223,6 +224,54 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         self.assertNotIn("Surveillance continue", translated_activation)
         self.assertNotIn("Commentaire aux clôtures", translated_activation)
 
+
+    def test_live_coach_explains_wick_direction_and_uses_only_closed_mtf(self):
+        cases = (
+            (
+                {"o": 100.0, "h": 105.0, "l": 99.0, "c": 101.0, "t": 2000},
+                "👁 Mèche haute : rejet vendeur potentiel (biais SHORT)",
+                "potential seller rejection (SHORT bias)",
+            ),
+            (
+                {"o": 100.0, "h": 101.0, "l": 95.0, "c": 99.0, "t": 2000},
+                "👁 Mèche basse : rejet acheteur potentiel (biais LONG)",
+                "potential buyer rejection (LONG bias)",
+            ),
+            (
+                {"o": 100.0, "h": 104.0, "l": 96.0, "c": 100.0, "t": 2000},
+                "👁 Mèches des deux côtés : indécision",
+                "Wicks on both sides: indecision",
+            ),
+        )
+        with patch.object(ab, "prochaine_cloture_bougie", return_value=3000):
+            for candle, french_label, english_label in cases:
+                market = {
+                    "m1": [{"c": candle["c"]}],
+                    "confirme": 0,
+                    "dirs_cloturees": [1] * 8 + [-1] * 3,
+                    "dirs": [-1] * 11,
+                    "sqzs": [0] * 11,
+                }
+                french = ab.texte_coach_live("BTC", candle, market, {}, public=True)
+                english = ab.traduire(french)
+                with self.subTest(french_label=french_label):
+                    self.assertIn(french_label, french)
+                    self.assertIn(english_label, english)
+                    self.assertIn("Biais de contexte : LONG dominant • 8/11", french)
+
+            missing = {
+                "m1": [{"c": 101.0}],
+                "confirme": 0,
+                "dirs": [1] * 11,
+                "sqzs": [0] * 11,
+            }
+            unavailable = ab.texte_coach_live(
+                "BTC", {"o": 100.0, "h": 101.0, "l": 99.0, "c": 100.5, "t": 2000},
+                missing, {}, public=True
+            )
+            self.assertIn("UT clôturées : indisponibles", unavailable)
+            self.assertIn("aucun biais LONG/SHORT déduit", unavailable)
+            self.assertNotIn("11/11", unavailable)
 
     def test_position_followup_allows_levels_only_for_exact_active_position_owner(self):
         position = {"fini": False, "e": 100.0, "sl": 95.0}

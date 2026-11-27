@@ -2984,6 +2984,13 @@ TRAD.update({
     "⚪ Bougie à plat": "⚪ Flat candle",
     "👁 Mèche haute : rejet": "👁 Upper wick: rejection",
     "👁 Mèche basse : rejet": "👁 Lower wick: rejection",
+    "👁 Mèche haute : rejet vendeur potentiel (biais SHORT)": "👁 Upper wick: potential seller rejection (SHORT bias)",
+    "👁 Mèche basse : rejet acheteur potentiel (biais LONG)": "👁 Lower wick: potential buyer rejection (LONG bias)",
+    "👁 Mèches des deux côtés : indécision": "👁 Wicks on both sides: indecision",
+    "ℹ️ ▲ LONG = hausse • ▼ SHORT = baisse • ➡️ neutre": "ℹ️ ▲ LONG = bullish • ▼ SHORT = bearish • ➡️ neutral",
+    "ℹ️ UT alignées = contexte, jamais une entrée seule.": "ℹ️ Aligned timeframes = context, never an entry by themselves.",
+    "📊 UT clôturées : indisponibles • données incomplètes": "📊 Closed timeframes: unavailable • incomplete data",
+    "📊 Alignement UT : indisponible • aucun biais LONG/SHORT déduit": "📊 Timeframe alignment: unavailable • no LONG/SHORT bias inferred",
     "👁 Mouvement franc 💪": "👁 Strong move 💪",
     "👁 Le marché hésite 🤏": "👁 Market is hesitating 🤏",
     "📉 Unités :": "📉 Timeframes:",
@@ -7246,32 +7253,46 @@ def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
     corps = abs(c_ - o_); rng = max(h_ - l_, 1e-9)
     m_haut, m_bas = h_ - max(o_, c_), min(o_, c_) - l_
     sens_b = "🟢 Bougie en hausse" if c_ > o_ else "🔴 Bougie en baisse" if c_ < o_ else "⚪ Bougie à plat"
-    if m_haut >= 0.5 * rng:
-        lecture = "👁 Mèche haute : rejet"
+    if m_haut >= 0.5 * rng and m_bas >= 0.5 * rng:
+        lecture = "👁 Mèches des deux côtés : indécision"
+    elif m_haut >= 0.5 * rng:
+        lecture = "👁 Mèche haute : rejet vendeur potentiel (biais SHORT)"
     elif m_bas >= 0.5 * rng:
-        lecture = "👁 Mèche basse : rejet"
+        lecture = "👁 Mèche basse : rejet acheteur potentiel (biais LONG)"
     elif corps >= 0.7 * rng:
         lecture = "👁 Mouvement franc 💪"
     else:
         lecture = "👁 Le marché hésite 🤏"
     d = r.get("confirme") or 0
     tr = cle.get("trade")
-    dirs = (r.get("dirs_cloturees") or r.get("dirs")) or [0] * 11
+    dirs_cloturees = r.get("dirs_cloturees")
+    mtf_clotures_ok = (
+        isinstance(dirs_cloturees, (list, tuple))
+        and len(dirs_cloturees) >= 11
+        and all(v in (-1, 0, 1) for v in dirs_cloturees[:11])
+    )
     noms_ut = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1")
-    lectures_ut = [(nom, dirs[i] if i < len(dirs) and dirs[i] in (-1, 1) else 0)
-                   for i, nom in enumerate(noms_ut)]
     fleche_ut = lambda sens: "⬆️" if sens == 1 else "⬇️" if sens == -1 else "➡️"
-    unites = "📊 UT clôturées : " + " ".join(f"{nom}{fleche_ut(sens)}" for nom, sens in lectures_ut)
-    haut = sum(1 for _, sens in lectures_ut if sens == 1)
-    bas = sum(1 for _, sens in lectures_ut if sens == -1)
-    neutres = len(lectures_ut) - haut - bas
-    if d in (-1, 1):
-        alignes = sum(1 for _, sens in lectures_ut if sens == d)
-        opposes = sum(1 for _, sens in lectures_ut if sens == -d)
-        bilan_ut = (f"🎯 Vs sens confirmé {'LONG' if d == 1 else 'SHORT'} : "
-                    f"{alignes}/11 alignées • {opposes} opposées • {neutres} neutres")
+    if mtf_clotures_ok:
+        lectures_ut = [(nom, dirs_cloturees[i]) for i, nom in enumerate(noms_ut)]
+        unites = "📊 UT clôturées : " + " ".join(f"{nom}{fleche_ut(sens)}" for nom, sens in lectures_ut)
+        haut = sum(1 for _, sens in lectures_ut if sens == 1)
+        bas = sum(1 for _, sens in lectures_ut if sens == -1)
+        neutres = len(lectures_ut) - haut - bas
+        if d in (-1, 1):
+            alignes = sum(1 for _, sens in lectures_ut if sens == d)
+            opposes = sum(1 for _, sens in lectures_ut if sens == -d)
+            bilan_ut = (f"🎯 Vs sens confirmé {'LONG' if d == 1 else 'SHORT'} : "
+                        f"{alignes}/11 alignées • {opposes} opposées • {neutres} neutres")
+        elif haut > bas:
+            bilan_ut = f"🧭 Biais de contexte : LONG dominant • {haut}/11 haussières • {bas} baissières • {neutres} neutres (pas un signal)"
+        elif bas > haut:
+            bilan_ut = f"🧭 Biais de contexte : SHORT dominant • {bas}/11 baissières • {haut} haussières • {neutres} neutres (pas un signal)"
+        else:
+            bilan_ut = f"🧭 Biais de contexte : MIXTE • {haut}/11 haussières • {bas} baissières • {neutres} neutres (pas un signal)"
     else:
-        bilan_ut = f"📊 Sans plan : {haut}/11 haussières • {bas} baissières • {neutres} neutres"
+        unites = "📊 UT clôturées : indisponibles • données incomplètes"
+        bilan_ut = "📊 Alignement UT : indisponible • aucun biais LONG/SHORT déduit"
     w1 = r.get("dirW") or 0
     w1_txt = "🌐 W1 contexte : " + fleche_ut(w1)
     strategie = str(r.get("strat") or "").upper()
@@ -7290,7 +7311,8 @@ def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
     l += [SEPARATEUR, sens_b, f"📏 Écart : {'+' if c_ >= o_ else '-'}{px(corps)}", lecture,
           "🧭 Tendance : " + ("🟢 hausse" if d == 1 else "🔴 baisse" if d == -1 else "➖ floue"),
           unites, bilan_ut, w1_txt, role_ut,
-          "ℹ️ Le décompte décrit le contexte ; seule la clôture de validation du plan autorise l'entrée."]
+          "ℹ️ ▲ LONG = hausse • ▼ SHORT = baisse • ➡️ neutre",
+          "ℹ️ UT alignées = contexte, jamais une entrée seule."]
     if sum((r.get("sqzs") or [0] * 11)[4:10]) >= 3:
         l.append("⚡ Compression : ça charge")
     if tr and public:
