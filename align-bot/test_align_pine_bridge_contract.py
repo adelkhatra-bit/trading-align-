@@ -224,7 +224,7 @@ if barstate.isconfirmed
             1,
         )
         weekly_start = without_export.find("    // Weekly : contexte clôturé affiché séparément")
-        weekly_end = without_export.find("// État de confirmation calculé pour l'affichage", weekly_start)
+        weekly_end = without_export.find("    titre = ", weekly_start)
         self.assertGreaterEqual(weekly_start, 0)
         self.assertGreater(weekly_end, weekly_start)
         without_export = without_export[:weekly_start] + without_export[weekly_end:]
