@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import align_bot as ab
@@ -323,12 +324,17 @@ class ClosedMtfSafety(unittest.TestCase):
 
     def test_live_ai_context_uses_four_closed_timeframes_for_gold_nasdaq(self):
         r = {
-            "dirPlan": -1, "confirme": -1, "dirs": [1] * 11, "dirs_cloturees": [-1] * 11,
+            "require_tv_bridge": True,
+            "dirPlan": -1, "confirme": 1, "dirs": [1] * 11, "dirs_cloturees": [-1] * 11,
             "m1": [bar(int(time.time()) - 10, c=100.0)],
             "b15": [], "b15_long": [], "b1h": [], "b1h_long": [],
             "b4h": [], "b4h_long": [], "niveaux": [],
         }
-        context = ab.contexte_technique_live({"GOLD": r})["marches"]["GOLD"]
+        with patch.object(ab, "plan_indicateur", return_value={
+            "available": True, "confirmed": True, "direction": -1,
+            "strategy": "DAY", "triggered": False, "price_in_zone": False,
+        }):
+            context = ab.contexte_technique_live({"GOLD": r})["marches"]["GOLD"]
         self.assertEqual(context["biais_plan"], "baissier")
         self.assertEqual(context["confirmation_m5_m15_h1_h4"], "quatre clôtures alignées à la baisse")
         self.assertEqual(context["lecture_mtf_cloturee"], {"M5": -1, "M15": -1, "H1": -1, "H4": -1})
@@ -367,22 +373,30 @@ class ClosedMtfSafety(unittest.TestCase):
     def test_live_ai_bias_uses_only_confirmed_direction_and_reports_short_term_conflict(self):
         now = int(time.time())
         base = {
-            "dirPlan": -1, "sens": -1, "confirme": 0,
+            "require_tv_bridge": True,
+            "dirPlan": -1, "sens": -1, "confirme": -1,
             "dirs": [-1] * 11, "dirs_cloturees": [-1] * 11,
             "m1": [bar(now - 30, o=99.0, c=103.0)],
             "b5": [bar(now - 600, o=99.0, c=99.5), bar(now - 300, o=99.5, h=104.0, c=103.0)],
             "b15": [bar(now - 1800, o=99.0, c=99.5), bar(now - 900, o=99.5, h=105.0, c=104.0)],
             "b15_long": [], "niveaux": [], "atr": 1.0,
         }
-        context = ab.contexte_technique_live({"BTC": base})["marches"]["BTC"]
+        with patch.object(ab, "plan_indicateur", return_value={
+            "available": True, "confirmed": False, "direction": -1,
+            "strategy": "DAY", "triggered": False, "price_in_zone": False,
+        }):
+            context = ab.contexte_technique_live({"BTC": base})["marches"]["BTC"]
         self.assertEqual(context["biais_plan"], "neutre")
         self.assertEqual(context["mouvement_court_terme"], {"M5": "haussière", "M15": "haussière"})
         fallback = ab.commentaires_live_de_secours({"marches": {"BTC": context}})
         self.assertIn("aucune direction de trade n'est confirmée", fallback)
         self.assertIn("pas de short anticipé", fallback)
 
-        base["confirme"] = -1
-        context = ab.contexte_technique_live({"BTC": base})["marches"]["BTC"]
+        with patch.object(ab, "plan_indicateur", return_value={
+            "available": True, "confirmed": True, "direction": -1,
+            "strategy": "DAY", "triggered": False, "price_in_zone": False,
+        }):
+            context = ab.contexte_technique_live({"BTC": base})["marches"]["BTC"]
         self.assertEqual(context["biais_plan"], "baissier")
         self.assertTrue(context["conflit_biais_court_terme"])
         fallback = ab.commentaires_live_de_secours({"marches": {"BTC": context}})
