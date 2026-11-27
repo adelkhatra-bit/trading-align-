@@ -69,8 +69,11 @@ class PineTpPlanStateTests(unittest.TestCase):
         self.assertIn("dv = array.get(dirsFermees, i)", self.source)
         self.assertIn("Bougie en formation :", self.source)
         for name in ("d1Fermee", "d3Fermee", "d5Fermee", "d10Fermee", "d15Fermee",
-                     "d30Fermee", "d45Fermee", "d60Fermee", "d120Fermee", "d240Fermee", "dDFermee"):
+                     "d30Fermee", "d45Fermee", "d60Fermee", "d120Fermee", "d240Fermee", "dDFermee", "dWFermee"):
             self.assertIn(f"f_align_v25_json_int(nz({name}))", self.source)
+        self.assertIn('lecture_1m\\":\' + f_align_v25_json_dir(nz(d1Fermee))', self.source)
+        self.assertIn('macro_bull\\":\' + str.tostring(bullFermee)', self.source)
+        self.assertIn('macro_bear\\":\' + str.tostring(bearFermee)', self.source)
         self.assertIn("d5Strat = nz(d5Fermee)", self.source)
         self.assertIn("d1Strat = nz(d1Fermee)", self.source)
         self.assertIn("uD  = nz(dDFermee) == dP", self.source)
