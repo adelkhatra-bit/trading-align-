@@ -4861,7 +4861,8 @@ class TradingViewPositionLifecycleTests(unittest.TestCase):
         self.assertTrue(messages)
         self.assertEqual(trade["statut"], "tp1")
         self.assertEqual(trade["sl"], trade["e"])
-        self.assertEqual(personal["sl"], personal["e"])
+        self.assertEqual(personal["sl"], 98.0)
+        self.assertEqual(personal["sl_conseil"], personal["e"])
 
     def test_open_pine_trade_uses_tradingview_bar_low_to_detect_sl_without_local_m1(self):
         now = int(align_bot.time.time())
@@ -4969,3 +4970,71 @@ class TradingViewPositionLifecycleTests(unittest.TestCase):
             context = align_bot.contexte_technique_live({"BTC": r})
         self.assertEqual(context["marches"]["BTC"]["motif_plan"], reason)
 
+
+
+    def test_tp1_preserves_more_protective_global_and_personal_stops(self):
+        now = int(align_bot.time.time())
+        cases = (
+            (1, 100.0, 100.1, 104.0, 108.0, 104.5, 105.0, 103.5, 101.0, 98.0, 101.5),
+            (-1, 100.0, 99.9, 96.0, 94.0, 95.5, 96.5, 95.0, 99.0, 102.0, 98.5),
+        )
+        for direction, entry, global_sl, tp1, tp2, price, high, low, personal_entry, personal_sl, personal_trailing in cases:
+            with self.subTest(direction=direction):
+                r = self._tv_snapshot(now * 1000, price=price, high=high, low=low)
+                r.update({
+                    "m1": [{"t": now, "o": price, "h": high, "l": low, "c": price}],
+                    "r5": [50.0, 50.0], "confirme": direction, "t": now,
+                    "posD": 0.5, "posW": 0.5, "dirs": [direction] * 11,
+                    "atr": 2.0, "b15": [{"t": now - 900, "o": entry, "c": price}],
+                    "niveaux": [],
+                })
+                personal = {
+                    "d": direction, "e": personal_entry, "sl": personal_sl,
+                    "sl_conseil": personal_trailing, "tp1": tp1, "fini": False,
+                }
+                trade = {
+                    "d": direction, "e": entry, "sl": global_sl, "tp1": tp1, "tp2": tp2,
+                    "statut": "entree", "cree": now - 120, "encore": 0,
+                    "qui": {"user": personal},
+                }
+                tv_price = {"price": price, "bar_fresh": True, "bar_high": high, "bar_low": low}
+                with unittest.mock.patch.object(align_bot, "prix_tradingview_actif", return_value=tv_price), \\
+                     unittest.mock.patch.object(align_bot, "carte_suivi", return_value="suivi"):
+                    messages = align_bot.agent("BTC", r, {"trade": trade}, "")
+                self.assertEqual(trade["statut"], "tp1")
+                self.assertAlmostEqual(trade["sl"], global_sl)
+                self.assertAlmostEqual(personal["sl"], personal_sl)
+                self.assertAlmostEqual(personal["sl_conseil"], personal_trailing)
+                self.assertTrue(messages)
+
+    def test_personal_coach_tp1_never_replaces_a_better_trailing_stop_with_entry(self):
+        cases = (
+            (1, 101.0, 98.0, 101.5, 102.0),
+            (-1, 99.0, 102.0, 98.5, 98.0),
+        )
+        for direction, entry, initial_sl, trailing_sl, price in cases:
+            with self.subTest(direction=direction):
+                position = {
+                    "d": direction, "e": entry, "sl": initial_sl,
+                    "sl_conseil": trailing_sl, "tp1": 104.0 if direction == 1 else 96.0,
+                    "fini": False,
+                }
+                trade = {
+                    "d": direction, "e": 100.0, "sl": 100.1 if direction == 1 else 99.9,
+                    "tp1": 104.0 if direction == 1 else 96.0,
+                    "tp2": 108.0 if direction == 1 else 92.0,
+                    "statut": "tp1", "qui": {"user": position},
+                }
+                sent = []
+                r = {"require_tv_bridge": True}
+                with unittest.mock.patch.object(align_bot, "prix_tradingview_actif", return_value={"price": price}), \\
+                     unittest.mock.patch.object(align_bot, "gerer_stop"), \\
+                     unittest.mock.patch.object(align_bot, "humaniser", side_effect=lambda state, cid, message: message), \\
+                     unittest.mock.patch.object(align_bot, "markup_position", return_value="{}"), \\
+                     unittest.mock.patch.object(align_bot, "_telegram_envoyer_commentaire_coach_prive",
+                                                side_effect=lambda *args, **kwargs: sent.append(args[3])):
+                    align_bot.coach({}, "BTC", r, {"trade": trade})
+                self.assertAlmostEqual(position["sl"], initial_sl)
+                self.assertAlmostEqual(position["sl_conseil"], trailing_sl)
+                self.assertTrue(any(align_bot.px(trailing_sl) in message for message in sent))
+                self.assertFalse(any(align_bot.px(entry) in message and "break-even" in message for message in sent))
