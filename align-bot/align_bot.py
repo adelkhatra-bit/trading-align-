@@ -6,6 +6,7 @@ import json, unicodedata, os, re, time, hashlib, urllib.request, urllib.error, u
 from zoneinfo import ZoneInfo
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import economic_news as economic_news
 try:
     import auto_trade, topstep_trade          # robots d'ordres FundedNext (MetaApi) et Topstep (mode test par défaut)
 except Exception as _ex:                      # un robot absent ne doit jamais arrêter le bot
@@ -11303,22 +11304,30 @@ def maj_jauge(etat, m, r, cle, chats, canal=None):
 
 # ───────── Annonces économiques et ouvertures de marché ─────────
 def calendrier(etat, maintenant):
-    """Calendrier gratuit (Forex Factory), rafraîchi toutes les heures. Annonces à fort impact USD (BTC et Gold y réagissent)."""
+    """Calendrier USD avec provenance, priorité macro et rafraîchissement rapproché autour des annonces."""
     cache = etat.setdefault("cal", {})
-    if maintenant - cache.get("t", 0) > 3600:
+    intervalle = economic_news.intervalle_rafraichissement(cache.get("ev") or [], maintenant)
+    besoin_schema = cache.get("schema") != 2
+    if (besoin_schema or maintenant - cache.get("t", 0) > intervalle) and maintenant >= cache.get("retry_after", 0):
+        cache["last_attempt_at"] = int(maintenant)
         try:
-            brut = http_json("https://nfs.faireconomy.media/ff_calendar_thisweek.json", timeout=HTTP_NEWS_TIMEOUT_SEC, attempts=1)
-            cache["ev"] = [dict(titre=x["title"], pays=x["country"], t=int(datetime.datetime.fromisoformat(x["date"]).timestamp()),
-                                prev=x.get("forecast", ""), avant=x.get("previous", ""))
-                           for x in brut if x.get("country") == "USD" and (x.get("impact") == "High" or (
-                               x.get("impact") == "Medium" and any(k in x.get("title", "") for k in ("Speaks", "FOMC", "Fed", "Powell", "PCE", "PPI", "CPI", "Jobless", "Claims",
-                                                                        "Retail", "GDP", "ISM", "Payrolls", "JOLTS", "Sentiment", "Employment"))))]
-            # Toutes les annonces USD du jour (même faibles) : affichées dans l'analyse pour montrer le sérieux
-            cache["jour"] = [dict(titre=x["title"], t=int(datetime.datetime.fromisoformat(x["date"]).timestamp()),
-                                  impact=x.get("impact", ""), prev=x.get("forecast", ""), avant=x.get("previous", ""))
-                             for x in brut if x.get("country") == "USD" and x.get("impact") in ("High", "Medium", "Low")]
-            cache["t"] = maintenant
+            brut = http_json(economic_news.CALENDAR_URL, timeout=HTTP_NEWS_TIMEOUT_SEC, attempts=1)
+            if not isinstance(brut, list):
+                raise ValueError("réponse calendrier non-list")
+            ev, jour = economic_news.normaliser_evenements(brut, maintenant)
+            cache["ev"] = ev
+            cache["jour"] = jour
+            cache["t"] = int(maintenant)
+            cache["schema"] = 2
+            cache["source"] = economic_news.CALENDAR_SOURCE
+            cache["source_url"] = economic_news.CALENDAR_URL
+            cache["statut"] = "ok"
+            cache.pop("retry_after", None)
+            cache.pop("erreur", None)
         except Exception as ex:
+            cache["retry_after"] = maintenant + 300
+            cache["erreur"] = {"t": int(maintenant), "type": type(ex).__name__}
+            cache["statut"] = "error"
             print("calendrier", ex)
     return cache.get("ev", [])
 
@@ -11344,63 +11353,98 @@ def heure(ts):
     return datetime.datetime.fromtimestamp(ts, PARIS).strftime("%H:%M")
 
 def annonces_et_sessions(etat, maintenant, derniers):
-    """Messages : programme du jour, annonce dans 30 min, ouvertures Londres / New York (avec alerte compression)."""
+    """Programme économique, préalertes et compte rendu séparant faits publiés et réaction prix."""
     out = []; vus = etat.setdefault("vus", [])
     jour = datetime.datetime.fromtimestamp(maintenant, PARIS)
     ev = calendrier(etat, maintenant)
+    cal_known = calendrier_connu(etat, maintenant)
     cle_j = jour.strftime("%Y-%m-%d")
-    # Programme du jour (une fois, après 7 h à Paris)
-    if jour.hour >= 7 and f"prog{cle_j}" not in vus:
+    if not cal_known:
+        ev = []
+        if f"calinconnu{cle_j}" not in vus:
+            vus.append(f"calinconnu{cle_j}")
+            out.append("⚠️ CALENDRIER ÉCONOMIQUE INDISPONIBLE — la source ne répond pas ou le dernier relevé n'est plus vérifié. Aucune absence d'annonce n'est confirmée ; les nouvelles entrées restent bloquées.")
+    # Programme du jour : « aucune annonce » uniquement après une récupération vérifiée.
+    if cal_known and jour.hour >= 7 and f"prog{cle_j}" not in vus:
         vus.append(f"prog{cle_j}")
         aujourdhui = [e for e in ev if datetime.datetime.fromtimestamp(e["t"], PARIS).date() == jour.date()]
         if aujourdhui:
-            out.append("📅 Annonces importantes aujourd'hui (heure de Paris) :\n" + "\n".join(
-                f"• {heure(e['t'])} {e['titre']} (prévu {e['prev'] or '?'}, avant {e['avant'] or '?'})" for e in aujourdhui)
-                + "\n→ Pas de nouvelle entrée 15 min avant et après. Volatilité forte possible.")
+            lignes = []
+            for e in aujourdhui:
+                lignes.append(
+                    f"• {heure(e['t'])} {e['titre']} — impact {e.get('impact', '?')} "
+                    f"(prévu {e.get('prev') or '?'}, avant {e.get('avant') or '?'})\n"
+                    f"  {economic_news.source_line(e)}"
+                )
+            out.append("📅 Annonces importantes aujourd'hui (heure de Paris) :\n" + "\n".join(lignes)
+                       + "\n→ Pas de nouvelle entrée 15 min avant et après. Volatilité forte possible.")
         elif jour.weekday() < 5:
             out.append("📅 Aucune annonce majeure US aujourd'hui.")
-    # Rappel 30 min avant chaque annonce
     for e in ev:
         reste = e["t"] - maintenant
         fin = heure(e["t"] + 15 * 60)
+        trace = economic_news.source_line(e)
+        cle_evt = economic_news.event_key(e)
         if 55 * 60 < reste <= 60 * 60 and f"ev60{e['t']}{e['titre']}" not in vus:
             vus.append(f"ev60{e['t']}{e['titre']}")
-            out.append(f"📰 NEWS USA DANS 1 H — {heure(e['t'])}\n🗞 {e['titre']}\n🚦 ⏳ JE N'ENTRE PAS ENCORE\n"
-                       f"🛑 Pas de nouvelle position à partir de {heure(e['t'] - 15 * 60)}\n🔒 En position ? Vérifie ton SL ; ne le déplace pas sans validation du coach\n"
-                       f"📊 Prévu : {e.get('prev') or '?'} • avant : {e.get('avant') or '?'}")
+            out.append(f"📰 NEWS USA DANS 1 H — {heure(e['t'])}\n🗞 {e['titre']}\n"
+                       f"🚦 ⏳ JE N'ENTRE PAS ENCORE\n"
+                       f"🛑 Pas de nouvelle position à partir de {heure(e['t'] - 15 * 60)}\n"
+                       f"🔒 En position ? Vérifie ton SL ; ne le déplace pas sans validation du coach\n"
+                       f"📊 Prévu : {e.get('prev') or '?'} • avant : {e.get('avant') or '?'}\n🔎 {trace}")
         if 35 * 60 < reste <= 40 * 60 and f"ev40{e['t']}{e['titre']}" not in vus:
             vus.append(f"ev40{e['t']}{e['titre']}")
-            out.append(f"⚠️ NEWS USA DANS 40 MIN — {heure(e['t'])}\n📰 {e['titre']}\n🛡 Évite toute nouvelle entrée à l’approche de l’annonce. Vérifie ton SL si tu es déjà en position.")
-        if 5 * 60 <= -reste <= 8 * 60 and f"evr{e['t']}{e['titre']}" not in vus:
+            out.append(f"⚠️ NEWS USA DANS 40 MIN — {heure(e['t'])}\n📰 {e['titre']}\n"
+                       f"🛡 Évite toute nouvelle entrée à l’approche de l’annonce. Vérifie ton SL si tu es déjà en position.\n"
+                       f"🔎 {trace}")
+        # Rapport après publication : on le garde jusqu'à 45 min pour survivre à un redémarrage.
+        if 5 * 60 <= -reste <= 45 * 60 and f"evr{e['t']}{e['titre']}" not in vus:
             vus.append(f"evr{e['t']}{e['titre']}")
             lr = []
             for mk, rr in (derniers or {}).items():
-                apres = [x for x in rr.get("m1", []) if x["t"] >= e["t"]]
+                apres = [x for x in rr.get("m1", []) if x.get("t", 0) >= e["t"]]
                 if apres:
-                    o0 = apres[0]["o"]; c1 = apres[-1]["c"]; hh = max(x["h"] for x in apres); ll = min(x["l"] for x in apres)
-                    lr.append(f"{ICONE.get(mk, '')} {mk} : {c1 - o0:+.1f} $ en {len(apres)} min {'⬆️' if c1 > o0 else '⬇️'} (écart haut-bas {hh - ll:.1f} $)")
+                    o0 = apres[0]["o"]; c1 = apres[-1]["c"]
+                    hh = max(x["h"] for x in apres); ll = min(x["l"] for x in apres)
+                    lr.append(f"{ICONE.get(mk, '')} {mk} : {c1 - o0:+.1f} $ en {len(apres)} min "
+                              f"{'⬆️' if c1 > o0 else '⬇️'} (écart haut-bas {hh - ll:.1f} $)")
+            message = f"📰 COMPTE RENDU APRÈS NEWS — {e['titre']}\n"
+            message += economic_news.facts_line(e)
             if lr:
+                message += "\n\n📈 Réaction de prix observée (distincte des faits publiés) :\n" + "\n".join(lr)
                 avis_apres = ia(
                     etat,
-                    "Après cette annonce économique, interprète uniquement la réaction de prix observée sur BTC et Gold. Dis si le mouvement est net ou limité, rappelle que les deux sens restent possibles et indique d'attendre la clôture 15 min avant toute reprise. N'invente aucun chiffre et ne donne pas d'ordre d'entrée.",
-                    {"annonce": e["titre"], "réaction observée": lr, "consigne": "aucune entrée avant clôture 15 min"},
+                    "Interprète uniquement la réaction de prix observée sur BTC et Gold. Sépare-la des faits publiés fournis; ne transforme jamais une valeur d'un calendrier agrégé en donnée officielle. Dis si le mouvement est net ou limité, rappelle que les deux sens restent possibles et indique d'attendre la clôture 15 min avant toute reprise. N'invente aucun chiffre et ne donne pas d'ordre d'entrée.",
+                    {"annonce": e["titre"], "faits_publiés_et_provenance": economic_news.facts_line(e),
+                     "réaction_observée": lr, "consigne": "aucune entrée avant clôture 15 min"},
                     cle_cache=f"newsreaction{e['t']}{e['titre']}", duree=3600, premium=True, recherche=True)
-                message = f"📰 RÉACTION À LA NEWS — {e['titre']}\n" + "\n".join(lr)
-                message += "\n⏳ J'attends la clôture de la bougie 15 min avant de reprendre"
                 if avis_apres:
-                    message += "\n\n🧠 L'analyse de l'IA ALIGN après l'annonce\n" + avis_apres + ligne_sources(etat, f"newsreaction{e['t']}{e['titre']}")
-                out.append(message)
-        if 6 * 60 < reste <= 15 * 60 and f"ev{e['t']}{e['titre']}" not in vus:        # préavis 15 min (VIP : le gratuit ne reçoit aucune news)
+                    message += "\n\n🧠 Analyse de la réaction prix par l'IA ALIGN\n" + avis_apres + ligne_sources(etat, f"newsreaction{e['t']}{e['titre']}")
+            else:
+                message += "\n\n📈 Réaction de prix : indisponible (aucun snapshot M1 postérieur exploitable)."
+            out.append(message)
+            if e.get("actual") not in (None, ""):
+                vus.append(f"evactual{cle_evt}")
+        # Si la valeur arrive dans le flux après le premier rapport, envoie une mise à jour unique.
+        if 8 * 60 < -reste <= 45 * 60 and e.get("actual") not in (None, "") and f"evactual{cle_evt}" not in vus:
+            vus.append(f"evactual{cle_evt}")
+            out.append(f"📌 MISE À JOUR — VALEUR REÇUE APRÈS {e['titre']}\n"
+                       + economic_news.facts_line(e))
+        if 6 * 60 < reste <= 15 * 60 and f"ev{e['t']}{e['titre']}" not in vus:  # préavis 15 min (VIP)
             vus.append(f"ev{e['t']}{e['titre']}")
             cle_news = f"news{e['t']}{e['titre']}"
             avis = ia(etat, "Explique en 2 lignes très simples ce que cette annonce peut faire au Gold et au BTC (sans donner de sens à trader, juste le risque).",
-                      {"annonce": e["titre"], "prévu": e.get("prev"), "avant": e.get("avant")}, cle_cache=cle_news, duree=3600, premium=True, recherche=True)
+                      {"annonce": e["titre"], "prévu": e.get("prev"), "avant": e.get("avant"),
+                       "source": trace, "impact": e.get("impact")},
+                      cle_cache=cle_news, duree=3600, premium=True, recherche=True)
             out.append(f"⚠️⚠️ NEWS USA dans {round(reste / 60)} min ({heure(e['t'])})\n📰 {e['titre']}\n\n"
                        f"🟥 N'ouvre AUCUN trade\n🛡 Déjà en position ? Vérifie que ton STOP est bien placé\n"
-                       f"💥 Le prix peut bouger très fort dans les 2 sens\n⏳ On reprend à {fin}" + (f"\n\n🧠 L'avis de l'IA ALIGN\n{avis}{ligne_sources(etat, cle_news)}" if avis else ""))
+                       f"💥 Le prix peut bouger très fort dans les 2 sens\n⏳ On reprend à {fin}\n🔎 {trace}"
+                       + (f"\n\n🧠 L'avis de l'IA ALIGN\n{avis}{ligne_sources(etat, cle_news)}" if avis else ""))
         if 0 <= reste <= 6 * 60 and f"ev5{e['t']}{e['titre']}" not in vus:
             vus.append(f"ev5{e['t']}{e['titre']}")
-            out.append(f"🚨🚨🚨 NEWS DANS {max(1, round(reste / 60))} MIN — {e['titre']}\n🟥 Ne touche à rien\n🛡 Stop en place ? OK, on attend")
+            out.append(f"🚨🚨🚨 NEWS DANS {max(1, round(reste / 60))} MIN — {e['titre']}\n"
+                       f"🟥 Ne touche à rien\n🛡 Stop en place ? OK, on attend\n🔎 {trace}")
         if 15 * 60 <= -reste <= 25 * 60 and f"evfin{e['t']}{e['titre']}" not in vus:
             vus.append(f"evfin{e['t']}{e['titre']}")
             out.append(f"✅ News passée ({e['titre']}). 🟩 Le bot reprend la recherche d'entrées.")
@@ -11506,8 +11550,16 @@ CALENDRIER_MAX_AGE = 6 * 3600   # rafraîchi toutes les heures : au-delà de 6 h
 
 
 def calendrier_connu(etat, maintenant):
-    t = (etat.get("cal") or {}).get("t") or 0
-    return bool(t) and 0 <= maintenant - t <= CALENDRIER_MAX_AGE
+    cache = etat.get("cal") or {}
+    succes = cache.get("t") or 0
+    erreur = cache.get("erreur") or {}
+    if not succes or not (0 <= maintenant - succes <= CALENDRIER_MAX_AGE):
+        return False
+    # Une tentative plus récente a échoué : le dernier calendrier connu n'est plus
+    # considéré comme vérifié pour autoriser de nouvelles entrées.
+    if erreur and int(erreur.get("t") or 0) >= int(succes):
+        return False
+    return True
 
 
 def annonce_proche(etat, maintenant):
