@@ -9793,7 +9793,11 @@ def resume_alignement_tradingview(r, plan, anglais=False):
         return None
     snapshots = ((r or {}).get("tv_indicator_mtf") or {}).get("snapshots") or {}
     favorables, contraires, neutres, indisponibles = [], [], [], []
+    labels_en = {"M1": "1 min", "M3": "3 min", "M5": "5 min", "M10": "10 min",
+                 "M15": "15 min", "M30": "30 min", "M45": "45 min", "H1": "1 hour",
+                 "H2": "2 hours", "H4": "4 hours", "D1": "1 day", "W1": "1 week"}
     for tf, label in TELEGRAM_TF_VIEWS:
+        label = labels_en.get(tf, label) if anglais else label
         snap = snapshots.get(tf)
         if not isinstance(snap, dict) or snap.get("fresh") is not True:
             indisponibles.append(label)
