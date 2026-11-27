@@ -2739,7 +2739,7 @@ class TestTradingViewReportRegression(unittest.TestCase):
     def _confirmed_or_waiting_pine_plan(confirmed):
         return {
             "available": True, "timeframe": "M15", "plan_timeframe": "M15",
-            "entry_timeframe": "M5", "strategy": "DAY",
+            "entry_timeframe": "M5", "strategy": "DAY", "direction": 1,
             "entry": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0,
             "zone_low": 99.0, "zone_high": 101.0, "decision": 100.0,
             "price": 101.25, "price_in_zone": False,
