@@ -12541,10 +12541,17 @@ def coach(etat, m, r, cle):
         msgs = []
 
         if tr["statut"] == "tp1" and not pos.get("be_notified"):
-            pos["sl"] = e
-            pos.pop("sl_conseil", None)
+            sl_avant = float(pos.get("sl_conseil") if pos.get("sl_conseil") is not None else pos.get("sl", tr["sl"]))
+            sl_protege = max(sl_avant, e) if d == 1 else min(sl_avant, e)
+            pos["sl_conseil"] = sl_protege
             pos["be_notified"] = True
-            msgs.append(f"🔒 {m}\nTP1 touché : ton stop de suivi est remonté à ton entrée {px(e)}.\nAjuste aussi ton stop manuellement sur ta plateforme.")
+            if d * (sl_avant - e) > 1e-9:
+                detail_stop = f"ton stop reste à {px(sl_protege)}, déjà plus protecteur que ton entrée {px(e)}"
+            elif abs(sl_avant - e) <= 1e-9:
+                detail_stop = f"ton stop est déjà au break-even {px(sl_protege)}"
+            else:
+                detail_stop = f"ton stop de suivi est remonté au break-even {px(sl_protege)}"
+            msgs.append(f"🔒 {m}\nTP1 touché : {detail_stop}.\nAjuste aussi ton stop manuellement sur ta plateforme.")
 
         if prog >= 0.7 and f"presque{tr['statut']}" not in vu:
             vu.append(f"presque{tr['statut']}")
@@ -13978,14 +13985,31 @@ def agent(m, r, cle, ferme):
             cle["fin"] = [tr, sl, "🔒 Sorti à BE" if tr.get("be_dit") else "🛑 Stop touché"]; cle["stop_t"] = r["t"]
             cle.pop("trade"); cle["aligne"] = 0; return out
         if touche_t1:
-            tr["statut"] = "tp1"; tr["sl"] = e
-            # Chaque abonné protège sa propre entrée, qui peut différer du prix du robot.
+            sl_precedent = float(tr.get("sl", e))
+            sl_protege = max(sl_precedent, e) if d == 1 else min(sl_precedent, e)
+            tr["statut"] = "tp1"
+            tr["sl"] = sl_protege
+            # Chaque abonné conserve son meilleur stop personnel ; le stop initial reste l'historique du risque.
             for pos_perso in tr.get("qui", {}).values():
                 if isinstance(pos_perso, dict) and not pos_perso.get("fini"):
-                    pos_perso["sl"] = pos_perso.get("e", e)
-                    pos_perso.pop("sl_conseil", None)
+                    d_perso = int(pos_perso.get("d", d))
+                    entree_perso = float(pos_perso.get("e", e))
+                    sl_perso_raw = pos_perso.get("sl_conseil")
+                    if sl_perso_raw is None:
+                        sl_perso_raw = pos_perso.get("sl", entree_perso)
+                    sl_perso = float(sl_perso_raw)
+                    sl_perso_protege = max(sl_perso, entree_perso) if d_perso == 1 else min(sl_perso, entree_perso)
+                    pos_perso["sl_conseil"] = sl_perso_protege
+            if d * (sl_precedent - e) > 1e-9:
+                libelle_sl = "SL conservé (plus protecteur)"
+            elif abs(sl_precedent - e) <= 1e-9:
+                libelle_sl = "SL maintenu au BE"
+            else:
+                libelle_sl = "SL → BE"
             details_tp1 = [] if require_tv else lecture_tp1(r, d)
-            out.append(cs_(m, "TP1 TOUCHÉ", [f"💰 TP1 : {px(t1)} ✅ 🎆", f"🔒 SL → BE : {px(e)} (plus de perte possible)", "☕ Va boire un café, la suite se fait sans risque", f"🏁 TP2 : {px(t2)}"] + details_tp1,
+            out.append(cs_(m, "TP1 TOUCHÉ", [f"💰 TP1 : {px(t1)} ✅ 🎆",
+                                           f"🔒 {libelle_sl} : {px(sl_protege)} (entrée {px(e)} • protection jamais relâchée)",
+                                           "☕ Va boire un café, la suite se fait sans risque", f"🏁 TP2 : {px(t2)}"] + details_tp1,
                                    "Sécuriser une partie, garder le reste", r))
             return out
         # ↩ Voyants de retournement (comme l'indicateur) : 3/5 petites unités contre la position = alerte, 1 fois.
