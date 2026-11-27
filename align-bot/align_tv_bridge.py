@@ -423,6 +423,64 @@ class BridgeStore:
                                            and retested_zone and trigger_closed
                                            and (entry_bar_close > plan_sl if signal_direction == 1 else entry_bar_close < plan_sl))
 
+        active_entry_bar_time = _epoch_ms(payload.get("activeEntryBarTime"))
+        active_entry_bar_open = _finite_number(payload.get("activeEntryBarOpen"))
+        active_entry_bar_high = _finite_number(payload.get("activeEntryBarHigh"))
+        active_entry_bar_low = _finite_number(payload.get("activeEntryBarLow"))
+        active_entry_bar_close = _finite_number(payload.get("activeEntryBarClose"))
+        active_entry_bar_available = False
+        active_entry_bar_rejection = None
+        if entry_timeframe in TIMEFRAME_MS:
+            active_values = (
+                active_entry_bar_open,
+                active_entry_bar_high,
+                active_entry_bar_low,
+                active_entry_bar_close,
+            )
+            if active_entry_bar_time is None or None in active_values:
+                active_entry_bar_rejection = {"error": "missing_active_entry_bar"}
+            else:
+                active_entry_bar_age = now_ms - active_entry_bar_time
+                active_entry_bar_ohlc_valid = (
+                    active_entry_bar_low
+                    <= min(active_entry_bar_open, active_entry_bar_close)
+                    <= max(active_entry_bar_open, active_entry_bar_close)
+                    <= active_entry_bar_high
+                )
+                active_entry_bar_after_closed = (
+                    entry_bar_time is None or active_entry_bar_time > entry_bar_time
+                )
+                active_entry_bar_fresh = (
+                    -MAX_FUTURE_SKEW_MS <= active_entry_bar_age
+                    <= TIMEFRAME_MS[entry_timeframe] + ENTRY_BAR_GRACE_MS
+                )
+                if not active_entry_bar_ohlc_valid:
+                    active_entry_bar_rejection = {"error": "invalid_active_entry_bar_ohlc"}
+                elif not active_entry_bar_after_closed:
+                    active_entry_bar_rejection = {"error": "active_entry_bar_not_after_closed_bar"}
+                elif not active_entry_bar_fresh:
+                    active_entry_bar_rejection = {"error": "stale_or_future_active_entry_bar"}
+                else:
+                    active_entry_bar_available = True
+        if has_plan and not active_entry_bar_available:
+            # Sans OHLC de la bougie déclencheuse active, le plan n'est pas exploitable
+            # pour un suivi SL/TP fiable : conserver les snapshots MTF mais publier WAIT.
+            entry_trigger_rejection = active_entry_bar_rejection or {"error": "missing_active_entry_bar"}
+            payload = {
+                **payload,
+                "signal": "WAIT",
+                "verdict": "WAIT — OHLC actif du déclencheur absent ou périmé",
+                "confirmed": False,
+                "entry": None,
+                "sl": None,
+                "tp": None,
+                "tp1": None,
+                "tp2": None,
+            }
+            signal_direction = None
+            has_plan = False
+            entry_triggered = False
+
         if not has_plan:
             # Pas de plan (WAIT) : la lecture MTF réelle reste publiée, aucun niveau, aucune entrée.
             entry_zone_low = entry_zone_high = entry_decision = None
@@ -441,6 +499,13 @@ class BridgeStore:
             "entryBarLow": entry_bar_low,
             "entryBarClose": entry_bar_close,
             "entryTriggered": entry_triggered,
+            "activeEntryBarTime": active_entry_bar_time,
+            "activeEntryBarOpen": active_entry_bar_open,
+            "activeEntryBarHigh": active_entry_bar_high,
+            "activeEntryBarLow": active_entry_bar_low,
+            "activeEntryBarClose": active_entry_bar_close,
+            "activeEntryBarOhlcAvailable": active_entry_bar_available,
+            "activeEntryBarRejection": active_entry_bar_rejection,
         })
         source_iso = _iso_utc(source_timestamp)
         # Keep one independent ROBOT V12 plan per chart timeframe. A payload from
