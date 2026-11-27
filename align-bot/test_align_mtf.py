@@ -2826,6 +2826,23 @@ class TestTradingViewReportRegression(unittest.TestCase):
         self.assertNotIn("123", message)
         self.assertNotIn("DIRECTION À SURVEILLER", message)
 
+    def test_required_bridge_report_preserves_open_trade_without_waiting_for_new_plan(self):
+        from unittest.mock import patch
+        r = self._required_bridge_card_fixture()
+        trade = {"d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0}
+        with patch.object(align_bot, "plan_indicateur", side_effect=AssertionError("open trade must not request a new entry plan")), \
+             patch.object(align_bot, "verdict", side_effect=AssertionError("open trade must not use local verdict")), \
+             patch.object(align_bot, "zone_txt", return_value="milieu"), \
+             patch.object(align_bot, "strategie_mtf", return_value=["Lecture locale"]) :
+            message = align_bot.texte_etat("BTC", r, {"trade": trade})
+        self.assertIn("POSITION EN COURS", message)
+        self.assertIn("La position et ses niveaux restent ceux mémorisés", message)
+        self.assertIn("POSITION EN COURS : 🟩 LONG", message)
+        self.assertIn("Entrée 100", message)
+        self.assertIn("SL 98", message)
+        self.assertNotIn("PLAN CANONIQUE PINE v25", message)
+        self.assertNotIn("DIVERGENCE DES SOURCES", message)
+
     def test_tradingview_active_price_rejects_stale_or_invalid_snapshots(self):
         r = self._required_bridge_card_fixture()
         self.assertEqual(align_bot.prix_tradingview_actif(r)["price"], 101.25)
