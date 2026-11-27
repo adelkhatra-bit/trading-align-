@@ -145,8 +145,46 @@ class BridgeStoreTests(unittest.TestCase):
         self.assertEqual(data["snapshots"]["M1"]["price"], 100.0)
         self.assertEqual(data["snapshots"]["M1"]["robotV12"]["tp1"], 110.0)
         self.assertEqual(data["snapshots"]["M1"]["robotV12"]["tp2"], 115.0)
+        self.assertTrue(data["snapshots"]["M1"]["robotV12"]["activeEntryBarOhlcAvailable"])
+        self.assertEqual(data["snapshots"]["M1"]["robotV12"]["activeEntryBarHigh"], 102.0)
+        self.assertEqual(data["snapshots"]["M1"]["robotV12"]["activeEntryBarLow"], 100.0)
         for tf in REQUIRED_TIMEFRAMES:
             self.assertTrue(data["snapshots"][tf]["fresh"], tf)
+
+    def test_missing_active_entry_bar_invalidates_plan_but_keeps_mtf_snapshots(self):
+        payload = valid_payload()
+        for key in ("activeEntryBarTime", "activeEntryBarOpen", "activeEntryBarHigh", "activeEntryBarLow", "activeEntryBarClose"):
+            payload.pop(key, None)
+        status, result = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+        self.assertEqual(result["diagnosticRejection"]["error"], "missing_active_entry_bar")
+        _, data = self.store.read("BTCUSD", BASE_MS + 1_000)
+        robot = data["snapshots"]["M1"]["robotV12"]
+        self.assertEqual(robot["signal"], "WAIT")
+        self.assertFalse(robot["confirmed"])
+        self.assertFalse(robot["activeEntryBarOhlcAvailable"])
+        self.assertTrue(data["snapshots"]["M1"]["fresh"])
+
+    def test_invalid_active_entry_bar_ohlc_invalidates_plan(self):
+        payload = valid_payload()
+        payload["activeEntryBarHigh"] = 99.0
+        status, result = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+        self.assertEqual(result["diagnosticRejection"]["error"], "invalid_active_entry_bar_ohlc")
+        _, data = self.store.read("BTCUSD", BASE_MS + 1_000)
+        robot = data["snapshots"]["M1"]["robotV12"]
+        self.assertEqual(robot["signal"], "WAIT")
+        self.assertFalse(robot["activeEntryBarOhlcAvailable"])
+
+    def test_stale_active_entry_bar_invalidates_plan(self):
+        payload = valid_payload()
+        payload["entryBarTime"] = BASE_MS - 900_000
+        payload["activeEntryBarTime"] = BASE_MS - 600_000
+        status, result = self.store.ingest(payload, INGEST, BASE_MS)
+        self.assertEqual(status, 200)
+        self.assertEqual(result["diagnosticRejection"]["error"], "stale_or_future_active_entry_bar")
+        _, data = self.store.read("BTCUSD", BASE_MS + 1_000)
+        self.assertFalse(data["snapshots"]["M1"]["robotV12"]["confirmed"])
 
     def test_bridge_marks_canonical_plan_unready_until_m15_chart_reports(self):
         status, _ = self.store.ingest(valid_payload(timeframe="M1"), INGEST, BASE_MS)
