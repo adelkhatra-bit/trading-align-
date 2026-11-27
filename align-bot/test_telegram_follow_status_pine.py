@@ -82,7 +82,7 @@ class TelegramFollowStatusPineTests(unittest.TestCase):
         text = self.pine_status(plan)
 
         self.assertIn("Plan Pine v25 confirmé : LONG", text)
-        self.assertIn("Entry 101", text)
+        self.assertIn("entrée 101", text)
         self.assertIn("SL 95", text)
         self.assertIn("TP1 110", text)
         self.assertIn("TP2 115", text)
