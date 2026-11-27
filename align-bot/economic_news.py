@@ -182,6 +182,7 @@ def normaliser_evenement(raw, retrieved_at):
         "importance": impact,
         "importance_source": CALENDAR_SOURCE,
         "relevance": relevance,
+        "entry_block": impact in ("High", "Medium"),
         "prev": forecast,
         "forecast": forecast,
         "avant": previous,
@@ -212,11 +213,12 @@ def normaliser_evenements(raw_events, retrieved_at):
         if event is not None:
             daily[event["id"]] = event
     all_usd = sorted(daily.values(), key=lambda event: (event["t"], event["id"]))
-    important = [
+    blocking = [event for event in all_usd if event["impact"] in ("High", "Medium")]
+    watch = [
         event for event in all_usd
-        if event["impact"] in ("High", "Medium") or event["relevance"] == "macro_watch"
+        if event["impact"] == "Low" and event["relevance"] == "macro_watch"
     ]
-    return important, all_usd
+    return blocking, watch, all_usd
 
 
 def event_key(event):
