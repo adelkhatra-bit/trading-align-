@@ -59,19 +59,19 @@ f_dir_confirme() =>
     d = close > ef and ef > es ? 1 : close < ef and ef < es ? -1 : 0
     d[1]
 
-// Contrat MTF canonique : direction ET horodatage de la dernière bougie clôturée pour les 11 UT.
-d1Fermee    = request.security(syminfo.tickerid, "1", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d3Fermee    = request.security(syminfo.tickerid, "3", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d5Fermee    = request.security(syminfo.tickerid, "5", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d10Fermee   = request.security(syminfo.tickerid, "10", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d15Fermee   = request.security(syminfo.tickerid, "15", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d30Fermee   = request.security(syminfo.tickerid, "30", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d45Fermee   = request.security(syminfo.tickerid, "45", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d60Fermee   = request.security(syminfo.tickerid, "60", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d120Fermee  = request.security(syminfo.tickerid, "120", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d240Fermee  = request.security(syminfo.tickerid, "240", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-dDFermee    = request.security(syminfo.tickerid, "D", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-dWFermee    = request.security(syminfo.tickerid, "W", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+// Contrat MTF canonique : directions des 11 dernières bougies clôturées.
+d1Fermee = request.security(syminfo.tickerid, "1", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d3Fermee = request.security(syminfo.tickerid, "3", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d5Fermee = request.security(syminfo.tickerid, "5", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d10Fermee = request.security(syminfo.tickerid, "10", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d15Fermee = request.security(syminfo.tickerid, "15", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d30Fermee = request.security(syminfo.tickerid, "30", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d45Fermee = request.security(syminfo.tickerid, "45", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d60Fermee = request.security(syminfo.tickerid, "60", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d120Fermee = request.security(syminfo.tickerid, "120", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d240Fermee = request.security(syminfo.tickerid, "240", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+dDFermee = request.security(syminfo.tickerid, "D", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+dWFermee = request.security(syminfo.tickerid, "W", f_dir_confirme(), lookahead=barmerge.lookahead_on)
 noms  = array.from("1", "3", "5", "10", "15", "30", "45", "1h", "2h", "4h", "D")
 nomsL = array.from("1 min", "3 min", "5 min", "10 min", "15 min", "30 min", "45 min", "1 heure", "2 heures", "4 heures", "Daily")
 dirs = array.from(nz(d1), nz(d2), nz(d5), nz(d10), nz(d15), nz(d30), nz(d45), nz(d60), nz(d120), nz(d240), nz(dD))
