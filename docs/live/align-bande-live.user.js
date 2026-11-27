@@ -18,7 +18,7 @@
 (function () {
   'use strict';
   if (window.__ALIGN_BANDE__) { try { window.__ALIGN_BANDE__.stop(); } catch (e) {} }
-  const VERSION = '12.2.31';  // v12.2.28 : duo Thomas/Leïla en français puis anglais, mêmes locuteurs et marché, séquencement sur fin réelle de chaque lecture. v12.2.27 : initialise vivant avant le premier poll coach. v12.2.26 : duo séquencé sur fin réelle et filtré par marché.  v12.2.25 : arrêt propre des reconnexions SSE, écouteurs et rafraîchissement de vue. v12.2.24 : breaking news narrées en français puis en anglais, sans changement visuel. v12.2.14 : relecture vocale du dernier commentaire IA visible, en français puis en anglais.  // v12.2.13 : synchronisation bouche ALIGN LIVE avec le coach vocal. v12.2.12 : voix naturelle retentée quand les voix navigateur arrivent, ON réinitialisé après rechargement et listener nettoyé. v12.2.11 : heartbeat écran via GM_xmlhttpRequest (hors page, sans blocage CORS/réseau). v12.2.10 : la voix garde sa phrase en mémoire jusqu'à la fin (plus de coupure après 2-3 mots). v12.2.9 : libellé « COACH VOCAL OFF » (plus « ACTIVER LE COMMENTATEUR »). v12.2.8 : une seule voix (naturelle), off = silence total, plus de phrase d'accueil. v12.2.7 : la voix parle en français PUIS en anglais (chaque info), voix naturelle si disponible, jamais « risque »  // v12.2.6 : la voix ne lit ni disclaimer ni appel « lien en bio », ni phrase coupée  // v12.2.5 : la voix suit uniquement le commentaire IA visible ; commandes déplacées en bas à gauche  // v12.0 : les commentaires IA du live déclenchent immédiatement bulle, ping prix et lueur neutre  // v11.8 : narration marché calée à 55 s, au plus près du cooldown d'affichage de 52 s  // v11.7 : narration technique factuelle toutes les ~75 s, horloges séparées et activation vocale explicite  // v10.8 : commentaires IA ancrés sur les données réelles du marché affiché  // v10.7 : « ÇA PLONGE 🌊 » quand ça coule (en plus de la fusée) ; v10.6 : NEWS DE DERNIÈRE MINUTE prioritaire (coupe la bande) ; v10.5 : fusée 🚀 + sourire quand le bot entre / quand ça accélère ; v10.4 : bot en position = blagues taquines (je suis dedans avec vous, qui est rentré ? tapote, partage) ; v10.3 : blagues quand le marché dort (petit film, café, ouvertures, tapote MDR) ; v10.2 : « prépare-toi ≠ vas-y 😝 » ; v10.1 : l'animateur remet gentiment les petits malins à leur place (feu vert, discipline 😝) ; v10.0 : après un TP → « une rose ou un like » + « crée ton compte démo » ; v9.9 : fenêtre « 💰 ALIGN EN DIRECT » (gain réel en cours, après la moitié du chemin vers le TP1) ; v9.8 : « active ton coach en temps réel » + « un clic sur Mon bot pour arrêter » ; v9.7 : texte de la ligne du bas plus gros (taille des %) ; v9.6 : ligne du bas qui clignote vert ▲ LONG ? / rouge ▼ SHORT ? (plus vite quand une entrée approche) ; v9.5 : ligne du bas du tableau rouge ↔ vert en boucle + « LONG OU SHORT ? » (le sens ne se voit plus) ; v9.4 : « crée ton compte démo, teste gratuitement » + codes prop firms (lien en bio) ; v9.3 : titres de bulle drôles liés au marché (fin de « LE GRAPH BALANCE ») ; v9.2 : plus de spectacle quand le marché hésite (l'animateur parle toutes les ~40 s, discussion avis → merci → lien en bio), bulle « 🤫 PSST… LE GRAPH BALANCE » ; v9.1 : plus aucune flèche ni sens (monter / baisser) sur la bande ; v9.0 : « tu préfères BTC, Gold ou NASDAQ ? une autre unité de temps ? lien en bio » ; v8.9 : « ALIGN est dedans depuis le début… trop tard pour rentrer, on ne court jamais après le prix » ; v8.8  // v8.8 : l'animateur parle toutes les ~90 s (humour, nouveaux arrivants, commentaires), feu d'artifice « objectif de likes atteint » ; v8.7  // v8.7 : « je t'avais prévenu » après le chrono de grosse distribution / accumulation ; v8.6  // v8.6 : marché calme → l'animateur (vrai trader) parle aux spectateurs : questions rebond / cassure, pression pour taper et commenter ; v8.5  // v8.5 : phrases IA gratuites toujours nouvelles (FR/EN), chrono « une position arrive » + agenda (discours, annonces, ouvertures) venant du bot, chrono posé AU-DESSUS des colonnes 1 min / 3 min / 5 min ; v8.4   // v8.4 : ligne du bas du tableau revenue à sa couleur d'origine (v8.2), texte 13 px ; v8.3  // v8.3 : (étiquettes posées par-dessus désactivées, à faire dans le Pine), ligne du bas du tableau en couleur neutre, plus grosse, « tu peux rentrer ? 👍 » ; v8.2  // v8.2 : prix cachés dans la ligne du bas du tableau (❓ + lien en bio) ; v8.1  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
+  const VERSION = '12.2.32';  // v12.2.32 : le bouton ON attend l'accusé du Worker ; échec réseau = voix coupée et état explicite.  // v12.2.28 : duo Thomas/Leïla en français puis anglais, mêmes locuteurs et marché, séquencement sur fin réelle de chaque lecture. v12.2.27 : initialise vivant avant le premier poll coach. v12.2.26 : duo séquencé sur fin réelle et filtré par marché.  v12.2.25 : arrêt propre des reconnexions SSE, écouteurs et rafraîchissement de vue. v12.2.24 : breaking news narrées en français puis en anglais, sans changement visuel. v12.2.14 : relecture vocale du dernier commentaire IA visible, en français puis en anglais.  // v12.2.13 : synchronisation bouche ALIGN LIVE avec le coach vocal. v12.2.12 : voix naturelle retentée quand les voix navigateur arrivent, ON réinitialisé après rechargement et listener nettoyé. v12.2.11 : heartbeat écran via GM_xmlhttpRequest (hors page, sans blocage CORS/réseau). v12.2.10 : la voix garde sa phrase en mémoire jusqu'à la fin (plus de coupure après 2-3 mots). v12.2.9 : libellé « COACH VOCAL OFF » (plus « ACTIVER LE COMMENTATEUR »). v12.2.8 : une seule voix (naturelle), off = silence total, plus de phrase d'accueil. v12.2.7 : la voix parle en français PUIS en anglais (chaque info), voix naturelle si disponible, jamais « risque »  // v12.2.6 : la voix ne lit ni disclaimer ni appel « lien en bio », ni phrase coupée  // v12.2.5 : la voix suit uniquement le commentaire IA visible ; commandes déplacées en bas à gauche  // v12.0 : les commentaires IA du live déclenchent immédiatement bulle, ping prix et lueur neutre  // v11.8 : narration marché calée à 55 s, au plus près du cooldown d'affichage de 52 s  // v11.7 : narration technique factuelle toutes les ~75 s, horloges séparées et activation vocale explicite  // v10.8 : commentaires IA ancrés sur les données réelles du marché affiché  // v10.7 : « ÇA PLONGE 🌊 » quand ça coule (en plus de la fusée) ; v10.6 : NEWS DE DERNIÈRE MINUTE prioritaire (coupe la bande) ; v10.5 : fusée 🚀 + sourire quand le bot entre / quand ça accélère ; v10.4 : bot en position = blagues taquines (je suis dedans avec vous, qui est rentré ? tapote, partage) ; v10.3 : blagues quand le marché dort (petit film, café, ouvertures, tapote MDR) ; v10.2 : « prépare-toi ≠ vas-y 😝 » ; v10.1 : l'animateur remet gentiment les petits malins à leur place (feu vert, discipline 😝) ; v10.0 : après un TP → « une rose ou un like » + « crée ton compte démo » ; v9.9 : fenêtre « 💰 ALIGN EN DIRECT » (gain réel en cours, après la moitié du chemin vers le TP1) ; v9.8 : « active ton coach en temps réel » + « un clic sur Mon bot pour arrêter » ; v9.7 : texte de la ligne du bas plus gros (taille des %) ; v9.6 : ligne du bas qui clignote vert ▲ LONG ? / rouge ▼ SHORT ? (plus vite quand une entrée approche) ; v9.5 : ligne du bas du tableau rouge ↔ vert en boucle + « LONG OU SHORT ? » (le sens ne se voit plus) ; v9.4 : « crée ton compte démo, teste gratuitement » + codes prop firms (lien en bio) ; v9.3 : titres de bulle drôles liés au marché (fin de « LE GRAPH BALANCE ») ; v9.2 : plus de spectacle quand le marché hésite (l'animateur parle toutes les ~40 s, discussion avis → merci → lien en bio), bulle « 🤫 PSST… LE GRAPH BALANCE » ; v9.1 : plus aucune flèche ni sens (monter / baisser) sur la bande ; v9.0 : « tu préfères BTC, Gold ou NASDAQ ? une autre unité de temps ? lien en bio » ; v8.9 : « ALIGN est dedans depuis le début… trop tard pour rentrer, on ne court jamais après le prix » ; v8.8  // v8.8 : l'animateur parle toutes les ~90 s (humour, nouveaux arrivants, commentaires), feu d'artifice « objectif de likes atteint » ; v8.7  // v8.7 : « je t'avais prévenu » après le chrono de grosse distribution / accumulation ; v8.6  // v8.6 : marché calme → l'animateur (vrai trader) parle aux spectateurs : questions rebond / cassure, pression pour taper et commenter ; v8.5  // v8.5 : phrases IA gratuites toujours nouvelles (FR/EN), chrono « une position arrive » + agenda (discours, annonces, ouvertures) venant du bot, chrono posé AU-DESSUS des colonnes 1 min / 3 min / 5 min ; v8.4   // v8.4 : ligne du bas du tableau revenue à sa couleur d'origine (v8.2), texte 13 px ; v8.3  // v8.3 : (étiquettes posées par-dessus désactivées, à faire dans le Pine), ligne du bas du tableau en couleur neutre, plus grosse, « tu peux rentrer ? 👍 » ; v8.2  // v8.2 : prix cachés dans la ligne du bas du tableau (❓ + lien en bio) ; v8.1  // v8.1 : les pastilles de motivation descendent juste au-dessus du tableau des unités (petit écran TikTok), les infos du marché restent collées au prix ; v8.0  // v8.0 : boost du live tout de suite + feu d'artifice, « t'as envie de rentrer là ? », on fait commenter (ça monte ou ça descend ?) ; v7.9  // v7.9 : une fenêtre TradingView ouverte passe DEVANT la bande (on peut toujours la fermer) + la pub « sans publicité » se ferme toute seule ; v7.8  // v7.8 : la pastille suit la langue de la bande (FR/EN) ; v7.7  // v7.7 : pastilles sur 2 lignes collées au prix, animations +12 %, « tapote au lieu de regarder », plus de doublons après réinjection ; v7.6  // v7.6 : le marché PARLE (bulle près du prix, ping sur le prix, texte qui s'écrit), plus de « péter / explosion / branche » ; v7.5 : zones cliquables, plus de contre-sens, pastilles côté prix (haut si ça baisse, bas si ça monte), « connecté depuis ton portable »
   // v7.2 : bandes du haut un peu plus grosses (86 px, texte 40 px)
   const SUJET = 'align-live-2a4bccafd9548d93';
   const WORKER_SHOW_URL = 'https://align-tv-mailbox.adel-khatra.workers.dev';
@@ -199,8 +199,8 @@
   const voixBtn = document.createElement('button');
   voixBtn.id = 'align-live-voice';
   voixBtn.type = 'button';
-  voixBtn.textContent = voixEtatInitial ? '🔊 COACH VOCAL ON' : '🔇 COACH VOCAL OFF';
-  voixBtn.setAttribute('aria-pressed', voixEtatInitial ? 'true' : 'false');
+  voixBtn.textContent = '🔇 COACH VOCAL OFF';
+  voixBtn.setAttribute('aria-pressed', 'false');
   voixBtn.title = 'Activer le commentateur vocal du live';
   voixBtn.style.cssText = 'position:fixed;left:18px;bottom:20px;z-index:10001;padding:11px 15px;border:2px solid #35d07f;border-radius:22px;background:linear-gradient(135deg,#123b2b,#10251f);color:#fff;font:800 13px system-ui;cursor:pointer;pointer-events:auto;box-shadow:0 0 18px rgba(53,208,127,.35)';
   document.body.appendChild(voixBtn);
@@ -286,6 +286,7 @@
     try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
   });
   let voixActive = voixEtatInitial, voixDerniere = 0, voixTexte = '', voixDerniereFR = 0, voixTexteEN = '';
+  let voixWorkerConfirmee = false, voixSyncSeq = 0;
   let dernierCommentaireIA = null;  // dernier commentaire IA effectivement affiché, avec sa paire FR/EN
   let dernierDialogueCoach = null;  // dernier dialogue Thomas/Leïla reçu de la scène ALIGN LIVE
   // Voix système naturelles disponibles : Thomas (Paul/David), Leïla (Hortense/Zira).
@@ -300,6 +301,11 @@
   function rafraichirVoix() { try { return window.speechSynthesis.getVoices() || []; } catch (e) { return []; } }
   function mettreEtatVoix() {
     if (!voixBtn || !voixActive) return;
+    if (!voixWorkerConfirmee) {
+      voixBtn.textContent = '⏳ SYNCHRONISATION...';
+      voixBtn.setAttribute('aria-pressed', 'false');
+      return;
+    }
     const frThomas = choisirVoix('fr', 't'), frLeila = choisirVoix('fr', 'l');
     const enThomas = choisirVoix('en', 't'), enLeila = choisirVoix('en', 'l');
     const manquantes = [];
@@ -379,38 +385,67 @@
       window.speechSynthesis.cancel();
       voixUtterances.clear(); voixUtterance = null;
       window.speechSynthesis.resume();
-      voixBtn.textContent = '🔊 COACH VOCAL ON';
-      voixBtn.setAttribute('aria-pressed', 'true');
+      voixWorkerConfirmee = false;
+      voixBtn.disabled = true;
+      voixBtn.textContent = '⏳ SYNCHRONISATION...';
+      voixBtn.setAttribute('aria-pressed', 'false');
+      voixBtn.title = 'Attente de confirmation du Worker vocal.';
       mettreEtatVoix();
-      // Une seule page TradingView propriétaire reçoit et prononce les commentaires.
       if (!es) { ecouter(); pingEcran(); }
-      if (!publierEtatCoach(true)) {
-        voixBtn.title = 'Coach vocal activé globalement ; lecture sur l’onglet TradingView propriétaire.';
-        return;
-      }
-      // Pas de phrase d'accueil : relire le dernier commentaire IA affiché, dans la langue FR puis EN.
-      voixDerniere = Date.now();
-      const dialogue = dernierDialogueCoach;
-      if (dialogue && Date.now() - Number(dialogue.ts || 0) < 30000) {
-        jouerDialogueCoach(dialogue, true);
-      } else {
-        const dernier = dernierCommentaireIA;
-        if (dernier && dernier.market && dernier.market === codeMarche()) {
-          const dureeFR = dernier.fr ? parlerLive(dernier.fr, true) : 0;
-          if (dureeFR > 0 && dernier.en && dernier.en.anglaisTraduit) parlerLive(dernier.en, true);
+      const refuserActivation = () => {
+        voixActive = false;
+        voixWorkerConfirmee = false;
+        try { localStorage.setItem('alignVoixActive', '0'); } catch (e) {}
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+        voixEnAttente = null;
+        annulerReprisesVoix();
+        voixUtterances.clear(); voixUtterance = null;
+        annulerDialogueCoach();
+        voixBtn.disabled = false;
+        voixBtn.textContent = '⚠️ COACH VOCAL NON CONNECTÉ';
+        voixBtn.setAttribute('aria-pressed', 'false');
+        voixBtn.title = "Le Worker n'a pas confirmé l'activation. Le coach vocal reste désactivé.";
+      };
+      if (!publierEtatCoach(true, false, ok => {
+        if (!voixActive) return;
+        voixBtn.disabled = false;
+        if (!ok) { refuserActivation(); return; }
+        voixBtn.textContent = '🔊 COACH VOCAL ON';
+        voixBtn.setAttribute('aria-pressed', 'true');
+        voixBtn.title = 'Activation confirmée par le Worker ALIGN.';
+        // Pas de phrase d'accueil : relire le dernier commentaire IA affiché, dans la langue FR puis EN.
+        voixDerniere = Date.now();
+        const dialogue = dernierDialogueCoach;
+        if (dialogue && Date.now() - Number(dialogue.ts || 0) < 30000) {
+          jouerDialogueCoach(dialogue, true);
+        } else {
+          const dernier = dernierCommentaireIA;
+          if (dernier && dernier.market && dernier.market === codeMarche()) {
+            const dureeFR = dernier.fr ? parlerLive(dernier.fr, true) : 0;
+            if (dureeFR > 0 && dernier.en && dernier.en.anglaisTraduit) parlerLive(dernier.en, true);
+          }
         }
-      }
+      })) return;
     } else {
-      try { window.speechSynthesis.cancel(); } catch (e) {}   // OFF coupe tout ce qui est en file
+      voixWorkerConfirmee = false;
+      try { window.speechSynthesis.cancel(); } catch (e) {}
       voixEnAttente = null;
       annulerReprisesVoix();
-      voixBtn.title = 'Coach vocal désactivé.';
       voixUtterances.clear(); voixUtterance = null;
       annulerDialogueCoach();
-      publierEtatCoach(false);
-      signalVoix('STOP', 'fr', 't');
-      voixBtn.textContent = '🔇 COACH VOCAL OFF';
+      voixBtn.disabled = true;
+      voixBtn.textContent = '⏳ ARRÊT...';
       voixBtn.setAttribute('aria-pressed', 'false');
+      if (!publierEtatCoach(false, false, ok => {
+        voixBtn.disabled = false;
+        if (ok) {
+          voixBtn.title = 'Coach vocal désactivé et arrêt confirmé par le Worker.';
+          voixBtn.textContent = '🔇 COACH VOCAL OFF';
+        } else {
+          voixBtn.title = "Lecture locale arrêtée, mais l'état serveur n'a pas été confirmé.";
+          voixBtn.textContent = '⚠️ ARRÊT NON CONFIRMÉ';
+        }
+      })) return;
     }
   });
   let voixUtterance = null;
@@ -436,10 +471,45 @@
   }
   // v12.2.27 : état initialisé avant tout callback/poll qui le consulte (évite la zone morte temporelle).
   let vivant = true;
-  function publierEtatCoach(enabled, forceOwner = false) {
+  function publierEtatCoach(enabled, forceOwner = false, callback = null) {
+    const sequence = ++voixSyncSeq;
     const owner = enabled ? prendreLeaseHeartbeat() : (forceOwner || estProprietaireEcran());
-    if (!owner) return false;
-    requeteWorkerShow('/show/coach?enabled=' + (enabled ? '1' : '0'));
+    const terminer = ok => {
+      if (sequence !== voixSyncSeq) return;
+      voixWorkerConfirmee = !!ok && enabled;
+      if (typeof callback === 'function') { callback(!!ok); return; }
+      if (!voixBtn) return;
+      voixBtn.disabled = false;
+      if (ok && enabled && voixActive) {
+        voixBtn.textContent = '🔊 COACH VOCAL ON';
+        voixBtn.setAttribute('aria-pressed', 'true');
+        voixBtn.title = 'Activation confirmée par le Worker ALIGN.';
+      } else if (ok && !enabled) {
+        voixBtn.textContent = '🔇 COACH VOCAL OFF';
+        voixBtn.setAttribute('aria-pressed', 'false');
+        voixBtn.title = 'Coach vocal désactivé et arrêt confirmé par le Worker.';
+      } else if (enabled) {
+        voixActive = false;
+        voixWorkerConfirmee = false;
+        try { localStorage.setItem('alignVoixActive', '0'); } catch (e) {}
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+        voixEnAttente = null;
+        annulerReprisesVoix();
+        voixUtterances.clear(); voixUtterance = null;
+        annulerDialogueCoach();
+        voixBtn.textContent = '⚠️ COACH VOCAL NON CONNECTÉ';
+        voixBtn.setAttribute('aria-pressed', 'false');
+        voixBtn.title = "Le Worker n'a pas confirmé l'activation. Le coach vocal reste désactivé.";
+      } else {
+        voixBtn.textContent = '⚠️ ARRÊT NON CONFIRMÉ';
+        voixBtn.setAttribute('aria-pressed', 'false');
+        voixBtn.title = "Lecture locale arrêtée, mais l'état serveur n'a pas été confirmé.";
+      }
+    };
+    if (!owner) { terminer(false); return false; }
+    requeteWorkerShow('/show/coach?enabled=' + (enabled ? '1' : '0'), result => {
+      terminer(!!result && result.ok === true && result.voiceEnabled === enabled);
+    });
     return true;
   }
   function signalVoix(action, lang, speaker = 't', text = '', durationMs = 0) {
@@ -453,7 +523,7 @@
   }
   let coachDialogueActive = false;
   function parlerLive(item, forcer = false, apresLecture = null) {
-    if (!vivant || !item || !voixActive || !estProprietaireEcran() || !['ia', 'marche', 'coach'].includes(item.source) || !('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return 0;
+    if (!vivant || !item || !voixActive || !voixWorkerConfirmee || !estProprietaireEcran() || !['ia', 'marche', 'coach'].includes(item.source) || !('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return 0;
     const speaker = item.speaker === 'l' ? 'l' : 't';
     // v12.2.7 (règle d'Adel) : chaque info est dite en FRANÇAIS, puis la même en ANGLAIS, jamais mélangées.
     const anglais = !!item.en;
@@ -506,7 +576,7 @@
       const duree = Math.max(4000, Math.ceil(phrase.length * 75 + 500));
       utterance.onstart = () => {
         voixBtn.title = 'Synthèse démarrée : ' + v.name + ' (' + (anglais ? 'en-US' : 'fr-FR') + ').';
-        if (voixActive && choisirVoix('fr', 't') && choisirVoix('fr', 'l')) voixBtn.textContent = '🔊 COACH VOCAL ON';
+        if (voixActive && voixWorkerConfirmee && choisirVoix('fr', 't') && choisirVoix('fr', 'l')) voixBtn.textContent = '🔊 COACH VOCAL ON';
         signalVoix('START', anglais ? 'en' : 'fr', speaker, phrase, duree);
       };
       let lectureTerminee = false;
@@ -1311,9 +1381,11 @@
       if (!es) { ecouter(); pingEcran(); }
       if (estProprietaireEcran()) {
         try { voixActive = localStorage.getItem('alignVoixActive') === '1'; } catch (e) {}
+        voixWorkerConfirmee = false;
         if (voixBtn) {
-          voixBtn.textContent = voixActive ? '🔊 COACH VOCAL ON' : '🔇 COACH VOCAL OFF';
-          voixBtn.setAttribute('aria-pressed', voixActive ? 'true' : 'false');
+          voixBtn.disabled = !!voixActive;
+          voixBtn.textContent = voixActive ? '⏳ SYNCHRONISATION...' : '🔇 COACH VOCAL OFF';
+          voixBtn.setAttribute('aria-pressed', 'false');
           if (voixActive) mettreEtatVoix();
         }
         publierEtatCoach(voixActive);
@@ -1325,21 +1397,34 @@
   window.addEventListener('storage', event => {
     if (!event || event.key !== 'alignVoixActive') return;
     voixActive = event.newValue === '1';
+    voixWorkerConfirmee = false;
     if (voixBtn) {
-      voixBtn.textContent = voixActive ? '🔊 COACH VOCAL ON' : '🔇 COACH VOCAL OFF';
-      voixBtn.setAttribute('aria-pressed', voixActive ? 'true' : 'false');
-      voixBtn.title = voixActive ? 'Coach vocal activé globalement ; lecture sur l’onglet TradingView propriétaire.' : 'Coach vocal désactivé.';
+      voixBtn.disabled = !!voixActive;
+      voixBtn.textContent = voixActive
+        ? (estProprietaireEcran() ? '⏳ SYNCHRONISATION...' : '🔊 COACH VOCAL SUR AUTRE ONGLET')
+        : '🔇 COACH VOCAL OFF';
+      voixBtn.setAttribute('aria-pressed', 'false');
+      voixBtn.title = voixActive ? 'Activation en cours ou coach contrôlé par un autre onglet.' : 'Coach vocal désactivé.';
       if (voixActive) mettreEtatVoix();
     }
     if (!estProprietaireEcran()) return;
     if (voixActive) {
-      publierEtatCoach(true);
       if (!coachPollTimer) ecouterDialoguesCoach();
-      const dernier = dernierCommentaireIA;
-      if (dernier && dernier.market && dernier.market === codeMarche()) {
-        const dureeFR = dernier.fr ? parlerLive(dernier.fr, true) : 0;
-        if (dureeFR > 0 && dernier.en && dernier.en.anglaisTraduit) parlerLive(dernier.en, true);
-      }
+      publierEtatCoach(true, false, ok => {
+        if (!voixActive) return;
+        if (!ok) return;
+        if (voixBtn) {
+          voixBtn.disabled = false;
+          voixBtn.textContent = '🔊 COACH VOCAL ON';
+          voixBtn.setAttribute('aria-pressed', 'true');
+          voixBtn.title = 'Activation confirmée par le Worker ALIGN.';
+        }
+        const dernier = dernierCommentaireIA;
+        if (dernier && dernier.market && dernier.market === codeMarche()) {
+          const dureeFR = dernier.fr ? parlerLive(dernier.fr, true) : 0;
+          if (dureeFR > 0 && dernier.en && dernier.en.anglaisTraduit) parlerLive(dernier.en, true);
+        }
+      });
     } else {
       try { window.speechSynthesis.cancel(); } catch (e) {}
       voixEnAttente = null;
