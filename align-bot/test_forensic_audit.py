@@ -333,8 +333,10 @@ class ForensicStopTransitionTest(unittest.TestCase):
         return trade, r
 
     def _capture(self, state, r):
-        with unittest.mock.patch.object(align_bot, "raison_attente", return_value="A"), \\
-             unittest.mock.patch.object(align_bot, "verdict", return_value=("N", "D")):
+        with (
+            unittest.mock.patch.object(align_bot, "raison_attente", return_value="A"),
+            unittest.mock.patch.object(align_bot, "verdict", return_value=("N", "D")),
+        ):
             align_bot.capturer_snapshot_audit(state, "BTC", r, state["cle"])
 
     def test_snapshot_records_global_stop_transition_inside_same_m5_bar(self):
