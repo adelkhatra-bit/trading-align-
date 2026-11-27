@@ -7256,21 +7256,16 @@ def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
         lecture = "👁 Le marché hésite 🤏"
     d = r.get("confirme") or 0
     tr = cle.get("trade")
-    dirs_source = r.get("dirs_cloturees")
-    dirs_disponibles = isinstance(dirs_source, (list, tuple)) and len(dirs_source) >= 11
-    dirs = list(dirs_source[:11]) if dirs_disponibles else [0] * 11
+    dirs = (r.get("dirs_cloturees") or r.get("dirs")) or [0] * 11
     noms_ut = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1")
-    lectures_ut = [(nom, dirs[i] if dirs[i] in (-1, 1) else 0)
+    lectures_ut = [(nom, dirs[i] if i < len(dirs) and dirs[i] in (-1, 1) else 0)
                    for i, nom in enumerate(noms_ut)]
     fleche_ut = lambda sens: "⬆️" if sens == 1 else "⬇️" if sens == -1 else "➡️"
-    unites = ("📊 UT clôturées : " + " ".join(f"{nom}{fleche_ut(sens)}" for nom, sens in lectures_ut)
-              if dirs_disponibles else "📊 UT clôturées : indisponibles • aucune direction déduite")
+    unites = "📊 UT clôturées : " + " ".join(f"{nom}{fleche_ut(sens)}" for nom, sens in lectures_ut)
     haut = sum(1 for _, sens in lectures_ut if sens == 1)
     bas = sum(1 for _, sens in lectures_ut if sens == -1)
     neutres = len(lectures_ut) - haut - bas
-    if not dirs_disponibles:
-        bilan_ut = "📊 Bilan MTF : clôtures indisponibles • aucun alignement calculé"
-    elif d in (-1, 1):
+    if d in (-1, 1):
         alignes = sum(1 for _, sens in lectures_ut if sens == d)
         opposes = sum(1 for _, sens in lectures_ut if sens == -d)
         bilan_ut = (f"🎯 Vs sens confirmé {'LONG' if d == 1 else 'SHORT'} : "
@@ -7381,6 +7376,8 @@ def flash_commentateur(m, r, cle):
     else:
         ligne_pos = ["🧭 Dans le sens de la tendance" if d_ * move > 0 else "↩ Contre la tendance : rebond ?" if d_ else "➖ Pas de tendance nette",
                      "⏳ J'attends la clôture 15 min"]
+    # Comparer les UT au trade réel s'il existe, sinon au sens Pine confirmé.
+    sens_reference = tr.get("d") if tr and tr.get("d") in (-1, 1) else d_
     # Le commentateur ne doit jamais compter les UT en formation : il ne lit que le contrat des 11 dernières clôtures.
     dirs_cloturees = r.get("dirs_cloturees")
     if isinstance(dirs_cloturees, (list, tuple)) and len(dirs_cloturees) >= 11:
@@ -7388,10 +7385,10 @@ def flash_commentateur(m, r, cle):
         nb_long = sum(1 for v in lectures if v == 1)
         nb_short = sum(1 for v in lectures if v == -1)
         nb_neutres = sum(1 for v in lectures if v not in (-1, 1))
-        if d_ in (-1, 1):
-            nb_alignes = nb_short if d_ == -1 else nb_long
-            nb_opposes = nb_long if d_ == -1 else nb_short
-            direction_txt = "SHORT" if d_ == -1 else "LONG"
+        if sens_reference in (-1, 1):
+            nb_alignes = nb_short if sens_reference == -1 else nb_long
+            nb_opposes = nb_long if sens_reference == -1 else nb_short
+            direction_txt = "SHORT" if sens_reference == -1 else "LONG"
             ligne_mtf = (f"🎯 Clôtures vs sens confirmé {direction_txt} : "
                          f"{nb_alignes}/11 alignées • {nb_opposes} opposées • {nb_neutres} neutres")
         elif nb_short > nb_long:
@@ -7405,9 +7402,7 @@ def flash_commentateur(m, r, cle):
     if abs(move) >= 0.5 * a:
         return "\n".join(["🎙 ÇA BOUGE !", f"{ICONE.get(m, '')} {m} : {px(p)}",
                           ("🔴 Les vendeurs accélèrent" if move < 0 else "🟢 Les acheteurs accélèrent"),
-                          f"📏 {'-' if move < 0 else '+'}{px(abs(move))} en 3 min",
-                          ligne_mtf,
-                          "ℹ️ Mouvement observé, pas une entrée : attendre la clôture M15"] + ligne_pos)
+                          f"📏 {'-' if move < 0 else '+'}{px(abs(move))} en 3 min"] + ligne_pos)
     b15 = (r.get("b15") or [])[-1:]
     if b15:
         x = b15[0]; rng = x["h"] - x["l"]

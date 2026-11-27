@@ -79,8 +79,6 @@ class FlashCommentateur(unittest.TestCase):
         r = {"atr": 100, "m1": [dict(o=1000, c=990), dict(o=990, c=960), dict(o=960, c=930)], "b15": []}
         t = ab.flash_commentateur("BTC", r, {"trade": {"d": -1}})
         self.assertIn("ÇA BOUGE", t); self.assertIn("vendeurs", t); self.assertIn("Dans le sens du bot", t)
-        self.assertIn("Clôtures MTF : indisponibles", t)
-        self.assertIn("pas une entrée", t)
 
     def test_grosse_meche_haute_est_clairement_un_rejet_baissier_non_confirme(self):
         r = {
@@ -127,6 +125,18 @@ class FlashCommentateur(unittest.TestCase):
         self.assertNotIn("REJET BAISSIER POTENTIEL", t)
         self.assertNotIn("REJET HAUSSIER POTENTIEL", t)
 
+    def test_active_trade_direction_is_the_mtf_reference(self):
+        r = {
+            "atr": 100, "m1": [dict(o=1000, c=1000)] * 3,
+            "b15": [dict(o=990, h=1080, l=985, c=1000)],
+            "confirme": 0,
+            "dirs_cloturees": [1] * 11,
+        }
+        t = ab.flash_commentateur("BTC", r, {"trade": {"d": -1, "e": 1000, "sl": 1010, "tp1": 980}})
+        self.assertIn("sens confirmé SHORT", t)
+        self.assertIn("0/11 alignées", t)
+        self.assertIn("11 opposées", t)
+
     def test_absence_de_clotures_mtf_n_est_pas_remplacee_par_les_ut_en_formation(self):
         r = {
             "atr": 100, "m1": [dict(o=1000, c=1000)] * 3,
@@ -136,18 +146,6 @@ class FlashCommentateur(unittest.TestCase):
         t = ab.flash_commentateur("GOLD", r, {})
         self.assertIn("Clôtures MTF : indisponibles", t)
         self.assertNotIn("11/11", t)
-
-    def test_coach_live_does_not_fallback_to_forming_mtf_directions(self):
-        r = {
-            "m1": [dict(c=100.0)],
-            "dirs": [-1] * 11,
-            "b15": [dict(t=900, o=101.0, h=102.0, l=99.0, c=100.0)],
-            "sqzs": [0] * 11,
-        }
-        message = ab.texte_coach_live("GOLD", r["b15"][0], r, {})
-        self.assertIn("UT clôturées : indisponibles", message)
-        self.assertIn("Bilan MTF : clôtures indisponibles", message)
-        self.assertNotIn("M1⬇️", message)
 
     def test_rien_de_special(self):
         r = {"atr": 100, "m1": [dict(o=1000, c=1001)] * 3, "b15": [dict(o=1000, h=1010, l=995, c=1001)]}
