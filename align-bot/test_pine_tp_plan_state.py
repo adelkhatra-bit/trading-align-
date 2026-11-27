@@ -31,6 +31,10 @@ class PineTpPlanStateTests(unittest.TestCase):
         self.assertIn("sigHaut = voirSignauxV24 and sigHaut0", self.source_v24)
         self.assertIn("sigBas  = voirSignauxV24 and sigBas0", self.source_v24)
         self.assertIn("CONTEXTE MTF v24 — plan Entry / SL / TP sur v25", self.source_v24)
+        self.assertIn("dirsFermees = array.from(nz(d1Fermee), nz(d3Fermee)", self.source_v24)
+        self.assertIn("dv = array.get(dirsFermees, i)", self.source_v24)
+        self.assertIn("Bougie en formation :", self.source_v24)
+        self.assertIn("visuel MTF d'accompagnement", self.source_v24)
         self.assertNotIn('E " + px(ent) + "  TP " + px(tp1) + "  SL " + px(sl)', self.source_v24)
 
     def test_entry_sl_tp_visuals_are_hidden_until_the_plan_is_confirmed(self):

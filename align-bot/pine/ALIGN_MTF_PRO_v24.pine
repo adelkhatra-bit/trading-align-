@@ -47,9 +47,28 @@ f_etat() =>
 [dD, sD, rD]       = request.security(syminfo.tickerid, "D",   f_etat())
 [dW, sW, rW]       = request.security(syminfo.tickerid, "W",   f_etat())
 
+// Même lecture clôturée que le v25 : le v24 reste un visuel d'accompagnement.
+f_dir_confirme() =>
+    ef = ta.ema(close, lenFast)
+    es = ta.ema(close, lenSlow)
+    d = close > ef and ef > es ? 1 : close < ef and ef < es ? -1 : 0
+    d[1]
+d1Fermee   = request.security(syminfo.tickerid, "1",   f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d3Fermee   = request.security(syminfo.tickerid, "3",   f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d5Fermee   = request.security(syminfo.tickerid, "5",   f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d10Fermee  = request.security(syminfo.tickerid, "10",  f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d15Fermee  = request.security(syminfo.tickerid, "15",  f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d30Fermee  = request.security(syminfo.tickerid, "30",  f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d45Fermee  = request.security(syminfo.tickerid, "45",  f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d60Fermee  = request.security(syminfo.tickerid, "60",  f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d120Fermee = request.security(syminfo.tickerid, "120", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d240Fermee = request.security(syminfo.tickerid, "240", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+dDFermee   = request.security(syminfo.tickerid, "D",   f_dir_confirme(), lookahead=barmerge.lookahead_on)
+
 noms  = array.from("1", "3", "5", "10", "15", "30", "45", "1h", "2h", "4h", "D")
 nomsL = array.from("1 min", "3 min", "5 min", "10 min", "15 min", "30 min", "45 min", "1 heure", "2 heures", "4 heures", "Daily")
 dirs = array.from(nz(d1), nz(d2), nz(d5), nz(d10), nz(d15), nz(d30), nz(d45), nz(d60), nz(d120), nz(d240), nz(dD))
+dirsFermees = array.from(nz(d1Fermee), nz(d3Fermee), nz(d5Fermee), nz(d10Fermee), nz(d15Fermee), nz(d30Fermee), nz(d45Fermee), nz(d60Fermee), nz(d120Fermee), nz(d240Fermee), nz(dDFermee))
 sqzs = array.from(nz(s1), nz(s2), nz(s5), nz(s10), nz(s15), nz(s30), nz(s45), nz(s60), nz(s120), nz(s240), nz(sD))
 rsis = array.from(nz(r1, 50), nz(r2, 50), nz(r5, 50), nz(r10, 50), nz(r15, 50), nz(r30, 50), nz(r45, 50), nz(r60, 50), nz(r120, 50), nz(r240, 50), nz(rD, 50))
 wts  = array.from(1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 3.0, 3.0, 4.0, 5.0)
@@ -345,8 +364,8 @@ var int dernierB = -100
 // Entrées uniquement dans le sens des grosses UT (2h, 4h, Daily)
 sigHaut0 = ((fortHaut or explHaut) and longT >= 1) or (zoneHaut and longT >= 0)
 sigBas0  = ((fortBas or explBas) and longT <= -1) or (zoneBas and longT <= 0)
-sigHaut = voirSignauxV24 and sigHaut0 and bar_index - dernierH > 12
-sigBas  = voirSignauxV24 and sigBas0 and bar_index - dernierB > 12
+sigHaut = sigHaut0 and bar_index - dernierH > 12
+sigBas  = sigBas0 and bar_index - dernierB > 12
 if sigHaut
     dernierH := bar_index
 if sigBas
@@ -437,25 +456,27 @@ clignote = animer and tick % 2 == 0
 if barstate.islast
     int nVoy = 0
     for k = 0 to 4
-        nVoy += dirPlan != 0 and array.get(dirs, k) == -dirPlan ? 1 : 0
+        nVoy += dirPlan != 0 and array.get(dirsFermees, k) == -dirPlan ? 1 : 0
     for i = 0 to 10
-        dv = array.get(dirs, i)
+        dvLive = array.get(dirs, i)
+        dv = array.get(dirsFermees, i)
         sq = array.get(sqzs, i) == 1
         rv = array.get(rsis, i)
         bg = sq ?  color.rgb(230, 130, 0) : dv == 1 ?  color.rgb(0, 140, 70) : dv == -1 ?  color.rgb(190, 30, 45) :  color.rgb(90, 90, 90)
-        sym = (dv == 1 ? "▲" : dv == -1 ? "▼" : "—") + (rv >= 70 ? "!" : rv <= 30 ? "!" : "") + (dirPlan != 0 and dv == -dirPlan and i <= 4 ? "↩" : "")
+        sym = (dv == 1 ? "▲" : dv == -1 ? "▼" : "—") + (rv >= 70 ? "!" : rv <= 30 ? "!" : "") + (dirPlan != 0 and dv == -dirPlan and i <= 4 ? "↩" : "") + (dvLive != dv ? "~" : "")
         roleUT = array.get(array.from("déclenchement SCALP", "timing très court", "déclenchement DAY • structure SCALP", "préparation", "direction SCALP • retracement DAY", "intermédiaire", "intermédiaire", "contexte SCALP • direction DAY • confirmation SWING", "intermédiaire", "contexte DAY • retracement SWING", "direction SWING"), i)
         minUT = array.get(array.from(1, 3, 5, 10, 15, 30, 45, 60, 120, 240, 0), i)
         sensUT = dv == 1 ? "HAUSSE ▲" : dv == -1 ? "BAISSE ▼" : "NEUTRE —"
+        sensLive = dvLive == 1 ? "HAUSSE ▲" : dvLive == -1 ? "BAISSE ▼" : "NEUTRE —"
         tendUT = dv == 1 ? "prix au-dessus de l'EMA 20, EMA 20 au-dessus de l'EMA 50" : dv == -1 ? "prix sous l'EMA 20, EMA 20 sous l'EMA 50" : "prix entre les moyennes : pas de sens net"
         rsiUT = rv >= 70 ? "SURACHAT (risque de baisse)" : rv <= 30 ? "SURVENTE (risque de rebond)" : rv >= 55 ? "acheteurs plus forts" : rv <= 45 ? "vendeurs plus forts" : "équilibré"
-        planUT = dirPlan == 0 ? "pas de plan en cours" : dv == dirPlan ? "✅ va dans le sens du plan " + (dirPlan == 1 ? "LONG" : "SHORT") : dv == -dirPlan ? "⛔ contre le plan " + (dirPlan == 1 ? "LONG" : "SHORT") + " : attendre qu'elle se retourne" : "⏳ neutre : pas encore de confirmation"
-        tip = array.get(nomsL, i) + " — " + sensUT + "\n━━━━━━━━━━━━\nTendance : " + tendUT + "\nRSI : " + str.tostring(rv, "#") + " — " + rsiUT + "\nCompression : " + (sq ? "OUI ⚡ prêt à exploser (attendre la direction)" : "non") + "\nRôle : " + roleUT + (minUT > 0 ? "\nClôture dans : " + f_mmss(f_reste(minUT)) : "") + "\n━━━━━━━━━━━━\n" + planUT + (dirPlan != 0 and dv == -dirPlan and i <= 4 ? "\n↩ VOYANT RETOURNEMENT allumé : " + str.tostring(nVoy) + "/5 petites unités (1 à 15 min) ont tourné contre le plan\n3/5 = le retournement se prépare • confirmé quand le 15 min ET la 1h clôturent dans le nouveau sens" : "")
+        planUT = "visuel MTF d'accompagnement ; décision et plan Entry / SL / TP uniquement sur v25"
+        tip = array.get(nomsL, i) + " — clôture : " + sensUT + "\nBougie en formation : " + sensLive + (dvLive != dv ? " • divergence temporaire (~)" : " • cohérente avec la clôture") + "\n━━━━━━━━━━━━\nTendance : " + tendUT + "\nRSI : " + str.tostring(rv, "#") + " — " + rsiUT + "\nCompression : " + (sq ? "OUI ⚡ prêt à exploser (attendre la direction)" : "non") + "\nRôle : " + roleUT + (minUT > 0 ? "\nClôture dans : " + f_mmss(f_reste(minUT)) : "") + "\n━━━━━━━━━━━━\n" + planUT + (dirPlan != 0 and dv == -dirPlan and i <= 4 ? "\n↩ VOYANT RETOURNEMENT allumé : " + str.tostring(nVoy) + "/5 petites unités (1 à 15 min) ont tourné contre le plan\n3/5 = le retournement se prépare • confirmé quand le 15 min ET la 1h clôturent dans le nouveau sens" : "")
         table.cell(t, i, 0, array.get(noms, i), width=largCol, bgcolor=rv >= 70 ?  color.rgb(120, 20, 30) : rv <= 30 ?  color.rgb(0, 90, 50) :  color.rgb(30, 34, 45), text_color=rv >= 70 or rv <= 30 ?  color.white :  color.gray, text_size=size.small, tooltip=tip)
         table.cell(t, i, 1, sym, width=largCol, bgcolor=bg, text_color= color.white, text_size=size.normal, tooltip=tip)
     titre = zoneBas ? "RETOURNEMENT ▼" : zoneHaut ? "REBOND ▲" : fortHaut ? "★ ACHAT FORT" : fortBas ? "★ VENTE FORTE" : retHaut ? "RETOURNEMENT ▲" : retBas ? "RETOURNEMENT ▼" : rsiOB >= 3 ? "RSI SURACHAT " + str.tostring(rsiOB) + "/11" : rsiOS >= 3 ? "RSI SURVENTE " + str.tostring(rsiOS) + "/11" : surcharge ? "⚡ SURCHARGE" : sens == 1 ? "HAUSSE" : sens == -1 ? "BAISSE" : "ATTENDRE"
     ligne = "📊 CONTEXTE MTF v24 — plan Entry / SL / TP sur v25 • " + titre
-    plan = "VISUEL COMPLÉMENTAIRE v24 : contexte et clôtures uniquement.\nClôture de validation : seule une bougie clôturée compte.\nLa direction du plan, Entry, SL et TP de référence sont exclusivement ceux de ALIGN MTF PRO v25."
+    plan = "VISUEL COMPLÉMENTAIRE v24 : contexte et clôtures uniquement.\nLa direction du plan, Entry, SL et TP de référence sont exclusivement ceux de ALIGN MTF PRO v25."
     vbg0 = zoneBas or zoneHaut ?  color.rgb(170, 130, 0) : dirPlan == 1 ?  color.rgb(0, 140, 70) : dirPlan == -1 ?  color.rgb(190, 30, 45) :  color.rgb(60, 60, 60)
     actif = zoneBas or zoneHaut or fortHaut or fortBas or retHaut or retBas or surcharge
     table.cell(t, 0, 2, ligne, bgcolor=actif and clignote ? color.new(vbg0, 50) : vbg0, text_color= color.white, text_size=size.normal, tooltip=titre + "\n" + plan)
