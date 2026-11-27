@@ -4896,3 +4896,76 @@ class TradingViewPositionLifecycleTests(unittest.TestCase):
         noter.assert_called_once()
         self.assertEqual(noter.call_args.args[4], 98.0)
 
+    def test_plan_indicateur_preserves_fresh_pine_verdict_when_levels_are_wait(self):
+        r = {
+            "tv_indicator_mtf": {
+                "activeTimeframe": "M5",
+                "snapshots": {
+                    "M15": {
+                        "fresh": True,
+                        "robotFresh": True,
+                        "robotV12": {
+                            "signal": "WAIT",
+                            "verdict": "À SURVEILLER : confirmation manquante",
+                        },
+                    },
+                    "M5": {"fresh": True, "price": 100.0},
+                },
+            }
+        }
+        plan = align_bot.plan_indicateur(r)
+        self.assertFalse(plan["available"])
+        self.assertEqual(plan["verdict"], "À SURVEILLER : confirmation manquante")
+
+    def test_telegram_why_card_surfaces_the_exact_pine_wait_reason(self):
+        reason = "À SURVEILLER : confirmation manquante"
+        with unittest.mock.patch.object(
+            align_bot, "plan_indicateur",
+            return_value={"available": False, "reason": "plan incomplet", "verdict": reason},
+        ):
+            message = align_bot.texte_pourquoi("BTC", {"require_tv_bridge": True}, {})
+        self.assertIn(f"Motif Pine v25 : {reason}", message)
+
+    def test_market_overview_surfaces_pine_verdict_instead_of_generic_wait(self):
+        now = int(align_bot.time.time())
+        r = {
+            "require_tv_bridge": True,
+            "m1": [{"t": now, "o": 100.0, "h": 101.0, "l": 99.0, "c": 100.0}],
+            "dirs": [1] * 11,
+            "dirs_cloturees": [1] * 11,
+            "rsis": [50.0] * 11,
+            "rC": 50.0,
+            "b5": [],
+            "b15": [],
+            "b15_long": [],
+            "niveaux": [],
+            "tv_indicator_mtf": {"available": True, "activeTimeframe": "M5"},
+        }
+        reason = "À SURVEILLER : confirmation manquante"
+        with unittest.mock.patch.object(
+            align_bot, "plan_indicateur",
+            return_value={"available": False, "reason": "plan incomplet", "verdict": reason},
+        ), unittest.mock.patch.object(align_bot, "prix_tradingview_actif", return_value=None):
+            message = align_bot.texte_apercu("BTC", r, {}, vip=True)
+        self.assertIn(f"Pourquoi : {reason}", message)
+
+    def test_live_commentary_context_carries_the_pine_wait_reason(self):
+        r = {
+            "require_tv_bridge": True,
+            "dirs": [1] * 11,
+            "dirs_cloturees": [1] * 11,
+            "b5": [],
+            "b15": [],
+            "b15_long": [],
+            "rC": 50.0,
+            "niveaux": [],
+            "m1": [{"c": 100.0}],
+        }
+        reason = "À SURVEILLER : confirmation manquante"
+        with unittest.mock.patch.object(
+            align_bot, "plan_indicateur",
+            return_value={"available": False, "reason": "plan incomplet", "verdict": reason},
+        ):
+            context = align_bot.contexte_technique_live({"BTC": r})
+        self.assertEqual(context["marches"]["BTC"]["motif_plan"], reason)
+
