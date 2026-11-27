@@ -11517,14 +11517,20 @@ def news_txt(etat, heures=4, n=2):
     cal = etat.get("cal", {})
     if not calendrier_connu(etat, maintenant):
         return "📰 News : calendrier indisponible"
-    ev = sorted((e for e in cal.get("ev", []) if e["t"] - maintenant >= -15 * 60), key=lambda e: e["t"])
+    # Les événements High/Medium sont dans ev ; les annonces Low pertinentes pour BTC/GOLD
+    # sont conservées séparément dans veille et doivent aussi apparaître dans le résumé utilisateur.
+    candidats = list(cal.get("ev") or []) + list(cal.get("veille") or [])
+    uniques = {economic_news.event_key(e): e for e in candidats if int(e.get("t") or 0) - maintenant >= -15 * 60}
+    ev = sorted(uniques.values(), key=lambda e: (int(e.get("t") or 0), economic_news.event_key(e)))
     if not ev:
         return "✅ Plus aucune annonce ni discours cette semaine"
     proche = ev[0]["t"] - maintenant <= heures * 3600
     lignes = [("⚠️ " if proche else "📰 ") + "Prochaines news (heure de Paris) :"]
     for e in ev[:n]:
         ic = "🎤" if "speak" in e["titre"].lower() else "📰"
-        lignes.append(f"{ic} {quand_txt(e['t'])} {e['titre']} — {dans_txt(e['t'] - maintenant)}")
+        impact = e.get("impact") or e.get("importance")
+        suffixe = f" — impact {impact}" if impact else ""
+        lignes.append(f"{ic} {quand_txt(e['t'])} {e['titre']}{suffixe} — {dans_txt(e['t'] - maintenant)}")
     if not proche:
         lignes.append(f"✅ Rien d'ici {heures} h")
     return "\n".join(lignes)
