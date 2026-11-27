@@ -82,7 +82,7 @@ class TelegramFollowStatusPineTests(unittest.TestCase):
         text = self.pine_status(plan)
 
         self.assertIn("Plan Pine v25 confirmé : LONG", text)
-        self.assertIn("entrée 101", text)
+        self.assertIn("Entry 101", text)
         self.assertIn("SL 95", text)
         self.assertIn("TP1 110", text)
         self.assertIn("TP2 115", text)
@@ -131,7 +131,7 @@ class TelegramFollowStatusPineTests(unittest.TestCase):
 
         self.assertIn("signal confirmé", text)
         self.assertIn("exécution manuelle à effectuer", text)
-        self.assertIn("Entry 101", text)
+        self.assertIn("entrée 101", text)
         self.assertIn("prix TradingView 102", text)
         self.assertNotIn("attente de confirmation Pine v25", text)
         self.assertNotIn("j'attends une entrée confirmée", text)
