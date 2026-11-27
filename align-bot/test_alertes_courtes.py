@@ -195,6 +195,7 @@ class EvenementsPine(unittest.TestCase):
                 message = "\n".join(ab.texte_pine({}, events[0]))
                 self.assertIn(expected_direction, message)
                 self.assertIn(expected_action, message)
+                self.assertIn("Seuil technique atteint", message)
 
         falling_cases = (
             (1, {"bull": 8, "bear": 2}, {"bull": 6, "bear": 2},
