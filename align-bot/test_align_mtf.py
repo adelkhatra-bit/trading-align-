@@ -2925,8 +2925,8 @@ class TestTradingViewReportRegression(unittest.TestCase):
         self.assertIn("POSITION DÉJÀ OUVERTE", message)
         self.assertIn("Direction de la position mémorisée : SHORT", message)
         self.assertIn("Entrée, SL et objectifs restent ceux enregistrés", message)
-        self.assertGreater(message.count("\\n"), 4)
-        self.assertNotIn("\\\\n", message)
+        self.assertGreater(message.count("\n"), 4)
+        self.assertNotIn("\\n", message)
         self.assertNotIn("biais local", message.lower())
 
     def test_required_bridge_position_uses_tv_price_and_preserves_personal_trade_levels(self):
