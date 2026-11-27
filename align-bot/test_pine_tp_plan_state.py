@@ -51,7 +51,7 @@ class PineTpPlanStateTests(unittest.TestCase):
         self.assertIn("label.delete(eConf)", self.source)
         self.assertNotIn('eE := label.new(x1, ent, "ENTRÉE "', self.source)
         self.assertNotIn("lE := line.new(x1, ent", self.source)
-        self.assertIn("var table t = table.new(pos, 11, 3", self.source)
+        self.assertIn("var table t = table.new(pos, 12, 3", self.source)
         self.assertIn("lZH := line.new(x1, zMil", self.source)
 
     def test_targets_and_stop_visual_contract_is_preserved(self):
