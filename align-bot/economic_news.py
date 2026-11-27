@@ -20,14 +20,32 @@ CALENDAR_SOURCE = "Forex Factory / Fair Economy (flux agrégé)"
 
 _OFFICIAL_SOURCES = (
     {
-        "name": "U.S. Bureau of Labor Statistics (BLS)",
-        "url": "https://www.bls.gov/schedule/news_release/bls.ics",
+        "name": "U.S. Bureau of Labor Statistics — Consumer Price Index",
+        "url": "https://www.bls.gov/news.release/cpi.toc.htm",
+        "keywords": ("consumer price index", "cpi"),
+    },
+    {
+        "name": "U.S. Bureau of Labor Statistics — Producer Price Index",
+        "url": "https://www.bls.gov/news.release/ppi.toc.htm",
+        "keywords": ("producer price index", "ppi"),
+    },
+    {
+        "name": "U.S. Bureau of Labor Statistics — Employment Situation",
+        "url": "https://www.bls.gov/news.release/empsit.toc.htm",
         "keywords": (
-            "consumer price index", "cpi", "producer price index", "ppi",
             "employment situation", "nonfarm payroll", "payrolls",
-            "unemployment rate", "unemployment claims", "jobless claims",
-            "jolts", "job openings", "employment",
+            "unemployment rate", "employment",
         ),
+    },
+    {
+        "name": "U.S. Bureau of Labor Statistics — JOLTS",
+        "url": "https://www.bls.gov/news.release/jolts.toc.htm",
+        "keywords": ("jolts", "job openings"),
+    },
+    {
+        "name": "U.S. Department of Labor — Weekly Unemployment Claims",
+        "url": "https://www.dol.gov/ui/data.pdf",
+        "keywords": ("unemployment claims", "jobless claims", "initial claims"),
     },
     {
         "name": "U.S. Bureau of Economic Analysis (BEA)",
