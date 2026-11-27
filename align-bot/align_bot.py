@@ -3297,25 +3297,26 @@ def carte_coach(m, r, cle, genre, tr=None, raison=None, declencheur=None, signal
             niv.append((f"🏁 TP2 : {px(tr['tp2'])}", tr["tp2"]))
         l += [x for x, _ in niv] + [f"⚖️ R:R : 1:{rr:.1f}".replace(".", ",")]
         # v8.7 (demande d'Adel) : durée estimée de la position + « le prix peut revenir vers l'entrée », pour ne pas paniquer
-        try:
-            bg = [x for x in (r.get("m1") or [])[-120:] if isinstance(x, dict) and x.get("h") is not None and x.get("l") is not None]
-            a1 = sum(x["h"] - x["l"] for x in bg) / max(len(bg), 1)
-            mins = 0.5 * (abs(tr["tp1"] - tr["e"]) / a1) ** 2 if a1 > 0 else 0
-            if mins > 0:
-                duree = "moins d'1 h" if mins < 60 else "quelques heures" if mins < 360 else "environ 1 journée" if mins < 1800 else "2 à 3 jours"
-                l.append(f"⏳ Durée estimée : {duree} • le prix peut revenir vers l'entrée avant de partir, garde ton SL")
-        except Exception:
-            pass
+        if not r.get("require_tv_bridge"):
+            try:
+                bg = [x for x in (r.get("m1") or [])[-120:] if isinstance(x, dict) and x.get("h") is not None and x.get("l") is not None]
+                a1 = sum(x["h"] - x["l"] for x in bg) / max(len(bg), 1)
+                mins = 0.5 * (abs(tr["tp1"] - tr["e"]) / a1) ** 2 if a1 > 0 else 0
+                if mins > 0:
+                    duree = "moins d'1 h" if mins < 60 else "quelques heures" if mins < 360 else "environ 1 journée" if mins < 1800 else "2 à 3 jours"
+                    l.append(f"⏳ Durée estimée : {duree} • le prix peut revenir vers l'entrée avant de partir, garde ton SL")
+            except Exception:
+                pass
         if validite:
             l.append(f"⏱ Valide : {validite}")
-        try:
-            co = coach_fvg(r, d, r["m1"][-1]["c"], attente=False, tr=tr) if r.get("m1") else []
-            # Demande d'Adel : l'entrée doit se lire SANS faire défiler → 2 lignes de coach maximum ici ;
-            # le détail complet reste sous « 🧠 En savoir plus » / « ❓ Pourquoi cette décision ? ».
-            l += [""] + co[:2] if co else []
-        except Exception:
-            pass
-        action = "SIGNAL CONFIRMÉ — EXÉCUTION MANUELLE"
+        if not r.get("require_tv_bridge"):
+            try:
+                co = coach_fvg(r, d, r["m1"][-1]["c"], attente=False, tr=tr) if r.get("m1") else []
+                # Contexte local uniquement ; le plan et les niveaux viennent de Pine v25.
+                l += [""] + co[:2] if co else []
+            except Exception:
+                pass
+        action = "ENTRÉE AUTORISÉE — EXÉCUTION MANUELLE"
     else:
         l = [f"📍 {m} - ATTENTE", "", f"⏳ Raison : {raison}"]
         if declencheur:
@@ -3340,7 +3341,7 @@ def carte_coach(m, r, cle, genre, tr=None, raison=None, declencheur=None, signal
     if signal:
         l.append(f"🔹 Signal : {signal}")
     l += [f"🔹 DXY : {dxy_court(macro)}", f"🔹 News : {news_prochaine_courte(etat)}",
-          f"🔹 Niveaux : R: {px(res) if res is not None else '—'} | S: {px(sup) if sup is not None else '—'}",
+          f"🔹 {'Niveaux locaux (contexte)' if r.get('require_tv_bridge') else 'Niveaux'} : R: {px(res) if res is not None else '—'} | S: {px(sup) if sup is not None else '—'}",
           "", f"🤖 Agent Auto-Trade : %%AGENT:{genre}%%", f"🛡️ Action : {action}", "", statut_sys(etat, r)]
     return "\n".join(l)
 
@@ -5367,7 +5368,7 @@ def texte_position(m, r, cle, cid):
     if not isinstance(pos, dict) or pos.get("fini"):
         return (f"📍 SIGNAL ALIGN EN COURS — {m}\n"
                 "Tu n'es pas encore enregistré sur cette position.\n"
-                "Utilise « Suivre cette position » si tu l'as prise.\n"
+                "Après ton exécution, clique sur « J'ai exécuté le plan — suivre ma position ».\n"
                 "Aucun résultat personnel ne sera compté avant ton inscription.")
     require_tv = bool((r or {}).get("require_tv_bridge"))
     tv_price = prix_tradingview_actif(r) if require_tv else None
