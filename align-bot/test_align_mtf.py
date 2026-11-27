@@ -4790,3 +4790,109 @@ class VerdictOptionalPullbackZoneTests(unittest.TestCase):
         self.assertIn("zone extrême", detail)
         self.assertEqual(bloque.call_args_list[1].args, (r, 1, 105.0))
         repli.assert_called_once_with(r, 1)
+
+class TradingViewPositionLifecycleTests(unittest.TestCase):
+    def _tv_snapshot(self, now_ms, price=100.5, high=105.0, low=98.0, bar_age_ms=30_000):
+        return {
+            "require_tv_bridge": True,
+            "tv_indicator_mtf": {
+                "available": True,
+                "activeTimeframe": "M5",
+                "activeTimeframeAgeMs": 1_500,
+                "snapshots": {
+                    "M5": {
+                        "fresh": True,
+                        "price": price,
+                        "robotAgeMs": 1_500,
+                        "robotFresh": True,
+                        "robotV12": {
+                            "entryTimeframe": "M5",
+                            "entryBarTime": now_ms - bar_age_ms,
+                            "entryBarOpen": 99.0,
+                            "entryBarHigh": high,
+                            "entryBarLow": low,
+                            "entryBarClose": 100.0,
+                        },
+                    }
+                },
+            },
+        }
+
+    def test_active_tradingview_price_exposes_fresh_closed_entry_bar_ohlc(self):
+        now_ms = int(align_bot.time.time() * 1000)
+        result = align_bot.prix_tradingview_actif(self._tv_snapshot(now_ms), now_ms=now_ms)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["price"], 100.5)
+        self.assertTrue(result["bar_fresh"])
+        self.assertEqual(result["bar_timeframe"], "M5")
+        self.assertEqual(result["bar_high"], 105.0)
+        self.assertEqual(result["bar_low"], 98.0)
+
+    def test_active_tradingview_price_rejects_stale_or_invalid_entry_bar_ohlc(self):
+        now_ms = int(align_bot.time.time() * 1000)
+        stale = align_bot.prix_tradingview_actif(
+            self._tv_snapshot(now_ms, bar_age_ms=700_000), now_ms=now_ms
+        )
+        invalid = align_bot.prix_tradingview_actif(
+            self._tv_snapshot(now_ms, high=97.0, low=98.0), now_ms=now_ms
+        )
+        self.assertIsNotNone(stale)
+        self.assertFalse(stale["bar_fresh"])
+        self.assertIsNotNone(invalid)
+        self.assertFalse(invalid["bar_fresh"])
+
+    def test_open_pine_trade_uses_tradingview_bar_high_to_detect_tp1_without_local_m1(self):
+        now = int(align_bot.time.time())
+        r = self._tv_snapshot(now * 1000, price=100.5, high=105.0, low=99.0)
+        r.update({"t": now, "annonce": None, "fermeture": False})
+        personal = {"e": 101.0, "sl": 98.0, "tp1": 104.0, "fini": False}
+        trade = {
+            "d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0,
+            "statut": "entree", "cree": now - 120, "encore": 0, "qui": {"user": personal},
+        }
+        state = {"trade": trade}
+        tv_price = {
+            "price": 100.5, "bar_fresh": True, "bar_high": 105.0, "bar_low": 99.0,
+        }
+        with unittest.mock.patch.object(align_bot, "mode_sans_signal", return_value=False), \
+             unittest.mock.patch.object(align_bot, "prix_tradingview_actif", return_value=tv_price), \
+             unittest.mock.patch.object(align_bot, "carte_suivi", return_value="suivi"):
+            messages = align_bot.agent("BTC", r, state, "")
+        self.assertTrue(messages)
+        self.assertEqual(trade["statut"], "tp1")
+        self.assertEqual(trade["sl"], trade["e"])
+        self.assertEqual(personal["sl"], personal["e"])
+
+    def test_open_pine_trade_uses_tradingview_bar_low_to_detect_sl_without_local_m1(self):
+        now = int(align_bot.time.time())
+        r = self._tv_snapshot(now * 1000, price=100.5, high=101.0, low=97.0)
+        r.update({"t": now, "annonce": None, "fermeture": False})
+        trade = {
+            "d": 1, "e": 100.0, "sl": 98.0, "tp1": 104.0, "tp2": 108.0,
+            "statut": "entree", "cree": now - 120, "encore": 0, "qui": {},
+        }
+        state = {"trade": trade}
+        tv_price = {
+            "price": 100.5, "bar_fresh": True, "bar_high": 101.0, "bar_low": 97.0,
+        }
+        with unittest.mock.patch.object(align_bot, "mode_sans_signal", return_value=False), \
+             unittest.mock.patch.object(align_bot, "prix_tradingview_actif", return_value=tv_price), \
+             unittest.mock.patch.object(align_bot, "carte_suivi", return_value="suivi"):
+            messages = align_bot.agent("BTC", r, state, "")
+        self.assertTrue(messages)
+        self.assertNotIn("trade", state)
+        self.assertIn("fin", state)
+
+    def test_personal_stop_monitor_uses_tradingview_bar_low_not_local_m1(self):
+        position = {"e": 100.0, "sl": 98.0}
+        trade = {"d": 1, "qui": {"user": position}}
+        r = {"require_tv_bridge": True}
+        tv_price = {
+            "price": 100.5, "bar_fresh": True, "bar_high": 101.0, "bar_low": 97.0,
+        }
+        with unittest.mock.patch.object(align_bot, "prix_tradingview_actif", return_value=tv_price), \
+             unittest.mock.patch.object(align_bot, "noter") as noter:
+            align_bot.gerer_stop({}, "BTC", r, trade, "user")
+        noter.assert_called_once()
+        self.assertEqual(noter.call_args.args[4], 98.0)
+
