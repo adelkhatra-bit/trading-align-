@@ -314,7 +314,7 @@ def plan_indicateur(r):
 
     if snap.get("fresh") is not True:
         return {"timeframe": plan_tf, "available": False, "reason": "snapshot TradingView canonique M15 périmé"}
-    if snap.get("robotFresh") is False:
+    if snap.get("robotFresh") is not True:
         return {"timeframe": plan_tf, "available": False, "reason": "plan ROBOT V12 M15 périmé"}
     if not active_tf or not isinstance(active_snap, dict) or active_snap.get("fresh") is not True:
         return {"timeframe": plan_tf, "available": False, "reason": "prix TradingView actif absent ou périmé"}
@@ -331,6 +331,24 @@ def plan_indicateur(r):
     entry_tf = str(robot.get("entryTimeframe") or "").upper()
     if expected_entry_tf is None or entry_tf != expected_entry_tf:
         return {"timeframe": plan_tf, "available": False, "reason": "unité de validation incohérente avec la stratégie"}
+    if robot.get("activeEntryBarOhlcAvailable") is not True:
+        return {"timeframe": plan_tf, "available": False,
+                "reason": "OHLC de la bougie active du déclencheur absent ou périmé"}
+    try:
+        active_entry_bar_time = int(robot.get("activeEntryBarTime"))
+        active_entry_bar_open = float(robot.get("activeEntryBarOpen"))
+        active_entry_bar_high = float(robot.get("activeEntryBarHigh"))
+        active_entry_bar_low = float(robot.get("activeEntryBarLow"))
+        active_entry_bar_close = float(robot.get("activeEntryBarClose"))
+    except (TypeError, ValueError):
+        return {"timeframe": plan_tf, "available": False,
+                "reason": "OHLC de la bougie active du déclencheur incomplet"}
+    if active_entry_bar_time <= entry_bar_time or not (
+        active_entry_bar_low <= min(active_entry_bar_open, active_entry_bar_close)
+        <= max(active_entry_bar_open, active_entry_bar_close) <= active_entry_bar_high
+    ):
+        return {"timeframe": plan_tf, "available": False,
+                "reason": "séquence ou géométrie de la bougie active du déclencheur invalide"}
 
     signal = str(robot.get("signal") or robot.get("verdict") or "").upper()
     direction = _direction_tv(signal)
@@ -361,10 +379,14 @@ def plan_indicateur(r):
     retested_zone = entry_bar_high >= zone_low and entry_bar_low <= zone_high
     candle_trigger = entry_bar_close > decision if direction == 1 else entry_bar_close < decision
     candle_before_stop = entry_bar_close > sl if direction == 1 else entry_bar_close < sl
+    active_bar_safe = (
+        active_entry_bar_low > sl and active_entry_bar_high < tp1
+        if direction == 1 else active_entry_bar_high < sl and active_entry_bar_low > tp1
+    )
     triggered = (
         snap.get("confirmed") is True and robot.get("confirmed") is True
         and robot.get("entryTriggered") is True and retested_zone
-        and candle_trigger and candle_before_stop
+        and candle_trigger and candle_before_stop and active_bar_safe
     )
 
     return {
@@ -375,7 +397,14 @@ def plan_indicateur(r):
         "price": current_price, "price_in_zone": prix_tradingview_dans_zone(current_price, zone_low, zone_high),
         "entry_bar_time": entry_bar_time, "entry_bar_open": entry_bar_open,
         "entry_bar_high": entry_bar_high, "entry_bar_low": entry_bar_low,
-        "entry_bar_close": entry_bar_close, "triggered": triggered,
+        "entry_bar_close": entry_bar_close,
+        "active_entry_bar_time": active_entry_bar_time,
+        "active_entry_bar_open": active_entry_bar_open,
+        "active_entry_bar_high": active_entry_bar_high,
+        "active_entry_bar_low": active_entry_bar_low,
+        "active_entry_bar_close": active_entry_bar_close,
+        "active_bar_safe": active_bar_safe,
+        "triggered": triggered,
         "confirmed": snap.get("confirmed") is True and robot.get("confirmed") is True,
         "verdict": robot.get("verdict"), "long_score": robot.get("long_score"),
         "short_score": robot.get("short_score"),
