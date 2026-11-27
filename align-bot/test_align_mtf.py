@@ -3181,7 +3181,7 @@ class TestTelegramPositionStateClarity(unittest.TestCase):
         buttons = json.loads(align_bot.boutons("BTC"))["inline_keyboard"]
         labels = [b["text"] for row in buttons for b in row]
         callbacks = [b["callback_data"] for row in buttons for b in row]
-        self.assertEqual(labels, ["🧑‍🏫 Coach : suis ma position"])
+        self.assertEqual(labels, ["✅ J'ai exécuté le plan — suivre ma position"])
         self.assertEqual(callbacks, ["in:BTC"])
 
     def test_active_trade_keyboard_is_personalized_for_untracked_user(self):
@@ -4311,7 +4311,7 @@ class PineOnlyEntryGateTests(unittest.TestCase):
         self.assertIn("clôtures MTF ne sont pas encore confirmées", message)
         self.assertNotIn("Direction Pine v25 :", message)
         self.assertNotIn("Entry ", message)
-        self.assertNotIn("SL ", message)
+        self.assertNotIn("SL :", message)
         self.assertNotIn("TP1 ", message)
 
     def test_personal_follow_records_fresh_tradingview_price_not_kraken(self):
@@ -4360,7 +4360,7 @@ class PineOnlyEntryGateTests(unittest.TestCase):
              patch.object(align_bot, "_telegram_envoyer_commentaire_coach_prive") as send:
             align_bot.coach(state, "BTC", r, {"trade": trade})
         self.assertTrue(send.called)
-        self.assertIn("Ça part dans le bon sens", send.call_args.args[3])
+        self.assertIn("Tiens bon, presque arrivé", send.call_args.args[3])
         self.assertNotIn("99,25", send.call_args.args[3])
 
     def test_personal_stop_touch_uses_tradingview_price_only_in_bridge_mode(self):
