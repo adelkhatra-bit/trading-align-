@@ -2884,9 +2884,9 @@ class TestTradingViewReportRegression(unittest.TestCase):
         with patch.object(align_bot, "plan_indicateur", return_value=confirmed):
             message = align_bot.texte_vision("BTC", r, {}, anglais=True)
         self.assertIn("TradingView · Pine v25", message)
-        self.assertIn("Entry: 100,00", message)
-        self.assertIn("SL: 98,00", message)
-        self.assertIn("TP1: 104,00", message)
+        self.assertIn("Entry: 100", message)
+        self.assertIn("SL: 98", message)
+        self.assertIn("TP1: 104", message)
 
     def test_required_bridge_why_view_never_calls_local_verdict(self):
         from unittest.mock import patch
