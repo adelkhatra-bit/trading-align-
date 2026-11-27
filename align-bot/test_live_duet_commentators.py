@@ -12,10 +12,33 @@ class LiveDuetCommentators(unittest.TestCase):
         self.js = LIVE_JS.read_text(encoding="utf-8")
         self.page = LIVE_PAGE.read_text(encoding="utf-8")
 
-    def test_visible_chart_publishes_initial_voice_state_before_poll(self):
-        publish = self.js.index("if (document.visibilityState === 'visible') publierEtatCoach(voixActive);")
-        poll = self.js.index("  ecouterDialoguesCoach();")
+    def test_visible_chart_acquires_owner_before_publishing_and_polling(self):
+        initial = self.js.rindex("  ecouter();\\n  pingEcran();")
+        owner = self.js.index("if (estProprietaireEcran()) {", initial)
+        publish = self.js.index("publierEtatCoach(voixActive);", owner)
+        poll = self.js.index("ecouterDialoguesCoach();", publish)
+        self.assertLess(initial, owner)
+        self.assertLess(owner, publish)
         self.assertLess(publish, poll)
+
+    def test_voice_state_is_shared_between_tabs_and_only_owner_publishes(self):
+        self.assertIn("function estProprietaireEcran()", self.js)
+        self.assertIn("const owner = enabled ? prendreLeaseHeartbeat() : (forceOwner || estProprietaireEcran());", self.js)
+        self.assertIn("if (!owner) return false;", self.js)
+        self.assertIn("window.addEventListener('storage', event => {", self.js)
+        self.assertIn("event.key !== 'alignVoixActive'", self.js)
+        self.assertIn("voixActive = event.newValue === '1';", self.js)
+        self.assertIn("!estProprietaireEcran() || coachPollTimer", self.js)
+        self.assertIn("!estProprietaireEcran() || !['ia', 'marche', 'coach'].includes(item.source)", self.js)
+
+    def test_hidden_non_owner_tab_cannot_disable_active_tab_voice(self):
+        start = self.js.index("function gererVisibilite()")
+        end = self.js.index("document.addEventListener('visibilitychange', gererVisibilite);", start)
+        hidden = self.js[start:end]
+        self.assertIn("const etaitProprietaire = estProprietaireEcran();", hidden)
+        self.assertIn("if (etaitProprietaire) {", hidden)
+        self.assertIn("publierEtatCoach(false, true);", hidden)
+        self.assertNotIn("publierEtatCoach(false);", hidden)
 
     def test_french_male_voice_map_accepts_supported_windows_and_chrome_aliases(self):
         self.assertIn("t: { fr: /\\b(?:paul|henri|pierre|david|thomas|remy|rémy|male)\\b/i", self.js)
