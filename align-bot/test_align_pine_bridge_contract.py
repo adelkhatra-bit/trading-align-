@@ -56,32 +56,16 @@ if not tp1Ok
     tp2M := tp2
 """
         without_tp_change = self.source[:tp_start] + baseline_tp_state + self.source[tp_end:]
-        # Remove only the new closed-RSI tuple value from the reviewed bridge source before
-        # comparing the remaining Pine bytes to the original canonical baseline.
-        without_tp_change = without_tp_change.replace(
-            "ta.rsi(close, lenRsi), ta.rsi(close, lenRsi)[1], time_close[1]",
-            "ta.rsi(close, lenRsi), time_close[1]",
-            1,
-        )
-        for live, closed in (
-            ("r1", "r1Fermee"), ("r2", "r2Fermee"), ("r5", "r5Fermee"),
-            ("r10", "r10Fermee"), ("r15", "r15Fermee"), ("r30", "r30Fermee"),
-            ("r45", "r45Fermee"), ("r60", "r60Fermee"), ("r120", "r120Fermee"),
-            ("r240", "r240Fermee"), ("rD", "rDFermee"), ("rW", "rWFermee"),
-        ):
+        # Normalize only the closed-RSI tuple/fields and aggregation introduced by this PR.
+        without_tp_change = without_tp_change.replace("ta.rsi(close, lenRsi), ta.rsi(close, lenRsi)[1], time_close[1]", "ta.rsi(close, lenRsi), time_close[1]", 1)
+        for live, closed in (("r1", "r1Fermee"), ("r2", "r2Fermee"), ("r5", "r5Fermee"), ("r10", "r10Fermee"), ("r15", "r15Fermee"), ("r30", "r30Fermee"), ("r45", "r45Fermee"), ("r60", "r60Fermee"), ("r120", "r120Fermee"), ("r240", "r240Fermee"), ("rD", "rDFermee"), ("rW", "rWFermee")):
             without_tp_change = without_tp_change.replace(", " + live + ", " + closed + ",", ", " + live + ",", 1)
+        without_tp_change = without_tp_change.replace("[dC, sC, rC, _, _] = f_etat()", "[dC, sC, rC, _] = f_etat()", 1)
         closed_rsi_start = without_tp_change.index("rsisFermees = array.from(")
         closed_rsi_end = without_tp_change.index('d1Fermee = request.security', closed_rsi_start)
         without_tp_change = without_tp_change[:closed_rsi_start] + without_tp_change[closed_rsi_end:]
-        without_tp_change = without_tp_change.replace("[dC, sC, rC, _, _] = f_etat()", "[dC, sC, rC, _] = f_etat()", 1)
         self.assertIn(RSI_CROSSOVER_BLOCK, self.source)
-        without_tp_change = without_tp_change.replace(
-            RSI_CROSSOVER_BLOCK,
-            RSI_CROSSOVER_BASELINE_BLOCK,
-            1,
-        )
-        # The v25 decision gate now reads closed strategy timeframes. Normalize only
-        # these explicitly reviewed additions before checking every other source byte.
+        without_tp_change = without_tp_change.replace(RSI_CROSSOVER_BLOCK, RSI_CROSSOVER_BASELINE_BLOCK, 1)
         for line in (
             'd1Fermee   = request.security(syminfo.tickerid, "1",   f_dir_confirme(), lookahead=barmerge.lookahead_on)\n',
             'dDFermee   = request.security(syminfo.tickerid, "D",   f_dir_confirme(), lookahead=barmerge.lookahead_on)\n',
@@ -115,19 +99,8 @@ o1h = d1hStrat == -dP"""
         self.assertGreater(decision_end, risk_start)
         baseline_decision = 'decisionS = strat == "" ? "AUCUNE ENTRÉE" : scoreV < 60 ? "AUCUNE ENTRÉE : configuration insuffisante" : etatS != "CONFIRMÉ" ? "À SURVEILLER : confirmation manquante" : scoreV >= 85 ? "ENTRÉE POSSIBLE : fortement aligné" : scoreV >= 75 ? "INTÉRESSANT : attendre les conditions finales" : "À SURVEILLER : confirmation manquante"'
         without_tp_change = without_tp_change[:risk_start] + baseline_decision + without_tp_change[decision_end:]
-        without_tp_change = without_tp_change.replace(
-            "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig or planGeometryMismatch",
-            "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig",
-            1,
-        )
-        without_tp_change = without_tp_change.replace(
-            "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig",
-            "if barstate.isconfirmed and (na(ent) or nouvelle15 or dirPlan != dirFig or strat != stratFig or slFranchi)",
-            1,
-        )
-
-        # The pending/confirmed ribbon is the only additional permitted UI change:
-        # replace that exact block with the v25 baseline before checking the rest byte-for-byte.
+        without_tp_change = without_tp_change.replace("if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig or planGeometryMismatch", "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig", 1)
+        without_tp_change = without_tp_change.replace("if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig", "if barstate.isconfirmed and (na(ent) or nouvelle15 or dirPlan != dirFig or strat != stratFig or slFranchi)", 1)
         ui_start = without_tp_change.find("// État de confirmation calculé pour l'affichage ; les champs d'export restent dans le bloc bridge canonique.")
         ui_end = without_tp_change.find("    actif = zoneBas", ui_start)
         self.assertGreaterEqual(ui_start, 0)
@@ -142,10 +115,7 @@ o1h = d1hStrat == -dP"""
     vbg0 = zoneBas or zoneHaut ?  color.rgb(170, 130, 0) : dirPlan == 1 ?  color.rgb(0, 140, 70) : dirPlan == -1 ?  color.rgb(190, 30, 45) :  color.rgb(60, 60, 60)
 """
         without_tp_change = without_tp_change[:ui_start] + baseline_ui + without_tp_change[ui_end:]
-        for marker, terminator in (
-            ("planGeometryMismatch = dirPlan != 0 and (", "\n)"),
-            ("bridgePlanGeometryOk = dirPlan == 1 ? (", ": false"),
-        ):
+        for marker, terminator in (("planGeometryMismatch = dirPlan != 0 and (", "\n)"), ("bridgePlanGeometryOk = dirPlan == 1 ? (", ": false")):
             start = without_tp_change.find(marker)
             if start != -1:
                 end = without_tp_change.find(terminator, start)
@@ -159,7 +129,7 @@ o1h = d1hStrat == -dP"""
         if without_export.endswith("\n\n"):
             without_export = without_export[:-1]
         raw = without_export.encode("utf-8")
-        git_blob = hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\\0" + raw).hexdigest()
+        git_blob = hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
         self.assertEqual(git_blob, BASELINE_GIT_BLOB_SHA)
 
     def test_rsi_crossovers_are_evaluated_unconditionally_on_every_bar(self):
