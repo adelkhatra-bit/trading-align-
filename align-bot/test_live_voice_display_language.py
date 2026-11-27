@@ -79,6 +79,8 @@ class LiveVoiceDisplayLanguage(unittest.TestCase):
         self.assertIn("⚠️ COACH VOCAL NON CONNECTÉ", click)
         self.assertNotIn("voixBtn.textContent = '🔊 COACH VOCAL ON';", click.split("publierEtatCoach(true", 1)[0])
         self.assertIn("!voixWorkerConfirmee", source)
+        self.assertIn("if (!voixActive && !estProprietaireEcran() && !prendreLeaseHeartbeat())", click)
+        self.assertIn("voixWorkerConfirmee = false;", publisher)
 
 
 if __name__ == "__main__":
