@@ -74,22 +74,6 @@ if not tp1Ok
         closed_rsi_end = without_tp_change.index('d1Fermee = request.security', closed_rsi_start)
         without_tp_change = without_tp_change[:closed_rsi_start] + without_tp_change[closed_rsi_end:]
         without_tp_change = without_tp_change.replace("[dC, sC, rC, _, _] = f_etat()", "[dC, sC, rC, _] = f_etat()", 1)
-        without_tp_change = without_tp_change.replace(
-            "[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time_close[1]]",
-            "[d, sqz ? 1 : 0, ta.rsi(close, lenRsi)]",
-            1,
-        )
-        for bridge_time in (
-            "bridgeTimeM1", "bridgeTimeM3", "bridgeTimeM5", "bridgeTimeM10",
-            "bridgeTimeM15", "bridgeTimeM30", "bridgeTimeM45", "bridgeTimeH1",
-            "bridgeTimeH2", "bridgeTimeH4", "bridgeTimeD1", "bridgeTimeW1",
-        ):
-            without_tp_change = without_tp_change.replace(f", {bridge_time}]", "]", 1)
-        without_tp_change = without_tp_change.replace(
-            "[dC, sC, rC, _] = f_etat()",
-            "[dC, sC, rC] = f_etat()",
-            1,
-        )
         self.assertIn(RSI_CROSSOVER_BLOCK, self.source)
         without_tp_change = without_tp_change.replace(
             RSI_CROSSOVER_BLOCK,
