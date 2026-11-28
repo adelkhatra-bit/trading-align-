@@ -435,15 +435,19 @@ if barstate.islast
     label.delete(eZone)
     line.delete(lZH)
     label.delete(eZH)
+    line.delete(lE)
     line.delete(lTP1)
     line.delete(lTP2)
     line.delete(lSL)
+    label.delete(eE)
     label.delete(eTP1)
     label.delete(eTP2)
     label.delete(eSL)
     if voirPlan and dirPlan != 0
         x1 = bar_index - 25
         x2 = bar_index + 3
+        lE := line.new(x1, ent, x2, ent, color=color.new(color.white, 15), width=2, style=line.style_dotted, extend=extend.right)
+        eE := label.new(x1, ent, "ENTRÉE " + px(ent), style=label.style_label_right, color=color.new(color.white, 15), textcolor=color.black, size=size.small, tooltip="ENTRÉE ALIGN — référence calculée sur la dernière clôture M15 : " + px(ent) + "\nZone d'entrée : " + px(zBas) + " → " + px(zHaut) + "\nSens : " + (dirPlan == 1 ? "LONG" : "SHORT") + "\nDéclenchement : attendre la clôture " + (strat == "SWING" ? "H1" : strat == "DAY" ? "M5" : strat == "SCALPING" ? "M1" : "M15") + "\nNe pas entrer sur la seule touche du niveau.")
         lTP1 := line.new(x1, tp1, x2, tp1, color=color.aqua, width=2, extend=extend.right)
         lTP2 := line.new(x1, tp2, x2, tp2, color=color.new(color.aqua, 35), width=2, style=line.style_dashed, extend=extend.right)
         lSL  := line.new(x1, sl, x2, sl, color=color.red, width=2, extend=extend.right)
