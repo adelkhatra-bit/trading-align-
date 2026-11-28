@@ -103,7 +103,7 @@ for i = 0 to 10
     ts += w * dv
     rs += w * (array.get(rsis, i) - 50) / 50
     court += i <= 4 ? dv : 0
-    longT += i >= 8 ? dv : 0
+    longT += i >= 7 ? dv : 0
     rsiOB += array.get(rsis, i) >= 70 ? 1 : 0
     rsiOS += array.get(rsis, i) <= 30 ? 1 : 0
 
@@ -171,7 +171,7 @@ f_dessus(refClose, refAtr) =>
                     t2 := t1
                 a1 := v
                 t1 := array.get(nomsNiv, k)
-            else if (na(a2) or v < a2) and math.abs(v - a1) > atrC * 0.3
+            else if (na(a2) or v < a2) and math.abs(v - a1) > refAtr * 0.3
                 a2 := v
                 t2 := array.get(nomsNiv, k)
     [a1, t1, a2, t2]
@@ -189,7 +189,7 @@ f_dessous(refClose, refAtr) =>
                     t2 := t1
                 b1 := v
                 t1 := array.get(nomsNiv, k)
-            else if (na(b2) or v > b2) and math.abs(v - b1) > atrC * 0.3
+            else if (na(b2) or v > b2) and math.abs(v - b1) > refAtr * 0.3
                 b2 := v
                 t2 := array.get(nomsNiv, k)
     [b1, t1, b2, t2]
@@ -341,21 +341,23 @@ ptsAlign = math.round(25.0 * alignN / 4.0)
 ctxU = strat == "SWING" ? uD : strat == "DAY" ? u4 : u1h
 ctxO = strat == "SWING" ? oW : strat == "DAY" ? o4 : o1h
 ptsStruct = strat == "" ? 0 : ctxU ? 20 : ctxO ? 0 : 10
-distE = math.abs(close - ent)
-ptsZone = strat == "" ? 0 : distE <= 0.5 * atrC ? 20 : distE <= 1.5 * atrC ? 10 : 0
-volMoy = ta.sma(volume, 20)
-volOk = not na(volume) and volume > 0 and not na(volMoy) and volMoy > 0
-volR = volOk ? volume / volMoy : 0.0
+distE = math.abs(planClose15 - ent)
+ptsZone = strat == "" ? 0 : distE <= 0.5 * planAtr15 ? 20 : distE <= 1.5 * planAtr15 ? 10 : 0
+volOk = not na(planVol15) and planVol15 > 0 and not na(planVolMoy15) and planVolMoy15 > 0
+volR = volOk ? planVol15 / planVolMoy15 : 0.0
 ptsVol = strat == "" or not volOk ? 0 : volR >= 1.0 ? 15 : volR >= 0.7 ? 7 : 0
-rsiT = strat == "SWING" ? nz(r60, 50) : strat == "DAY" ? nz(r5, 50) : nz(r1, 50)
+rsiT = strat == "SWING" ? nz(r60Fermee, 50) : strat == "DAY" ? nz(r5Fermee, 50) : nz(r1Fermee, 50)
 rsiSain = dP == 1 ? rsiT < 70 : rsiT > 30
-ptsInd = strat == "" ? 0 : rsiSain ? (sens == dP ? 10 : 5) : 0
+sensPlan = longT > 0 ? 1 : longT < 0 ? -1 : 0
+ptsInd = strat == "" ? 0 : rsiSain ? (sensPlan == dP ? 10 : 5) : 0
 rrS = math.abs(tp1 - ent) / math.max(math.abs(ent - sl), syminfo.mintick)
 ptsRR = strat == "" ? 0 : rrS >= 2.0 ? 10 : rrS >= 1.5 ? 7 : 0
 scoreV = ptsAlign + ptsStruct + ptsZone + ptsVol + ptsInd + ptsRR
-decisionS = strat == "" ? "AUCUNE ENTRÉE" : scoreV < 60 ? "AUCUNE ENTRÉE : configuration insuffisante" : etatS != "CONFIRMÉ" ? "À SURVEILLER : confirmation manquante" : scoreV >= 85 ? "ENTRÉE POSSIBLE : fortement aligné" : scoreV >= 75 ? "INTÉRESSANT : attendre les conditions finales" : "À SURVEILLER : confirmation manquante"
+planRisk = math.abs(ent - sl)
+planRiskRewardOk = not na(atr15) and atr15 > 0 and rrS >= 2.0 and planRisk <= 1.5 * atr15
+decisionS = strat == "" ? "AUCUNE ENTRÉE" : not planRiskRewardOk ? "AUCUNE ENTRÉE : risque ou gain/risque insuffisant" : scoreV < 60 ? "AUCUNE ENTRÉE : configuration insuffisante" : etatS != "CONFIRMÉ" ? "À SURVEILLER : confirmation manquante" : scoreV >= 85 ? "PLAN VALIDÉ : attendre le déclencheur" : scoreV >= 75 ? "INTÉRESSANT : attendre les conditions finales" : "À SURVEILLER : confirmation manquante"
 rr  = math.abs(tp1 - ent) / math.max(math.abs(ent - sl), syminfo.mintick)
-tEnt = ent == close ? "au marché" : "ordre limite"
+tEnt = ent == planClose15 ? "au marché" : "ordre limite"
 // Fibonacci du dernier mouvement 15 min (24 bougies clôturées) : même calcul que le robot Telegram
 [fH, fL] = request.security(syminfo.tickerid, "15", [ta.highest(high, 24)[1], ta.lowest(low, 24)[1]])
 fR = fH - fL
@@ -443,7 +445,7 @@ if barstate.islast
     label.delete(eTP1)
     label.delete(eTP2)
     label.delete(eSL)
-    if voirPlan and dirPlan != 0
+    if voirPlan and planConfirmedUi
         x1 = bar_index - 25
         x2 = bar_index + 3
         lE := line.new(x1, ent, x2, ent, color=color.new(color.white, 15), width=2, style=line.style_dotted, extend=extend.right)
@@ -505,8 +507,8 @@ if barstate.islast
     table.cell(t, 11, 0, "1W", width=largCol, bgcolor=rvW >= 70 ? color.rgb(120, 20, 30) : rvW <= 30 ? color.rgb(0, 90, 50) : color.rgb(30, 34, 45), text_color=color.white, text_size=size.small, tooltip=tipW)
     table.cell(t, 11, 1, symW, width=largCol, bgcolor=bgW, text_color=color.white, text_size=size.normal, tooltip=tipW)
 // État de confirmation calculé pour l'affichage ; les champs d'export restent dans le bloc bridge canonique.
-planClosedMtfOkUi = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan)
-planConfirmedUi = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2) and etatS == "CONFIRMÉ" and scoreV >= 75 and planClosedMtfOkUi
+planClosedMtfOkUi = strat == "SWING" ? (nz(dDFermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) != -dirPlan and nz(dWFermee) != -dirPlan) : strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d240Fermee) != -dirPlan) : strat == "SCALPING" ? (nz(d60Fermee) != -dirPlan and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan) : false
+planConfirmedUi = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and planRiskRewardOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2) and etatS == "CONFIRMÉ" and scoreV >= 75 and planClosedMtfOkUi
     titre = zoneBas ? "RETOURNEMENT ▼" : zoneHaut ? "REBOND ▲" : fortHaut ? "★ ACHAT FORT" : fortBas ? "★ VENTE FORTE" : retHaut ? "RETOURNEMENT ▲" : retBas ? "RETOURNEMENT ▼" : rsiOB >= 3 ? "RSI SURACHAT " + str.tostring(rsiOB) + "/11" : rsiOS >= 3 ? "RSI SURVENTE " + str.tostring(rsiOS) + "/11" : surcharge ? "⚡ SURCHARGE" : sens == 1 ? "HAUSSE" : sens == -1 ? "BAISSE" : "ATTENDRE"
     statutPlan = planConfirmedUi ? (dirPlan == 1 ? "▲ LONG CONFIRMÉ" : "▼ SHORT CONFIRMÉ") : strat != "" and dirPlan != 0 ? (dirPlan == 1 ? "⏳ BIAIS LONG — EN ATTENTE" : "⏳ BIAIS SHORT — EN ATTENTE") : "ATTENDRE • AUCUNE STRATÉGIE"
     ligne = (retDir != 0 and not retConf ? "↩ RETOURNEMENT  " : nVoy >= 3 ? "↩ " + str.tostring(nVoy) + "/5  " : "") + statutPlan + (planConfirmedUi ? " • " + (strat == "SCALPING" ? "SCALP" : strat) + " • TP " + px(tp1) + " • SL " + px(sl) : strat != "" and dirPlan != 0 ? " • " + strat + " • confirmation requise" : "   " + titre)
@@ -645,9 +647,9 @@ if barstate.islast
 
 // ═════════ BRIDGE ALIGN — export structuré du Pine v25 (sans toucher aux signaux/visuels) ═════════
 // Le bridge ne publie LONG/SHORT que si le plan complet est confirmé.
-bridgePlanValid = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2)
-bridgeClosedMtfOk = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan)
-bridgeConfirmed = bridgePlanValid and etatS == "CONFIRMÉ" and scoreV >= 75 and bridgeClosedMtfOk
+bridgePlanValid = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and not planGeometryMismatch and bridgePlanGeometryOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2)
+bridgeClosedMtfOk = strat == "SWING" ? (nz(dDFermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) != -dirPlan and nz(dWFermee) != -dirPlan) : strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d240Fermee) != -dirPlan) : strat == "SCALPING" ? ((nz(d60Fermee) != -dirPlan or (dirPlan == 1 and retLongConfirme) or (dirPlan == -1 and retShortConfirme)) and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan) : false
+bridgeConfirmed = bridgePlanValid and planRiskRewardOk and etatS == "CONFIRMÉ" and scoreV >= 75 and bridgeClosedMtfOk
 bridgeSignal = bridgeConfirmed ? (dirPlan == 1 ? "LONG" : "SHORT") : "WAIT"
 bridgeZone = zoneHaut ? "SUPPORT" : zoneBas ? "RESISTANCE" : "PLAN"
 // Routage canonique : un graphique BTC ne peut publier que BTCUSD, un graphique Gold que XAUUSD.
