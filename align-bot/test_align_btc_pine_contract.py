@@ -49,8 +49,8 @@ class AlignBtcPineContract(unittest.TestCase):
 
     def test_btc_strategy_and_entry_sl_targets_share_the_canonical_m15_plan(self):
         source = PINE.read_text(encoding="utf-8")
-        self.assertIn("uW  = nz(dWFermee) == dP", source)
-        self.assertIn("uD  = nz(dDFermee) == dP", source)
+        self.assertIn("uW = nz(dWFermee) == dP", source)
+        self.assertIn("uD = nz(dDFermee) == dP", source)
         self.assertIn("d4Strat = nz(d240Fermee)", source)
         self.assertIn("d1hStrat = nz(d60Fermee)", source)
         self.assertIn("d15Strat = nz(d15Fermee)", source)
@@ -62,7 +62,7 @@ class AlignBtcPineContract(unittest.TestCase):
         self.assertIn("sl = slC", source)
         self.assertNotIn("var float ent = na", source)
         self.assertNotIn("var int dirStable = 0", source)
-        self.assertIn('request.security(syminfo.tickerid, "15", [close[1], ta.atr(14)[1]', source)
+        self.assertIn('request.security(syminfo.tickerid, "15", [open[1], ta.highest(high, 10)[1], ta.lowest(low, 10)[1], close[1]', source)
 
 
 if __name__ == "__main__":
