@@ -33,6 +33,37 @@ class AlignBtcPineContract(unittest.TestCase):
         self.assertNotIn('isGold = str.contains', source)
         self.assertIn('"UNSUPPORTED"', source)
 
+    def test_every_timeframe_direction_comes_from_its_last_closed_candle(self):
+        source = PINE.read_text(encoding="utf-8")
+        for tf, name in (
+            ('"1"', "d1Fermee"), ('"3"', "d3Fermee"), ('"5"', "d5Fermee"),
+            ('"10"', "d10Fermee"), ('"15"', "d15Fermee"), ('"30"', "d30Fermee"),
+            ('"45"', "d45Fermee"), ('"60"', "d60Fermee"), ('"120"', "d120Fermee"),
+            ('"240"', "d240Fermee"), ('"D"', "dDFermee"), ('"W"', "dWFermee"),
+        ):
+            self.assertIn(name + ' = request.security(syminfo.tickerid, ' + tf + ', f_dir_confirme(), lookahead=barmerge.lookahead_on)', source)
+        self.assertIn("dirs = array.from(nz(d1Fermee), nz(d3Fermee)", source)
+        self.assertIn("dirBrut = zoneLongConfirmee ? 1 : zoneShortConfirmee ? -1 : longT >= 2 ? 1 : longT <= -2 ? -1 : 0", source)
+        self.assertIn("dirStable = dirBrut", source)
+        self.assertNotIn("var int dirStable = 0", source)
+
+    def test_btc_strategy_and_entry_sl_targets_share_the_canonical_m15_plan(self):
+        source = PINE.read_text(encoding="utf-8")
+        self.assertIn("uW  = nz(dWFermee) == dP", source)
+        self.assertIn("uD  = nz(dDFermee) == dP", source)
+        self.assertIn("d4Strat = nz(d240Fermee)", source)
+        self.assertIn("d1hStrat = nz(d60Fermee)", source)
+        self.assertIn("d15Strat = nz(d15Fermee)", source)
+        self.assertIn("d5Strat = nz(d5Fermee)", source)
+        self.assertIn("d1Strat = nz(d1Fermee)", source)
+        self.assertIn("ent = entC", source)
+        self.assertIn("tp1 = tp1C", source)
+        self.assertIn("tp2 = tp2C", source)
+        self.assertIn("sl = slC", source)
+        self.assertNotIn("var float ent = na", source)
+        self.assertNotIn("var int dirStable = 0", source)
+        self.assertIn('request.security(syminfo.tickerid, "15", [close[1], ta.atr(14)[1]', source)
+
 
 if __name__ == "__main__":
     unittest.main()
