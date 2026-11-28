@@ -192,6 +192,30 @@ f_niv_mtf(string tf) =>
 [rA60, sA60, rB60, sB60] = f_niv_mtf("60")
 [rA4h, sA4h, rB4h, sB4h] = f_niv_mtf("240")
 [rAD, sAD, rBD, sBD] = f_niv_mtf("D")
+
+f_fibo_snapshot() =>
+    fiboHigh = ta.highest(high, 24)
+    fiboLow = ta.lowest(low, 24)
+    [fiboHigh, fiboLow, time_close, fiboHigh[1], fiboLow[1], time_close[1], time_close <= timenow]
+
+f_fibo_mtf(string tf) =>
+    float fiboHigh = na
+    float fiboLow = na
+    if timeframe.in_seconds(tf) < timeframe.in_seconds()
+        [fiboHighArray, fiboLowArray, fiboTimeArray, fiboHighPrevArray, fiboLowPrevArray, _, fiboConfirmedArray] = request.security_lower_tf(syminfo.tickerid, tf, f_fibo_snapshot())
+        int fiboLastIndex = array.size(fiboTimeArray) - 1
+        if fiboLastIndex >= 0
+            if not array.get(fiboConfirmedArray, fiboLastIndex)
+                fiboHigh := array.get(fiboHighPrevArray, fiboLastIndex)
+                fiboLow := array.get(fiboLowPrevArray, fiboLastIndex)
+            else
+                fiboHigh := array.get(fiboHighArray, fiboLastIndex)
+                fiboLow := array.get(fiboLowArray, fiboLastIndex)
+    else
+        [_, _, _, fiboHighClosed, fiboLowClosed, _, _] = request.security(syminfo.tickerid, tf, f_fibo_snapshot(), lookahead=barmerge.lookahead_off)
+        fiboHigh := fiboHighClosed
+        fiboLow := fiboLowClosed
+    [fiboHigh, fiboLow]
 niveaux = array.from(rA15, sA15, rB15, sB15, rA60, sA60, rB60, sB60, rA4h, sA4h, rB4h, sB4h, rAD, sAD, rBD, sBD)
 nomsNiv = array.from("15m", "15m", "15m", "15m", "1h", "1h", "1h", "1h", "4h", "4h", "4h", "4h", "Daily", "Daily", "Daily", "Daily")
 atrC = ta.atr(14)
@@ -458,7 +482,7 @@ decisionS = strat == "" ? "AUCUNE ENTRÉE" : not planRiskRewardOk ? "AUCUNE ENTR
 rr  = math.abs(tp1 - ent) / math.max(math.abs(ent - sl), syminfo.mintick)
 tEnt = ent == planClose15 ? "au marché" : "ordre limite"
 // Fibonacci du dernier mouvement 15 min (24 bougies clôturées) : même calcul que le robot Telegram
-[fH, fL] = request.security(syminfo.tickerid, "15", [ta.highest(high, 24)[1], ta.lowest(low, 24)[1]])
+[fH, fL] = f_fibo_mtf("15")
 fR = fH - fL
 f50  = dirPlan == -1 ? fL + 0.5 * fR : fH - 0.5 * fR
 f618 = dirPlan == -1 ? fL + 0.618 * fR : fH - 0.618 * fR
@@ -642,9 +666,9 @@ voirEss  = input.bool(false, "Essoufflement / retournement ◆", group=grpX)
 voirExpl = input.bool(false, "Explosion à venir ⚡", group=grpX)
 voirTP2  = input.bool(false, "TP1 touché : garder TP1 + afficher TP2", group=grpX)
 // Fibonacci 50 % des grandes unités de temps (milieu du dernier mouvement de 24 bougies clôturées)
-[x1H, x1L] = request.security(syminfo.tickerid, "60",  [ta.highest(high, 24)[1], ta.lowest(low, 24)[1]])
-[x4H, x4L] = request.security(syminfo.tickerid, "240", [ta.highest(high, 24)[1], ta.lowest(low, 24)[1]])
-[xDH, xDL] = request.security(syminfo.tickerid, "D",   [ta.highest(high, 24)[1], ta.lowest(low, 24)[1]])
+[x1H, x1L] = f_fibo_mtf("60")
+[x4H, x4L] = f_fibo_mtf("240")
+[xDH, xDL] = f_fibo_mtf("D")
 m1h = (x1H + x1L) / 2
 m4h = (x4H + x4L) / 2
 mD  = (xDH + xDL) / 2
