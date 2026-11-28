@@ -3079,7 +3079,7 @@ TRAD.update({
     "🎯 Rôles : H4 tendance • H1 confirmation • M15 setup • M5 timing • M1 exécution": "🎯 Roles: H4 trend • H1 confirmation • M15 setup • M5 timing • M1 execution",
     "ℹ️ Le décompte décrit le contexte ; seule la clôture de validation du plan autorise l'entrée.": "ℹ️ This count describes context; only the plan's validation close can authorize an entry.",
     "➖ Unités partagées": "➖ Mixed timeframes",
-    "📏 Écart :": "📏 Range:",
+    "📏 Corps M15 :": "📏 M15 body:",
     "🧭 Biais Pine confirmé :": "🧭 Confirmed Pine bias:",
     "🟢 hausse": "🟢 rising",
     "🔴 baisse": "🔴 falling",
@@ -7376,7 +7376,7 @@ def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
          "📊 BILAN 15 MIN", f"{ICONE.get(m, '')} {m} (prix actuel) : {px(p)}"]
     if public or not tr:
         l.append("ℹ️ Info, pas une entrée")
-    l += [SEPARATEUR, sens_b, f"📏 Écart : {'+' if c_ >= o_ else '-'}{px(corps)}", lecture,
+    l += [SEPARATEUR, sens_b, f"📏 Corps M15 : {'+' if c_ >= o_ else '-'}{px(corps)}", lecture,
           "🧭 Biais Pine confirmé : " + ("🟢 hausse" if d == 1 else "🔴 baisse" if d == -1 else "➖ flou"),
           unites, bilan_ut, w1_txt, role_ut,
           "ℹ️ ▲ LONG = hausse • ▼ SHORT = baisse • ➡️ neutre",

@@ -203,12 +203,12 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         english = ab.traduire(french)
         for expected in (
             "LIVE COMMENTATOR", "LIVE", "15-MINUTE SUMMARY", "Information, not an entry",
-            "M15 candle closed higher", "Range:", "Confirmed Pine bias:", "Timeframes:", "Vs confirmed direction LONG", "W1 context:", "Roles:", "Next:",
+            "M15 candle closed higher", "M15 body:", "Confirmed Pine bias:", "Timeframes:", "Vs confirmed direction LONG", "W1 context:", "Roles:", "Next:",
         ):
             with self.subTest(expected=expected):
                 self.assertIn(expected, english)
         for french_label in ("COACH COMMENTATEUR", "BILAN 15 MIN", "Bougie en hausse — M15 clôturée",
-                             "Écart :", "Biais Pine confirmé :", "Unités :", "Prochaine :"):
+                             "Corps M15 :", "Biais Pine confirmé :", "Unités :", "Prochaine :"):
             with self.subTest(french_label=french_label):
                 self.assertNotIn(french_label, english)
 
@@ -239,12 +239,14 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         self.assertIn("Mèche haute : rejet des prix élevés, pression vendeuse possible", french)
         self.assertIn("Biais Pine confirmé : 🔴 baisse", french)
         self.assertIn("BTC (prix actuel)", french)
+        self.assertIn("Corps M15 : +1", french)
 
         english = ab.traduire(french)
         self.assertIn("M15 candle closed higher", english)
         self.assertIn("Upper wick: higher prices rejected; possible selling pressure", english)
         self.assertIn("Confirmed Pine bias: 🔴 falling", english)
         self.assertIn("BTC (current price)", english)
+        self.assertIn("M15 body: +1", english)
 
 
     def test_live_coach_explains_wick_direction_and_uses_only_closed_mtf(self):
