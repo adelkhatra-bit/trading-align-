@@ -60,14 +60,18 @@ class PineClosedMtfGuard(unittest.TestCase):
             self.assertIn(gate, bridge_line)
 
     def test_direction_confirmation_uses_closed_htf_candles_not_live_ones(self):
-        # Régression : la confirmation du sens ne doit jamais lire la bougie 15 min / 1 h en formation
-        # (nz(d15) / nz(d60)), sinon le sens SHORT/LONG bascule à chaque tick.
+        # The executable direction is a pure projection of already-confirmed MTF states.
         source = PINE.read_text(encoding="utf-8")
-        start = source.index("var int dirStable = 0")
-        block = source[start:start + 700]
-        self.assertNotIn("nz(d15)", block)
-        self.assertNotIn("nz(d60)", block)
-        self.assertIn("nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut", block)
+        self.assertIn("dirStable = dirBrut", source)
+        self.assertNotIn("var int dirStable = 0", source)
+        # Include the confirmation declarations: they intentionally precede dirBrut.
+        decision_start = source.index("zoneLongConfirmee =")
+        decision_end = source.index("// GOLD : aucune direction de trade", decision_start)
+        decision = source[decision_start:decision_end]
+        self.assertNotIn("nz(d15)", decision)
+        self.assertNotIn("nz(d60)", decision)
+        self.assertIn("zoneLongConfirmee = (zoneHaut or retHaut) and retLongConfirme", decision)
+        self.assertIn("zoneShortConfirmee = (zoneBas or retBas) and retShortConfirme", decision)
 
 
 if __name__ == "__main__":
