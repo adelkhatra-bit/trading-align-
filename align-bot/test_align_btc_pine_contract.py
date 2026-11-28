@@ -90,18 +90,18 @@ class AlignBtcPineContract(unittest.TestCase):
             ):
                 self.assertIn(f"[{high_name}, {low_name}] = f_fibo_mtf({tf})", source)
             self.assertIn("+ contexteOpposeCourt", next(line for line in source.splitlines() if line.strip().startswith("ligne = ")))
-            request_sites = source.count("request.security(") + source.count("request.security_lower_tf(")
+            request_sites = source.count("request.security(")
             self.assertLessEqual(request_sites, 40)
             self.assertIn("time_close <= timenow", source)
-            self.assertIn("request.security_lower_tf(syminfo.tickerid, tf, f_etat())", source)
-            self.assertIn("request.security_lower_tf(syminfo.tickerid, tf, f_niv())", source)
-            self.assertIn('request.security_lower_tf(syminfo.tickerid, "15", f_plan_snapshot())', source)
+            self.assertIn("EtatMtfSnapshot etatRequested = request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)", source)
+            self.assertIn("NivMtfSnapshot nivRequested = request.security(syminfo.tickerid, tf, f_niv(), lookahead=barmerge.lookahead_off)", source)
+            self.assertIn('PlanM15Snapshot planRequested = request.security(syminfo.tickerid, "15", f_plan_snapshot(), lookahead=barmerge.lookahead_off)', source)
 
 
     def test_btc_entry_trigger_timestamp_uses_closed_candle_close(self):
         source = PINE.read_text(encoding="utf-8")
-        bridge_start = source.index("bridgeEntryTf =")
-        bridge_end = source.index("bridgeEntryTimeSafe =", bridge_start)
+        bridge_start = source.index("f_bridge_entry_snapshot() =>")
+        bridge_end = source.index("\n\nbridgeEntryTf =", bridge_start)
         bridge_entry = source[bridge_start:bridge_end]
         self.assertIn("time_close[1]", bridge_entry)
         self.assertNotIn("time[1]", bridge_entry)
@@ -116,7 +116,7 @@ class AlignBtcPineContract(unittest.TestCase):
         source = PINE.read_text(encoding="utf-8")
         for tf in ('"1"', '"3"', '"5"', '"10"', '"15"', '"30"', '"45"', '"60"', '"120"', '"240"', '"D"', '"W"'):
             self.assertIn(f"f_etat_mtf({tf})", source)
-        self.assertIn("request.security_lower_tf(syminfo.tickerid, tf, f_etat())", source)
+        self.assertIn("EtatMtfSnapshot etatRequested = request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)", source)
         self.assertIn("time_close <= timenow", source)
         self.assertIn("dirs = array.from(nz(d1Fermee), nz(d3Fermee)", source)
         self.assertIn("dirBrut = zoneLongConfirmee ? 1 : zoneShortConfirmee ? -1 : longT >= 2 ? 1 : longT <= -2 ? -1 : 0", source)
