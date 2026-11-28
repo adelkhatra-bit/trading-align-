@@ -126,7 +126,7 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
     def test_bridge_bar_timestamps_match_the_closed_mtf_candle(self):
         # The exported direction is based on the previous, fully closed candle.
         # Its bar_time must identify that same candle, not the currently forming one.
-        self.assertIn("[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), ta.rsi(close, lenRsi)[1], time_close[1]]", self.source)
+        self.assertIn("[d, sqz ? 1 : 0, rsiValue, time_close, d[1], sqz[1] ? 1 : 0, rsiValue[1], time_close[1], time_close <= timenow]", self.source)
         self.assertNotIn("[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]", self.source)
 
     def test_robot_v12_exports_closed_mtf_directions_for_entry_confirmation(self):
@@ -210,8 +210,8 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
             self.assertNotIn(field + " = request.security", self.source)
         request_sites = self.source.count("request.security(") + self.source.count("request.security_lower_tf(")
         self.assertLessEqual(request_sites, 40)
-        self.assertIn("[d1, s1, r1, r1Fermee, bridgeTimeM1]", self.source)
-        self.assertIn("[dW, sW, rW, rWFermee, bridgeTimeW1]", self.source)
+        self.assertIn('[d1, s1, r1, d1Fermee, r1Fermee, bridgeTimeM1] = f_etat_mtf("1")', self.source)
+        self.assertIn('[dW, sW, rW, dWFermee, rWFermee, bridgeTimeW1] = f_etat_mtf("W")', self.source)
 
 
     def test_plan_levels_use_last_closed_source_timeframe_candle_on_every_chart_interval(self):
