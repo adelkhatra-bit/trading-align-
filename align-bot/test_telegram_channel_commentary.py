@@ -203,12 +203,12 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         english = ab.traduire(french)
         for expected in (
             "LIVE COMMENTATOR", "LIVE", "15-MINUTE SUMMARY", "Information, not an entry",
-            "Candle rising", "Range:", "Trend:", "Timeframes:", "Vs confirmed direction LONG", "W1 context:", "Roles:", "Next:",
+            "M15 candle closed higher", "Range:", "Confirmed Pine bias:", "Timeframes:", "Vs confirmed direction LONG", "W1 context:", "Roles:", "Next:",
         ):
             with self.subTest(expected=expected):
                 self.assertIn(expected, english)
-        for french_label in ("COACH COMMENTATEUR", "BILAN 15 MIN", "Bougie en hausse",
-                             "Écart :", "Tendance :", "Unités :", "Prochaine :"):
+        for french_label in ("COACH COMMENTATEUR", "BILAN 15 MIN", "Bougie en hausse — M15 clôturée",
+                             "Écart :", "Biais Pine confirmé :", "Unités :", "Prochaine :"):
             with self.subTest(french_label=french_label):
                 self.assertNotIn(french_label, english)
 
@@ -229,13 +229,13 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         cases = (
             (
                 {"o": 100.0, "h": 105.0, "l": 99.0, "c": 101.0, "t": 2000},
-                "👁 Mèche haute dominante : pression vendeuse possible — rejet non établi sans résistance identifiée",
-                "no confirmed resistance rejection",
+                "👁 Mèche haute : rejet des prix élevés, pression vendeuse possible — rejet non confirmé sans résistance identifiée",
+                "rejection unconfirmed without identified resistance",
             ),
             (
                 {"o": 100.0, "h": 101.0, "l": 95.0, "c": 99.0, "t": 2000},
-                "👁 Mèche basse dominante : pression acheteuse possible — rejet non établi sans support identifié",
-                "no confirmed support rejection",
+                "👁 Mèche basse : rejet des prix bas, pression acheteuse possible — rejet non confirmé sans support identifié",
+                "rejection unconfirmed without identified support",
             ),
             (
                 {"o": 100.0, "h": 104.0, "l": 96.0, "c": 100.0, "t": 2000},
