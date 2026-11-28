@@ -223,7 +223,6 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertIn("f_niv_mtf(string tf) =>", self.source)
         self.assertIn("NivMtfSnapshot nivRequested = request.security(syminfo.tickerid, tf, f_niv(), lookahead=barmerge.lookahead_off)", self.source)
         self.assertIn("nivRequested.confirmed ? nivRequested.rANow : nivRequested.rAPrev", self.source)
-        self.assertIn("nivRequested.confirmed ? nivRequested.rANow : nivRequested.rAPrev", self.source)
         self.assertIn("NivMtfSnapshot nivRequested = request.security(syminfo.tickerid, tf, f_niv(), lookahead=barmerge.lookahead_off)", self.source)
         for timeframe in ('"15"', '"60"', '"240"', '"D"'):
             with self.subTest(timeframe=timeframe):
@@ -259,7 +258,6 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertIn("f_etat_mtf(string tf) =>", self.source)
         self.assertIn("EtatMtfSnapshot etatRequested = request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)", self.source)
         self.assertIn("etatRequested.confirmed ? etatRequested.dLive : etatRequested.dPrev", self.source)
-        self.assertIn("etatRequested.confirmed ? etatRequested.dLive : etatRequested.dPrev", self.source)
         self.assertIn("EtatMtfSnapshot etatRequested = request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)", self.source)
         timeframes = (
             ('"1"', "d1", "s1", "r1", "d1Fermee", "r1Fermee", "bridgeTimeM1"),
@@ -287,7 +285,6 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertIn("f_plan_snapshot_mtf() =>", self.source)
         self.assertIn('PlanM15Snapshot planRequested = request.security(syminfo.tickerid, "15", f_plan_snapshot(), lookahead=barmerge.lookahead_off)', self.source)
         self.assertIn("planRequested.confirmed ? planRequested.m15OpenNow : planRequested.m15OpenPrev", self.source)
-        self.assertIn("planRequested.confirmed ? planRequested.m15OpenNow : planRequested.m15OpenPrev", self.source)
         self.assertIn('PlanM15Snapshot planRequested = request.security(syminfo.tickerid, "15", f_plan_snapshot(), lookahead=barmerge.lookahead_off)', self.source)
         self.assertIn("[planOpen15, planHigh15, planLow15, planClose15, planAtr15, planRsi15, planMom15, planMomPrev15, planVol15, planVolMoy15] = f_plan_snapshot_mtf()", self.source)
 
@@ -295,7 +292,6 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
     def test_fibonacci_ranges_use_the_last_closed_source_candle_for_each_timeframe(self):
         self.assertIn("f_fibo_mtf(string tf) =>", self.source)
         self.assertIn("FiboMtfSnapshot fiboRequested = request.security(syminfo.tickerid, tf, f_fibo_snapshot(), lookahead=barmerge.lookahead_off)", self.source)
-        self.assertIn("fiboRequested.confirmed ? fiboRequested.highNow : fiboRequested.highPrev", self.source)
         self.assertIn("fiboRequested.confirmed ? fiboRequested.highNow : fiboRequested.highPrev", self.source)
         self.assertIn("FiboMtfSnapshot fiboRequested = request.security(syminfo.tickerid, tf, f_fibo_snapshot(), lookahead=barmerge.lookahead_off)", self.source)
         for tf, high_name, low_name in (
