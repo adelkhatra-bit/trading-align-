@@ -3050,8 +3050,8 @@ TRAD.update({
     "données Pine v25 absentes ou périmées": "Pine v25 data missing or stale",
     "👁 Mèche haute : rejet": "👁 Upper wick: rejection",
     "👁 Mèche basse : rejet": "👁 Lower wick: rejection",
-    "👁 Mèche haute : rejet vendeur potentiel (biais SHORT)": "👁 Upper wick: potential seller rejection (SHORT bias)",
-    "👁 Mèche basse : rejet acheteur potentiel (biais LONG)": "👁 Lower wick: potential buyer rejection (LONG bias)",
+    "👁 Mèche haute dominante : pression vendeuse possible — rejet non établi sans résistance identifiée": "👁 Dominant upper wick: possible selling pressure — no confirmed resistance rejection",
+    "👁 Mèche basse dominante : pression acheteuse possible — rejet non établi sans support identifié": "👁 Dominant lower wick: possible buying pressure — no confirmed support rejection",
     "👁 Mèches des deux côtés : indécision": "👁 Wicks on both sides: indecision",
     "ℹ️ ▲ LONG = hausse • ▼ SHORT = baisse • ➡️ neutre": "ℹ️ ▲ LONG = bullish • ▼ SHORT = bearish • ➡️ neutral",
     "ℹ️ UT alignées = contexte, jamais une entrée seule.": "ℹ️ Aligned timeframes = context, never an entry by themselves.",
@@ -7322,9 +7322,9 @@ def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
     if m_haut >= 0.5 * rng and m_bas >= 0.5 * rng:
         lecture = "👁 Mèches des deux côtés : indécision"
     elif m_haut >= 0.5 * rng:
-        lecture = "👁 Mèche haute : rejet vendeur potentiel (biais SHORT)"
+        lecture = "👁 Mèche haute dominante : pression vendeuse possible — rejet non établi sans résistance identifiée"
     elif m_bas >= 0.5 * rng:
-        lecture = "👁 Mèche basse : rejet acheteur potentiel (biais LONG)"
+        lecture = "👁 Mèche basse dominante : pression acheteuse possible — rejet non établi sans support identifié"
     elif corps >= 0.7 * rng:
         lecture = "👁 Mouvement franc 💪"
     else:
