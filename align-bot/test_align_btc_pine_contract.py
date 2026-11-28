@@ -65,6 +65,13 @@ class AlignBtcPineContract(unittest.TestCase):
             self.assertIn("contexteOpposeTxt", source)
             self.assertIn("nz(d120Fermee) == -dirPlan", source)
             self.assertIn('"H2 "', source)
+            for tf, high_name, low_name in (
+                ('"15"', "fH", "fL"),
+                ('"60"', "x1H", "x1L"),
+                ('"240"', "x4H", "x4L"),
+                ('"D"', "xDH", "xDL"),
+            ):
+                self.assertIn(f"[{high_name}, {low_name}] = f_fibo_mtf({tf})", source)
             self.assertIn("+ contexteOpposeCourt", next(line for line in source.splitlines() if line.strip().startswith("ligne = ")))
             request_sites = source.count("request.security(") + source.count("request.security_lower_tf(")
             self.assertLessEqual(request_sites, 40)
