@@ -38,7 +38,8 @@ f_etat() =>
     kc = ta.ema(close, lenSqz)
     rng = 1.5 * ta.atr(lenSqz)
     sqz = (basis + dev) < (kc + rng) and (basis - dev) > (kc - rng)
-    [d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]
+    rsiValue = ta.rsi(close, lenRsi)
+    [d, sqz ? 1 : 0, rsiValue, rsiValue[1], time_close[1]]
 
 // Sens confirmé : la valeur est décalée d'une bougie HTF et publiée avec lookahead_on.
 // Cela évite d'utiliser une H1/H4/M15/M5 encore en formation pour autoriser une entrée.
@@ -48,28 +49,38 @@ f_dir_confirme() =>
     d = close > ef and ef > es ? 1 : close < ef and ef < es ? -1 : 0
     d[1]
 
-[d1, s1, r1, bridgeTimeM1]       = request.security(syminfo.tickerid, "1",   f_etat())
-[d2, s2, r2, bridgeTimeM3]       = request.security(syminfo.tickerid, "3",   f_etat())
-[d5, s5, r5, bridgeTimeM5]       = request.security(syminfo.tickerid, "5",   f_etat())
-[d10, s10, r10, bridgeTimeM10]    = request.security(syminfo.tickerid, "10",  f_etat())
-[d15, s15, r15, bridgeTimeM15]    = request.security(syminfo.tickerid, "15",  f_etat())
-[d30, s30, r30, bridgeTimeM30]    = request.security(syminfo.tickerid, "30",  f_etat())
-[d45, s45, r45, bridgeTimeM45]    = request.security(syminfo.tickerid, "45",  f_etat())
-[d60, s60, r60, bridgeTimeH1]    = request.security(syminfo.tickerid, "60",  f_etat())
-[d120, s120, r120, bridgeTimeH2] = request.security(syminfo.tickerid, "120", f_etat())
-[d240, s240, r240, bridgeTimeH4] = request.security(syminfo.tickerid, "240", f_etat())
-[dD, sD, rD, bridgeTimeD1]       = request.security(syminfo.tickerid, "D",   f_etat())
-[dW, sW, rW, bridgeTimeW1]       = request.security(syminfo.tickerid, "W",   f_etat())
-d5Fermee   = request.security(syminfo.tickerid, "5",   f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d15Fermee  = request.security(syminfo.tickerid, "15",  f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d60Fermee  = request.security(syminfo.tickerid, "60",  f_dir_confirme(), lookahead=barmerge.lookahead_on)
+[d1, s1, r1, r1Fermee, bridgeTimeM1] = request.security(syminfo.tickerid, "1", f_etat())
+[d2, s2, r2, r2Fermee, bridgeTimeM3] = request.security(syminfo.tickerid, "3", f_etat())
+[d5, s5, r5, r5Fermee, bridgeTimeM5] = request.security(syminfo.tickerid, "5", f_etat())
+[d10, s10, r10, r10Fermee, bridgeTimeM10] = request.security(syminfo.tickerid, "10", f_etat())
+[d15, s15, r15, r15Fermee, bridgeTimeM15] = request.security(syminfo.tickerid, "15", f_etat())
+[d30, s30, r30, r30Fermee, bridgeTimeM30] = request.security(syminfo.tickerid, "30", f_etat())
+[d45, s45, r45, r45Fermee, bridgeTimeM45] = request.security(syminfo.tickerid, "45", f_etat())
+[d60, s60, r60, r60Fermee, bridgeTimeH1] = request.security(syminfo.tickerid, "60", f_etat())
+[d120, s120, r120, r120Fermee, bridgeTimeH2] = request.security(syminfo.tickerid, "120", f_etat())
+[d240, s240, r240, r240Fermee, bridgeTimeH4] = request.security(syminfo.tickerid, "240", f_etat())
+[dD, sD, rD, rDFermee, bridgeTimeD1] = request.security(syminfo.tickerid, "D", f_etat())
+[dW, sW, rW, rWFermee, bridgeTimeW1] = request.security(syminfo.tickerid, "W", f_etat())
+d1Fermee = request.security(syminfo.tickerid, "1", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d3Fermee = request.security(syminfo.tickerid, "3", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d5Fermee = request.security(syminfo.tickerid, "5", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d10Fermee = request.security(syminfo.tickerid, "10", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d15Fermee = request.security(syminfo.tickerid, "15", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d30Fermee = request.security(syminfo.tickerid, "30", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d45Fermee = request.security(syminfo.tickerid, "45", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d60Fermee = request.security(syminfo.tickerid, "60", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+d120Fermee = request.security(syminfo.tickerid, "120", f_dir_confirme(), lookahead=barmerge.lookahead_on)
 d240Fermee = request.security(syminfo.tickerid, "240", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+dDFermee = request.security(syminfo.tickerid, "D", f_dir_confirme(), lookahead=barmerge.lookahead_on)
+dWFermee = request.security(syminfo.tickerid, "W", f_dir_confirme(), lookahead=barmerge.lookahead_on)
 
 noms  = array.from("1", "3", "5", "10", "15", "30", "45", "1h", "2h", "4h", "D")
 nomsL = array.from("1 min", "3 min", "5 min", "10 min", "15 min", "30 min", "45 min", "1 heure", "2 heures", "4 heures", "Daily")
-dirs = array.from(nz(d1), nz(d2), nz(d5), nz(d10), nz(d15), nz(d30), nz(d45), nz(d60), nz(d120), nz(d240), nz(dD))
+dirs = array.from(nz(d1Fermee), nz(d3Fermee), nz(d5Fermee), nz(d10Fermee), nz(d15Fermee), nz(d30Fermee), nz(d45Fermee), nz(d60Fermee), nz(d120Fermee), nz(d240Fermee), nz(dDFermee))
+dirsFermees = array.from(nz(d1Fermee), nz(d3Fermee), nz(d5Fermee), nz(d10Fermee), nz(d15Fermee), nz(d30Fermee), nz(d45Fermee), nz(d60Fermee), nz(d120Fermee), nz(d240Fermee), nz(dDFermee))
 sqzs = array.from(nz(s1), nz(s2), nz(s5), nz(s10), nz(s15), nz(s30), nz(s45), nz(s60), nz(s120), nz(s240), nz(sD))
-rsis = array.from(nz(r1, 50), nz(r2, 50), nz(r5, 50), nz(r10, 50), nz(r15, 50), nz(r30, 50), nz(r45, 50), nz(r60, 50), nz(r120, 50), nz(r240, 50), nz(rD, 50))
+rsis = array.from(nz(r1Fermee, 50), nz(r2Fermee, 50), nz(r5Fermee, 50), nz(r10Fermee, 50), nz(r15Fermee, 50), nz(r30Fermee, 50), nz(r45Fermee, 50), nz(r60Fermee, 50), nz(r120Fermee, 50), nz(r240Fermee, 50), nz(rDFermee, 50))
+rsisFermees = array.from(nz(r1Fermee, 50), nz(r2Fermee, 50), nz(r5Fermee, 50), nz(r10Fermee, 50), nz(r15Fermee, 50), nz(r30Fermee, 50), nz(r45Fermee, 50), nz(r60Fermee, 50), nz(r120Fermee, 50), nz(r240Fermee, 50), nz(rDFermee, 50), nz(rWFermee, 50))
 wts  = array.from(1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 3.0, 3.0, 4.0, 5.0)
 
 int bull = 0
@@ -101,7 +112,7 @@ alignBas  = bear >= minAlign
 surcharge = comp >= minSqz
 
 // ═════════ UT DU GRAPHIQUE : RSI, MOMENTUM, EXPLOSION ═════════
-[dC, sC, rC, _] = f_etat()
+[dC, sC, rC, _, _] = f_etat()
 rsiSig = ta.ema(rC, 9)
 rsiCrossSigUp   = ta.crossover(rC, rsiSig)
 rsiCross30Up     = ta.crossover(rC, 30)
@@ -121,8 +132,12 @@ rsiS = math.max(-1.0, math.min(1.0, rs / sw * 2))
 score = 0.45 * trendS + 0.30 * rsiS + 0.25 * momS
 pctH = math.round(50 + 50 * score)
 sens = score > 0.15 ? 1 : score < -0.15 ? -1 : 0
-retHaut = court >= 3 and longT <= -1 and momS > 0
-retBas  = court <= -3 and longT >= 1 and momS < 0
+microBull = (nz(d1Fermee) == 1 ? 1 : 0) + (nz(d3Fermee) == 1 ? 1 : 0) + (nz(d5Fermee) == 1 ? 1 : 0)
+microBear = (nz(d1Fermee) == -1 ? 1 : 0) + (nz(d3Fermee) == -1 ? 1 : 0) + (nz(d5Fermee) == -1 ? 1 : 0)
+retHaut = nz(d1Fermee) == 1 and microBull >= 2 and longT <= -1
+retBas = nz(d1Fermee) == -1 and microBear >= 2 and longT >= 1
+retLongConfirme = microBull >= 2 and nz(d5Fermee) == 1 and nz(d15Fermee) == 1
+retShortConfirme = microBear >= 2 and nz(d5Fermee) == -1 and nz(d15Fermee) == -1
 
 // ═════════ RÉSISTANCES / SUPPORTS 15m - 1h - 4h ═════════
 f_niv() =>
@@ -136,22 +151,22 @@ f_niv() =>
 niveaux = array.from(rA15, sA15, rB15, sB15, rA60, sA60, rB60, sB60, rA4h, sA4h, rB4h, sB4h, rAD, sAD, rBD, sBD)
 nomsNiv = array.from("15m", "15m", "15m", "15m", "1h", "1h", "1h", "1h", "4h", "4h", "4h", "4h", "Daily", "Daily", "Daily", "Daily")
 atrC = ta.atr(14)
-// ATR de la vue 15 min (la référence du bot) : le SL ne dépend plus de la petite unité de temps affichée
-atr15 = request.security(syminfo.tickerid, "15", ta.atr(14)[1])
-// Référence unique du plan : dernière bougie 15 min clôturée, quel que soit le graphique affiché.
-[planClose15, planAtr15, planLow15, planHigh15] = request.security(syminfo.tickerid, "15", [close[1], ta.atr(14)[1], ta.lowest(low, 10)[1], ta.highest(high, 10)[1]], lookahead=barmerge.lookahead_on)
+// Référence unique du plan : dernière bougie M15 clôturée, identique sur tous les graphiques.
+[planOpen15, planHigh15, planLow15, planClose15, planAtr15, planRsi15, planMom15, planMomPrev15, planVol15, planVolMoy15] = request.security(syminfo.tickerid, "15", [open[1], ta.highest(high, 10)[1], ta.lowest(low, 10)[1], close[1], ta.atr(14)[1], ta.rsi(close, lenRsi)[1], ta.linreg(close - math.avg(math.avg(ta.highest(high, lenSqz), ta.lowest(low, lenSqz)), ta.sma(close, lenSqz)), lenSqz, 0)[1], ta.linreg(close - math.avg(math.avg(ta.highest(high, lenSqz), ta.lowest(low, lenSqz)), ta.sma(close, lenSqz)), lenSqz, 0)[2], volume[1], ta.sma(volume, 20)[1]], lookahead=barmerge.lookahead_on)
+atr15 = planAtr15
+planMomS15 = planMom15 > 0 ? (planMom15 > planMomPrev15 ? 1.0 : 0.4) : (planMom15 < planMomPrev15 ? -1.0 : -0.4)
 
 // Niveau le plus proche au-dessus / en dessous (1er et 2e)
-f_dessus() =>
+f_dessus(refClose, refAtr) =>
     float a1 = na
     float a2 = na
     string t1 = ""
     string t2 = ""
     for k = 0 to 11
         v = array.get(niveaux, k)
-        if not na(v) and v > close + atrC * 0.3
+        if not na(v) and v > refClose + refAtr * 0.3
             if na(a1) or v < a1
-                if not na(a1) and math.abs(v - a1) > atrC * 0.3
+                if not na(a1) and math.abs(v - a1) > refAtr * 0.3
                     a2 := a1
                     t2 := t1
                 a1 := v
@@ -160,16 +175,16 @@ f_dessus() =>
                 a2 := v
                 t2 := array.get(nomsNiv, k)
     [a1, t1, a2, t2]
-f_dessous() =>
+f_dessous(refClose, refAtr) =>
     float b1 = na
     float b2 = na
     string t1 = ""
     string t2 = ""
     for k = 0 to 11
         v = array.get(niveaux, k)
-        if not na(v) and v < close - atrC * 0.3
+        if not na(v) and v < refClose - refAtr * 0.3
             if na(b1) or v > b1
-                if not na(b1) and math.abs(v - b1) > atrC * 0.3
+                if not na(b1) and math.abs(v - b1) > refAtr * 0.3
                     b2 := b1
                     t2 := t1
                 b1 := v
@@ -179,16 +194,16 @@ f_dessous() =>
                 t2 := array.get(nomsNiv, k)
     [b1, t1, b2, t2]
 
-[hau1, tH1, hau2, tH2] = f_dessus()
-[bas1, tB1, bas2, tB2] = f_dessous()
+[hau1, tH1, hau2, tH2] = f_dessus(planClose15, planAtr15)
+[bas1, tB1, bas2, tB2] = f_dessous(planClose15, planAtr15)
 
 // Zone de retournement : prix collé à une résistance / un support de grosse UT
 // Mèche qui touche le niveau + RSI en excès + essoufflement
-surR = not na(hau1) and high >= hau1 - atrC * margeAtr and close < hau1
-surS = not na(bas1) and low <= bas1 + atrC * margeAtr and close > bas1
-zBas0  = surR and (rC > 58 or rsiOB >= 3) and momS < 1.0 and close < open
-zHaut0 = surS and (rC < 42 or rsiOS >= 3) and momS > -1.0 and close > open
-zoneBas  = zBas0 and not (zHaut0 and rC < 50)
+surR = not na(hau1) and planHigh15 >= hau1 - planAtr15 * margeAtr and planClose15 < hau1
+surS = not na(bas1) and planLow15 <= bas1 + planAtr15 * margeAtr and planClose15 > bas1
+zBas0 = surR and (planRsi15 > 58 or rsiOB >= 3) and planMomS15 < 1.0 and planClose15 < planOpen15
+zHaut0 = surS and (planRsi15 < 42 or rsiOS >= 3) and planMomS15 > -1.0 and planClose15 > planOpen15
+zoneBas = zBas0 and not (zHaut0 and planRsi15 < 50)
 zoneHaut = zHaut0 and not zoneBas
 
 // ═════════ PLAN : direction, TP, SL ═════════
@@ -237,18 +252,11 @@ f_plan(d, sMin, sMax, cMin, cMax, refClose, refAtr, refLow10, refHigh10) =>
     t2 = na(c2) ? e + d * risque * (gainMin + 2) : c2
     n2 = na(c2) ? "projection " + str.tostring(gainMin + 2) + " x le risque" : (d == 1 ? "résistance " : "support ") + nc2
     [e, t1, t2, s, n1, n2]
-// Plan automatique : les grosses UT (2h, 4h, Daily) décident, sauf zone de retournement
-dirBrut = zoneHaut ? 1 : zoneBas ? -1 : longT >= 2 ? 1 : longT <= -2 ? -1 : retHaut ? 1 : retBas ? -1 : sens
-// Anti-parasites (vue 1 / 3 / 5 min) : le sens ne change qu'à la CLÔTURE d'une bougie,
-// et seulement si le 15 min ou l'1h confirme le nouveau sens. Pas de LONG / SHORT qui clignote en cours de bougie.
-var int dirStable = 0
-if barstate.isconfirmed
-    if dirStable == 0
-        dirStable := dirBrut
-    else if dirBrut != 0 and dirBrut != dirStable and (nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut)
-        dirStable := dirBrut
-    else if dirBrut == 0 and nz(d15Fermee) != dirStable and nz(d60Fermee) != dirStable
-        dirStable := 0
+// Le sens exécutable vient des clôtures MTF ; un retournement contre le contexte exige M5 et M15.
+zoneLongConfirmee = (zoneHaut or retHaut) and retLongConfirme
+zoneShortConfirmee = (zoneBas or retBas) and retShortConfirme
+dirBrut = zoneLongConfirmee ? 1 : zoneShortConfirmee ? -1 : longT >= 2 ? 1 : longT <= -2 ? -1 : 0
+dirStable = dirBrut
 // GOLD : aucune direction de trade tant que les clôtures M5, M15, H1 et H4 ne concordent pas.
 tickerUpper = str.upper(syminfo.ticker)
 isBtc = str.contains(tickerUpper, "BTC") or str.contains(tickerUpper, "XBT")
@@ -262,26 +270,27 @@ dirPlan = not isSupportedMarket or (isGold and not goldConfluence) ? 0 : dirStab
 // SWING : W1/D1 contexte • H4 retracement (ou aligné) • H1 confirmation de reprise
 // DAY : H4 contexte • H1 direction • M15 retracement • M5 déclenchement
 // SCALPING : H1 contexte • M15 direction • M5 structure • M1 déclenchement
-dP  = dirPlan
-uW  = nz(dW) == dP
-uD  = nz(dD) == dP
-d4Strat = isGold ? nz(d240Fermee) : nz(d240)
-d1hStrat = isGold ? nz(d60Fermee) : nz(d60)
-d15Strat = isGold ? nz(d15Fermee) : nz(d15)
-d5Strat = isGold ? nz(d5Fermee) : nz(d5)
-u4  = d4Strat == dP
+dP = dirPlan
+uW = nz(dWFermee) == dP
+uD = nz(dDFermee) == dP
+d4Strat = nz(d240Fermee)
+d1hStrat = nz(d60Fermee)
+d15Strat = nz(d15Fermee)
+d5Strat = nz(d5Fermee)
+d1Strat = nz(d1Fermee)
+u4 = d4Strat == dP
 u1h = d1hStrat == dP
 u15 = d15Strat == dP
-u5  = d5Strat == dP
-u1  = nz(d1) == dP
-oW  = nz(dW) == -dP
+u5 = d5Strat == dP
+u1 = d1Strat == dP
+oW = nz(dWFermee) == -dP
 o4  = d4Strat == -dP
 o1h = d1hStrat == -dP
 swOk  = dP != 0 and uD and not oW and u1h and not o4
 swAtt = dP != 0 and uD and not oW and not u4 and not u1h
 dyOk  = dP != 0 and not o4 and u1h and u5
 dyAtt = dP != 0 and not o4 and u1h and not u15 and not u5
-scOk  = dP != 0 and not o1h and u15 and u5 and u1
+scOk  = dP != 0 and (not o1h or retLongConfirme or retShortConfirme) and u15 and u5 and u1
 scAtt = dP != 0 and not o1h and u15 and u5 and not u1
 strat = swOk ? "SWING" : dyOk ? "DAY" : scOk ? "SCALPING" : swAtt ? "SWING" : dyAtt ? "DAY" : scAtt ? "SCALPING" : ""
 etatS = swOk or dyOk or scOk ? "CONFIRMÉ" : strat != "" ? "EN ATTENTE" : "AUCUNE"
@@ -297,20 +306,19 @@ calePlan = profNiv == 3 ? "SL derrière la zone 1h / 4h • TP 4h / Daily • va
 // ═════════ PLAN FIGÉ (anti-parasites en vue 1 / 3 / 5 min) ═════════
 // Entrée, SL et TP ne bougent qu'à la clôture d'une bougie 15 min, ou tout de suite si le sens / la stratégie change
 // ou si le SL est franchi. Entre-temps, les niveaux affichés restent fixes pour pouvoir entrer sans confusion.
-var float ent = na
-var float tp1 = na
-var float tp2 = na
-var float sl = na
-var int dirFig = 0
-var string stratFig = ""
-nouvelle15 = ta.change(time("15")) != 0
-slFranchi = not na(sl) and ((dirFig == -1 and close > sl) or (dirFig == 1 and close < sl))
+ent = entC
+tp1 = tp1C
+tp2 = tp2C
+sl = slC
+dirFig = dirPlan
+stratFig = strat
+slFranchi = not na(sl) and ((dirFig == -1 and planClose15 > sl) or (dirFig == 1 and planClose15 < sl))
 planGeometryMismatch = dirPlan != 0 and (
      na(ent) or na(sl) or na(tp1) or na(tp2) or
      (dirPlan == 1 and (sl >= ent or tp1 <= ent or tp2 <= tp1)) or
      (dirPlan == -1 and (sl <= ent or tp1 >= ent or tp2 >= tp1))
 )
-// ═════════ RETOURNEMENT : SL franchi à la clôture → position annulée ; confirmé quand le nouveau sens est validé ═════════
+// ═════════ RETOURNEMENT : contrôle à la clôture M15, confirmation par les clôtures MTF ═════════
 var int retDir = 0
 var int retBar = 0
 if barstate.isconfirmed and slFranchi
@@ -319,14 +327,7 @@ if barstate.isconfirmed and slFranchi
 if retDir != 0 and bar_index - retBar > 40
     retDir := 0
 retConf = retDir != 0 and dirPlan == retDir
-retTxt = retDir == 0 ? "" : retConf ? "✅ RETOURNEMENT CONFIRMÉ : " + (retDir == 1 ? "LONG" : "SHORT") + (strat != "" ? " • " + strat : "") : "⛔ SL cassé à la clôture : " + (retDir == 1 ? "SHORT" : "LONG") + " annulé ↩ RETOURNEMENT en cours (attendre la confirmation 15 min / 1h)"
-if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig or planGeometryMismatch
-    ent := entC
-    tp1 := tp1C
-    tp2 := tp2C
-    sl := slC
-    dirFig := dirPlan
-    stratFig := strat
+retTxt = retDir == 0 ? "" : retConf ? "✅ RETOURNEMENT CONFIRMÉ : " + (retDir == 1 ? "LONG" : "SHORT") + (strat != "" ? " • " + strat : "") : "⛔ SL cassé à la clôture M15 : " + (retDir == 1 ? "SHORT" : "LONG") + " annulé ↩ RETOURNEMENT en cours (attendre les clôtures M5/M15/H1)"
 // Compte à rebours jusqu'à la clôture de l'unité de validation (calé sur l'horloge, comme TradingView)
 f_mmss(ms) =>
     t = math.max(0, int(ms / 1000))
@@ -434,15 +435,19 @@ if barstate.islast
     label.delete(eZone)
     line.delete(lZH)
     label.delete(eZH)
+    line.delete(lE)
     line.delete(lTP1)
     line.delete(lTP2)
     line.delete(lSL)
+    label.delete(eE)
     label.delete(eTP1)
     label.delete(eTP2)
     label.delete(eSL)
     if voirPlan and dirPlan != 0
         x1 = bar_index - 25
         x2 = bar_index + 3
+        lE := line.new(x1, ent, x2, ent, color=color.new(color.white, 15), width=2, style=line.style_dotted, extend=extend.right)
+        eE := label.new(x1, ent, "ENTRÉE " + px(ent), style=label.style_label_right, color=color.new(color.white, 15), textcolor=color.black, size=size.small, tooltip="ENTRÉE ALIGN — référence calculée sur la dernière clôture M15 : " + px(ent) + "\nZone d'entrée : " + px(zBas) + " → " + px(zHaut) + "\nSens : " + (dirPlan == 1 ? "LONG" : "SHORT") + "\nDéclenchement : attendre la clôture " + (strat == "SWING" ? "H1" : strat == "DAY" ? "M5" : strat == "SCALPING" ? "M1" : "M15") + "\nNe pas entrer sur la seule touche du niveau.")
         lTP1 := line.new(x1, tp1, x2, tp1, color=color.aqua, width=2, extend=extend.right)
         lTP2 := line.new(x1, tp2, x2, tp2, color=color.new(color.aqua, 35), width=2, style=line.style_dashed, extend=extend.right)
         lSL  := line.new(x1, sl, x2, sl, color=color.red, width=2, extend=extend.right)
@@ -467,7 +472,7 @@ if barstate.islast
         eSL  := label.new(x1, sl, "STOP " + px(sl), style=label.style_label_right, color= color.new(color.red, 20), textcolor= color.white, size=size.small, tooltip="Stop placé derrière la " + (dirPlan == 1 ? "zone de support" : "zone de résistance") + " 1h / 4h la plus proche (+ marge 0,3 ATR)")
 
 // ═════════ BARRE (en bas, propre, explications au clic) ═════════
-var table t = table.new(pos, 11, 3, border_width=1, frame_color= color.new(color.gray, 70), frame_width=1)
+var table t = table.new(pos, 12, 3, border_width=1, frame_color= color.new(color.gray, 70), frame_width=1)
 varip int tick = 0
 if barstate.isrealtime
     tick += 1
@@ -477,7 +482,7 @@ if barstate.islast
     for k = 0 to 4
         nVoy += dirPlan != 0 and array.get(dirs, k) == -dirPlan ? 1 : 0
     for i = 0 to 10
-        dv = array.get(dirs, i)
+        dv = array.get(dirsFermees, i)
         sq = array.get(sqzs, i) == 1
         rv = array.get(rsis, i)
         bg = sq ?  color.rgb(230, 130, 0) : dv == 1 ?  color.rgb(0, 140, 70) : dv == -1 ?  color.rgb(190, 30, 45) :  color.rgb(90, 90, 90)
@@ -491,6 +496,14 @@ if barstate.islast
         tip = array.get(nomsL, i) + " — " + sensUT + "\n━━━━━━━━━━━━\nTendance : " + tendUT + "\nRSI : " + str.tostring(rv, "#") + " — " + rsiUT + "\nCompression : " + (sq ? "OUI ⚡ prêt à exploser (attendre la direction)" : "non") + "\nRôle : " + roleUT + (minUT > 0 ? "\nClôture dans : " + f_mmss(f_reste(minUT)) : "") + "\n━━━━━━━━━━━━\n" + planUT + (dirPlan != 0 and dv == -dirPlan and i <= 4 ? "\n↩ VOYANT RETOURNEMENT allumé : " + str.tostring(nVoy) + "/5 petites unités (1 à 15 min) ont tourné contre le plan\n3/5 = le retournement se prépare • confirmé quand le 15 min ET la 1h clôturent dans le nouveau sens" : "")
         table.cell(t, i, 0, array.get(noms, i), width=largCol, bgcolor=rv >= 70 ?  color.rgb(120, 20, 30) : rv <= 30 ?  color.rgb(0, 90, 50) :  color.rgb(30, 34, 45), text_color=rv >= 70 or rv <= 30 ?  color.white :  color.gray, text_size=size.small, tooltip=tip)
         table.cell(t, i, 1, sym, width=largCol, bgcolor=bg, text_color= color.white, text_size=size.normal, tooltip=tip)
+    // W1 reste hors score 11 UT, mais son biais clôturé est visible pour le contexte SWING.
+    dvW = nz(dWFermee)
+    rvW = nz(rWFermee, 50)
+    symW = dvW == 1 ? "▲" : dvW == -1 ? "▼" : "—"
+    bgW = dvW == 1 ? color.rgb(0, 140, 70) : dvW == -1 ? color.rgb(190, 30, 45) : color.rgb(90, 90, 90)
+    tipW = "1W — dernière clôture : " + (dvW == 1 ? "HAUSSE ▲" : dvW == -1 ? "BAISSE ▼" : "NEUTRE —") + "\nRSI hebdomadaire clôturé : " + str.tostring(rvW, "#") + (rvW >= 70 ? " — SURACHAT" : rvW <= 30 ? " — SURVENTE" : " — équilibré") + "\nRôle : contexte macro et filtre SWING ; hors score des 11 UT."
+    table.cell(t, 11, 0, "1W", width=largCol, bgcolor=rvW >= 70 ? color.rgb(120, 20, 30) : rvW <= 30 ? color.rgb(0, 90, 50) : color.rgb(30, 34, 45), text_color=color.white, text_size=size.small, tooltip=tipW)
+    table.cell(t, 11, 1, symW, width=largCol, bgcolor=bgW, text_color=color.white, text_size=size.normal, tooltip=tipW)
 // État de confirmation calculé pour l'affichage ; les champs d'export restent dans le bloc bridge canonique.
 planClosedMtfOkUi = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan)
 planConfirmedUi = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2) and etatS == "CONFIRMÉ" and scoreV >= 75 and planClosedMtfOkUi
@@ -500,8 +513,10 @@ planConfirmedUi = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat =
     plan = (retTxt != "" ? retTxt + "\n\n" : "") + (dirPlan != 0 ? "STRATÉGIE : " + (strat == "" ? "aucune — aucun plan exécutable" : strat + " — " + etatS) + "\nScore : " + str.tostring(scoreV) + " / 100\n• Alignement : " + str.tostring(ptsAlign) + " / 25\n• Structure : " + str.tostring(ptsStruct) + " / 20\n• Zone d'entrée : " + str.tostring(ptsZone) + " / 20\n• Volume : " + str.tostring(ptsVol) + " / 15" + (volOk ? "" : " (indisponible)") + "\n• Indicateurs : " + str.tostring(ptsInd) + " / 10\n• Risque / rendement : " + str.tostring(ptsRR) + " / 10\n⏱ Clôture de validation " + (strat == "SWING" ? "1h" : strat == "DAY" ? "5 min" : strat == "SCALPING" ? "1 min" : "15 min") + " dans " + f_mmss(f_reste((strat == "SWING" ? 60 : strat == "DAY" ? 5 : strat == "SCALPING" ? 1 : 15))) + "\nDécision : " + decisionS + "\nMotif : " + motifS + (planConfirmedUi ? "\nPlan confirmé : " + calePlan + "\n\n" : "\n\nAUCUNE ENTRÉE : attendre la confirmation MTF et la clôture de validation. Aucun niveau Entry/TP/SL à suivre.\n\n") : "") + "SENS PROBABLE : " + (sens == 1 ? "HAUSSE " : sens == -1 ? "BAISSE " : "INDÉCIS ") + str.tostring(pctH) + "% hausse / " + str.tostring(100 - pctH) + "% baisse\n" + str.tostring(bull) + " UT en hausse • " + str.tostring(bear) + " en baisse • " + str.tostring(comp) + " comprimées\nRSI : " + str.tostring(rsiOB) + " UT en surachat (>70) • " + str.tostring(rsiOS) + " en survente (<30)" + (rsiOB >= 3 ? "\nSURCHARGE RSI HAUTE : éviter d'acheter, retournement baissier possible" : rsiOS >= 3 ? "\nSURCHARGE RSI BASSE : éviter de vendre, rebond possible" : "") + (retHaut ? "\nLes petites UT montent avant les grandes : retournement HAUSSIER en préparation" : retBas ? "\nLes petites UT baissent avant les grandes : retournement BAISSIER en préparation" : "") + (zoneBas ? "\nPrix sur une résistance " + tH1 + " : risque de retournement à la baisse" : zoneHaut ? "\nPrix sur un support " + tB1 + " : rebond possible" : "") + (planConfirmedUi ? "\n\nPLAN CONFIRMÉ " + (dirPlan == 1 ? "ACHAT" : "VENTE") + "\nEntrée " + px(ent) + " (" + tEnt + ")\nTP1 " + px(tp1) + " (" + tTP1 + ")\nTP2 " + px(tp2) + " (" + tTP2 + ")\nStop " + px(sl) + "\nGain/risque ≈ " + str.tostring(rr, "#.#") : "")
     vbg0 = zoneBas or zoneHaut ? color.rgb(170, 130, 0) : planConfirmedUi and dirPlan == 1 ? color.rgb(0, 140, 70) : planConfirmedUi and dirPlan == -1 ? color.rgb(190, 30, 45) : color.rgb(60, 60, 60)
     actif = zoneBas or zoneHaut or fortHaut or fortBas or retHaut or retBas or surcharge
-    table.cell(t, 0, 2, ligne, bgcolor=actif and clignote ? color.new(vbg0, 50) : vbg0, text_color= color.white, text_size=size.normal, tooltip=titre + "\n" + plan)
-    table.merge_cells(t, 0, 2, 10, 2)
+    contexteOppose = dirPlan != 0 and (nz(dWFermee) == -dirPlan or nz(dDFermee) == -dirPlan or nz(d240Fermee) == -dirPlan or nz(d60Fermee) == -dirPlan)
+    contexteOpposeTxt = contexteOppose ? "\n⚠ CONTEXTE SUPÉRIEUR OPPOSÉ : " + (nz(dWFermee) == -dirPlan ? "W1 " : "") + (nz(dDFermee) == -dirPlan ? "D1 " : "") + (nz(d240Fermee) == -dirPlan ? "H4 " : "") + (nz(d60Fermee) == -dirPlan ? "H1 " : "") + "contre le plan " + (dirPlan == 1 ? "LONG" : "SHORT") + ". Le biais macro est distinct du plan d'exécution." : ""
+    table.cell(t, 0, 2, ligne, bgcolor=actif and clignote ? color.new(vbg0, 50) : vbg0, text_color= color.white, text_size=size.normal, tooltip=titre + "\n" + plan + contexteOpposeTxt)
+    table.merge_cells(t, 0, 2, 11, 2)
 
 // ═════════ ALERTES (créer une alerte « N'importe quel appel alert() ») ═════════
 if sigHaut
@@ -678,7 +693,7 @@ if bridgeEntryTf != ""
         bridgeEntryTime := bridgeEntryTimeRequested
 bridgeEntryTimeSafe = bridgeEntryTf == "" ? na : bridgeEntryTime
 
-bridgePayload = '{"source":"ALIGN_MTF_PRO_V25","symbol":"' + bridgeMarket + '","tickerid":"' + syminfo.tickerid + '","timeframe":"' + bridgeTf + '","planTimeframe":"M15","entryTimeframe":"' + (strat == "SWING" ? "H1" : strat == "DAY" ? "M5" : strat == "SCALPING" ? "M1" : "UNSUPPORTED") + '","entryZoneLow":' + f_align_v25_json_num(bridgePlanValid ? zBas : na) + ',"entryZoneHigh":' + f_align_v25_json_num(bridgePlanValid ? zHaut : na) + ',"entryDecision":' + f_align_v25_json_num(bridgePlanValid ? (zBas + zHaut) / 2 : na) + ',"entryBarTime":' + f_align_v25_json_int(bridgeEntryTimeSafe) + ',"entryBarOpen":' + f_align_v25_json_num(bridgeEntryOpen) + ',"entryBarHigh":' + f_align_v25_json_num(bridgeEntryHigh) + ',"entryBarLow":' + f_align_v25_json_num(bridgeEntryLow) + ',"entryBarClose":' + f_align_v25_json_num(bridgeEntryClose) + ',"price":' + f_align_v25_json_num(close) + ',"timestamp":' + str.tostring(timenow) + ',"candle_time":' + str.tostring(time) + ',"confirmed":' + str.tostring(bridgeConfirmed) + ',"candle_confirmed":' + str.tostring(barstate.isconfirmed) + ',"bar_confirmed":' + str.tostring(barstate.isconfirmed) + ',"signal":"' + bridgeSignal + '","verdict":"' + decisionS + '","entry":' + f_align_v25_json_num(bridgePlanValid ? ent : na) + ',"sl":' + f_align_v25_json_num(bridgePlanValid ? sl : na) + ',"tp1":' + f_align_v25_json_num(bridgePlanValid ? tp1 : na) + ',"tp2":' + f_align_v25_json_num(bridgePlanValid ? tp2 : na) + ',"rrRatio":' + f_align_v25_json_num(rr) + ',"macro_bull":' + str.tostring(bull) + ',"macro_bear":' + str.tostring(bear) + ',"long_score":' + str.tostring(dirPlan == 1 ? scoreV : 0) + ',"short_score":' + str.tostring(dirPlan == -1 ? scoreV : 0) + ',"scalp_inverse":false,"strategy":"' + strat + '","anticipation":"' + (retHaut ? "HAUSSIER" : retBas ? "BAISSIER" : "AUCUNE") + '","zone_proche":"' + bridgeZone + '","volume":"' + (volOk ? "OK" : "INDISPONIBLE") + '","rsi_etat":"' + (rsiOB >= 3 ? "SURACHAT" : rsiOS >= 3 ? "SURVENTE" : "NORMAL") + '","rsi_1m":' + f_align_v25_json_num(r1) + ',"rsi_5m":' + f_align_v25_json_num(r5) + ',"rsi_15m":' + f_align_v25_json_num(r15) + ',"rsi_60m":' + f_align_v25_json_num(r60) + ',"lecture_1m":' + f_align_v25_json_dir(d1) + ',"lecture_5m":' + f_align_v25_json_dir(nz(d5Fermee)) + ',"lecture_15m":' + f_align_v25_json_dir(nz(d15Fermee)) + ',"lecture_60m":' + f_align_v25_json_dir(nz(d60Fermee)) + ',"mtf":{"M1":{"direction":' + f_align_v25_json_int(d1) + ',"rsi":' + f_align_v25_json_num(r1) + ',"bar_time":' + str.tostring(nz(bridgeTimeM1, 0)) + '},"M3":{"direction":' + f_align_v25_json_int(d2) + ',"rsi":' + f_align_v25_json_num(r2) + ',"bar_time":' + str.tostring(nz(bridgeTimeM3, 0)) + '},"M5":{"direction":' + f_align_v25_json_int(d5Strat) + ',"rsi":' + f_align_v25_json_num(r5) + ',"bar_time":' + str.tostring(nz(bridgeTimeM5, 0)) + '},"M10":{"direction":' + f_align_v25_json_int(d10) + ',"rsi":' + f_align_v25_json_num(r10) + ',"bar_time":' + str.tostring(nz(bridgeTimeM10, 0)) + '},"M15":{"direction":' + f_align_v25_json_int(d15Strat) + ',"rsi":' + f_align_v25_json_num(r15) + ',"bar_time":' + str.tostring(nz(bridgeTimeM15, 0)) + '},"M30":{"direction":' + f_align_v25_json_int(d30) + ',"rsi":' + f_align_v25_json_num(r30) + ',"bar_time":' + str.tostring(nz(bridgeTimeM30, 0)) + '},"M45":{"direction":' + f_align_v25_json_int(d45) + ',"rsi":' + f_align_v25_json_num(r45) + ',"bar_time":' + str.tostring(nz(bridgeTimeM45, 0)) + '},"H1":{"direction":' + f_align_v25_json_int(d1hStrat) + ',"rsi":' + f_align_v25_json_num(r60) + ',"bar_time":' + str.tostring(nz(bridgeTimeH1, 0)) + '},"H2":{"direction":' + f_align_v25_json_int(d120) + ',"rsi":' + f_align_v25_json_num(r120) + ',"bar_time":' + str.tostring(nz(bridgeTimeH2, 0)) + '},"H4":{"direction":' + f_align_v25_json_int(d4Strat) + ',"rsi":' + f_align_v25_json_num(r240) + ',"bar_time":' + str.tostring(nz(bridgeTimeH4, 0)) + '},"D1":{"direction":' + f_align_v25_json_int(dD) + ',"rsi":' + f_align_v25_json_num(rD) + ',"bar_time":' + str.tostring(nz(bridgeTimeD1, 0)) + '},"W1":{"direction":' + f_align_v25_json_int(dW) + ',"rsi":' + f_align_v25_json_num(rW) + ',"bar_time":' + str.tostring(nz(bridgeTimeW1, 0)) + '}}}'
+bridgePayload = '{"source":"ALIGN_MTF_PRO_V25","symbol":"' + bridgeMarket + '","tickerid":"' + syminfo.tickerid + '","timeframe":"' + bridgeTf + '","planTimeframe":"M15","entryTimeframe":"' + (strat == "SWING" ? "H1" : strat == "DAY" ? "M5" : strat == "SCALPING" ? "M1" : "UNSUPPORTED") + '","entryZoneLow":' + f_align_v25_json_num(bridgePlanValid ? zBas : na) + ',"entryZoneHigh":' + f_align_v25_json_num(bridgePlanValid ? zHaut : na) + ',"entryDecision":' + f_align_v25_json_num(bridgePlanValid ? (zBas + zHaut) / 2 : na) + ',"entryBarTime":' + f_align_v25_json_int(bridgeEntryTimeSafe) + ',"entryBarOpen":' + f_align_v25_json_num(bridgeEntryOpen) + ',"entryBarHigh":' + f_align_v25_json_num(bridgeEntryHigh) + ',"entryBarLow":' + f_align_v25_json_num(bridgeEntryLow) + ',"entryBarClose":' + f_align_v25_json_num(bridgeEntryClose) + ',"price":' + f_align_v25_json_num(close) + ',"timestamp":' + str.tostring(timenow) + ',"candle_time":' + str.tostring(time) + ',"confirmed":' + str.tostring(bridgeConfirmed) + ',"candle_confirmed":' + str.tostring(barstate.isconfirmed) + ',"bar_confirmed":' + str.tostring(barstate.isconfirmed) + ',"signal":"' + bridgeSignal + '","verdict":"' + decisionS + '","entry":' + f_align_v25_json_num(bridgePlanValid ? ent : na) + ',"sl":' + f_align_v25_json_num(bridgePlanValid ? sl : na) + ',"tp1":' + f_align_v25_json_num(bridgePlanValid ? tp1 : na) + ',"tp2":' + f_align_v25_json_num(bridgePlanValid ? tp2 : na) + ',"rrRatio":' + f_align_v25_json_num(rr) + ',"macro_bull":' + str.tostring(bull) + ',"macro_bear":' + str.tostring(bear) + ',"long_score":' + str.tostring(dirPlan == 1 ? scoreV : 0) + ',"short_score":' + str.tostring(dirPlan == -1 ? scoreV : 0) + ',"scalp_inverse":false,"strategy":"' + strat + '","anticipation":"' + (retHaut ? "HAUSSIER" : retBas ? "BAISSIER" : "AUCUNE") + '","zone_proche":"' + bridgeZone + '","volume":"' + (volOk ? "OK" : "INDISPONIBLE") + '","rsi_etat":"' + (rsiOB >= 3 ? "SURACHAT" : rsiOS >= 3 ? "SURVENTE" : "NORMAL") + '","rsi_1m":' + f_align_v25_json_num(r1Fermee) + ',"rsi_5m":' + f_align_v25_json_num(r5Fermee) + ',"rsi_15m":' + f_align_v25_json_num(r15Fermee) + ',"rsi_60m":' + f_align_v25_json_num(r60Fermee) + ',"lecture_1m":' + f_align_v25_json_dir(d1Fermee) + ',"lecture_5m":' + f_align_v25_json_dir(nz(d5Fermee)) + ',"lecture_15m":' + f_align_v25_json_dir(nz(d15Fermee)) + ',"lecture_60m":' + f_align_v25_json_dir(nz(d60Fermee)) + ',"mtf":{"M1":{"direction":' + f_align_v25_json_int(d1Fermee) + ',"rsi":' + f_align_v25_json_num(r1Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM1, 0)) + '},"M3":{"direction":' + f_align_v25_json_int(d3Fermee) + ',"rsi":' + f_align_v25_json_num(r2Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM3, 0)) + '},"M5":{"direction":' + f_align_v25_json_int(d5Fermee) + ',"rsi":' + f_align_v25_json_num(r5Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM5, 0)) + '},"M10":{"direction":' + f_align_v25_json_int(d10Fermee) + ',"rsi":' + f_align_v25_json_num(r10Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM10, 0)) + '},"M15":{"direction":' + f_align_v25_json_int(d15Fermee) + ',"rsi":' + f_align_v25_json_num(r15Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM15, 0)) + '},"M30":{"direction":' + f_align_v25_json_int(d30Fermee) + ',"rsi":' + f_align_v25_json_num(r30Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM30, 0)) + '},"M45":{"direction":' + f_align_v25_json_int(d45Fermee) + ',"rsi":' + f_align_v25_json_num(r45Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM45, 0)) + '},"H1":{"direction":' + f_align_v25_json_int(d60Fermee) + ',"rsi":' + f_align_v25_json_num(r60Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeH1, 0)) + '},"H2":{"direction":' + f_align_v25_json_int(d120Fermee) + ',"rsi":' + f_align_v25_json_num(r120Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeH2, 0)) + '},"H4":{"direction":' + f_align_v25_json_int(d240Fermee) + ',"rsi":' + f_align_v25_json_num(r240Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeH4, 0)) + '},"D1":{"direction":' + f_align_v25_json_int(dDFermee) + ',"rsi":' + f_align_v25_json_num(rDFermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeD1, 0)) + '},"W1":{"direction":' + f_align_v25_json_int(dWFermee) + ',"rsi":' + f_align_v25_json_num(rWFermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeW1, 0)) + '}}}'
 
 varip int lastBridgeSent = na
 bridgeDue = bridgeEnabled and isSupportedMarket and bridgeTf != "UNSUPPORTED" and barstate.isrealtime and (na(lastBridgeSent) or timenow - lastBridgeSent >= 20000)
