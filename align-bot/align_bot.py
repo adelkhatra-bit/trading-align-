@@ -3083,7 +3083,7 @@ TRAD.update({
     "🧭 Biais Pine confirmé :": "🧭 Confirmed Pine bias:",
     "🟢 hausse": "🟢 rising",
     "🔴 baisse": "🔴 falling",
-    "➖ floue": "➖ unclear",
+    "➖ flou": "➖ unclear",
     "⚡ Compression : ça charge": "⚡ Compression: pressure is building",
     "📂 Bot : ": "📂 Bot: ",
     "🟢 LONG en cours": "🟢 LONG ongoing",
