@@ -3079,8 +3079,24 @@ TRAD.update({
     "🎯 Rôles : H4 tendance • H1 confirmation • M15 setup • M5 timing • M1 exécution": "🎯 Roles: H4 trend • H1 confirmation • M15 setup • M5 timing • M1 execution",
     "ℹ️ Le décompte décrit le contexte ; seule la clôture de validation du plan autorise l'entrée.": "ℹ️ This count describes context; only the plan's validation close can authorize an entry.",
     "➖ Unités partagées": "➖ Mixed timeframes",
+    "🔴 Mouvement baissier observé": "🔴 Bearish move observed",
+    "🟢 Mouvement haussier observé": "🟢 Bullish move observed",
+    "🧭 Mouvement dans le sens du biais Pine confirmé": "🧭 Move in line with confirmed Pine bias",
+    "↩ Mouvement contre le biais Pine confirmé : rebond possible": "↩ Move against confirmed Pine bias: possible bounce",
+    "🧭 Mouvement dans le sens du biais local confirmé": "🧭 Move in line with confirmed local bias",
+    "↩ Mouvement contre le biais local confirmé : rebond possible": "↩ Move against confirmed local bias: possible bounce",
+    "➖ Biais Pine non confirmé — mouvement observé": "➖ Pine bias unconfirmed — move observed",
+    "➖ Pas de biais local confirmé": "➖ No confirmed local bias",
+    "🎯 Clôtures vs biais Pine confirmé ": "🎯 Closed timeframes vs confirmed Pine bias ",
+    "🎯 Clôtures vs biais local confirmé ": "🎯 Closed timeframes vs confirmed local bias ",
+    "🎯 Vs biais Pine confirmé ": "🎯 Vs confirmed Pine bias ",
+    "🎯 Vs biais local confirmé ": "🎯 Vs confirmed local bias ",
+    "🎯 Clôtures vs position ": "🎯 Closed timeframes vs position ",
     "📏 Corps M15 :": "📏 M15 body:",
     "🧭 Biais Pine confirmé :": "🧭 Confirmed Pine bias:",
+    "🧭 Biais Pine : non confirmé — attente": "🧭 Pine bias: unconfirmed — waiting",
+    "🧭 Biais local confirmé :": "🧭 Confirmed local bias:",
+    "🧭 Biais local : non confirmé": "🧭 Local bias: unconfirmed",
     "🟢 hausse": "🟢 rising",
     "🔴 baisse": "🔴 falling",
     "➖ flou": "➖ unclear",
@@ -7313,6 +7329,22 @@ def signature_cloture(texte):
 # Le coach LIVE reste actif jusqu'à l'arrêt manuel de l'utilisateur.
 
 
+def biais_commentateur_confirme(r):
+    """Retourne une direction confirmée avec sa provenance réelle ; jamais de faux biais Pine."""
+    if r.get("require_tv_bridge") is True:
+        plan = plan_indicateur(r)
+        if (
+            isinstance(plan, dict)
+            and plan.get("available") is True
+            and plan.get("confirmed") is True
+            and plan.get("direction") in (-1, 1)
+        ):
+            return plan["direction"], "pine"
+        return 0, "pine"
+    direction = r.get("confirme") or 0
+    return (direction if direction in (-1, 1) else 0), "local"
+
+
 def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
     """Bilan de clôture 15 min : un titre clair, une info par ligne, chaque ligne tient sur un téléphone
     sans retour à la ligne (règle d'Adel : jamais plus large que « 🎙 COACH COMMENTATEUR »)."""
@@ -7331,7 +7363,17 @@ def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
         lecture = "👁 Mouvement franc 💪"
     else:
         lecture = "👁 Le marché hésite 🤏"
-    d = r.get("confirme") or 0
+    d, origine_biais = biais_commentateur_confirme(r)
+    if origine_biais == "pine":
+        biais_ligne = (
+            "🧭 Biais Pine confirmé : " + ("🟢 hausse" if d == 1 else "🔴 baisse")
+            if d in (-1, 1) else "🧭 Biais Pine : non confirmé — attente"
+        )
+    else:
+        biais_ligne = (
+            "🧭 Biais local confirmé : " + ("🟢 hausse" if d == 1 else "🔴 baisse")
+            if d in (-1, 1) else "🧭 Biais local : non confirmé"
+        )
     tr = cle.get("trade")
     dirs_cloturees = r.get("dirs_cloturees")
     mtf_clotures_ok = (
@@ -7350,7 +7392,8 @@ def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
         if d in (-1, 1):
             alignes = sum(1 for _, sens in lectures_ut if sens == d)
             opposes = sum(1 for _, sens in lectures_ut if sens == -d)
-            bilan_ut = (f"🎯 Vs sens confirmé {'LONG' if d == 1 else 'SHORT'} : "
+            ref_biais = "biais Pine confirmé" if origine_biais == "pine" else "biais local confirmé"
+            bilan_ut = (f"🎯 Vs {ref_biais} {'LONG' if d == 1 else 'SHORT'} : "
                         f"{alignes}/11 alignées • {opposes} opposées • {neutres} neutres")
         elif haut > bas:
             bilan_ut = f"🧭 Biais de contexte : LONG dominant • {haut}/11 haussières • {bas} baissières • {neutres} neutres (pas un signal)"
@@ -7377,7 +7420,7 @@ def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
     if public or not tr:
         l.append("ℹ️ Info, pas une entrée")
     l += [SEPARATEUR, sens_b, f"📏 Corps M15 : {'+' if c_ >= o_ else '-'}{px(corps)}", lecture,
-          "🧭 Biais Pine confirmé : " + ("🟢 hausse" if d == 1 else "🔴 baisse" if d == -1 else "➖ flou"),
+          biais_ligne,
           unites, bilan_ut, w1_txt, role_ut,
           "ℹ️ ▲ LONG = hausse • ▼ SHORT = baisse • ➡️ neutre",
           "ℹ️ UT alignées = contexte, jamais une entrée seule."]
@@ -7453,7 +7496,7 @@ def flash_commentateur(m, r, cle):
     p = m1[-1]["c"]
     move = p - m1[0]["o"]
     tr = cle.get("trade")
-    d_ = r.get("confirme") or 0
+    d_, origine_biais = biais_commentateur_confirme(r)
     ligne_pos = []
     if tr:
         dd = tr["d"]
@@ -7464,9 +7507,20 @@ def flash_commentateur(m, r, cle):
             ligne_pos = ["⚠️ Contre le bot", "🔒 SL à BE : zéro risque" if dd * (tr["e"] - tr["sl"]) <= 0 else "🧊 On garde la tête froide",
                          "⏳ La clôture 15 min décide"]
     else:
-        ligne_pos = ["🧭 Dans le sens de la tendance" if d_ * move > 0 else "↩ Contre la tendance : rebond ?" if d_ else "➖ Pas de tendance nette",
-                     "⏳ J'attends la clôture 15 min"]
-    # Comparer les UT au trade réel s'il existe, sinon au sens Pine confirmé.
+        if d_ in (-1, 1):
+            libelle_biais = "biais Pine confirmé" if origine_biais == "pine" else "biais local confirmé"
+            ligne_pos = [
+                "🧭 Mouvement dans le sens du " + libelle_biais if d_ * move > 0
+                else "↩ Mouvement contre le " + libelle_biais + " : rebond possible",
+                "⏳ J'attends la clôture 15 min",
+            ]
+        else:
+            ligne_pos = [
+                "➖ Biais Pine non confirmé — mouvement observé" if origine_biais == "pine"
+                else "➖ Pas de biais local confirmé",
+                "⏳ J'attends la clôture 15 min",
+            ]
+    # Comparer les UT à la position ouverte, sinon au biais réellement confirmé.
     sens_reference = tr.get("d") if tr and tr.get("d") in (-1, 1) else d_
     # Le commentateur ne doit jamais compter les UT en formation : il ne lit que le contrat des 11 dernières clôtures.
     dirs_cloturees = r.get("dirs_cloturees")
@@ -7479,7 +7533,12 @@ def flash_commentateur(m, r, cle):
             nb_alignes = nb_short if sens_reference == -1 else nb_long
             nb_opposes = nb_long if sens_reference == -1 else nb_short
             direction_txt = "SHORT" if sens_reference == -1 else "LONG"
-            ligne_mtf = (f"🎯 Clôtures vs sens confirmé {direction_txt} : "
+            ref = (
+                "position" if tr else
+                "biais Pine confirmé" if origine_biais == "pine" else
+                "biais local confirmé"
+            )
+            ligne_mtf = (f"🎯 Clôtures vs {ref} {direction_txt} : "
                          f"{nb_alignes}/11 alignées • {nb_opposes} opposées • {nb_neutres} neutres")
         elif nb_short > nb_long:
             ligne_mtf = f"🧭 Biais de contexte : SHORT dominant • {nb_short}/11 baissières • {nb_long} haussières • {nb_neutres} neutres (pas un signal)"
@@ -7491,7 +7550,7 @@ def flash_commentateur(m, r, cle):
         ligne_mtf = "📊 Clôtures MTF : indisponibles ou incomplètes • aucune direction déduite"
     if abs(move) >= 0.5 * a:
         return "\n".join(["🎙 ÇA BOUGE !", f"{ICONE.get(m, '')} {m} : {px(p)}",
-                          ("🔴 Les vendeurs accélèrent" if move < 0 else "🟢 Les acheteurs accélèrent"),
+                          ("🔴 Mouvement baissier observé" if move < 0 else "🟢 Mouvement haussier observé"),
                           f"📏 {'-' if move < 0 else '+'}{px(abs(move))} en 3 min",
                           ligne_mtf,
                           "ℹ️ Mouvement observé, pas une entrée : attendre la clôture M15"] + ligne_pos)
