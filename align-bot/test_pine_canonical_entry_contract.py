@@ -250,8 +250,9 @@ class PineCanonicalEntryContract(unittest.TestCase):
 
 
     def test_bridge_rsi_matches_the_same_closed_mtf_candle_as_direction_and_timestamp(self):
+        self.assertIn("type EtatMtfSnapshot", self.pine)
         self.assertIn(
-            "[d, sqz ? 1 : 0, rsiValue, time_close, d[1], sqz[1] ? 1 : 0, rsiValue[1], time_close[1], time_close <= timenow]",
+            "EtatMtfSnapshot.new(d, sqz ? 1 : 0, rsiValue, time_close, d[1], sqz[1] ? 1 : 0, rsiValue[1], time_close[1], time_close <= timenow)",
             self.pine,
         )
         payload = self.pine.split("bridgePayload = ", 1)[1]
