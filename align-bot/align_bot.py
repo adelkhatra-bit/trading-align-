@@ -3081,6 +3081,9 @@ TRAD.update({
     "➖ Unités partagées": "➖ Mixed timeframes",
     "📏 Corps M15 :": "📏 M15 body:",
     "🧭 Biais Pine confirmé :": "🧭 Confirmed Pine bias:",
+    "🧭 Biais Pine : non confirmé — attente": "🧭 Pine bias: unconfirmed — waiting",
+    "🧭 Biais local confirmé :": "🧭 Confirmed local bias:",
+    "🧭 Biais local : non confirmé": "🧭 Local bias: unconfirmed",
     "🟢 hausse": "🟢 rising",
     "🔴 baisse": "🔴 falling",
     "➖ flou": "➖ unclear",
@@ -7331,7 +7334,28 @@ def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
         lecture = "👁 Mouvement franc 💪"
     else:
         lecture = "👁 Le marché hésite 🤏"
-    d = r.get("confirme") or 0
+    require_tv_bridge = r.get("require_tv_bridge") is True
+    tv_plan = plan_indicateur(r) if require_tv_bridge else None
+    pine_confirmed = (
+        isinstance(tv_plan, dict)
+        and tv_plan.get("available") is True
+        and tv_plan.get("confirmed") is True
+        and tv_plan.get("direction") in (-1, 1)
+    )
+    if require_tv_bridge:
+        # En production, seule la direction du plan Pine v25 peut être présentée comme biais confirmé.
+        # r["confirme"] reste une confirmation locale/filtre d'exécution, pas la preuve du plan Pine.
+        d = tv_plan["direction"] if pine_confirmed else 0
+        biais_ligne = (
+            "🧭 Biais Pine confirmé : " + ("🟢 hausse" if d == 1 else "🔴 baisse")
+            if pine_confirmed else "🧭 Biais Pine : non confirmé — attente"
+        )
+    else:
+        d = r.get("confirme") or 0
+        biais_ligne = (
+            "🧭 Biais local confirmé : " + ("🟢 hausse" if d == 1 else "🔴 baisse")
+            if d in (-1, 1) else "🧭 Biais local : non confirmé"
+        )
     tr = cle.get("trade")
     dirs_cloturees = r.get("dirs_cloturees")
     mtf_clotures_ok = (
@@ -7377,7 +7401,7 @@ def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
     if public or not tr:
         l.append("ℹ️ Info, pas une entrée")
     l += [SEPARATEUR, sens_b, f"📏 Corps M15 : {'+' if c_ >= o_ else '-'}{px(corps)}", lecture,
-          "🧭 Biais Pine confirmé : " + ("🟢 hausse" if d == 1 else "🔴 baisse" if d == -1 else "➖ flou"),
+          biais_ligne,
           unites, bilan_ut, w1_txt, role_ut,
           "ℹ️ ▲ LONG = hausse • ▼ SHORT = baisse • ➡️ neutre",
           "ℹ️ UT alignées = contexte, jamais une entrée seule."]
