@@ -213,6 +213,34 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertIn("[d1, s1, r1, r1Fermee, bridgeTimeM1]", self.source)
         self.assertIn("[dW, sW, rW, rWFermee, bridgeTimeW1]", self.source)
 
+
+    def test_plan_levels_use_last_closed_source_timeframe_candle_on_every_chart_interval(self):
+        # A higher chart timeframe must not let request.security() select an
+        # arbitrary lower-timeframe intrabar for the plan's support/resistance levels.
+        self.assertIn("f_niv_mtf(string tf) =>", self.source)
+        self.assertIn("request.security_lower_tf(syminfo.tickerid, tf, f_niv())", self.source)
+        self.assertIn("array.get(nivConfirmedArray, nivLastIndex)", self.source)
+        self.assertIn("if not array.get(nivConfirmedArray, nivLastIndex)", self.source)
+        self.assertIn("request.security(syminfo.tickerid, tf, f_niv_previous(), lookahead=barmerge.lookahead_on)", self.source)
+        for timeframe in ('"15"', '"60"', '"240"', '"D"'):
+            with self.subTest(timeframe=timeframe):
+                self.assertIn("f_niv_mtf(" + timeframe + ")", self.source)
+        self.assertNotIn('request.security(syminfo.tickerid, "15",  f_niv())', self.source)
+        self.assertNotIn('request.security(syminfo.tickerid, "60",  f_niv())', self.source)
+        self.assertNotIn('request.security(syminfo.tickerid, "240", f_niv())', self.source)
+        self.assertNotIn('request.security(syminfo.tickerid, "D",   f_niv())', self.source)
+
+    def test_canonical_plan_levels_and_m15_price_snapshot_share_closed_bar_semantics(self):
+        self.assertIn("f_niv_previous() =>", self.source)
+        self.assertIn("nivConfirmedArray", self.source)
+        self.assertIn("nivLastIndex", self.source)
+        self.assertIn("timeframe.in_seconds(tf) < timeframe.in_seconds()", self.source)
+        self.assertIn("planClose15", self.source)
+        self.assertIn("[hau1, tH1, hau2, tH2] = f_dessus(planClose15, planAtr15)", self.source)
+        self.assertIn("[bas1, tB1, bas2, tB2] = f_dessous(planClose15, planAtr15)", self.source)
+        self.assertIn("f_stopH(sMin, sMax, refClose, refAtr)", self.source)
+        self.assertIn("f_cible(d, e, risque * gainMin, cMin, cMax)", self.source)
+
     def test_no_secret_is_embedded_in_pine(self):
         self.assertNotIn("ALIGN_TV_INGEST_TOKEN", self.source)
         self.assertNotIn("ingest_token", self.source)
