@@ -24,6 +24,8 @@ class AlignBtcPineContract(unittest.TestCase):
         self.assertIn('strat == "SWING" ?', bridge)
         self.assertIn('strat == "DAY" ?', bridge)
         self.assertIn('strat == "SCALPING" ?', bridge)
+        self.assertIn("nz(d3Fermee) == dirPlan", bridge)
+        self.assertIn("and u15 and u5 and u3 and u1", source)
         self.assertIn("nz(dDFermee) == dirPlan", bridge)
         self.assertIn("nz(dWFermee) != -dirPlan", bridge)
         self.assertIn("nz(d5Fermee) == dirPlan", bridge)
