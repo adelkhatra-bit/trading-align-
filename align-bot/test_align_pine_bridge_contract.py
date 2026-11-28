@@ -195,6 +195,8 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertIn("bridgeEntryRequested.timePrev", export_block)
         self.assertIn("bridgeEntryRequested.timeNow", export_block)
         self.assertIn("EntryTriggerSnapshot bridgeEntryRequested = request.security(syminfo.tickerid, bridgeEntryTf, f_bridge_entry_snapshot(), lookahead=barmerge.lookahead_off)", export_block)
+        self.assertIn("type EntryTriggerSnapshot", self.source)
+        self.assertIn("EntryTriggerSnapshot.new(open, high, low, close, time_close, open[1], high[1], low[1], close[1], time_close[1], time_close <= timenow)", self.source)
         self.assertIn("if not bridgeEntryRequested.confirmed", export_block)
         self.assertIn('bridgeEntryTimeSafe = bridgeEntryTf == "" ? na : bridgeEntryTime', export_block)
 
@@ -232,6 +234,7 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertNotIn('request.security(syminfo.tickerid, "D",   f_niv())', self.source)
 
     def test_canonical_plan_levels_and_m15_price_snapshot_share_closed_bar_semantics(self):
+        self.assertNotIn("request.security_lower_tf", self.source)
         self.assertIn("time_close <= timenow", self.source)
         self.assertIn("type EtatMtfSnapshot", self.source)
         self.assertIn("type NivMtfSnapshot", self.source)
