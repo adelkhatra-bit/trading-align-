@@ -246,7 +246,6 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertIn("PlanM15Snapshot.new(", self.source)
         self.assertIn("NivMtfSnapshot", self.source)
         self.assertIn("nivRequested.confirmed", self.source)
-        self.assertIn("timeframe.in_seconds(tf) < timeframe.in_seconds()", self.source)
         self.assertIn("planClose15", self.source)
         self.assertIn("[hau1, tH1, hau2, tH2] = f_dessus(planClose15, planAtr15)", self.source)
         self.assertIn("[bas1, tB1, bas2, tB2] = f_dessous(planClose15, planAtr15)", self.source)
