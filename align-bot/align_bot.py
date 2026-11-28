@@ -7509,19 +7509,19 @@ def flash_commentateur(m, r, cle):
                 ] + ligne_pos)
             if meche_haute:
                 return "\n".join([
-                    "🎙 GROSSE MÈCHE — REJET BAISSIER POTENTIEL",
+                    "🎙 GROSSE MÈCHE HAUTE — PRESSION VENDEUSE POSSIBLE",
                     f"{ICONE.get(m, '')} {m} : {px(p)}",
-                    f"👀 M15 en formation : mèche haute, rejet baissier potentiel à {px(x['h'])}",
-                    "🔴 Vendeurs rejettent le haut — non confirmé",
+                    f"👀 M15 en formation : mèche haute à {px(x['h'])}",
+                    "ℹ️ Rejet non confirmé : résistance non vérifiée",
                     ligne_mtf,
                     "⏳ M15 non clôturée : attendre la clôture avant toute conclusion"
                 ] + ligne_pos)
             if meche_basse:
                 return "\n".join([
-                    "🎙 GROSSE MÈCHE — REJET HAUSSIER POTENTIEL",
+                    "🎙 GROSSE MÈCHE BASSE — PRESSION ACHETEUSE POSSIBLE",
                     f"{ICONE.get(m, '')} {m} : {px(p)}",
-                    f"👀 M15 en formation : mèche basse, rejet haussier potentiel à {px(x['l'])}",
-                    "🟢 Acheteurs défendent le bas — non confirmé",
+                    f"👀 M15 en formation : mèche basse à {px(x['l'])}",
+                    "ℹ️ Rejet non confirmé : support non vérifié",
                     ligne_mtf,
                     "⏳ M15 non clôturée : attendre la clôture avant toute conclusion"
                 ] + ligne_pos)
