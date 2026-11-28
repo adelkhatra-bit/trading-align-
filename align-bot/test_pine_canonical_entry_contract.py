@@ -196,6 +196,25 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn("🟢 ZONE ATTEINTE — LONG PRÊT", self.pine)
         self.assertIn("🔴 ZONE ATTEINTE — SHORT PRÊT", self.pine)
 
+    def test_mtf_signal_and_entry_plan_are_independent_of_chart_timeframe(self):
+        # The executable direction and profile must come from confirmed MTF closes,
+        # never from chart-local persistent state or chart-local momentum.
+        self.assertIn("dirs = array.from(nz(d1Fermee), nz(d3Fermee)", self.pine)
+        self.assertIn("dirStable = dirBrut", self.pine)
+        self.assertIn("dirBrut = zoneLongConfirmee ? 1 : zoneShortConfirmee ? -1 : longT >= 2 ? 1 : longT <= -2 ? -1 : 0", self.pine)
+        self.assertNotIn("var int dirStable", self.pine)
+        self.assertNotIn("var float ent = na", self.pine)
+        self.assertIn("ent = entC", self.pine)
+        self.assertIn("tp1 = tp1C", self.pine)
+        self.assertIn("sl = slC", self.pine)
+        self.assertIn("planClose15 > sl", self.pine)
+        self.assertIn("distE = math.abs(planClose15 - ent)", self.pine)
+        self.assertIn("ptsZone = strat == \"\" ? 0 : distE <= 0.5 * planAtr15", self.pine)
+        self.assertIn("planVol15 = request.security(syminfo.tickerid, \"15\", volume[1]", self.pine)
+        self.assertIn("rsiT = strat == \"SWING\" ? nz(r60Fermee, 50)", self.pine)
+        self.assertIn("math.abs(v - a1) > refAtr * 0.3", self.pine)
+        self.assertIn("math.abs(v - b1) > refAtr * 0.3", self.pine)
+
     def test_progressive_mtf_reversal_requires_micro_build_and_m15_confirmation(self):
         # M1 is the early warning; at least two of M1/M3/M5 must build the move.
         self.assertIn("microBull = (nz(d1Fermee) == 1 ? 1 : 0) + (nz(d3Fermee) == 1 ? 1 : 0) + (nz(d5Fermee) == 1 ? 1 : 0)", self.pine)
