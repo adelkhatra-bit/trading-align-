@@ -3,6 +3,7 @@ from pathlib import Path
 import unittest
 
 PINE = Path(__file__).resolve().parent / "pine" / "ALIGN_BTC_MTF_PRO_v25.pine"
+MTF_PINE = Path(__file__).resolve().parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
 
 
 class AlignBtcPineContract(unittest.TestCase):
@@ -27,6 +28,8 @@ class AlignBtcPineContract(unittest.TestCase):
         self.assertIn("nz(dWFermee) != -dirPlan", bridge)
         self.assertIn("nz(d5Fermee) == dirPlan", bridge)
         self.assertIn("nz(d1Fermee) == dirPlan", bridge)
+        mtf_source = MTF_PINE.read_text(encoding="utf-8")
+        self.assertEqual(bridge, next(line for line in mtf_source.splitlines() if line.startswith("bridgeClosedMtfOk = ")))
         self.assertIn("planConfirmedUi", source)
         self.assertIn("bridgeSignal = bridgeConfirmed ?", source)
 
@@ -77,6 +80,7 @@ class AlignBtcPineContract(unittest.TestCase):
         self.assertIn("planRiskRewardOk = not na(atr15) and atr15 > 0 and rrS >= 2.0 and planRisk <= 1.5 * atr15", source)
         self.assertIn("and planRiskRewardOk and not na(ent)", source)
         self.assertIn("bridgeConfirmed = bridgePlanValid and planRiskRewardOk", source)
+        self.assertIn("bridgePlanValid = dirPlan != 0 and strat != \"\" and dirPlan == dirFig and strat == stratFig and not planGeometryMismatch and bridgePlanGeometryOk", source)
 
     def test_plan_and_confirmation_are_independent_of_the_chart_timeframe(self):
         source = PINE.read_text(encoding="utf-8")
@@ -86,6 +90,7 @@ class AlignBtcPineContract(unittest.TestCase):
         self.assertIn("math.abs(v - b1) > refAtr * 0.3", levels)
         self.assertNotIn("atrC", levels)
         self.assertIn("if voirPlan and planConfirmedUi", source)
+        self.assertIn("longT += i >= 7 ? dv : 0", source)
 
     def test_entry_stop_targets_and_table_keep_explanatory_hover_text(self):
         source = PINE.read_text(encoding="utf-8")
@@ -97,6 +102,13 @@ class AlignBtcPineContract(unittest.TestCase):
         self.assertIn("tooltip=tip", source)
         self.assertIn('table.cell(t, 11, 0, "1W"', source)
 
+    def test_main_mtf_ui_gate_matches_its_bridge_for_confirmed_scalp_reversal(self):
+        source = MTF_PINE.read_text(encoding="utf-8")
+        ui = next(line for line in source.splitlines() if line.startswith("planClosedMtfOkUi = "))
+        bridge = next(line for line in source.splitlines() if line.startswith("bridgeClosedMtfOk = "))
+        reversal_exception = "(nz(d60Fermee) != -dirPlan or (dirPlan == 1 and retLongConfirme) or (dirPlan == -1 and retShortConfirme))"
+        self.assertIn(reversal_exception, ui)
+        self.assertIn(reversal_exception, bridge)
 
 if __name__ == "__main__":
     unittest.main()
