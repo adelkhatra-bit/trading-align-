@@ -225,6 +225,28 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         self.assertNotIn("Commentaire aux clôtures", translated_activation)
 
 
+    def test_live_candle_direction_and_confirmed_pine_bias_are_separate(self):
+        candle = {"o": 100.0, "h": 105.0, "l": 99.0, "c": 101.0, "t": 2000}
+        market = {
+            "m1": [{"c": 101.0}],
+            "confirme": -1,
+            "dirs_cloturees": [-1] * 11,
+            "sqzs": [0] * 11,
+        }
+        with patch.object(ab, "prochaine_cloture_bougie", return_value=3000):
+            french = ab.texte_coach_live("BTC", candle, market, {}, public=True)
+        self.assertIn("Bougie en hausse — M15 clôturée", french)
+        self.assertIn("Mèche haute : rejet des prix élevés, pression vendeuse possible", french)
+        self.assertIn("Biais Pine confirmé : 🔴 baisse", french)
+        self.assertIn("BTC (prix actuel)", french)
+
+        english = ab.traduire(french)
+        self.assertIn("M15 candle closed higher", english)
+        self.assertIn("Upper wick: higher prices rejected; possible selling pressure", english)
+        self.assertIn("Confirmed Pine bias: 🔴 falling", english)
+        self.assertIn("BTC (current price)", english)
+
+
     def test_live_coach_explains_wick_direction_and_uses_only_closed_mtf(self):
         cases = (
             (
