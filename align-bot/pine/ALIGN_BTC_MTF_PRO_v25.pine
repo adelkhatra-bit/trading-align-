@@ -29,6 +29,7 @@ bridgeEnabled = input.bool(false, "Envoyer les snapshots au ROBOT V12", group=gr
 
 // ═════════ ÉTAT DE CHAQUE UNITÉ DE TEMPS ═════════
 // Tendance : +1 (prix > EMA20 > EMA50) / -1 / 0  •  Compression : Bollinger dans Keltner  •  RSI
+// Les requêtes request.* transportent un seul objet UDT par contexte pour respecter la limite Pine cumulée de 127 éléments de tuple.
 type EtatMtfSnapshot
     int dLive
     int sqzLive
