@@ -164,10 +164,8 @@ niveaux = array.from(rA15, sA15, rB15, sB15, rA60, sA60, rB60, sB60, rA4h, sA4h,
 nomsNiv = array.from("15m", "15m", "15m", "15m", "1h", "1h", "1h", "1h", "4h", "4h", "4h", "4h", "Daily", "Daily", "Daily", "Daily")
 atrC = ta.atr(14)
 // ATR de la vue 15 min (la référence du bot) : le SL ne dépend plus de la petite unité de temps affichée
-atr15 = request.security(syminfo.tickerid, "15", ta.atr(14)[1])
-// Référence unique du plan : dernière bougie 15 min clôturée, quel que soit le graphique affiché.
-[planOpen15, planHigh15, planLow15, planClose15, planAtr15] = request.security(syminfo.tickerid, "15", [open[1], ta.highest(high, 10)[1], ta.lowest(low, 10)[1], close[1], ta.atr(14)[1]], lookahead=barmerge.lookahead_on)
-[planRsi15, planMom15, planMomPrev15] = request.security(syminfo.tickerid, "15", [ta.rsi(close, lenRsi)[1], ta.linreg(close - math.avg(math.avg(ta.highest(high, lenSqz), ta.lowest(low, lenSqz)), ta.sma(close, lenSqz)), lenSqz, 0)[1], ta.linreg(close - math.avg(math.avg(ta.highest(high, lenSqz), ta.lowest(low, lenSqz)), ta.sma(close, lenSqz)), lenSqz, 0)[2]], lookahead=barmerge.lookahead_on)
+[planOpen15, planHigh15, planLow15, planClose15, planAtr15, planRsi15, planMom15, planMomPrev15, planVol15, planVolMoy15] = request.security(syminfo.tickerid, "15", [open[1], ta.highest(high, 10)[1], ta.lowest(low, 10)[1], close[1], ta.atr(14)[1], ta.rsi(close, lenRsi)[1], ta.linreg(close - math.avg(math.avg(ta.highest(high, lenSqz), ta.lowest(low, lenSqz)), ta.sma(close, lenSqz)), lenSqz, 0)[1], ta.linreg(close - math.avg(math.avg(ta.highest(high, lenSqz), ta.lowest(low, lenSqz)), ta.sma(close, lenSqz)), lenSqz, 0)[2], volume[1], ta.sma(volume, 20)[1]], lookahead=barmerge.lookahead_on)
+atr15 = planAtr15
 planMomS15 = planMom15 > 0 ? (planMom15 > planMomPrev15 ? 1.0 : 0.4) : (planMom15 < planMomPrev15 ? -1.0 : -0.4)
 
 // Niveau le plus proche au-dessus / en dessous (1er et 2e)
@@ -185,7 +183,7 @@ f_dessus(refClose, refAtr) =>
                     t2 := t1
                 a1 := v
                 t1 := array.get(nomsNiv, k)
-            else if (na(a2) or v < a2) and math.abs(v - a1) > atrC * 0.3
+            else if (na(a2) or v < a2) and math.abs(v - a1) > refAtr * 0.3
                 a2 := v
                 t2 := array.get(nomsNiv, k)
     [a1, t1, a2, t2]
@@ -203,7 +201,7 @@ f_dessous(refClose, refAtr) =>
                     t2 := t1
                 b1 := v
                 t1 := array.get(nomsNiv, k)
-            else if (na(b2) or v > b2) and math.abs(v - b1) > atrC * 0.3
+            else if (na(b2) or v > b2) and math.abs(v - b1) > refAtr * 0.3
                 b2 := v
                 t2 := array.get(nomsNiv, k)
     [b1, t1, b2, t2]
@@ -359,8 +357,6 @@ ctxO = strat == "SWING" ? oW : strat == "DAY" ? o4 : o1h
 ptsStruct = strat == "" ? 0 : ctxU ? 20 : ctxO ? 0 : 10
 distE = math.abs(planClose15 - ent)
 ptsZone = strat == "" ? 0 : distE <= 0.5 * planAtr15 ? 20 : distE <= 1.5 * planAtr15 ? 10 : 0
-planVol15 = request.security(syminfo.tickerid, "15", volume[1], lookahead=barmerge.lookahead_on)
-planVolMoy15 = request.security(syminfo.tickerid, "15", ta.sma(volume, 20)[1], lookahead=barmerge.lookahead_on)
 volOk = not na(planVol15) and planVol15 > 0 and not na(planVolMoy15) and planVolMoy15 > 0
 volR = volOk ? planVol15 / planVolMoy15 : 0.0
 ptsVol = strat == "" or not volOk ? 0 : volR >= 1.0 ? 15 : volR >= 0.7 ? 7 : 0
@@ -664,7 +660,7 @@ if barstate.islast
 
 // ═════════ BRIDGE ALIGN — export structuré du Pine v25 (sans toucher aux signaux/visuels) ═════════
 // Le bridge ne publie LONG/SHORT que si le plan complet est confirmé.
-bridgePlanValid = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2)
+bridgePlanValid = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and not planGeometryMismatch and bridgePlanGeometryOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2)
 bridgeClosedMtfOk = strat == "SWING" ? (nz(dDFermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) != -dirPlan and nz(dWFermee) != -dirPlan) : strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d240Fermee) != -dirPlan) : strat == "SCALPING" ? ((nz(d60Fermee) != -dirPlan or (dirPlan == 1 and retLongConfirme) or (dirPlan == -1 and retShortConfirme)) and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan) : false
 bridgeConfirmed = bridgePlanValid and planRiskRewardOk and etatS == "CONFIRMÉ" and scoreV >= 75 and bridgeClosedMtfOk
 bridgeSignal = bridgeConfirmed ? (dirPlan == 1 ? "LONG" : "SHORT") : "WAIT"
