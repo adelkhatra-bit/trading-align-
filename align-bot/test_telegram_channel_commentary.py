@@ -238,7 +238,7 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         english = ab.traduire(french)
         for expected in (
             "LIVE COMMENTATOR", "LIVE", "15-MINUTE SUMMARY", "Information, not an entry",
-            "M15 candle closed higher", "M15 body:", "Confirmed Pine bias:", "Timeframes:", "Vs confirmed direction LONG", "W1 context:", "Roles:", "Next:",
+            "M15 candle closed higher", "M15 body:", "Confirmed Pine bias:", "Timeframes:", "Vs confirmed Pine bias LONG", "W1 context:", "Roles:", "Next:",
         ):
             with self.subTest(expected=expected):
                 self.assertIn(expected, english)
