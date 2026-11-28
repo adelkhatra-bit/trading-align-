@@ -93,6 +93,7 @@ class AlignBtcPineContract(unittest.TestCase):
             request_sites = source.count("request.security(")
             self.assertLessEqual(request_sites, 40)
             self.assertIn("time_close <= timenow", source)
+            self.assertNotIn("request.security_lower_tf", source)
             self.assertIn("EtatMtfSnapshot etatRequested = request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)", source)
             self.assertIn("NivMtfSnapshot nivRequested = request.security(syminfo.tickerid, tf, f_niv(), lookahead=barmerge.lookahead_off)", source)
             self.assertIn('PlanM15Snapshot planRequested = request.security(syminfo.tickerid, "15", f_plan_snapshot(), lookahead=barmerge.lookahead_off)', source)
@@ -103,6 +104,8 @@ class AlignBtcPineContract(unittest.TestCase):
         bridge_start = source.index("f_bridge_entry_snapshot() =>")
         bridge_end = source.index("\n\nbridgeEntryTf =", bridge_start)
         bridge_entry = source[bridge_start:bridge_end]
+        self.assertIn("type EntryTriggerSnapshot", source)
+        self.assertIn("EntryTriggerSnapshot.new(open, high, low, close, time_close, open[1], high[1], low[1], close[1], time_close[1], time_close <= timenow)", source)
         self.assertIn("time_close[1]", bridge_entry)
         self.assertNotIn("time[1]", bridge_entry)
 
