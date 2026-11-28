@@ -3,7 +3,7 @@ import hashlib
 import unittest
 
 PINE = Path(__file__).parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
-BASELINE_GIT_BLOB_SHA = "09b58ccdcdf3264aa4e63473285e9246548b6f19"  # reviewed normalized v25 baseline after exact RSI and entry-direction blocks are restored
+BASELINE_GIT_BLOB_SHA = "8bb2382adc6174e492cf15fb9e59876369307b3e"  # reviewed v25 baseline including progressive MTF reversal and canonical M15 levels
 SETTINGS_BLOCK = """// ═════════ BRIDGE ALIGN (optionnel, sans modification visuelle) ═════════
 grpBridge = "Bridge ALIGN (optionnel)"
 bridgeEnabled = input.bool(true, "Envoyer les snapshots au ROBOT V12", group=grpBridge)
@@ -346,7 +346,7 @@ if barstate.isconfirmed
             self.source,
         )
         self.assertIn(
-            'strat == "SCALPING" ? (nz(d60Fermee) != -dirPlan and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan)',
+            'strat == "SCALPING" ? ((nz(d60Fermee) != -dirPlan or (dirPlan == 1 and retLongConfirme) or (dirPlan == -1 and retShortConfirme)) and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan)',
             self.source,
         )
         self.assertIn(

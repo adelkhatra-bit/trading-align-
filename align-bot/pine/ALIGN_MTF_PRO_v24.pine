@@ -95,7 +95,7 @@ for i = 0 to 10
     ts += w * dv
     rs += w * (array.get(rsis, i) - 50) / 50
     court += i <= 4 ? dv : 0
-    longT += i >= 8 ? dv : 0
+    longT += i >= 7 ? dv : 0
     rsiOB += array.get(rsis, i) >= 70 ? 1 : 0
     rsiOS += array.get(rsis, i) <= 30 ? 1 : 0
 
@@ -124,8 +124,11 @@ rsiS = math.max(-1.0, math.min(1.0, rs / sw * 2))
 score = 0.45 * trendS + 0.30 * rsiS + 0.25 * momS
 pctH = math.round(50 + 50 * score)
 sens = score > 0.15 ? 1 : score < -0.15 ? -1 : 0
-retHaut = court >= 3 and longT <= -1 and momS > 0
-retBas  = court <= -3 and longT >= 1 and momS < 0
+// Détection progressive commune au contexte v25 : M1 alerte, M3/M5 construisent.
+microBull = (nz(d1Fermee) == 1 ? 1 : 0) + (nz(d3Fermee) == 1 ? 1 : 0) + (nz(d5Fermee) == 1 ? 1 : 0)
+microBear = (nz(d1Fermee) == -1 ? 1 : 0) + (nz(d3Fermee) == -1 ? 1 : 0) + (nz(d5Fermee) == -1 ? 1 : 0)
+retHaut = nz(d1Fermee) == 1 and microBull >= 2 and longT <= -1 and momS > 0
+retBas  = nz(d1Fermee) == -1 and microBear >= 2 and longT >= 1 and momS < 0
 
 // ═════════ RÉSISTANCES / SUPPORTS 15m - 1h - 4h ═════════
 f_niv() =>
