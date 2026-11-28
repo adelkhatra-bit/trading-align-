@@ -87,21 +87,21 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         timeframes = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1")
         self.assertIn(">= 20000", self.source)
         tuple_contracts = (
-            ("d1, s1, r1, r1Fermee", "bridgeTimeM1"),
-            ("d2, s2, r2, r2Fermee", "bridgeTimeM3"),
-            ("d5, s5, r5, r5Fermee", "bridgeTimeM5"),
-            ("d10, s10, r10, r10Fermee", "bridgeTimeM10"),
-            ("d15, s15, r15, r15Fermee", "bridgeTimeM15"),
-            ("d30, s30, r30, r30Fermee", "bridgeTimeM30"),
-            ("d45, s45, r45, r45Fermee", "bridgeTimeM45"),
-            ("d60, s60, r60, r60Fermee", "bridgeTimeH1"),
-            ("d120, s120, r120, r120Fermee", "bridgeTimeH2"),
-            ("d240, s240, r240, r240Fermee", "bridgeTimeH4"),
-            ("dD, sD, rD, rDFermee", "bridgeTimeD1"),
-            ("dW, sW, rW, rWFermee", "bridgeTimeW1"),
+            ('[d1, s1, r1, d1Fermee, r1Fermee, bridgeTimeM1] = f_etat_mtf("1")', "bridgeTimeM1"),
+            ('[d2, s2, r2, d3Fermee, r2Fermee, bridgeTimeM3] = f_etat_mtf("3")', "bridgeTimeM3"),
+            ('[d5, s5, r5, d5Fermee, r5Fermee, bridgeTimeM5] = f_etat_mtf("5")', "bridgeTimeM5"),
+            ('[d10, s10, r10, d10Fermee, r10Fermee, bridgeTimeM10] = f_etat_mtf("10")', "bridgeTimeM10"),
+            ('[d15, s15, r15, d15Fermee, r15Fermee, bridgeTimeM15] = f_etat_mtf("15")', "bridgeTimeM15"),
+            ('[d30, s30, r30, d30Fermee, r30Fermee, bridgeTimeM30] = f_etat_mtf("30")', "bridgeTimeM30"),
+            ('[d45, s45, r45, d45Fermee, r45Fermee, bridgeTimeM45] = f_etat_mtf("45")', "bridgeTimeM45"),
+            ('[d60, s60, r60, d60Fermee, r60Fermee, bridgeTimeH1] = f_etat_mtf("60")', "bridgeTimeH1"),
+            ('[d120, s120, r120, d120Fermee, r120Fermee, bridgeTimeH2] = f_etat_mtf("120")', "bridgeTimeH2"),
+            ('[d240, s240, r240, d240Fermee, r240Fermee, bridgeTimeH4] = f_etat_mtf("240")', "bridgeTimeH4"),
+            ('[dD, sD, rD, dDFermee, rDFermee, bridgeTimeD1] = f_etat_mtf("D")', "bridgeTimeD1"),
+            ('[dW, sW, rW, dWFermee, rWFermee, bridgeTimeW1] = f_etat_mtf("W")', "bridgeTimeW1"),
         )
-        for tuple_head, closed_time in tuple_contracts:
-            self.assertIn("[" + tuple_head + ", " + closed_time + "]", self.source)
+        for assignment, closed_time in tuple_contracts:
+            self.assertIn(assignment, self.source)
             self.assertNotIn(closed_time + " = request.security(", self.source)
         request_sites = self.source.count("request.security(") + self.source.count("request.security_lower_tf(")
         self.assertLessEqual(request_sites, 40)
