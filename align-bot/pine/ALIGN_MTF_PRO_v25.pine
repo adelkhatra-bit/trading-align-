@@ -282,7 +282,8 @@ isBtc = str.contains(tickerUpper, "BTC") or str.contains(tickerUpper, "XBT")
 isGold = str.contains(tickerUpper, "XAU") or str.contains(tickerUpper, "GOLD")
 isSupportedMarket = isBtc or isGold
 goldConfluence = dirStable != 0 and nz(d5Fermee) == dirStable and nz(d15Fermee) == dirStable and
-                 nz(d60Fermee) == dirStable and nz(d240Fermee) == dirStable
+                 ((nz(d60Fermee) == dirStable and nz(d240Fermee) == dirStable) or
+                  (dirStable == 1 and retLongConfirme) or (dirStable == -1 and retShortConfirme))
 dirPlan = not isSupportedMarket or (isGold and not goldConfluence) ? 0 : dirStable
 // ═════════ STRATÉGIES SCALPING / DAY / SWING : règles d'alignement multi-UT ═════════
 // SWING : W1/D1 contexte • H4 retracement (ou aligné) • H1 confirmation de reprise
@@ -308,7 +309,7 @@ swOk  = dP != 0 and uD and not oW and u1h and not o4
 swAtt = dP != 0 and uD and not oW and not u4 and not u1h
 dyOk  = dP != 0 and not o4 and u1h and u5
 dyAtt = dP != 0 and not o4 and u1h and not u15 and not u5
-scOk  = dP != 0 and not o1h and u15 and u5 and u1
+scOk  = dP != 0 and (not o1h or retLongConfirme or retShortConfirme) and u15 and u5 and u1
 scAtt = dP != 0 and not o1h and u15 and u5 and not u1
 strat = swOk ? "SWING" : dyOk ? "DAY" : scOk ? "SCALPING" : swAtt ? "SWING" : dyAtt ? "DAY" : scAtt ? "SCALPING" : ""
 etatS = swOk or dyOk or scOk ? "CONFIRMÉ" : strat != "" ? "EN ATTENTE" : "AUCUNE"
@@ -673,7 +674,7 @@ if barstate.islast
 // ═════════ BRIDGE ALIGN — export structuré du Pine v25 (sans toucher aux signaux/visuels) ═════════
 // Le bridge ne publie LONG/SHORT que si le plan complet est confirmé.
 bridgePlanValid = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2)
-bridgeClosedMtfOk = strat == "SWING" ? (nz(dDFermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) != -dirPlan and nz(dWFermee) != -dirPlan) : strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d240Fermee) != -dirPlan) : strat == "SCALPING" ? (nz(d60Fermee) != -dirPlan and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan) : false
+bridgeClosedMtfOk = strat == "SWING" ? (nz(dDFermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) != -dirPlan and nz(dWFermee) != -dirPlan) : strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d240Fermee) != -dirPlan) : strat == "SCALPING" ? ((nz(d60Fermee) != -dirPlan or (dirPlan == 1 and retLongConfirme) or (dirPlan == -1 and retShortConfirme)) and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan) : false
 bridgeConfirmed = bridgePlanValid and planRiskRewardOk and etatS == "CONFIRMÉ" and scoreV >= 75 and bridgeClosedMtfOk
 bridgeSignal = bridgeConfirmed ? (dirPlan == 1 ? "LONG" : "SHORT") : "WAIT"
 bridgeZone = zoneHaut ? "SUPPORT" : zoneBas ? "RESISTANCE" : "PLAN"
