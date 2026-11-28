@@ -82,7 +82,19 @@ f_etat_mtf(string tf) =>
 [d120, s120, r120, d120Fermee, r120Fermee, bridgeTimeH2] = f_etat_mtf("120")
 [d240, s240, r240, d240Fermee, r240Fermee, bridgeTimeH4] = f_etat_mtf("240")
 [dD, sD, rD, dDFermee, rDFermee, bridgeTimeD1] = f_etat_mtf("D")
-[dW, sW, rW, dWFermee, rWFermee, bridgeTimeW1] = f_etat_mtf("W")noms  = array.from("1", "3", "5", "10", "15", "30", "45", "1h", "2h", "4h", "D")
+[dW, sW, rW, dWFermee, rWFermee, bridgeTimeW1] = f_etat_mtf("W")
+
+// Contrat MTF : conserve la lecture live pour l'affichage, mais ancre direction, RSI et horodatage sur la dernière bougie clôturée de chaque UT.
+// Les UT inférieures au graphique passent par request.security_lower_tf() et sélectionnent le dernier intrabar confirmé.
+rsisFermees = array.from(nz(r1Fermee, 50), nz(r2Fermee, 50), nz(r5Fermee, 50), nz(r10Fermee, 50), nz(r15Fermee, 50), nz(r30Fermee, 50), nz(r45Fermee, 50), nz(r60Fermee, 50), nz(r120Fermee, 50), nz(r240Fermee, 50), nz(rDFermee, 50), nz(rWFermee, 50))
+int rsiOBFermee = 0
+int rsiOSFermee = 0
+for i = 0 to 11
+    rsiValeurFermee = array.get(rsisFermees, i)
+    rsiOBFermee += rsiValeurFermee >= 70 ? 1 : 0
+    rsiOSFermee += rsiValeurFermee <= 30 ? 1 : 0
+
+noms  = array.from("1", "3", "5", "10", "15", "30", "45", "1h", "2h", "4h", "D")
 nomsL = array.from("1 min", "3 min", "5 min", "10 min", "15 min", "30 min", "45 min", "1 heure", "2 heures", "4 heures", "Daily")
 dirs = array.from(nz(d1Fermee), nz(d3Fermee), nz(d5Fermee), nz(d10Fermee), nz(d15Fermee), nz(d30Fermee), nz(d45Fermee), nz(d60Fermee), nz(d120Fermee), nz(d240Fermee), nz(dDFermee))
 dirsFermees = array.from(nz(d1Fermee), nz(d3Fermee), nz(d5Fermee), nz(d10Fermee), nz(d15Fermee), nz(d30Fermee), nz(d45Fermee), nz(d60Fermee), nz(d120Fermee), nz(d240Fermee), nz(dDFermee))
