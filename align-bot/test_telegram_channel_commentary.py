@@ -285,7 +285,7 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         self.assertIn("Confirmed Pine bias: 🔴 falling", english)
         self.assertIn("BTC (current price)", english)
         self.assertIn("M15 body: +1", english)
-        self.assertIn("Vs sens confirmé SHORT : 11/11 alignées", french)
+        self.assertIn("Vs biais Pine confirmé SHORT : 11/11 alignées", french)
 
 
     def test_live_coach_never_calls_local_direction_a_confirmed_pine_bias(self):
@@ -304,7 +304,7 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         self.assertIn("Biais Pine : non confirmé — attente", french)
         self.assertIn("Biais de contexte : SHORT dominant • 11/11 baissières", french)
         self.assertNotIn("Biais Pine confirmé :", french)
-        self.assertNotIn("Vs sens confirmé SHORT", french)
+        self.assertNotIn("Vs biais Pine confirmé SHORT", french)
         english = ab.traduire(french)
         self.assertIn("Pine bias: unconfirmed — waiting", english)
         self.assertNotIn("Confirmed Pine bias:", english)
