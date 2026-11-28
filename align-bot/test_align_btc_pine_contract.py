@@ -80,6 +80,15 @@ class AlignBtcPineContract(unittest.TestCase):
             self.assertIn("request.security_lower_tf(syminfo.tickerid, tf, f_niv())", source)
             self.assertIn('request.security_lower_tf(syminfo.tickerid, "15", f_plan_snapshot())', source)
 
+
+    def test_btc_entry_trigger_timestamp_uses_closed_candle_close(self):
+        source = PINE.read_text(encoding="utf-8")
+        bridge_start = source.index("bridgeEntryTf =")
+        bridge_end = source.index("bridgeEntryTimeSafe =", bridge_start)
+        bridge_entry = source[bridge_start:bridge_end]
+        self.assertIn("time_close[1]", bridge_entry)
+        self.assertNotIn("time[1]", bridge_entry)
+
     def test_gold_routing_is_not_present_in_the_dedicated_btc_export(self):
         source = PINE.read_text(encoding="utf-8")
         self.assertNotIn('"XAUUSD"', source)
