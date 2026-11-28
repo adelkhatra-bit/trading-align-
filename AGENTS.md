@@ -222,3 +222,5 @@ For every completed task, provide a concise, evidence-based report containing:
 Never say “100% operational”, “fixed”, “deployed”, “live”, or “all tests pass” unless the available evidence supports that exact claim. Never claim background work or continuous monitoring unless an authorized automation actually exists and its state has been checked.
 Owner approval rule
 The owner retains final authority over production. Explicit authorization to investigate, edit code, create a branch, commit, or open a PR does not authorize merge, deployment, secret changes, broker activity, or destructive maintenance. Those actions require separate approvals as specified above.
+
+All contributors must obtain explicit user approval before any merge.
