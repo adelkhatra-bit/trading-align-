@@ -111,7 +111,7 @@ class BridgeStoreTests(unittest.TestCase):
         for variable, interval in expected.items():
             with self.subTest(timeframe=variable):
                 self.assertIn(variable + '] = f_etat_mtf(' + interval + ')', pine)
-        self.assertIn("request.security_lower_tf(syminfo.tickerid, tf, f_etat())", pine)
+        self.assertIn("EtatMtfSnapshot etatRequested = request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)", pine)
         self.assertIn("request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)", pine)
         self.assertIn('EtatMtfSnapshot.new(d, sqz ? 1 : 0, rsiValue, time_close, d[1], sqz[1] ? 1 : 0, rsiValue[1], time_close[1], time_close <= timenow)', pine)
         self.assertIn('type EtatMtfSnapshot', pine)
