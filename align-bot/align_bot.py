@@ -3031,10 +3031,11 @@ TRAD.update({
     "🎙 COACH COMMENTATEUR": "🎙 LIVE COMMENTATOR",
     "👁 EN DIRECT": "👁 LIVE",
     "📊 BILAN 15 MIN": "📊 15-MINUTE SUMMARY",
+    " (prix actuel) :": " (current price):",
     "ℹ️ Info, pas une entrée": "ℹ️ Information, not an entry",
-    "🟢 Bougie en hausse": "🟢 Candle rising",
-    "🔴 Bougie en baisse": "🔴 Candle falling",
-    "⚪ Bougie à plat": "⚪ Flat candle",
+    "🟢 Bougie en hausse — M15 clôturée": "🟢 M15 candle closed higher",
+    "🔴 Bougie en baisse — M15 clôturée": "🔴 M15 candle closed lower",
+    "⚪ Bougie à plat — M15 clôturée": "⚪ M15 candle closed flat",
     "⏳ ATTENTE — biais candidat LONG": "⏳ WAITING — candidate LONG bias",
     "⏳ ATTENTE — biais candidat SHORT": "⏳ WAITING — candidate SHORT bias",
     "⏳ ATTENTE — aucun biais LONG/SHORT confirmé par Pine v25": "⏳ WAITING — no LONG/SHORT bias confirmed by Pine v25",
@@ -3051,8 +3052,8 @@ TRAD.update({
     "données Pine v25 absentes ou périmées": "Pine v25 data missing or stale",
     "👁 Mèche haute : rejet": "👁 Upper wick: rejection",
     "👁 Mèche basse : rejet": "👁 Lower wick: rejection",
-    "👁 Mèche haute dominante : pression vendeuse possible — rejet non établi sans résistance identifiée": "👁 Dominant upper wick: possible selling pressure — no confirmed resistance rejection",
-    "👁 Mèche basse dominante : pression acheteuse possible — rejet non établi sans support identifié": "👁 Dominant lower wick: possible buying pressure — no confirmed support rejection",
+    "👁 Mèche haute : rejet des prix élevés, pression vendeuse possible — rejet non confirmé sans résistance identifiée": "👁 Upper wick: higher prices rejected; possible selling pressure — rejection unconfirmed without identified resistance",
+    "👁 Mèche basse : rejet des prix bas, pression acheteuse possible — rejet non confirmé sans support identifié": "👁 Lower wick: lower prices rejected; possible buying pressure — rejection unconfirmed without identified support",
     "👁 Mèches des deux côtés : indécision": "👁 Wicks on both sides: indecision",
     "ℹ️ ▲ LONG = hausse • ▼ SHORT = baisse • ➡️ neutre": "ℹ️ ▲ LONG = bullish • ▼ SHORT = bearish • ➡️ neutral",
     "ℹ️ UT alignées = contexte, jamais une entrée seule.": "ℹ️ Aligned timeframes = context, never an entry by themselves.",
@@ -3079,10 +3080,10 @@ TRAD.update({
     "ℹ️ Le décompte décrit le contexte ; seule la clôture de validation du plan autorise l'entrée.": "ℹ️ This count describes context; only the plan's validation close can authorize an entry.",
     "➖ Unités partagées": "➖ Mixed timeframes",
     "📏 Écart :": "📏 Range:",
-    "🧭 Tendance :": "🧭 Trend:",
+    "🧭 Biais Pine confirmé :": "🧭 Confirmed Pine bias:",
     "🟢 hausse": "🟢 rising",
     "🔴 baisse": "🔴 falling",
-    "➖ floue": "➖ unclear",
+    "➖ flou": "➖ unclear",
     "⚡ Compression : ça charge": "⚡ Compression: pressure is building",
     "📂 Bot : ": "📂 Bot: ",
     "🟢 LONG en cours": "🟢 LONG ongoing",
@@ -7319,13 +7320,13 @@ def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
     o_, h_, l_, c_ = bougie["o"], bougie["h"], bougie["l"], bougie["c"]
     corps = abs(c_ - o_); rng = max(h_ - l_, 1e-9)
     m_haut, m_bas = h_ - max(o_, c_), min(o_, c_) - l_
-    sens_b = "🟢 Bougie en hausse" if c_ > o_ else "🔴 Bougie en baisse" if c_ < o_ else "⚪ Bougie à plat"
+    sens_b = "🟢 Bougie en hausse — M15 clôturée" if c_ > o_ else "🔴 Bougie en baisse — M15 clôturée" if c_ < o_ else "⚪ Bougie à plat — M15 clôturée"
     if m_haut >= 0.5 * rng and m_bas >= 0.5 * rng:
         lecture = "👁 Mèches des deux côtés : indécision"
     elif m_haut >= 0.5 * rng:
-        lecture = "👁 Mèche haute dominante : pression vendeuse possible — rejet non établi sans résistance identifiée"
+        lecture = "👁 Mèche haute : rejet des prix élevés, pression vendeuse possible — rejet non confirmé sans résistance identifiée"
     elif m_bas >= 0.5 * rng:
-        lecture = "👁 Mèche basse dominante : pression acheteuse possible — rejet non établi sans support identifié"
+        lecture = "👁 Mèche basse : rejet des prix bas, pression acheteuse possible — rejet non confirmé sans support identifié"
     elif corps >= 0.7 * rng:
         lecture = "👁 Mouvement franc 💪"
     else:
@@ -7372,11 +7373,11 @@ def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
     else:
         role_ut = "🎯 Rôles : H4 tendance • H1 confirmation • M15 setup • M5 timing • M1 exécution"
     l = ["🎙 COACH COMMENTATEUR", "👁 EN DIRECT", SEPARATEUR,
-         "📊 BILAN 15 MIN", f"{ICONE.get(m, '')} {m} : {px(p)}"]
+         "📊 BILAN 15 MIN", f"{ICONE.get(m, '')} {m} (prix actuel) : {px(p)}"]
     if public or not tr:
         l.append("ℹ️ Info, pas une entrée")
     l += [SEPARATEUR, sens_b, f"📏 Écart : {'+' if c_ >= o_ else '-'}{px(corps)}", lecture,
-          "🧭 Tendance : " + ("🟢 hausse" if d == 1 else "🔴 baisse" if d == -1 else "➖ floue"),
+          "🧭 Biais Pine confirmé : " + ("🟢 hausse" if d == 1 else "🔴 baisse" if d == -1 else "➖ flou"),
           unites, bilan_ut, w1_txt, role_ut,
           "ℹ️ ▲ LONG = hausse • ▼ SHORT = baisse • ➡️ neutre",
           "ℹ️ UT alignées = contexte, jamais une entrée seule."]
