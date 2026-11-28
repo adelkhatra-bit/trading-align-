@@ -48,7 +48,8 @@ class AlignBtcPineContract(unittest.TestCase):
             return source[i:j].strip()
 
         for start, end in (
-            ("f_etat() =>", "[d1,"),
+            ("f_etat() =>", "\n\nf_etat_mtf"),
+            ("f_etat_mtf(string tf) =>", "\n\n"),
             ("f_niv() =>", "[rA15,"),
             ("f_plan_snapshot() =>", "[planOpen15,"),
         ):
