@@ -52,6 +52,7 @@ class AlignBtcPineContract(unittest.TestCase):
             ("f_etat_mtf(string tf) =>", "\n\n"),
             ("f_niv() =>", "[rA15,"),
             ("f_plan_snapshot() =>", "[planOpen15,"),
+            ("f_fibo_snapshot() =>", "[fH, fL]"),
             ("f_plan(d, sMin", "[e, t1, t2, s, n1, n2]"),
         ):
             with self.subTest(helper=start):
