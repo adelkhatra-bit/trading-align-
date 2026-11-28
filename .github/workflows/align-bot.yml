@@ -424,7 +424,9 @@ jobs:
           # Les signaux restent bloqués par ALIGN_REQUIRE_TV_BRIDGE=1 et ALIGN_TV_BRIDGE_PRET=0.
           # Le gate final conserve un échec visible tant que le bridge n’est pas valide.
           DUREE_SEC: "${{ github.event_name == 'workflow_dispatch' && '300' || '21000' }}"
-          PAUSE_SEC: "5"
+          # Les commandes Telegram et les chronos restent réactifs via leurs boucles dédiées.
+          # L’analyse complète des marchés est espacée à 15 s (bridge snapshots rafraîchis toutes les 20 s).
+          PAUSE_SEC: "15"
         run: exec python3 align_bot.py
 
       - name: Auditer la mémoire persistée après migration BTC + GOLD

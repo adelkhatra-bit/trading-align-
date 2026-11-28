@@ -4639,7 +4639,7 @@ LIEN_INDICATEUR = os.environ.get("LIEN_INDICATEUR", "")   # lien du script Tradi
 PRIX_STARS = int(os.environ.get("PRIX_STARS", "2500"))   # abonnement VIP mensuel : 2 500 ⭐ ≈ 49,90 €
 ECOUTE_SEC = int(os.environ.get("ECOUTE_SEC", "200"))   # (ancien réglage, gardé pour compatibilité)
 DUREE_SEC = int(os.environ.get("DUREE_SEC", str(ECOUTE_SEC)))   # durée maximale du worker; un run plus récent en file déclenche un arrêt anticipé via surveiller_releve
-PAUSE_SEC = int(os.environ.get("PAUSE_SEC", "5"))    # surveillance des setups toutes les 5 s ; les sources de marché restent mises en cache
+PAUSE_SEC = int(os.environ.get("PAUSE_SEC", "15"))   # analyse complète toutes les 15 s ; Telegram et chronos restent traités indépendamment entre deux tours
 
 def marche_retiree_demande(txt):
     """Détecte une demande NASDAQ pour la refuser explicitement, sans la convertir en BTC ou GOLD."""
