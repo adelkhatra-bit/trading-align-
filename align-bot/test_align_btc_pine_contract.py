@@ -18,12 +18,24 @@ class AlignBtcPineContract(unittest.TestCase):
         self.assertIn('"source":"ALIGN_MTF_PRO_V25"', source)
         self.assertNotIn('bridgeMarket = isBtc ? "BTCUSD" : isGold ? "XAUUSD"', source)
 
+
+    def test_btc_global_score_uses_closed_mtf_and_fixed_m15_momentum(self):
+        source = PINE.read_text(encoding="utf-8")
+        self.assertIn("rs += w * (array.get(rsisFermees, i) - 50) / 50", source)
+        self.assertIn("score = 0.45 * trendS + 0.30 * rsiS + 0.25 * planMomS15", source)
+        self.assertIn("momS reste réservé aux signaux locaux", source)
+        self.assertIn("confirmation microstructure SCALP", source)
+        self.assertIn('3 min " + (u3 ? "✅" : "⏳")', source)
+
+
     def test_btc_ui_and_bridge_use_the_strategy_specific_closed_mtf_gates(self):
         source = PINE.read_text(encoding="utf-8")
         bridge = next(line for line in source.splitlines() if line.startswith("bridgeClosedMtfOk = "))
         self.assertIn('strat == "SWING" ?', bridge)
         self.assertIn('strat == "DAY" ?', bridge)
         self.assertIn('strat == "SCALPING" ?', bridge)
+        self.assertIn("nz(d3Fermee) == dirPlan", bridge)
+        self.assertIn("and u15 and u5 and u3 and u1", source)
         self.assertIn("nz(dDFermee) == dirPlan", bridge)
         self.assertIn("nz(dWFermee) != -dirPlan", bridge)
         self.assertIn("nz(d5Fermee) == dirPlan", bridge)

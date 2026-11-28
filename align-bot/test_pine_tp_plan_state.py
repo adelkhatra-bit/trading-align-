@@ -91,7 +91,7 @@ class PineTpPlanStateTests(unittest.TestCase):
         self.assertIn("uW  = nz(dWFermee) == dP", self.source)
         self.assertIn('strat == "SWING" ? (nz(dDFermee) == dirPlan', self.source)
         self.assertIn('strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan', self.source)
-        self.assertIn('strat == "SCALPING" ? ((nz(d60Fermee) != -dirPlan or (dirPlan == 1 and retLongConfirme) or (dirPlan == -1 and retShortConfirme)) and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan)', self.source)
+        self.assertIn('strat == "SCALPING" ? ((nz(d60Fermee) != -dirPlan or (dirPlan == 1 and retLongConfirme) or (dirPlan == -1 and retShortConfirme)) and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d3Fermee) == dirPlan and nz(d1Fermee) == dirPlan)', self.source)
 
     def test_visual_and_bridge_share_the_coach_risk_reward_and_atr_gate(self):
         self.assertIn("planRiskRewardOk = not na(atr15) and atr15 > 0 and rrS >= 2.0 and planRisk <= 1.5 * atr15", self.source)

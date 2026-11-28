@@ -172,11 +172,11 @@ for i = 0 to 10
     comp += array.get(sqzs, i)
     sw += w
     ts += w * dv
-    rs += w * (array.get(rsis, i) - 50) / 50
+    rs += w * (array.get(rsisFermees, i) - 50) / 50
     court += i <= 4 ? dv : 0
     longT += i >= 7 ? dv : 0
-    rsiOB += array.get(rsis, i) >= 70 ? 1 : 0
-    rsiOS += array.get(rsis, i) <= 30 ? 1 : 0
+    rsiOB += array.get(rsisFermees, i) >= 70 ? 1 : 0
+    rsiOS += array.get(rsisFermees, i) <= 30 ? 1 : 0
 
 alignHaut = bull >= minAlign
 alignBas  = bear >= minAlign
@@ -201,11 +201,7 @@ momS = mom > 0 ? (mom > mom[1] ? 1.0 : 0.4) : (mom < mom[1] ? -1.0 : -0.4)
 liberation = sC[1] == 1 and sC == 0
 
 // ═════════ ANTICIPATION : SENS PROBABLE ═════════
-trendS = ts / sw
-rsiS = math.max(-1.0, math.min(1.0, rs / sw * 2))
-score = 0.45 * trendS + 0.30 * rsiS + 0.25 * momS
-pctH = math.round(50 + 50 * score)
-sens = score > 0.15 ? 1 : score < -0.15 ? -1 : 0
+
 // Détection progressive : M1 alerte, M3/M5 construisent, M15 confirme.
 microBull = (nz(d1Fermee) == 1 ? 1 : 0) + (nz(d3Fermee) == 1 ? 1 : 0) + (nz(d5Fermee) == 1 ? 1 : 0)
 microBear = (nz(d1Fermee) == -1 ? 1 : 0) + (nz(d3Fermee) == -1 ? 1 : 0) + (nz(d5Fermee) == -1 ? 1 : 0)
@@ -271,6 +267,14 @@ f_plan_snapshot_mtf() =>
 [planOpen15, planHigh15, planLow15, planClose15, planAtr15, planRsi15, planMom15, planMomPrev15, planVol15, planVolMoy15] = f_plan_snapshot_mtf()
 atr15 = planAtr15
 planMomS15 = planMom15 > 0 ? (planMom15 > planMomPrev15 ? 1.0 : 0.4) : (planMom15 < planMomPrev15 ? -1.0 : -0.4)
+
+// Score global chart-invariant : directions et RSI clôturés MTF + momentum M15 clôturé.
+// momS reste réservé aux signaux locaux de l'UT affichée.
+trendS = ts / sw
+rsiS = math.max(-1.0, math.min(1.0, rs / sw * 2))
+score = 0.45 * trendS + 0.30 * rsiS + 0.25 * planMomS15
+pctH = math.round(50 + 50 * score)
+sens = score > 0.15 ? 1 : score < -0.15 ? -1 : 0
 
 // Niveau le plus proche au-dessus / en dessous (1er et 2e)
 f_dessus(refClose, refAtr) =>
@@ -389,7 +393,7 @@ dirPlan = not isSupportedMarket or (isGold and not goldConfluence) ? 0 : dirStab
 // ═════════ STRATÉGIES SCALPING / DAY / SWING : règles d'alignement multi-UT ═════════
 // SWING : W1/D1 contexte • H4 retracement (ou aligné) • H1 confirmation de reprise
 // DAY : H4 contexte • H1 direction • M15 retracement • M5 déclenchement
-// SCALPING : H1 contexte • M15 direction • M5 structure • M1 déclenchement
+// SCALPING : H1 contexte • M15 direction • M5 structure • M3 confirmation microstructure • M1 déclenchement
 dP  = dirPlan
 uW  = nz(dWFermee) == dP
 uD  = nz(dDFermee) == dP
@@ -397,11 +401,13 @@ d4Strat = nz(d240Fermee)
 d1hStrat = nz(d60Fermee)
 d15Strat = nz(d15Fermee)
 d5Strat = nz(d5Fermee)
+d3Strat = nz(d3Fermee)
 d1Strat = nz(d1Fermee)
 u4  = d4Strat == dP
 u1h = d1hStrat == dP
 u15 = d15Strat == dP
 u5  = d5Strat == dP
+u3  = d3Strat == dP
 u1  = d1Strat == dP
 oW  = nz(dWFermee) == -dP
 o4  = d4Strat == -dP
@@ -410,11 +416,11 @@ swOk  = dP != 0 and uD and not oW and u1h and not o4
 swAtt = dP != 0 and uD and not oW and not u4 and not u1h
 dyOk  = dP != 0 and not o4 and u1h and u5
 dyAtt = dP != 0 and not o4 and u1h and not u15 and not u5
-scOk  = dP != 0 and (not o1h or retLongConfirme or retShortConfirme) and u15 and u5 and u1
-scAtt = dP != 0 and not o1h and u15 and u5 and not u1
+scOk  = dP != 0 and (not o1h or retLongConfirme or retShortConfirme) and u15 and u5 and u3 and u1
+scAtt = dP != 0 and not o1h and u15 and u5 and (not u3 or not u1)
 strat = swOk ? "SWING" : dyOk ? "DAY" : scOk ? "SCALPING" : swAtt ? "SWING" : dyAtt ? "DAY" : scAtt ? "SCALPING" : ""
 etatS = swOk or dyOk or scOk ? "CONFIRMÉ" : strat != "" ? "EN ATTENTE" : "AUCUNE"
-motifS = strat == "SWING" ? (swOk ? "D1 ✔ H1 ✔ " + (u4 ? "H4 ✔" : "H4 en retracement") + " : reprise confirmée" : "Retracement H4 détecté, H1 non confirmé : aucune entrée pour le moment") : strat == "DAY" ? (dyOk ? "H1 ✔ M5 ✔ " + (u15 ? "M15 ✔" : "M15 en retracement") + (u4 ? " H4 ✔" : " H4 neutre") : "Retracement M15 en cours, M5 non confirmé : attendre la clôture 5 min") : strat == "SCALPING" ? (scOk ? "M15 ✔ M5 ✔ M1 ✔" + (u1h ? " H1 ✔" : " H1 neutre") : "M15 et M5 alignés, déclenchement M1 manquant") : "Pas d'alignement conforme aux règles SCALPING / DAY / SWING"
+motifS = strat == "SWING" ? (swOk ? "D1 ✔ H1 ✔ " + (u4 ? "H4 ✔" : "H4 en retracement") + " : reprise confirmée" : "Retracement H4 détecté, H1 non confirmé : aucune entrée pour le moment") : strat == "DAY" ? (dyOk ? "H1 ✔ M5 ✔ " + (u15 ? "M15 ✔" : "M15 en retracement") + (u4 ? " H4 ✔" : " H4 neutre") : "Retracement M15 en cours, M5 non confirmé : attendre la clôture 5 min") : strat == "SCALPING" ? (scOk ? "M15 ✔ M5 ✔ M3 ✔ M1 ✔" + (u1h ? " H1 ✔" : " H1 neutre") : not u3 ? "M15 et M5 alignés, confirmation microstructure M3 manquante" : "M3 confirmé, déclenchement M1 manquant") : "Pas d'alignement conforme aux règles SCALPING / DAY / SWING"
 profNiv = strat == "SWING" ? 3 : strat == "DAY" ? 2 : strat == "SCALPING" ? 1 : 0
 // Niveaux : 0-3 = 15 min • 4-7 = 1h • 8-11 = 4h • 12-15 = Daily
 sMinP = profNiv == 3 ? 4 : profNiv == 2 ? 4 : profNiv == 1 ? 0 : 4
@@ -454,8 +460,9 @@ f_reste(minutes) =>
     tfms = minutes * 60000
     (math.floor(timenow / tfms) + 1) * tfms - timenow
 // ═════════ SCORE DE VALIDATION /100 (critères mesurés, pas une probabilité) ═════════
-alignN = strat == "SWING" ? (uW ? 1 : 0) + (uD ? 1 : 0) + (u4 ? 1 : 0) + (u1h ? 1 : 0) : strat == "DAY" ? (u4 ? 1 : 0) + (u1h ? 1 : 0) + (u15 ? 1 : 0) + (u5 ? 1 : 0) : strat == "SCALPING" ? (u1h ? 1 : 0) + (u15 ? 1 : 0) + (u5 ? 1 : 0) + (u1 ? 1 : 0) : 0
-ptsAlign = math.round(25.0 * alignN / 4.0)
+alignN = strat == "SWING" ? (uW ? 1 : 0) + (uD ? 1 : 0) + (u4 ? 1 : 0) + (u1h ? 1 : 0) : strat == "DAY" ? (u4 ? 1 : 0) + (u1h ? 1 : 0) + (u15 ? 1 : 0) + (u5 ? 1 : 0) : strat == "SCALPING" ? (u1h ? 1 : 0) + (u15 ? 1 : 0) + (u5 ? 1 : 0) + (u3 ? 1 : 0) + (u1 ? 1 : 0) : 0
+alignMax = strat == "SCALPING" ? 5.0 : 4.0
+ptsAlign = math.round(25.0 * alignN / alignMax)
 ctxU = strat == "SWING" ? uD : strat == "DAY" ? u4 : u1h
 ctxO = strat == "SWING" ? oW : strat == "DAY" ? o4 : o1h
 ptsStruct = strat == "" ? 0 : ctxU ? 20 : ctxO ? 0 : 10
@@ -492,7 +499,7 @@ bridgePlanGeometryOk = dirPlan == 1 ? (
 ) : dirPlan == -1 ? (
      tp1 < zBas and ent >= zBas and ent <= zHaut and sl > zHaut and tp2 < tp1
 ) : false
-planClosedMtfOkUi = strat == "SWING" ? (nz(dDFermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) != -dirPlan and nz(dWFermee) != -dirPlan) : strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d240Fermee) != -dirPlan) : strat == "SCALPING" ? ((nz(d60Fermee) != -dirPlan or (dirPlan == 1 and retLongConfirme) or (dirPlan == -1 and retShortConfirme)) and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan) : false
+planClosedMtfOkUi = strat == "SWING" ? (nz(dDFermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) != -dirPlan and nz(dWFermee) != -dirPlan) : strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d240Fermee) != -dirPlan) : strat == "SCALPING" ? ((nz(d60Fermee) != -dirPlan or (dirPlan == 1 and retLongConfirme) or (dirPlan == -1 and retShortConfirme)) and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d3Fermee) == dirPlan and nz(d1Fermee) == dirPlan) : false
 planConfirmedUi = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and planRiskRewardOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2) and etatS == "CONFIRMÉ" and scoreV >= 75 and planClosedMtfOkUi
 
 
@@ -607,7 +614,7 @@ if barstate.islast
         rv = array.get(rsisFermees, i)
         bg = sq ?  color.rgb(230, 130, 0) : dv == 1 ?  color.rgb(0, 140, 70) : dv == -1 ?  color.rgb(190, 30, 45) :  color.rgb(90, 90, 90)
         sym = (dv == 1 ? "▲" : dv == -1 ? "▼" : "—") + (rv >= 70 ? "!" : rv <= 30 ? "!" : "") + (dirPlan != 0 and dv == -dirPlan and i <= 4 ? "↩" : "") + (dvLive != dv ? "~" : "")
-        roleUT = array.get(array.from("déclenchement SCALP", "timing très court", "déclenchement DAY • structure SCALP", "préparation", "direction SCALP • retracement DAY", "intermédiaire", "intermédiaire", "contexte SCALP • direction DAY • confirmation SWING", "intermédiaire", "contexte DAY • retracement SWING", "direction SWING"), i)
+        roleUT = array.get(array.from("pré-alerte • déclencheur SCALP", "confirmation microstructure SCALP", "structure SCALP • déclenchement DAY", "préparation", "direction SCALP • retracement DAY", "intermédiaire", "intermédiaire", "contexte SCALP • direction DAY • confirmation SWING", "intermédiaire", "contexte DAY • retracement SWING", "direction SWING"), i)
         minUT = array.get(array.from(1, 3, 5, 10, 15, 30, 45, 60, 120, 240, 0), i)
         sensUT = dv == 1 ? "HAUSSE ▲" : dv == -1 ? "BAISSE ▼" : "NEUTRE —"
         sensLive = dvLive == 1 ? "HAUSSE ▲" : dvLive == -1 ? "BAISSE ▼" : "NEUTRE —"
@@ -765,12 +772,12 @@ if barstate.islast
         lRet := line.new(bar_index, sl, bar_index + 30, sl, color= color.new(color.white, 30), style=line.style_dotted, width=1)
         eRet := label.new(bar_index + 30, sl, "↩ RETOURNEMENT", style=label.style_label_left, color= color.rgb(30, 34, 45), textcolor= color.white, size=size.small, tooltip="↩ LIGNE DE RETOURNEMENT : " + px(sl) + "\n\nSi une bougie " + (strat == "SWING" ? "1h" : strat == "DAY" ? "5 min" : strat == "SCALPING" ? "1 min" : "15 min") + " CLÔTURE " + (dirPlan == -1 ? "AU-DESSUS" : "EN DESSOUS") + " de cette ligne :\n⛔ le " + (dirPlan == -1 ? "SHORT" : "LONG") + " est annulé\n↩ retournement possible vers le " + (dirPlan == -1 ? "LONG" : "SHORT") + "\n\nEntrée dans l'autre sens SEULEMENT si le 15 min et la 1h confirment\n(et les unités de la stratégie SWING / DAY / SCALP)\n\n⏱ Prochaine clôture " + (strat == "SWING" ? "1h" : strat == "DAY" ? "5 min" : strat == "SCALPING" ? "1 min" : "15 min") + " dans " + f_mmss(f_reste((strat == "SWING" ? 60 : strat == "DAY" ? 5 : strat == "SCALPING" ? 1 : 15))) + (retTxt != "" ? "\n\n" + retTxt : ""))
         lConf := line.new(bar_index, ent, bar_index + 30, ent, color= color.new(color.white, 30), style=line.style_dotted, width=1)
-        eConf := label.new(bar_index + 30, ent, "🎯 ENTRÉE PLANIFIÉE — ATTENTE DÉCLENCHEUR", style=label.style_label_left, color= color.rgb(30, 34, 45), textcolor= color.white, size=size.small, tooltip="🎯 PRIX D'ENTRÉE PLANIFIÉ : " + px(ent) + "\nCe niveau n'est pas une entrée exécutable. Attendre la clôture du déclencheur M1 / M5 / H1 validé par le bridge." + "\n\nPour entrer en " + (dirPlan == -1 ? "SHORT" : "LONG") + " :\n1. le prix revient sur cette ligne\n2. une bougie " + (strat == "SWING" ? "1h" : strat == "DAY" ? "5 min" : strat == "SCALPING" ? "1 min" : "15 min") + " CLÔTURE " + (dirPlan == -1 ? "EN DESSOUS" : "AU-DESSUS") + "\n3. les unités de la stratégie " + (strat == "" ? "(aucune pour l'instant)" : strat) + " sont alignées\n\nÉtat des unités :\n" + "1h " + (u1h ? "✅" : "⏳") + "  15 min " + (u15 ? "✅" : "⏳") + "  5 min " + (u5 ? "✅" : "⏳") + "  1 min " + (u1 ? "✅" : "⏳") + "  4h " + (u4 ? "✅" : nz(d240) == 0 ? "—" : "⛔") + "  Daily " + (uD ? "✅" : "⏳") + "\n\nÉtat : " + (etatS == "CONFIRMÉ" and scoreV >= 75 ? "✅ entrée possible" : "⏳ pas encore : " + decisionS) + "\n⏱ Prochaine clôture " + (strat == "SWING" ? "1h" : strat == "DAY" ? "5 min" : strat == "SCALPING" ? "1 min" : "15 min") + " dans " + f_mmss(f_reste((strat == "SWING" ? 60 : strat == "DAY" ? 5 : strat == "SCALPING" ? 1 : 15))))
+        eConf := label.new(bar_index + 30, ent, "🎯 ENTRÉE PLANIFIÉE — ATTENTE DÉCLENCHEUR", style=label.style_label_left, color= color.rgb(30, 34, 45), textcolor= color.white, size=size.small, tooltip="🎯 PRIX D'ENTRÉE PLANIFIÉ : " + px(ent) + "\nCe niveau n'est pas une entrée exécutable. Attendre la clôture du déclencheur M1 / M5 / H1 validé par le bridge." + "\n\nPour entrer en " + (dirPlan == -1 ? "SHORT" : "LONG") + " :\n1. le prix revient sur cette ligne\n2. une bougie " + (strat == "SWING" ? "1h" : strat == "DAY" ? "5 min" : strat == "SCALPING" ? "1 min" : "15 min") + " CLÔTURE " + (dirPlan == -1 ? "EN DESSOUS" : "AU-DESSUS") + "\n3. les unités de la stratégie " + (strat == "" ? "(aucune pour l'instant)" : strat) + " sont alignées\n\nÉtat des unités :\n" + "1h " + (u1h ? "✅" : "⏳") + "  15 min " + (u15 ? "✅" : "⏳") + "  5 min " + (u5 ? "✅" : "⏳") + "  3 min " + (u3 ? "✅" : "⏳") + "  1 min " + (u1 ? "✅" : "⏳") + "  4h " + (u4 ? "✅" : nz(d240) == 0 ? "—" : "⛔") + "  Daily " + (uD ? "✅" : "⏳") + "\n\nÉtat : " + (etatS == "CONFIRMÉ" and scoreV >= 75 ? "✅ entrée possible" : "⏳ pas encore : " + decisionS) + "\n⏱ Prochaine clôture " + (strat == "SWING" ? "1h" : strat == "DAY" ? "5 min" : strat == "SCALPING" ? "1 min" : "15 min") + " dans " + f_mmss(f_reste((strat == "SWING" ? 60 : strat == "DAY" ? 5 : strat == "SCALPING" ? 1 : 15))))
 
 // ═════════ BRIDGE ALIGN — export structuré du Pine v25 (sans toucher aux signaux/visuels) ═════════
 // Le bridge ne publie LONG/SHORT que si le plan complet est confirmé.
 bridgePlanValid = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and not planGeometryMismatch and bridgePlanGeometryOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2)
-bridgeClosedMtfOk = strat == "SWING" ? (nz(dDFermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) != -dirPlan and nz(dWFermee) != -dirPlan) : strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d240Fermee) != -dirPlan) : strat == "SCALPING" ? ((nz(d60Fermee) != -dirPlan or (dirPlan == 1 and retLongConfirme) or (dirPlan == -1 and retShortConfirme)) and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan) : false
+bridgeClosedMtfOk = strat == "SWING" ? (nz(dDFermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) != -dirPlan and nz(dWFermee) != -dirPlan) : strat == "DAY" ? (nz(d60Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d240Fermee) != -dirPlan) : strat == "SCALPING" ? ((nz(d60Fermee) != -dirPlan or (dirPlan == 1 and retLongConfirme) or (dirPlan == -1 and retShortConfirme)) and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d3Fermee) == dirPlan and nz(d1Fermee) == dirPlan) : false
 bridgeConfirmed = bridgePlanValid and planRiskRewardOk and etatS == "CONFIRMÉ" and scoreV >= 75 and bridgeClosedMtfOk
 bridgeSignal = bridgeConfirmed ? (dirPlan == 1 ? "LONG" : "SHORT") : "WAIT"
 bridgeZone = zoneHaut ? "SUPPORT" : zoneBas ? "RESISTANCE" : "PLAN"
