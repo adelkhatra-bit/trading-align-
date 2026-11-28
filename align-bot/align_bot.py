@@ -3050,8 +3050,8 @@ TRAD.update({
     "données Pine v25 absentes ou périmées": "Pine v25 data missing or stale",
     "👁 Mèche haute : rejet": "👁 Upper wick: rejection",
     "👁 Mèche basse : rejet": "👁 Lower wick: rejection",
-    "👁 Mèche haute : rejet vendeur potentiel (biais SHORT)": "👁 Upper wick: potential seller rejection (SHORT bias)",
-    "👁 Mèche basse : rejet acheteur potentiel (biais LONG)": "👁 Lower wick: potential buyer rejection (LONG bias)",
+    "👁 Mèche haute dominante : pression vendeuse possible — rejet non établi sans résistance identifiée": "👁 Dominant upper wick: possible selling pressure — no confirmed resistance rejection",
+    "👁 Mèche basse dominante : pression acheteuse possible — rejet non établi sans support identifié": "👁 Dominant lower wick: possible buying pressure — no confirmed support rejection",
     "👁 Mèches des deux côtés : indécision": "👁 Wicks on both sides: indecision",
     "ℹ️ ▲ LONG = hausse • ▼ SHORT = baisse • ➡️ neutre": "ℹ️ ▲ LONG = bullish • ▼ SHORT = bearish • ➡️ neutral",
     "ℹ️ UT alignées = contexte, jamais une entrée seule.": "ℹ️ Aligned timeframes = context, never an entry by themselves.",
@@ -3116,14 +3116,14 @@ TRAD.update({
     " en 3 min": " in 3 min",
     "🎙 GROSSE MÈCHE !": "🎙 BIG WICK!",
     "👀 15 min en cours : rejet à ": "👀 15-min candle forming: rejection at ",
-    "🎙 GROSSE MÈCHE — REJET BAISSIER POTENTIEL": "🎙 BIG WICK — POTENTIAL BEARISH REJECTION",
-    "🎙 GROSSE MÈCHE — REJET HAUSSIER POTENTIEL": "🎙 BIG WICK — POTENTIAL BULLISH REJECTION",
+    "🎙 GROSSE MÈCHE HAUTE — PRESSION VENDEUSE POSSIBLE": "🎙 BIG UPPER WICK — POSSIBLE SELLING PRESSURE",
+    "🎙 GROSSE MÈCHE BASSE — PRESSION ACHETEUSE POSSIBLE": "🎙 BIG LOWER WICK — POSSIBLE BUYING PRESSURE",
     "🎙 GRANDES MÈCHES DES DEUX CÔTÉS — INDÉCISION": "🎙 LONG WICKS ON BOTH SIDES — INDECISION",
-    "👀 M15 en formation : mèche haute, rejet baissier potentiel à ": "👀 M15 forming: upper wick, potential bearish rejection at ",
-    "👀 M15 en formation : mèche basse, rejet haussier potentiel à ": "👀 M15 forming: lower wick, potential bullish rejection at ",
+    "👀 M15 en formation : mèche haute à ": "👀 M15 forming: upper wick at ",
+    "👀 M15 en formation : mèche basse à ": "👀 M15 forming: lower wick at ",
     "👀 M15 en formation : mèches haute et basse • aucun rejet directionnel retenu": "👀 M15 forming: upper and lower wicks • no directional rejection retained",
-    "🔴 Vendeurs rejettent le haut — non confirmé": "🔴 Sellers reject the high — unconfirmed",
-    "🟢 Acheteurs défendent le bas — non confirmé": "🟢 Buyers defend the low — unconfirmed",
+    "ℹ️ Rejet non confirmé : résistance non vérifiée": "ℹ️ Rejection unconfirmed: resistance not verified",
+    "ℹ️ Rejet non confirmé : support non vérifié": "ℹ️ Rejection unconfirmed: support not verified",
     "⏳ M15 non clôturée : attendre la clôture avant toute conclusion": "⏳ M15 not closed: wait for the close before any conclusion",
     "🎯 Clôtures vs sens confirmé ": "🎯 Closed candles vs confirmed direction ",
     "🧭 Biais de contexte : SHORT dominant • ": "🧭 Context bias: SHORT dominant • ",
@@ -7322,9 +7322,9 @@ def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
     if m_haut >= 0.5 * rng and m_bas >= 0.5 * rng:
         lecture = "👁 Mèches des deux côtés : indécision"
     elif m_haut >= 0.5 * rng:
-        lecture = "👁 Mèche haute : rejet vendeur potentiel (biais SHORT)"
+        lecture = "👁 Mèche haute dominante : pression vendeuse possible — rejet non établi sans résistance identifiée"
     elif m_bas >= 0.5 * rng:
-        lecture = "👁 Mèche basse : rejet acheteur potentiel (biais LONG)"
+        lecture = "👁 Mèche basse dominante : pression acheteuse possible — rejet non établi sans support identifié"
     elif corps >= 0.7 * rng:
         lecture = "👁 Mouvement franc 💪"
     else:
@@ -7509,19 +7509,19 @@ def flash_commentateur(m, r, cle):
                 ] + ligne_pos)
             if meche_haute:
                 return "\n".join([
-                    "🎙 GROSSE MÈCHE — REJET BAISSIER POTENTIEL",
+                    "🎙 GROSSE MÈCHE HAUTE — PRESSION VENDEUSE POSSIBLE",
                     f"{ICONE.get(m, '')} {m} : {px(p)}",
-                    f"👀 M15 en formation : mèche haute, rejet baissier potentiel à {px(x['h'])}",
-                    "🔴 Vendeurs rejettent le haut — non confirmé",
+                    f"👀 M15 en formation : mèche haute à {px(x['h'])}",
+                    "ℹ️ Rejet non confirmé : résistance non vérifiée",
                     ligne_mtf,
                     "⏳ M15 non clôturée : attendre la clôture avant toute conclusion"
                 ] + ligne_pos)
             if meche_basse:
                 return "\n".join([
-                    "🎙 GROSSE MÈCHE — REJET HAUSSIER POTENTIEL",
+                    "🎙 GROSSE MÈCHE BASSE — PRESSION ACHETEUSE POSSIBLE",
                     f"{ICONE.get(m, '')} {m} : {px(p)}",
-                    f"👀 M15 en formation : mèche basse, rejet haussier potentiel à {px(x['l'])}",
-                    "🟢 Acheteurs défendent le bas — non confirmé",
+                    f"👀 M15 en formation : mèche basse à {px(x['l'])}",
+                    "ℹ️ Rejet non confirmé : support non vérifié",
                     ligne_mtf,
                     "⏳ M15 non clôturée : attendre la clôture avant toute conclusion"
                 ] + ligne_pos)

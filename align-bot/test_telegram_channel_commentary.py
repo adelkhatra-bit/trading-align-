@@ -229,13 +229,13 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         cases = (
             (
                 {"o": 100.0, "h": 105.0, "l": 99.0, "c": 101.0, "t": 2000},
-                "👁 Mèche haute : rejet vendeur potentiel (biais SHORT)",
-                "potential seller rejection (SHORT bias)",
+                "👁 Mèche haute dominante : pression vendeuse possible — rejet non établi sans résistance identifiée",
+                "no confirmed resistance rejection",
             ),
             (
                 {"o": 100.0, "h": 101.0, "l": 95.0, "c": 99.0, "t": 2000},
-                "👁 Mèche basse : rejet acheteur potentiel (biais LONG)",
-                "potential buyer rejection (LONG bias)",
+                "👁 Mèche basse dominante : pression acheteuse possible — rejet non établi sans support identifié",
+                "no confirmed support rejection",
             ),
             (
                 {"o": 100.0, "h": 104.0, "l": 96.0, "c": 100.0, "t": 2000},
