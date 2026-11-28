@@ -89,15 +89,15 @@ class FlashCommentateur(unittest.TestCase):
             "dirs_cloturees": [-1] * 8 + [1, 1, 0],
         }
         t = ab.flash_commentateur("GOLD", r, {})
-        self.assertIn("REJET BAISSIER POTENTIEL", t)
+        self.assertIn("PRESSION VENDEUSE POSSIBLE", t)
         self.assertIn("mèche haute", t)
-        self.assertIn("Vendeurs rejettent le haut", t)
+        self.assertIn("résistance non vérifiée", t)
         self.assertIn("Biais de contexte : SHORT dominant", t)
         self.assertIn("8/11 baissières", t)
         self.assertIn("pas un signal", t)
         self.assertIn("M15 non clôturée", t)
         english = ab.traduire(t)
-        self.assertIn("POTENTIAL BEARISH REJECTION", english)
+        self.assertIn("POSSIBLE SELLING PRESSURE", english)
         self.assertIn("Context bias: SHORT dominant", english)
         self.assertIn("M15 not closed", english)
 
@@ -108,9 +108,9 @@ class FlashCommentateur(unittest.TestCase):
             "dirs_cloturees": [1] * 7 + [-1] * 3 + [0],
         }
         t = ab.flash_commentateur("GOLD", r, {})
-        self.assertIn("REJET HAUSSIER POTENTIEL", t)
+        self.assertIn("PRESSION ACHETEUSE POSSIBLE", t)
         self.assertIn("mèche basse", t)
-        self.assertIn("Acheteurs défendent le bas", t)
+        self.assertIn("support non vérifié", t)
         self.assertIn("Biais de contexte : LONG dominant", t)
         self.assertIn("7/11 haussières", t)
         self.assertIn("M15 non clôturée", t)
