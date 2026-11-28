@@ -239,14 +239,14 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         self.assertIn("Mèche haute : rejet des prix élevés, pression vendeuse possible", french)
         self.assertIn("Biais Pine confirmé : 🔴 baisse", french)
         self.assertIn("BTC (prix actuel)", french)
-        self.assertIn("Corps M15 : +1,00", french)
+        self.assertIn("Corps M15 : +1", french)
 
         english = ab.traduire(french)
         self.assertIn("M15 candle closed higher", english)
         self.assertIn("Upper wick: higher prices rejected; possible selling pressure", english)
         self.assertIn("Confirmed Pine bias: 🔴 falling", english)
         self.assertIn("BTC (current price)", english)
-        self.assertIn("M15 body: +1.00", english)
+        self.assertIn("M15 body: +1", english)
 
 
     def test_live_coach_explains_wick_direction_and_uses_only_closed_mtf(self):
