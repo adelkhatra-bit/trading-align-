@@ -58,6 +58,7 @@ class AlignBtcPineContract(unittest.TestCase):
                 self.assertEqual(block(btc, start, end), block(mtf, start, end))
 
         for source in (btc, mtf):
+            self.assertIn('tEnt = ent == planClose15 ? "au marché" : "ordre limite"', source)
             request_sites = source.count("request.security(") + source.count("request.security_lower_tf(")
             self.assertLessEqual(request_sites, 40)
             self.assertIn("time_close <= timenow", source)
