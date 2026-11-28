@@ -17,13 +17,16 @@ class AlignBtcPineContract(unittest.TestCase):
         self.assertIn('"source":"ALIGN_MTF_PRO_V25"', source)
         self.assertNotIn('bridgeMarket = isBtc ? "BTCUSD" : isGold ? "XAUUSD"', source)
 
-    def test_btc_ui_and_bridge_require_the_same_closed_h1_h4_confirmation(self):
+    def test_btc_ui_and_bridge_use_the_strategy_specific_closed_mtf_gates(self):
         source = PINE.read_text(encoding="utf-8")
-        required = "nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan"
-        ui = next(line for line in source.splitlines() if line.startswith("planClosedMtfOkUi = "))
         bridge = next(line for line in source.splitlines() if line.startswith("bridgeClosedMtfOk = "))
-        self.assertIn(required, ui)
-        self.assertIn(required, bridge)
+        self.assertIn('strat == "SWING" ?', bridge)
+        self.assertIn('strat == "DAY" ?', bridge)
+        self.assertIn('strat == "SCALPING" ?', bridge)
+        self.assertIn("nz(dDFermee) == dirPlan", bridge)
+        self.assertIn("nz(dWFermee) != -dirPlan", bridge)
+        self.assertIn("nz(d5Fermee) == dirPlan", bridge)
+        self.assertIn("nz(d1Fermee) == dirPlan", bridge)
         self.assertIn("planConfirmedUi", source)
         self.assertIn("bridgeSignal = bridgeConfirmed ?", source)
 
@@ -63,6 +66,36 @@ class AlignBtcPineContract(unittest.TestCase):
         self.assertNotIn("var float ent = na", source)
         self.assertNotIn("var int dirStable = 0", source)
         self.assertIn('request.security(syminfo.tickerid, "15", [open[1], ta.highest(high, 10)[1], ta.lowest(low, 10)[1], close[1]', source)
+
+    def test_validation_score_and_risk_gate_use_canonical_m15_inputs(self):
+        source = PINE.read_text(encoding="utf-8")
+        self.assertIn("distE = math.abs(planClose15 - ent)", source)
+        self.assertIn("distE <= 0.5 * planAtr15", source)
+        self.assertIn("volOk = not na(planVol15) and planVol15 > 0 and not na(planVolMoy15) and planVolMoy15 > 0", source)
+        self.assertIn('rsiT = strat == "SWING" ? nz(r60Fermee, 50) : strat == "DAY" ? nz(r5Fermee, 50) : nz(r1Fermee, 50)', source)
+        self.assertIn("sensPlan = longT > 0 ? 1 : longT < 0 ? -1 : 0", source)
+        self.assertIn("planRiskRewardOk = not na(atr15) and atr15 > 0 and rrS >= 2.0 and planRisk <= 1.5 * atr15", source)
+        self.assertIn("and planRiskRewardOk and not na(ent)", source)
+        self.assertIn("bridgeConfirmed = bridgePlanValid and planRiskRewardOk", source)
+
+    def test_plan_and_confirmation_are_independent_of_the_chart_timeframe(self):
+        source = PINE.read_text(encoding="utf-8")
+        self.assertIn("longT += i >= 7 ? dv : 0", source)
+        levels = source.split("f_dessus(refClose, refAtr) =>", 1)[1].split("[hau1, tH1, hau2, tH2]", 1)[0]
+        self.assertIn("math.abs(v - a1) > refAtr * 0.3", levels)
+        self.assertIn("math.abs(v - b1) > refAtr * 0.3", levels)
+        self.assertNotIn("atrC", levels)
+        self.assertIn("if voirPlan and planConfirmedUi", source)
+
+    def test_entry_stop_targets_and_table_keep_explanatory_hover_text(self):
+        source = PINE.read_text(encoding="utf-8")
+        self.assertIn("eE := label.new", source)
+        self.assertIn('tooltip="ENTRÉE ALIGN', source)
+        self.assertIn('tooltip="Stop placé derrière', source)
+        self.assertIn('tooltip="Objectif 1 :', source)
+        self.assertIn('tooltip="Objectif 2 :', source)
+        self.assertIn("tooltip=tip", source)
+        self.assertIn('table.cell(t, 11, 0, "1W"', source)
 
 
 if __name__ == "__main__":
