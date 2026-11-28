@@ -290,7 +290,7 @@ swOk  = dP != 0 and uD and not oW and u1h and not o4
 swAtt = dP != 0 and uD and not oW and not u4 and not u1h
 dyOk  = dP != 0 and not o4 and u1h and u5
 dyAtt = dP != 0 and not o4 and u1h and not u15 and not u5
-scOk  = dP != 0 and not o1h and u15 and u5 and u1
+scOk  = dP != 0 and (not o1h or retLongConfirme or retShortConfirme) and u15 and u5 and u1
 scAtt = dP != 0 and not o1h and u15 and u5 and not u1
 strat = swOk ? "SWING" : dyOk ? "DAY" : scOk ? "SCALPING" : swAtt ? "SWING" : dyAtt ? "DAY" : scAtt ? "SCALPING" : ""
 etatS = swOk or dyOk or scOk ? "CONFIRMÉ" : strat != "" ? "EN ATTENTE" : "AUCUNE"
@@ -472,7 +472,7 @@ if barstate.islast
         eSL  := label.new(x1, sl, "STOP " + px(sl), style=label.style_label_right, color= color.new(color.red, 20), textcolor= color.white, size=size.small, tooltip="Stop placé derrière la " + (dirPlan == 1 ? "zone de support" : "zone de résistance") + " 1h / 4h la plus proche (+ marge 0,3 ATR)")
 
 // ═════════ BARRE (en bas, propre, explications au clic) ═════════
-var table t = table.new(pos, 11, 3, border_width=1, frame_color= color.new(color.gray, 70), frame_width=1)
+var table t = table.new(pos, 12, 3, border_width=1, frame_color= color.new(color.gray, 70), frame_width=1)
 varip int tick = 0
 if barstate.isrealtime
     tick += 1
@@ -496,6 +496,14 @@ if barstate.islast
         tip = array.get(nomsL, i) + " — " + sensUT + "\n━━━━━━━━━━━━\nTendance : " + tendUT + "\nRSI : " + str.tostring(rv, "#") + " — " + rsiUT + "\nCompression : " + (sq ? "OUI ⚡ prêt à exploser (attendre la direction)" : "non") + "\nRôle : " + roleUT + (minUT > 0 ? "\nClôture dans : " + f_mmss(f_reste(minUT)) : "") + "\n━━━━━━━━━━━━\n" + planUT + (dirPlan != 0 and dv == -dirPlan and i <= 4 ? "\n↩ VOYANT RETOURNEMENT allumé : " + str.tostring(nVoy) + "/5 petites unités (1 à 15 min) ont tourné contre le plan\n3/5 = le retournement se prépare • confirmé quand le 15 min ET la 1h clôturent dans le nouveau sens" : "")
         table.cell(t, i, 0, array.get(noms, i), width=largCol, bgcolor=rv >= 70 ?  color.rgb(120, 20, 30) : rv <= 30 ?  color.rgb(0, 90, 50) :  color.rgb(30, 34, 45), text_color=rv >= 70 or rv <= 30 ?  color.white :  color.gray, text_size=size.small, tooltip=tip)
         table.cell(t, i, 1, sym, width=largCol, bgcolor=bg, text_color= color.white, text_size=size.normal, tooltip=tip)
+    // W1 reste hors score 11 UT, mais son biais clôturé est visible pour le contexte SWING.
+    dvW = nz(dWFermee)
+    rvW = nz(rWFermee, 50)
+    symW = dvW == 1 ? "▲" : dvW == -1 ? "▼" : "—"
+    bgW = dvW == 1 ? color.rgb(0, 140, 70) : dvW == -1 ? color.rgb(190, 30, 45) : color.rgb(90, 90, 90)
+    tipW = "1W — dernière clôture : " + (dvW == 1 ? "HAUSSE ▲" : dvW == -1 ? "BAISSE ▼" : "NEUTRE —") + "\nRSI hebdomadaire clôturé : " + str.tostring(rvW, "#") + (rvW >= 70 ? " — SURACHAT" : rvW <= 30 ? " — SURVENTE" : " — équilibré") + "\nRôle : contexte macro et filtre SWING ; hors score des 11 UT."
+    table.cell(t, 11, 0, "1W", width=largCol, bgcolor=rvW >= 70 ? color.rgb(120, 20, 30) : rvW <= 30 ? color.rgb(0, 90, 50) : color.rgb(30, 34, 45), text_color=color.white, text_size=size.small, tooltip=tipW)
+    table.cell(t, 11, 1, symW, width=largCol, bgcolor=bgW, text_color=color.white, text_size=size.normal, tooltip=tipW)
 // État de confirmation calculé pour l'affichage ; les champs d'export restent dans le bloc bridge canonique.
 planClosedMtfOkUi = isGold ? (nz(d5Fermee) == dirPlan and nz(d15Fermee) == dirPlan and nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan) : (nz(d60Fermee) == dirPlan and nz(d240Fermee) == dirPlan)
 planConfirmedUi = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2) and etatS == "CONFIRMÉ" and scoreV >= 75 and planClosedMtfOkUi
@@ -505,8 +513,10 @@ planConfirmedUi = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat =
     plan = (retTxt != "" ? retTxt + "\n\n" : "") + (dirPlan != 0 ? "STRATÉGIE : " + (strat == "" ? "aucune — aucun plan exécutable" : strat + " — " + etatS) + "\nScore : " + str.tostring(scoreV) + " / 100\n• Alignement : " + str.tostring(ptsAlign) + " / 25\n• Structure : " + str.tostring(ptsStruct) + " / 20\n• Zone d'entrée : " + str.tostring(ptsZone) + " / 20\n• Volume : " + str.tostring(ptsVol) + " / 15" + (volOk ? "" : " (indisponible)") + "\n• Indicateurs : " + str.tostring(ptsInd) + " / 10\n• Risque / rendement : " + str.tostring(ptsRR) + " / 10\n⏱ Clôture de validation " + (strat == "SWING" ? "1h" : strat == "DAY" ? "5 min" : strat == "SCALPING" ? "1 min" : "15 min") + " dans " + f_mmss(f_reste((strat == "SWING" ? 60 : strat == "DAY" ? 5 : strat == "SCALPING" ? 1 : 15))) + "\nDécision : " + decisionS + "\nMotif : " + motifS + (planConfirmedUi ? "\nPlan confirmé : " + calePlan + "\n\n" : "\n\nAUCUNE ENTRÉE : attendre la confirmation MTF et la clôture de validation. Aucun niveau Entry/TP/SL à suivre.\n\n") : "") + "SENS PROBABLE : " + (sens == 1 ? "HAUSSE " : sens == -1 ? "BAISSE " : "INDÉCIS ") + str.tostring(pctH) + "% hausse / " + str.tostring(100 - pctH) + "% baisse\n" + str.tostring(bull) + " UT en hausse • " + str.tostring(bear) + " en baisse • " + str.tostring(comp) + " comprimées\nRSI : " + str.tostring(rsiOB) + " UT en surachat (>70) • " + str.tostring(rsiOS) + " en survente (<30)" + (rsiOB >= 3 ? "\nSURCHARGE RSI HAUTE : éviter d'acheter, retournement baissier possible" : rsiOS >= 3 ? "\nSURCHARGE RSI BASSE : éviter de vendre, rebond possible" : "") + (retHaut ? "\nLes petites UT montent avant les grandes : retournement HAUSSIER en préparation" : retBas ? "\nLes petites UT baissent avant les grandes : retournement BAISSIER en préparation" : "") + (zoneBas ? "\nPrix sur une résistance " + tH1 + " : risque de retournement à la baisse" : zoneHaut ? "\nPrix sur un support " + tB1 + " : rebond possible" : "") + (planConfirmedUi ? "\n\nPLAN CONFIRMÉ " + (dirPlan == 1 ? "ACHAT" : "VENTE") + "\nEntrée " + px(ent) + " (" + tEnt + ")\nTP1 " + px(tp1) + " (" + tTP1 + ")\nTP2 " + px(tp2) + " (" + tTP2 + ")\nStop " + px(sl) + "\nGain/risque ≈ " + str.tostring(rr, "#.#") : "")
     vbg0 = zoneBas or zoneHaut ? color.rgb(170, 130, 0) : planConfirmedUi and dirPlan == 1 ? color.rgb(0, 140, 70) : planConfirmedUi and dirPlan == -1 ? color.rgb(190, 30, 45) : color.rgb(60, 60, 60)
     actif = zoneBas or zoneHaut or fortHaut or fortBas or retHaut or retBas or surcharge
-    table.cell(t, 0, 2, ligne, bgcolor=actif and clignote ? color.new(vbg0, 50) : vbg0, text_color= color.white, text_size=size.normal, tooltip=titre + "\n" + plan)
-    table.merge_cells(t, 0, 2, 10, 2)
+    contexteOppose = dirPlan != 0 and (nz(dWFermee) == -dirPlan or nz(dDFermee) == -dirPlan or nz(d240Fermee) == -dirPlan or nz(d60Fermee) == -dirPlan)
+    contexteOpposeTxt = contexteOppose ? "\n⚠ CONTEXTE SUPÉRIEUR OPPOSÉ : " + (nz(dWFermee) == -dirPlan ? "W1 " : "") + (nz(dDFermee) == -dirPlan ? "D1 " : "") + (nz(d240Fermee) == -dirPlan ? "H4 " : "") + (nz(d60Fermee) == -dirPlan ? "H1 " : "") + "contre le plan " + (dirPlan == 1 ? "LONG" : "SHORT") + ". Le biais macro est distinct du plan d'exécution." : ""
+    table.cell(t, 0, 2, ligne, bgcolor=actif and clignote ? color.new(vbg0, 50) : vbg0, text_color= color.white, text_size=size.normal, tooltip=titre + "\n" + plan + contexteOpposeTxt)
+    table.merge_cells(t, 0, 2, 11, 2)
 
 // ═════════ ALERTES (créer une alerte « N'importe quel appel alert() ») ═════════
 if sigHaut
