@@ -212,8 +212,9 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn("ptsZone = strat == \"\" ? 0 : distE <= 0.5 * planAtr15", self.pine)
         self.assertIn("planVol15, planVolMoy15] = f_plan_snapshot_mtf()", self.pine)
         self.assertIn('tEnt = ent == planClose15 ? "au marché" : "ordre limite"', self.pine)
+        self.assertIn("PlanM15Snapshot.new(open, ta.highest(high, 10), ta.lowest(low, 10), close", self.pine)
         self.assertIn("volume, planVolMoy, time_close, open[1]", self.pine)
-        self.assertIn("volume[1], planVolMoy[1], time_close[1], time_close <= timenow", self.pine)
+        self.assertIn("volume[1], planVolMoy[1], time_close[1], time_close <= timenow)", self.pine)
         self.assertIn("rsiT = strat == \"SWING\" ? nz(r60Fermee, 50)", self.pine)
         self.assertIn("math.abs(v - a1) > refAtr * 0.3", self.pine)
         self.assertIn("math.abs(v - b1) > refAtr * 0.3", self.pine)
@@ -275,7 +276,9 @@ class PineCanonicalEntryContract(unittest.TestCase):
 
     def test_closed_rsi_export_does_not_change_live_chart_rsi_calculations(self):
         self.assertIn("rsis = array.from(nz(r1, 50)", self.pine)
-        self.assertIn("[dC, sC, rC, _, _, _, _, _, _] = f_etat()", self.pine)
+        self.assertIn("EtatMtfSnapshot etatChart = f_etat()", self.pine)
+        self.assertIn("dC = etatChart.dLive", self.pine)
+        self.assertIn("rC = etatChart.rsiLive", self.pine)
         self.assertIn("rsiSig = ta.ema(rC, 9)", self.pine)
         self.assertIn("rsiAchat =", self.pine)
         self.assertIn("rsiVente =", self.pine)
