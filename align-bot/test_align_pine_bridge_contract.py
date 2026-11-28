@@ -87,23 +87,23 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         timeframes = ("M1", "M3", "M5", "M10", "M15", "M30", "M45", "H1", "H2", "H4", "D1", "W1")
         self.assertIn(">= 20000", self.source)
         tuple_contracts = (
-            ("d1, s1, r1, r1Fermee", "bridgeTimeM1"),
-            ("d2, s2, r2, r2Fermee", "bridgeTimeM3"),
-            ("d5, s5, r5, r5Fermee", "bridgeTimeM5"),
-            ("d10, s10, r10, r10Fermee", "bridgeTimeM10"),
-            ("d15, s15, r15, r15Fermee", "bridgeTimeM15"),
-            ("d30, s30, r30, r30Fermee", "bridgeTimeM30"),
-            ("d45, s45, r45, r45Fermee", "bridgeTimeM45"),
-            ("d60, s60, r60, r60Fermee", "bridgeTimeH1"),
-            ("d120, s120, r120, r120Fermee", "bridgeTimeH2"),
-            ("d240, s240, r240, r240Fermee", "bridgeTimeH4"),
-            ("dD, sD, rD, rDFermee", "bridgeTimeD1"),
-            ("dW, sW, rW, rWFermee", "bridgeTimeW1"),
+            ('[d1, s1, r1, d1Fermee, r1Fermee, bridgeTimeM1] = f_etat_mtf("1")', "bridgeTimeM1"),
+            ('[d2, s2, r2, d3Fermee, r2Fermee, bridgeTimeM3] = f_etat_mtf("3")', "bridgeTimeM3"),
+            ('[d5, s5, r5, d5Fermee, r5Fermee, bridgeTimeM5] = f_etat_mtf("5")', "bridgeTimeM5"),
+            ('[d10, s10, r10, d10Fermee, r10Fermee, bridgeTimeM10] = f_etat_mtf("10")', "bridgeTimeM10"),
+            ('[d15, s15, r15, d15Fermee, r15Fermee, bridgeTimeM15] = f_etat_mtf("15")', "bridgeTimeM15"),
+            ('[d30, s30, r30, d30Fermee, r30Fermee, bridgeTimeM30] = f_etat_mtf("30")', "bridgeTimeM30"),
+            ('[d45, s45, r45, d45Fermee, r45Fermee, bridgeTimeM45] = f_etat_mtf("45")', "bridgeTimeM45"),
+            ('[d60, s60, r60, d60Fermee, r60Fermee, bridgeTimeH1] = f_etat_mtf("60")', "bridgeTimeH1"),
+            ('[d120, s120, r120, d120Fermee, r120Fermee, bridgeTimeH2] = f_etat_mtf("120")', "bridgeTimeH2"),
+            ('[d240, s240, r240, d240Fermee, r240Fermee, bridgeTimeH4] = f_etat_mtf("240")', "bridgeTimeH4"),
+            ('[dD, sD, rD, dDFermee, rDFermee, bridgeTimeD1] = f_etat_mtf("D")', "bridgeTimeD1"),
+            ('[dW, sW, rW, dWFermee, rWFermee, bridgeTimeW1] = f_etat_mtf("W")', "bridgeTimeW1"),
         )
-        for tuple_head, closed_time in tuple_contracts:
-            self.assertIn("[" + tuple_head + ", " + closed_time + "]", self.source)
+        for assignment, closed_time in tuple_contracts:
+            self.assertIn(assignment, self.source)
             self.assertNotIn(closed_time + " = request.security(", self.source)
-        request_sites = self.source.count("request.security(") + self.source.count("request.security_lower_tf(")
+        request_sites = self.source.count("request.security(")
         self.assertLessEqual(request_sites, 40)
         self.assertIn('bridgeTfSeconds == 180 ? "M3"', self.source)
         self.assertIn('bridgeTfSeconds == 600 ? "M10"', self.source)
@@ -126,7 +126,7 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
     def test_bridge_bar_timestamps_match_the_closed_mtf_candle(self):
         # The exported direction is based on the previous, fully closed candle.
         # Its bar_time must identify that same candle, not the currently forming one.
-        self.assertIn("[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), ta.rsi(close, lenRsi)[1], time_close[1]]", self.source)
+        self.assertIn("EtatMtfSnapshot.new(d, sqz ? 1 : 0, rsiValue, time_close, d[1], sqz[1] ? 1 : 0, rsiValue[1], time_close[1], time_close <= timenow)", self.source)
         self.assertNotIn("[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]", self.source)
 
     def test_robot_v12_exports_closed_mtf_directions_for_entry_confirmation(self):
@@ -192,9 +192,12 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
 
     def test_higher_chart_uses_last_closed_lower_timeframe_intrabar_for_entry_trigger(self):
         export_block = self.source.split(EXPORT_MARKER, 1)[1]
-        self.assertIn("timeframe.in_seconds(bridgeEntryTf) < timeframe.in_seconds()", export_block)
-        self.assertIn("request.security_lower_tf(syminfo.tickerid, bridgeEntryTf", export_block)
-        self.assertIn("array.get(bridgeEntryTimeArray, bridgeEntryLast)", export_block)
+        self.assertIn("bridgeEntryRequested.timePrev", export_block)
+        self.assertIn("bridgeEntryRequested.timeNow", export_block)
+        self.assertIn("EntryTriggerSnapshot bridgeEntryRequested = request.security(syminfo.tickerid, bridgeEntryTf, f_bridge_entry_snapshot(), lookahead=barmerge.lookahead_off)", export_block)
+        self.assertIn("type EntryTriggerSnapshot", self.source)
+        self.assertIn("EntryTriggerSnapshot.new(open, high, low, close, time_close, open[1], high[1], low[1], close[1], time_close[1], time_close <= timenow)", self.source)
+        self.assertIn("if not bridgeEntryRequested.confirmed", export_block)
         self.assertIn('bridgeEntryTimeSafe = bridgeEntryTf == "" ? na : bridgeEntryTime', export_block)
 
     def test_bridge_reuses_mtf_time_requests_and_stays_below_tv_request_budget(self):
@@ -208,10 +211,97 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         ):
             self.assertIn(field, self.source)
             self.assertNotIn(field + " = request.security", self.source)
-        request_sites = self.source.count("request.security(") + self.source.count("request.security_lower_tf(")
+        request_sites = self.source.count("request.security(")
         self.assertLessEqual(request_sites, 40)
-        self.assertIn("[d1, s1, r1, r1Fermee, bridgeTimeM1]", self.source)
-        self.assertIn("[dW, sW, rW, rWFermee, bridgeTimeW1]", self.source)
+        self.assertIn('[d1, s1, r1, d1Fermee, r1Fermee, bridgeTimeM1] = f_etat_mtf("1")', self.source)
+        self.assertIn('[dW, sW, rW, dWFermee, rWFermee, bridgeTimeW1] = f_etat_mtf("W")', self.source)
+
+
+    def test_plan_levels_use_last_closed_source_timeframe_candle_on_every_chart_interval(self):
+        # A higher chart timeframe must not let request.security() select an
+        # arbitrary lower-timeframe intrabar for the plan's support/resistance levels.
+        self.assertIn("f_niv_mtf(string tf) =>", self.source)
+        self.assertIn("NivMtfSnapshot nivRequested = request.security(syminfo.tickerid, tf, f_niv(), lookahead=barmerge.lookahead_off)", self.source)
+        self.assertIn("nivRequested.confirmed ? nivRequested.rANow : nivRequested.rAPrev", self.source)
+        self.assertIn("NivMtfSnapshot nivRequested = request.security(syminfo.tickerid, tf, f_niv(), lookahead=barmerge.lookahead_off)", self.source)
+        for timeframe in ('"15"', '"60"', '"240"', '"D"'):
+            with self.subTest(timeframe=timeframe):
+                self.assertIn("f_niv_mtf(" + timeframe + ")", self.source)
+        self.assertNotIn('request.security(syminfo.tickerid, "15",  f_niv())', self.source)
+        self.assertNotIn('request.security(syminfo.tickerid, "60",  f_niv())', self.source)
+        self.assertNotIn('request.security(syminfo.tickerid, "240", f_niv())', self.source)
+        self.assertNotIn('request.security(syminfo.tickerid, "D",   f_niv())', self.source)
+
+    def test_canonical_plan_levels_and_m15_price_snapshot_share_closed_bar_semantics(self):
+        self.assertNotIn("request.security_lower_tf", self.source)
+        self.assertIn("time_close <= timenow", self.source)
+        self.assertIn("type EtatMtfSnapshot", self.source)
+        self.assertIn("type NivMtfSnapshot", self.source)
+        self.assertIn("type FiboMtfSnapshot", self.source)
+        self.assertIn("type PlanM15Snapshot", self.source)
+        self.assertIn("EtatMtfSnapshot.new(", self.source)
+        self.assertIn("NivMtfSnapshot.new(", self.source)
+        self.assertIn("FiboMtfSnapshot.new(", self.source)
+        self.assertIn("PlanM15Snapshot.new(", self.source)
+        self.assertIn("NivMtfSnapshot", self.source)
+        self.assertIn("nivRequested.confirmed", self.source)
+        self.assertIn("planClose15", self.source)
+        self.assertIn("[hau1, tH1, hau2, tH2] = f_dessus(planClose15, planAtr15)", self.source)
+        self.assertIn("[bas1, tB1, bas2, tB2] = f_dessous(planClose15, planAtr15)", self.source)
+        self.assertIn("f_stopH(sMin, sMax, refClose, refAtr)", self.source)
+        self.assertIn("f_cible(d, e, risque * gainMin, cMin, cMax)", self.source)
+
+
+    def test_all_mtf_dashboard_states_use_the_last_closed_intrabar_on_higher_chart_timeframes(self):
+        # request.security() on a chart above the requested timeframe returns only
+        # one intrabar. The dashboard must select the last confirmed intrabar instead.
+        self.assertIn("f_etat_mtf(string tf) =>", self.source)
+        self.assertIn("EtatMtfSnapshot etatRequested = request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)", self.source)
+        self.assertIn("etatRequested.confirmed ? etatRequested.dLive : etatRequested.dPrev", self.source)
+        self.assertIn("EtatMtfSnapshot etatRequested = request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)", self.source)
+        timeframes = (
+            ('"1"', "d1", "s1", "r1", "d1Fermee", "r1Fermee", "bridgeTimeM1"),
+            ('"3"', "d2", "s2", "r2", "d3Fermee", "r2Fermee", "bridgeTimeM3"),
+            ('"5"', "d5", "s5", "r5", "d5Fermee", "r5Fermee", "bridgeTimeM5"),
+            ('"10"', "d10", "s10", "r10", "d10Fermee", "r10Fermee", "bridgeTimeM10"),
+            ('"15"', "d15", "s15", "r15", "d15Fermee", "r15Fermee", "bridgeTimeM15"),
+            ('"30"', "d30", "s30", "r30", "d30Fermee", "r30Fermee", "bridgeTimeM30"),
+            ('"45"', "d45", "s45", "r45", "d45Fermee", "r45Fermee", "bridgeTimeM45"),
+            ('"60"', "d60", "s60", "r60", "d60Fermee", "r60Fermee", "bridgeTimeH1"),
+            ('"120"', "d120", "s120", "r120", "d120Fermee", "r120Fermee", "bridgeTimeH2"),
+            ('"240"', "d240", "s240", "r240", "d240Fermee", "r240Fermee", "bridgeTimeH4"),
+            ('"D"', "dD", "sD", "rD", "dDFermee", "rDFermee", "bridgeTimeD1"),
+            ('"W"', "dW", "sW", "rW", "dWFermee", "rWFermee", "bridgeTimeW1"),
+        )
+        for tf, live_d, live_sqz, live_rsi, closed_d, closed_rsi, closed_time in timeframes:
+            with self.subTest(timeframe=tf):
+                self.assertIn(
+                    f"[{live_d}, {live_sqz}, {live_rsi}, {closed_d}, {closed_rsi}, {closed_time}] = f_etat_mtf({tf})",
+                    self.source,
+                )
+        self.assertNotIn("f_dir_confirme()", self.source)
+
+    def test_canonical_m15_plan_snapshot_uses_last_closed_intrabar_above_m15(self):
+        self.assertIn("f_plan_snapshot_mtf() =>", self.source)
+        self.assertIn('PlanM15Snapshot planRequested = request.security(syminfo.tickerid, "15", f_plan_snapshot(), lookahead=barmerge.lookahead_off)', self.source)
+        self.assertIn("planRequested.confirmed ? planRequested.m15OpenNow : planRequested.m15OpenPrev", self.source)
+        self.assertIn('PlanM15Snapshot planRequested = request.security(syminfo.tickerid, "15", f_plan_snapshot(), lookahead=barmerge.lookahead_off)', self.source)
+        self.assertIn("[planOpen15, planHigh15, planLow15, planClose15, planAtr15, planRsi15, planMom15, planMomPrev15, planVol15, planVolMoy15] = f_plan_snapshot_mtf()", self.source)
+
+
+    def test_fibonacci_ranges_use_the_last_closed_source_candle_for_each_timeframe(self):
+        self.assertIn("f_fibo_mtf(string tf) =>", self.source)
+        self.assertIn("FiboMtfSnapshot fiboRequested = request.security(syminfo.tickerid, tf, f_fibo_snapshot(), lookahead=barmerge.lookahead_off)", self.source)
+        self.assertIn("fiboRequested.confirmed ? fiboRequested.highNow : fiboRequested.highPrev", self.source)
+        self.assertIn("FiboMtfSnapshot fiboRequested = request.security(syminfo.tickerid, tf, f_fibo_snapshot(), lookahead=barmerge.lookahead_off)", self.source)
+        for tf, high_name, low_name in (
+            ('"15"', "fH", "fL"),
+            ('"60"', "x1H", "x1L"),
+            ('"240"', "x4H", "x4L"),
+            ('"D"', "xDH", "xDL"),
+        ):
+            with self.subTest(timeframe=tf):
+                self.assertIn(f"[{high_name}, {low_name}] = f_fibo_mtf({tf})", self.source)
 
     def test_no_secret_is_embedded_in_pine(self):
         self.assertNotIn("ALIGN_TV_INGEST_TOKEN", self.source)

@@ -29,6 +29,78 @@ bridgeEnabled = input.bool(false, "Envoyer les snapshots au ROBOT V12", group=gr
 
 // ═════════ ÉTAT DE CHAQUE UNITÉ DE TEMPS ═════════
 // Tendance : +1 (prix > EMA20 > EMA50) / -1 / 0  •  Compression : Bollinger dans Keltner  •  RSI
+// Les requêtes request.* transportent un seul objet UDT par contexte pour respecter la limite Pine cumulée de 127 éléments de tuple.
+type EtatMtfSnapshot
+    int dLive
+    int sqzLive
+    float rsiLive
+    int timeLive
+    int dPrev
+    int sqzPrev
+    float rsiPrev
+    int timePrev
+    bool confirmed
+
+type NivMtfSnapshot
+    float rANow
+    float sANow
+    float rBNow
+    float sBNow
+    int timeNow
+    float rAPrev
+    float sAPrev
+    float rBPrev
+    float sBPrev
+    int timePrev
+    bool confirmed
+
+type FiboMtfSnapshot
+    float highNow
+    float lowNow
+    int timeNow
+    float highPrev
+    float lowPrev
+    int timePrev
+    bool confirmed
+
+type PlanM15Snapshot
+    float m15OpenNow
+    float m15HighNow
+    float m15LowNow
+    float m15CloseNow
+    float m15AtrNow
+    float m15RsiNow
+    float m15MomNow
+    float m15MomPrevNow
+    float m15VolumeNow
+    float m15VolumeAvgNow
+    int m15TimeNow
+    float m15OpenPrev
+    float m15HighPrev
+    float m15LowPrev
+    float m15ClosePrev
+    float m15AtrPrev
+    float m15RsiPrev
+    float m15MomPrev
+    float m15MomPrevPrev
+    float m15VolumePrev
+    float m15VolumeAvgPrev
+    int m15TimePrev
+    bool confirmed
+
+type EntryTriggerSnapshot
+    float openNow
+    float highNow
+    float lowNow
+    float closeNow
+    int timeNow
+    float openPrev
+    float highPrev
+    float lowPrev
+    float closePrev
+    int timePrev
+    bool confirmed
+
 f_etat() =>
     ef = ta.ema(close, lenFast)
     es = ta.ema(close, lenSlow)
@@ -39,41 +111,26 @@ f_etat() =>
     rng = 1.5 * ta.atr(lenSqz)
     sqz = (basis + dev) < (kc + rng) and (basis - dev) > (kc - rng)
     rsiValue = ta.rsi(close, lenRsi)
-    [d, sqz ? 1 : 0, rsiValue, rsiValue[1], time_close[1]]
+    EtatMtfSnapshot.new(d, sqz ? 1 : 0, rsiValue, time_close, d[1], sqz[1] ? 1 : 0, rsiValue[1], time_close[1], time_close <= timenow)
 
-// Sens confirmé : la valeur est décalée d'une bougie HTF et publiée avec lookahead_on.
-// Cela évite d'utiliser une H1/H4/M15/M5 encore en formation pour autoriser une entrée.
-f_dir_confirme() =>
-    ef = ta.ema(close, lenFast)
-    es = ta.ema(close, lenSlow)
-    d = close > ef and ef > es ? 1 : close < ef and ef < es ? -1 : 0
-    d[1]
-
-[d1, s1, r1, r1Fermee, bridgeTimeM1] = request.security(syminfo.tickerid, "1", f_etat())
-[d2, s2, r2, r2Fermee, bridgeTimeM3] = request.security(syminfo.tickerid, "3", f_etat())
-[d5, s5, r5, r5Fermee, bridgeTimeM5] = request.security(syminfo.tickerid, "5", f_etat())
-[d10, s10, r10, r10Fermee, bridgeTimeM10] = request.security(syminfo.tickerid, "10", f_etat())
-[d15, s15, r15, r15Fermee, bridgeTimeM15] = request.security(syminfo.tickerid, "15", f_etat())
-[d30, s30, r30, r30Fermee, bridgeTimeM30] = request.security(syminfo.tickerid, "30", f_etat())
-[d45, s45, r45, r45Fermee, bridgeTimeM45] = request.security(syminfo.tickerid, "45", f_etat())
-[d60, s60, r60, r60Fermee, bridgeTimeH1] = request.security(syminfo.tickerid, "60", f_etat())
-[d120, s120, r120, r120Fermee, bridgeTimeH2] = request.security(syminfo.tickerid, "120", f_etat())
-[d240, s240, r240, r240Fermee, bridgeTimeH4] = request.security(syminfo.tickerid, "240", f_etat())
-[dD, sD, rD, rDFermee, bridgeTimeD1] = request.security(syminfo.tickerid, "D", f_etat())
-[dW, sW, rW, rWFermee, bridgeTimeW1] = request.security(syminfo.tickerid, "W", f_etat())
-d1Fermee = request.security(syminfo.tickerid, "1", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d3Fermee = request.security(syminfo.tickerid, "3", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d5Fermee = request.security(syminfo.tickerid, "5", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d10Fermee = request.security(syminfo.tickerid, "10", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d15Fermee = request.security(syminfo.tickerid, "15", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d30Fermee = request.security(syminfo.tickerid, "30", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d45Fermee = request.security(syminfo.tickerid, "45", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d60Fermee = request.security(syminfo.tickerid, "60", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d120Fermee = request.security(syminfo.tickerid, "120", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-d240Fermee = request.security(syminfo.tickerid, "240", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-dDFermee = request.security(syminfo.tickerid, "D", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-dWFermee = request.security(syminfo.tickerid, "W", f_dir_confirme(), lookahead=barmerge.lookahead_on)
-
+f_etat_mtf(string tf) =>
+    EtatMtfSnapshot etatRequested = request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)
+    int dClosed = etatRequested.confirmed ? etatRequested.dLive : etatRequested.dPrev
+    float rsiClosed = etatRequested.confirmed ? etatRequested.rsiLive : etatRequested.rsiPrev
+    int timeClosed = etatRequested.confirmed ? etatRequested.timeLive : etatRequested.timePrev
+    [etatRequested.dLive, etatRequested.sqzLive, etatRequested.rsiLive, dClosed, rsiClosed, timeClosed]
+[d1, s1, r1, d1Fermee, r1Fermee, bridgeTimeM1] = f_etat_mtf("1")
+[d2, s2, r2, d3Fermee, r2Fermee, bridgeTimeM3] = f_etat_mtf("3")
+[d5, s5, r5, d5Fermee, r5Fermee, bridgeTimeM5] = f_etat_mtf("5")
+[d10, s10, r10, d10Fermee, r10Fermee, bridgeTimeM10] = f_etat_mtf("10")
+[d15, s15, r15, d15Fermee, r15Fermee, bridgeTimeM15] = f_etat_mtf("15")
+[d30, s30, r30, d30Fermee, r30Fermee, bridgeTimeM30] = f_etat_mtf("30")
+[d45, s45, r45, d45Fermee, r45Fermee, bridgeTimeM45] = f_etat_mtf("45")
+[d60, s60, r60, d60Fermee, r60Fermee, bridgeTimeH1] = f_etat_mtf("60")
+[d120, s120, r120, d120Fermee, r120Fermee, bridgeTimeH2] = f_etat_mtf("120")
+[d240, s240, r240, d240Fermee, r240Fermee, bridgeTimeH4] = f_etat_mtf("240")
+[dD, sD, rD, dDFermee, rDFermee, bridgeTimeD1] = f_etat_mtf("D")
+[dW, sW, rW, dWFermee, rWFermee, bridgeTimeW1] = f_etat_mtf("W")
 noms  = array.from("1", "3", "5", "10", "15", "30", "45", "1h", "2h", "4h", "D")
 nomsL = array.from("1 min", "3 min", "5 min", "10 min", "15 min", "30 min", "45 min", "1 heure", "2 heures", "4 heures", "Daily")
 dirs = array.from(nz(d1Fermee), nz(d3Fermee), nz(d5Fermee), nz(d10Fermee), nz(d15Fermee), nz(d30Fermee), nz(d45Fermee), nz(d60Fermee), nz(d120Fermee), nz(d240Fermee), nz(dDFermee))
@@ -112,7 +169,10 @@ alignBas  = bear >= minAlign
 surcharge = comp >= minSqz
 
 // ═════════ UT DU GRAPHIQUE : RSI, MOMENTUM, EXPLOSION ═════════
-[dC, sC, rC, _, _] = f_etat()
+EtatMtfSnapshot etatChart = f_etat()
+dC = etatChart.dLive
+sC = etatChart.sqzLive
+rC = etatChart.rsiLive
 rsiSig = ta.ema(rC, 9)
 rsiCrossSigUp   = ta.crossover(rC, rsiSig)
 rsiCross30Up     = ta.crossover(rC, 30)
@@ -143,16 +203,57 @@ retShortConfirme = microBear >= 2 and nz(d5Fermee) == -1 and nz(d15Fermee) == -1
 f_niv() =>
     ph = ta.pivothigh(high, 5, 5)
     pl = ta.pivotlow(low, 5, 5)
-    [ta.valuewhen(not na(ph), ph, 0), ta.valuewhen(not na(pl), pl, 0), ta.valuewhen(not na(ph), ph, 1), ta.valuewhen(not na(pl), pl, 1)]
-[rA15, sA15, rB15, sB15] = request.security(syminfo.tickerid, "15",  f_niv())
-[rA60, sA60, rB60, sB60] = request.security(syminfo.tickerid, "60",  f_niv())
-[rA4h, sA4h, rB4h, sB4h] = request.security(syminfo.tickerid, "240", f_niv())
-[rAD, sAD, rBD, sBD]     = request.security(syminfo.tickerid, "D",   f_niv())
+    rA = ta.valuewhen(not na(ph), ph, 0)
+    sA = ta.valuewhen(not na(pl), pl, 0)
+    rB = ta.valuewhen(not na(ph), ph, 1)
+    sB = ta.valuewhen(not na(pl), pl, 1)
+    NivMtfSnapshot.new(rA, sA, rB, sB, time_close, rA[1], sA[1], rB[1], sB[1], time_close[1], time_close <= timenow)
+
+f_niv_mtf(string tf) =>
+    NivMtfSnapshot nivRequested = request.security(syminfo.tickerid, tf, f_niv(), lookahead=barmerge.lookahead_off)
+    float rA = nivRequested.confirmed ? nivRequested.rANow : nivRequested.rAPrev
+    float sA = nivRequested.confirmed ? nivRequested.sANow : nivRequested.sAPrev
+    float rB = nivRequested.confirmed ? nivRequested.rBNow : nivRequested.rBPrev
+    float sB = nivRequested.confirmed ? nivRequested.sBNow : nivRequested.sBPrev
+    [rA, sA, rB, sB]
+[rA15, sA15, rB15, sB15] = f_niv_mtf("15")
+[rA60, sA60, rB60, sB60] = f_niv_mtf("60")
+[rA4h, sA4h, rB4h, sB4h] = f_niv_mtf("240")
+[rAD, sAD, rBD, sBD] = f_niv_mtf("D")
+
+f_fibo_snapshot() =>
+    fiboHigh = ta.highest(high, 24)
+    fiboLow = ta.lowest(low, 24)
+    FiboMtfSnapshot.new(fiboHigh, fiboLow, time_close, fiboHigh[1], fiboLow[1], time_close[1], time_close <= timenow)
+
+f_fibo_mtf(string tf) =>
+    FiboMtfSnapshot fiboRequested = request.security(syminfo.tickerid, tf, f_fibo_snapshot(), lookahead=barmerge.lookahead_off)
+    float fiboHigh = fiboRequested.confirmed ? fiboRequested.highNow : fiboRequested.highPrev
+    float fiboLow = fiboRequested.confirmed ? fiboRequested.lowNow : fiboRequested.lowPrev
+    [fiboHigh, fiboLow]
 niveaux = array.from(rA15, sA15, rB15, sB15, rA60, sA60, rB60, sB60, rA4h, sA4h, rB4h, sB4h, rAD, sAD, rBD, sBD)
 nomsNiv = array.from("15m", "15m", "15m", "15m", "1h", "1h", "1h", "1h", "4h", "4h", "4h", "4h", "Daily", "Daily", "Daily", "Daily")
 atrC = ta.atr(14)
 // Référence unique du plan : dernière bougie M15 clôturée, identique sur tous les graphiques.
-[planOpen15, planHigh15, planLow15, planClose15, planAtr15, planRsi15, planMom15, planMomPrev15, planVol15, planVolMoy15] = request.security(syminfo.tickerid, "15", [open[1], ta.highest(high, 10)[1], ta.lowest(low, 10)[1], close[1], ta.atr(14)[1], ta.rsi(close, lenRsi)[1], ta.linreg(close - math.avg(math.avg(ta.highest(high, lenSqz), ta.lowest(low, lenSqz)), ta.sma(close, lenSqz)), lenSqz, 0)[1], ta.linreg(close - math.avg(math.avg(ta.highest(high, lenSqz), ta.lowest(low, lenSqz)), ta.sma(close, lenSqz)), lenSqz, 0)[2], volume[1], ta.sma(volume, 20)[1]], lookahead=barmerge.lookahead_on)
+f_plan_snapshot() =>
+    planMom = ta.linreg(close - math.avg(math.avg(ta.highest(high, lenSqz), ta.lowest(low, lenSqz)), ta.sma(close, lenSqz)), lenSqz, 0)
+    planVolMoy = ta.sma(volume, 20)
+    PlanM15Snapshot.new(open, ta.highest(high, 10), ta.lowest(low, 10), close, ta.atr(14), ta.rsi(close, lenRsi), planMom, planMom[1], volume, planVolMoy, time_close, open[1], ta.highest(high, 10)[1], ta.lowest(low, 10)[1], close[1], ta.atr(14)[1], ta.rsi(close, lenRsi)[1], planMom[1], planMom[2], volume[1], planVolMoy[1], time_close[1], time_close <= timenow)
+
+f_plan_snapshot_mtf() =>
+    PlanM15Snapshot planRequested = request.security(syminfo.tickerid, "15", f_plan_snapshot(), lookahead=barmerge.lookahead_off)
+    float planOpen = planRequested.confirmed ? planRequested.m15OpenNow : planRequested.m15OpenPrev
+    float planHigh = planRequested.confirmed ? planRequested.m15HighNow : planRequested.m15HighPrev
+    float planLow = planRequested.confirmed ? planRequested.m15LowNow : planRequested.m15LowPrev
+    float planClose = planRequested.confirmed ? planRequested.m15CloseNow : planRequested.m15ClosePrev
+    float planAtr = planRequested.confirmed ? planRequested.m15AtrNow : planRequested.m15AtrPrev
+    float planRsi = planRequested.confirmed ? planRequested.m15RsiNow : planRequested.m15RsiPrev
+    float planMom = planRequested.confirmed ? planRequested.m15MomNow : planRequested.m15MomPrev
+    float planMomPrev = planRequested.confirmed ? planRequested.m15MomPrevNow : planRequested.m15MomPrevPrev
+    float planVol = planRequested.confirmed ? planRequested.m15VolumeNow : planRequested.m15VolumePrev
+    float planVolMoy = planRequested.confirmed ? planRequested.m15VolumeAvgNow : planRequested.m15VolumeAvgPrev
+    [planOpen, planHigh, planLow, planClose, planAtr, planRsi, planMom, planMomPrev, planVol, planVolMoy]
+[planOpen15, planHigh15, planLow15, planClose15, planAtr15, planRsi15, planMom15, planMomPrev15, planVol15, planVolMoy15] = f_plan_snapshot_mtf()
 atr15 = planAtr15
 planMomS15 = planMom15 > 0 ? (planMom15 > planMomPrev15 ? 1.0 : 0.4) : (planMom15 < planMomPrev15 ? -1.0 : -0.4)
 
@@ -359,7 +460,7 @@ decisionS = strat == "" ? "AUCUNE ENTRÉE" : not planRiskRewardOk ? "AUCUNE ENTR
 rr  = math.abs(tp1 - ent) / math.max(math.abs(ent - sl), syminfo.mintick)
 tEnt = ent == planClose15 ? "au marché" : "ordre limite"
 // Fibonacci du dernier mouvement 15 min (24 bougies clôturées) : même calcul que le robot Telegram
-[fH, fL] = request.security(syminfo.tickerid, "15", [ta.highest(high, 24)[1], ta.lowest(low, 24)[1]])
+[fH, fL] = f_fibo_mtf("15")
 fR = fH - fL
 f50  = dirPlan == -1 ? fL + 0.5 * fR : fH - 0.5 * fR
 f618 = dirPlan == -1 ? fL + 0.618 * fR : fH - 0.618 * fR
@@ -510,12 +611,15 @@ if barstate.islast
 // État de confirmation calculé pour l'affichage ; les champs d'export restent dans le bloc bridge canonique.
     titre = zoneBas ? "RETOURNEMENT ▼" : zoneHaut ? "REBOND ▲" : fortHaut ? "★ ACHAT FORT" : fortBas ? "★ VENTE FORTE" : retHaut ? "RETOURNEMENT ▲" : retBas ? "RETOURNEMENT ▼" : rsiOB >= 3 ? "RSI SURACHAT " + str.tostring(rsiOB) + "/11" : rsiOS >= 3 ? "RSI SURVENTE " + str.tostring(rsiOS) + "/11" : surcharge ? "⚡ SURCHARGE" : sens == 1 ? "HAUSSE" : sens == -1 ? "BAISSE" : "ATTENDRE"
     statutPlan = planConfirmedUi ? (dirPlan == 1 ? "▲ LONG CONFIRMÉ" : "▼ SHORT CONFIRMÉ") : strat != "" and dirPlan != 0 ? (dirPlan == 1 ? "⏳ BIAIS LONG — EN ATTENTE" : "⏳ BIAIS SHORT — EN ATTENTE") : "ATTENDRE • AUCUNE STRATÉGIE"
-    ligne = (retDir != 0 and not retConf ? "↩ RETOURNEMENT  " : nVoy >= 3 ? "↩ " + str.tostring(nVoy) + "/5  " : "") + statutPlan + (planConfirmedUi ? " • " + (strat == "SCALPING" ? "SCALP" : strat) + " • TP " + px(tp1) + " • SL " + px(sl) : strat != "" and dirPlan != 0 ? " • " + strat + " • confirmation requise" : "   " + titre)
+    contexteOppose = dirPlan != 0 and (nz(dWFermee) == -dirPlan or nz(dDFermee) == -dirPlan or nz(d240Fermee) == -dirPlan or nz(d120Fermee) == -dirPlan or nz(d60Fermee) == -dirPlan)
+    contexteOpposeUts = (nz(dWFermee) == -dirPlan ? "W1 " : "") + (nz(dDFermee) == -dirPlan ? "D1 " : "") + (nz(d240Fermee) == -dirPlan ? "H4 " : "") + (nz(d120Fermee) == -dirPlan ? "H2 " : "") + (nz(d60Fermee) == -dirPlan ? "H1 " : "")
+    contexteOpposeSens = dirPlan == 1 ? "SHORT" : "LONG"
+    contexteOpposeCourt = contexteOppose ? " • ⚠ " + contexteOpposeUts + contexteOpposeSens + " contre-plan" : ""
+    contexteOpposeTxt = contexteOppose ? "\n⚠ CONTEXTE SUPÉRIEUR OPPOSÉ : " + contexteOpposeUts + contexteOpposeSens + " contre le plan " + (dirPlan == 1 ? "LONG" : "SHORT") + ". Le biais macro est distinct du plan d'exécution." : ""
+    ligne = (retDir != 0 and not retConf ? "↩ RETOURNEMENT  " : nVoy >= 3 ? "↩ " + str.tostring(nVoy) + "/5  " : "") + statutPlan + (planConfirmedUi ? " • " + (strat == "SCALPING" ? "SCALP" : strat) + " • TP " + px(tp1) + " • SL " + px(sl) : strat != "" and dirPlan != 0 ? " • " + strat + " • confirmation requise" : "   " + titre) + contexteOpposeCourt
     plan = (retTxt != "" ? retTxt + "\n\n" : "") + (dirPlan != 0 ? "STRATÉGIE : " + (strat == "" ? "aucune — aucun plan exécutable" : strat + " — " + etatS) + "\nScore : " + str.tostring(scoreV) + " / 100\n• Alignement : " + str.tostring(ptsAlign) + " / 25\n• Structure : " + str.tostring(ptsStruct) + " / 20\n• Zone d'entrée : " + str.tostring(ptsZone) + " / 20\n• Volume : " + str.tostring(ptsVol) + " / 15" + (volOk ? "" : " (indisponible)") + "\n• Indicateurs : " + str.tostring(ptsInd) + " / 10\n• Risque / rendement : " + str.tostring(ptsRR) + " / 10\n⏱ Clôture de validation " + (strat == "SWING" ? "1h" : strat == "DAY" ? "5 min" : strat == "SCALPING" ? "1 min" : "15 min") + " dans " + f_mmss(f_reste((strat == "SWING" ? 60 : strat == "DAY" ? 5 : strat == "SCALPING" ? 1 : 15))) + "\nDécision : " + decisionS + "\nMotif : " + motifS + (planConfirmedUi ? "\nPlan confirmé : " + calePlan + "\n\n" : "\n\nAUCUNE ENTRÉE : attendre la confirmation MTF et la clôture de validation. Aucun niveau Entry/TP/SL à suivre.\n\n") : "") + "SENS PROBABLE : " + (sens == 1 ? "HAUSSE " : sens == -1 ? "BAISSE " : "INDÉCIS ") + str.tostring(pctH) + "% hausse / " + str.tostring(100 - pctH) + "% baisse\n" + str.tostring(bull) + " UT en hausse • " + str.tostring(bear) + " en baisse • " + str.tostring(comp) + " comprimées\nRSI : " + str.tostring(rsiOB) + " UT en surachat (>70) • " + str.tostring(rsiOS) + " en survente (<30)" + (rsiOB >= 3 ? "\nSURCHARGE RSI HAUTE : éviter d'acheter, retournement baissier possible" : rsiOS >= 3 ? "\nSURCHARGE RSI BASSE : éviter de vendre, rebond possible" : "") + (retHaut ? "\nLes petites UT montent avant les grandes : retournement HAUSSIER en préparation" : retBas ? "\nLes petites UT baissent avant les grandes : retournement BAISSIER en préparation" : "") + (zoneBas ? "\nPrix sur une résistance " + tH1 + " : risque de retournement à la baisse" : zoneHaut ? "\nPrix sur un support " + tB1 + " : rebond possible" : "") + (planConfirmedUi ? "\n\nPLAN CONFIRMÉ " + (dirPlan == 1 ? "ACHAT" : "VENTE") + "\nEntrée " + px(ent) + " (" + tEnt + ")\nTP1 " + px(tp1) + " (" + tTP1 + ")\nTP2 " + px(tp2) + " (" + tTP2 + ")\nStop " + px(sl) + "\nGain/risque ≈ " + str.tostring(rr, "#.#") : "")
     vbg0 = zoneBas or zoneHaut ? color.rgb(170, 130, 0) : planConfirmedUi and dirPlan == 1 ? color.rgb(0, 140, 70) : planConfirmedUi and dirPlan == -1 ? color.rgb(190, 30, 45) : color.rgb(60, 60, 60)
     actif = zoneBas or zoneHaut or fortHaut or fortBas or retHaut or retBas or surcharge
-    contexteOppose = dirPlan != 0 and (nz(dWFermee) == -dirPlan or nz(dDFermee) == -dirPlan or nz(d240Fermee) == -dirPlan or nz(d60Fermee) == -dirPlan)
-    contexteOpposeTxt = contexteOppose ? "\n⚠ CONTEXTE SUPÉRIEUR OPPOSÉ : " + (nz(dWFermee) == -dirPlan ? "W1 " : "") + (nz(dDFermee) == -dirPlan ? "D1 " : "") + (nz(d240Fermee) == -dirPlan ? "H4 " : "") + (nz(d60Fermee) == -dirPlan ? "H1 " : "") + "contre le plan " + (dirPlan == 1 ? "LONG" : "SHORT") + ". Le biais macro est distinct du plan d'exécution." : ""
     table.cell(t, 0, 2, ligne, bgcolor=actif and clignote ? color.new(vbg0, 50) : vbg0, text_color= color.white, text_size=size.normal, tooltip=titre + "\n" + plan + contexteOpposeTxt)
     table.merge_cells(t, 0, 2, 11, 2)
 
@@ -540,9 +644,9 @@ voirEss  = input.bool(false, "Essoufflement / retournement ◆", group=grpX)
 voirExpl = input.bool(false, "Explosion à venir ⚡", group=grpX)
 voirTP2  = input.bool(false, "TP1 touché : garder TP1 + afficher TP2", group=grpX)
 // Fibonacci 50 % des grandes unités de temps (milieu du dernier mouvement de 24 bougies clôturées)
-[x1H, x1L] = request.security(syminfo.tickerid, "60",  [ta.highest(high, 24)[1], ta.lowest(low, 24)[1]])
-[x4H, x4L] = request.security(syminfo.tickerid, "240", [ta.highest(high, 24)[1], ta.lowest(low, 24)[1]])
-[xDH, xDL] = request.security(syminfo.tickerid, "D",   [ta.highest(high, 24)[1], ta.lowest(low, 24)[1]])
+[x1H, x1L] = f_fibo_mtf("60")
+[x4H, x4L] = f_fibo_mtf("240")
+[xDH, xDL] = f_fibo_mtf("D")
 m1h = (x1H + x1L) / 2
 m4h = (x4H + x4L) / 2
 mD  = (xDH + xDL) / 2
@@ -665,9 +769,12 @@ bridgeTfSeconds = timeframe.in_seconds()
 bridgeTf = bridgeTfSeconds == 60 ? "M1" : bridgeTfSeconds == 180 ? "M3" : bridgeTfSeconds == 300 ? "M5" : bridgeTfSeconds == 600 ? "M10" : bridgeTfSeconds == 900 ? "M15" : bridgeTfSeconds == 1800 ? "M30" : bridgeTfSeconds == 2700 ? "M45" : bridgeTfSeconds == 3600 ? "H1" : bridgeTfSeconds == 7200 ? "H2" : bridgeTfSeconds == 14400 ? "H4" : bridgeTfSeconds == 86400 ? "D1" : bridgeTfSeconds == 604800 ? "W1" : "UNSUPPORTED"
 
 
-// Chaque timeframe transporte l'heure d'ouverture de SA propre bougie.
-// Sur un chart supérieur, request.security() ne restitue qu'un intrabar ;
-// request.security_lower_tf() donne les intrabars et permet de prendre le dernier clôturé.
+// Chaque timeframe transporte l'heure de clôture de sa dernière bougie confirmée.
+// lookahead_off renvoie le dernier intrabar, puis l'horodatage choisit sa clôture ou la précédente.
+// Déclencheur calculé sur la dernière bougie clôturée de son UT, sans dépendre de l'UT du graphique.
+f_bridge_entry_snapshot() =>
+    EntryTriggerSnapshot.new(open, high, low, close, time_close, open[1], high[1], low[1], close[1], time_close[1], time_close <= timenow)
+
 bridgeEntryTf = strat == "SWING" ? "60" : strat == "DAY" ? "5" : strat == "SCALPING" ? "1" : ""
 float bridgeEntryOpen = na
 float bridgeEntryHigh = na
@@ -675,23 +782,19 @@ float bridgeEntryLow = na
 float bridgeEntryClose = na
 int bridgeEntryTime = na
 if bridgeEntryTf != ""
-    if timeframe.in_seconds(bridgeEntryTf) < timeframe.in_seconds()
-        [bridgeEntryOpenArray, bridgeEntryHighArray, bridgeEntryLowArray, bridgeEntryCloseArray, bridgeEntryTimeArray] = request.security_lower_tf(syminfo.tickerid, bridgeEntryTf, [open[1], high[1], low[1], close[1], time[1]])
-        int bridgeEntryCount = array.size(bridgeEntryTimeArray)
-        if bridgeEntryCount > 0
-            int bridgeEntryLast = bridgeEntryCount - 1
-            bridgeEntryOpen := array.get(bridgeEntryOpenArray, bridgeEntryLast)
-            bridgeEntryHigh := array.get(bridgeEntryHighArray, bridgeEntryLast)
-            bridgeEntryLow := array.get(bridgeEntryLowArray, bridgeEntryLast)
-            bridgeEntryClose := array.get(bridgeEntryCloseArray, bridgeEntryLast)
-            bridgeEntryTime := array.get(bridgeEntryTimeArray, bridgeEntryLast)
+    EntryTriggerSnapshot bridgeEntryRequested = request.security(syminfo.tickerid, bridgeEntryTf, f_bridge_entry_snapshot(), lookahead=barmerge.lookahead_off)
+    if not bridgeEntryRequested.confirmed
+        bridgeEntryOpen := bridgeEntryRequested.openPrev
+        bridgeEntryHigh := bridgeEntryRequested.highPrev
+        bridgeEntryLow := bridgeEntryRequested.lowPrev
+        bridgeEntryClose := bridgeEntryRequested.closePrev
+        bridgeEntryTime := bridgeEntryRequested.timePrev
     else
-        [bridgeEntryOpenRequested, bridgeEntryHighRequested, bridgeEntryLowRequested, bridgeEntryCloseRequested, bridgeEntryTimeRequested] = request.security(syminfo.tickerid, bridgeEntryTf, [open[1], high[1], low[1], close[1], time[1]], lookahead=barmerge.lookahead_on)
-        bridgeEntryOpen := bridgeEntryOpenRequested
-        bridgeEntryHigh := bridgeEntryHighRequested
-        bridgeEntryLow := bridgeEntryLowRequested
-        bridgeEntryClose := bridgeEntryCloseRequested
-        bridgeEntryTime := bridgeEntryTimeRequested
+        bridgeEntryOpen := bridgeEntryRequested.openNow
+        bridgeEntryHigh := bridgeEntryRequested.highNow
+        bridgeEntryLow := bridgeEntryRequested.lowNow
+        bridgeEntryClose := bridgeEntryRequested.closeNow
+        bridgeEntryTime := bridgeEntryRequested.timeNow
 bridgeEntryTimeSafe = bridgeEntryTf == "" ? na : bridgeEntryTime
 
 bridgePayload = '{"source":"ALIGN_MTF_PRO_V25","symbol":"' + bridgeMarket + '","tickerid":"' + syminfo.tickerid + '","timeframe":"' + bridgeTf + '","planTimeframe":"M15","entryTimeframe":"' + (strat == "SWING" ? "H1" : strat == "DAY" ? "M5" : strat == "SCALPING" ? "M1" : "UNSUPPORTED") + '","entryZoneLow":' + f_align_v25_json_num(bridgePlanValid ? zBas : na) + ',"entryZoneHigh":' + f_align_v25_json_num(bridgePlanValid ? zHaut : na) + ',"entryDecision":' + f_align_v25_json_num(bridgePlanValid ? (zBas + zHaut) / 2 : na) + ',"entryBarTime":' + f_align_v25_json_int(bridgeEntryTimeSafe) + ',"entryBarOpen":' + f_align_v25_json_num(bridgeEntryOpen) + ',"entryBarHigh":' + f_align_v25_json_num(bridgeEntryHigh) + ',"entryBarLow":' + f_align_v25_json_num(bridgeEntryLow) + ',"entryBarClose":' + f_align_v25_json_num(bridgeEntryClose) + ',"price":' + f_align_v25_json_num(close) + ',"timestamp":' + str.tostring(timenow) + ',"candle_time":' + str.tostring(time) + ',"confirmed":' + str.tostring(bridgeConfirmed) + ',"candle_confirmed":' + str.tostring(barstate.isconfirmed) + ',"bar_confirmed":' + str.tostring(barstate.isconfirmed) + ',"signal":"' + bridgeSignal + '","verdict":"' + decisionS + '","entry":' + f_align_v25_json_num(bridgePlanValid ? ent : na) + ',"sl":' + f_align_v25_json_num(bridgePlanValid ? sl : na) + ',"tp1":' + f_align_v25_json_num(bridgePlanValid ? tp1 : na) + ',"tp2":' + f_align_v25_json_num(bridgePlanValid ? tp2 : na) + ',"rrRatio":' + f_align_v25_json_num(rr) + ',"macro_bull":' + str.tostring(bull) + ',"macro_bear":' + str.tostring(bear) + ',"long_score":' + str.tostring(dirPlan == 1 ? scoreV : 0) + ',"short_score":' + str.tostring(dirPlan == -1 ? scoreV : 0) + ',"scalp_inverse":false,"strategy":"' + strat + '","anticipation":"' + (retHaut ? "HAUSSIER" : retBas ? "BAISSIER" : "AUCUNE") + '","zone_proche":"' + bridgeZone + '","volume":"' + (volOk ? "OK" : "INDISPONIBLE") + '","rsi_etat":"' + (rsiOB >= 3 ? "SURACHAT" : rsiOS >= 3 ? "SURVENTE" : "NORMAL") + '","rsi_1m":' + f_align_v25_json_num(r1Fermee) + ',"rsi_5m":' + f_align_v25_json_num(r5Fermee) + ',"rsi_15m":' + f_align_v25_json_num(r15Fermee) + ',"rsi_60m":' + f_align_v25_json_num(r60Fermee) + ',"lecture_1m":' + f_align_v25_json_dir(d1Fermee) + ',"lecture_5m":' + f_align_v25_json_dir(nz(d5Fermee)) + ',"lecture_15m":' + f_align_v25_json_dir(nz(d15Fermee)) + ',"lecture_60m":' + f_align_v25_json_dir(nz(d60Fermee)) + ',"mtf":{"M1":{"direction":' + f_align_v25_json_int(d1Fermee) + ',"rsi":' + f_align_v25_json_num(r1Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM1, 0)) + '},"M3":{"direction":' + f_align_v25_json_int(d3Fermee) + ',"rsi":' + f_align_v25_json_num(r2Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM3, 0)) + '},"M5":{"direction":' + f_align_v25_json_int(d5Fermee) + ',"rsi":' + f_align_v25_json_num(r5Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM5, 0)) + '},"M10":{"direction":' + f_align_v25_json_int(d10Fermee) + ',"rsi":' + f_align_v25_json_num(r10Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM10, 0)) + '},"M15":{"direction":' + f_align_v25_json_int(d15Fermee) + ',"rsi":' + f_align_v25_json_num(r15Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM15, 0)) + '},"M30":{"direction":' + f_align_v25_json_int(d30Fermee) + ',"rsi":' + f_align_v25_json_num(r30Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM30, 0)) + '},"M45":{"direction":' + f_align_v25_json_int(d45Fermee) + ',"rsi":' + f_align_v25_json_num(r45Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeM45, 0)) + '},"H1":{"direction":' + f_align_v25_json_int(d60Fermee) + ',"rsi":' + f_align_v25_json_num(r60Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeH1, 0)) + '},"H2":{"direction":' + f_align_v25_json_int(d120Fermee) + ',"rsi":' + f_align_v25_json_num(r120Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeH2, 0)) + '},"H4":{"direction":' + f_align_v25_json_int(d240Fermee) + ',"rsi":' + f_align_v25_json_num(r240Fermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeH4, 0)) + '},"D1":{"direction":' + f_align_v25_json_int(dDFermee) + ',"rsi":' + f_align_v25_json_num(rDFermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeD1, 0)) + '},"W1":{"direction":' + f_align_v25_json_int(dWFermee) + ',"rsi":' + f_align_v25_json_num(rWFermee) + ',"bar_time":' + str.tostring(nz(bridgeTimeW1, 0)) + '}}}'
