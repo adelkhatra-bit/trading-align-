@@ -37,6 +37,32 @@ class AlignBtcPineContract(unittest.TestCase):
         self.assertIn("planConfirmedUi", source)
         self.assertIn("bridgeSignal = bridgeConfirmed ?", source)
 
+
+    def test_btc_and_general_indicators_share_identical_canonical_mtf_sampling(self):
+        btc = PINE.read_text(encoding="utf-8")
+        mtf = MTF_PINE.read_text(encoding="utf-8")
+
+        def block(source, start, end):
+            i = source.index(start)
+            j = source.index(end, i)
+            return source[i:j].strip()
+
+        for start, end in (
+            ("f_etat() =>", "[d1,"),
+            ("f_niv() =>", "[rA15,"),
+            ("f_plan_snapshot() =>", "[planOpen15,"),
+        ):
+            with self.subTest(helper=start):
+                self.assertEqual(block(btc, start, end), block(mtf, start, end))
+
+        for source in (btc, mtf):
+            request_sites = source.count("request.security(") + source.count("request.security_lower_tf(")
+            self.assertLessEqual(request_sites, 40)
+            self.assertIn("time_close <= timenow", source)
+            self.assertIn("request.security_lower_tf(syminfo.tickerid, tf, f_etat())", source)
+            self.assertIn("request.security_lower_tf(syminfo.tickerid, tf, f_niv())", source)
+            self.assertIn('request.security_lower_tf(syminfo.tickerid, "15", f_plan_snapshot())', source)
+
     def test_gold_routing_is_not_present_in_the_dedicated_btc_export(self):
         source = PINE.read_text(encoding="utf-8")
         self.assertNotIn('"XAUUSD"', source)
