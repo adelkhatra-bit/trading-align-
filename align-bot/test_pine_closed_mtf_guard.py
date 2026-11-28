@@ -8,12 +8,13 @@ PINE = Path(__file__).resolve().parent / "pine" / "ALIGN_MTF_PRO_v25.pine"
 class PineClosedMtfGuard(unittest.TestCase):
     def test_gold_uses_previous_closed_candle_for_m5_m15_h1_h4(self):
         source = PINE.read_text(encoding="utf-8")
-        self.assertIn("f_dir_confirme() =>", source)
+        self.assertIn("f_etat_mtf(string tf) =>", source)
+        self.assertIn("request.security_lower_tf(syminfo.tickerid, tf, f_etat())", source)
+        self.assertIn("request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)", source)
         self.assertIn("d[1]", source)
-        import re
+        self.assertIn("time_close <= timenow", source)
         for tf in ('"5"', '"15"', '"60"', '"240"'):
-            pattern = rf'request\.security\(syminfo\.tickerid,\s*{re.escape(tf)},\s*f_dir_confirme\(\),\s*lookahead=barmerge\.lookahead_on\)'
-            self.assertRegex(source, pattern)
+            self.assertIn(f"f_etat_mtf({tf})", source)
 
     def test_gold_requires_four_way_confluence_and_unsupported_markets_are_blocked(self):
         source = PINE.read_text(encoding="utf-8")
