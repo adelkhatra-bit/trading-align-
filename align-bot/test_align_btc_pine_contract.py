@@ -47,9 +47,19 @@ class AlignBtcPineContract(unittest.TestCase):
             j = source.index(end, i)
             return source[i:j].strip()
 
+        def function_block(source, start):
+            lines = source.splitlines()
+            i = next(i for i, line in enumerate(lines) if line.startswith(start))
+            j = i + 1
+            while j < len(lines) and (not lines[j].strip() or lines[j].startswith("    ")):
+                j += 1
+            return "\n".join(lines[i:j]).strip()
+
+        for start in ("f_etat() =>", "f_etat_mtf(string tf) =>"):
+            with self.subTest(helper=start):
+                self.assertEqual(function_block(btc, start), function_block(mtf, start))
+
         for start, end in (
-            ("f_etat() =>", "\n\nf_etat_mtf"),
-            ("f_etat_mtf(string tf) =>", "\n\n"),
             ("f_niv() =>", "[rA15,"),
             ("f_plan_snapshot() =>", "[planOpen15,"),
             ("f_fibo_snapshot() =>", "\n\nf_fibo_mtf"),
@@ -58,6 +68,13 @@ class AlignBtcPineContract(unittest.TestCase):
         ):
             with self.subTest(helper=start):
                 self.assertEqual(block(btc, start, end), block(mtf, start, end))
+
+        def bridge_entry_block(source):
+            start = source.index("bridgeEntryTf =")
+            end = source.index("bridgeEntryTimeSafe =", start)
+            return source[start:end]
+
+        self.assertEqual(bridge_entry_block(btc), bridge_entry_block(mtf))
 
         for source in (btc, mtf):
             self.assertIn('tEnt = ent == planClose15 ? "au marché" : "ordre limite"', source)
