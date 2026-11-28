@@ -130,7 +130,8 @@ f_etat_mtf(string tf) =>
         dClosed := etatRequested.dPrev
         rsiClosed := etatRequested.rsiPrev
         timeClosed := etatRequested.timePrev
-    [dLive, sqzLive, rsiLive, dClosed, rsiClosed, timeClosed][d1, s1, r1, d1Fermee, r1Fermee, bridgeTimeM1] = f_etat_mtf("1")
+    [dLive, sqzLive, rsiLive, dClosed, rsiClosed, timeClosed]
+[d1, s1, r1, d1Fermee, r1Fermee, bridgeTimeM1] = f_etat_mtf("1")
 [d2, s2, r2, d3Fermee, r2Fermee, bridgeTimeM3] = f_etat_mtf("3")
 [d5, s5, r5, d5Fermee, r5Fermee, bridgeTimeM5] = f_etat_mtf("5")
 [d10, s10, r10, d10Fermee, r10Fermee, bridgeTimeM10] = f_etat_mtf("10")
@@ -246,7 +247,8 @@ f_niv_mtf(string tf) =>
         sA := nivRequested.sAPrev
         rB := nivRequested.rBPrev
         sB := nivRequested.sBPrev
-    [rA, sA, rB, sB][rA15, sA15, rB15, sB15] = f_niv_mtf("15")
+    [rA, sA, rB, sB]
+[rA15, sA15, rB15, sB15] = f_niv_mtf("15")
 [rA60, sA60, rB60, sB60] = f_niv_mtf("60")
 [rA4h, sA4h, rB4h, sB4h] = f_niv_mtf("240")
 [rAD, sAD, rBD, sBD] = f_niv_mtf("D")
