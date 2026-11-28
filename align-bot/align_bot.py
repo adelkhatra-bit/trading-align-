@@ -3089,6 +3089,8 @@ TRAD.update({
     "➖ Pas de biais local confirmé": "➖ No confirmed local bias",
     "🎯 Clôtures vs biais Pine confirmé ": "🎯 Closed timeframes vs confirmed Pine bias ",
     "🎯 Clôtures vs biais local confirmé ": "🎯 Closed timeframes vs confirmed local bias ",
+    "🎯 Vs biais Pine confirmé ": "🎯 Vs confirmed Pine bias ",
+    "🎯 Vs biais local confirmé ": "🎯 Vs confirmed local bias ",
     "🎯 Clôtures vs position ": "🎯 Closed timeframes vs position ",
     "📏 Corps M15 :": "📏 M15 body:",
     "🧭 Biais Pine confirmé :": "🧭 Confirmed Pine bias:",
@@ -7390,7 +7392,8 @@ def texte_coach_live(m, bougie, r, cle, positions=None, public=False):
         if d in (-1, 1):
             alignes = sum(1 for _, sens in lectures_ut if sens == d)
             opposes = sum(1 for _, sens in lectures_ut if sens == -d)
-            bilan_ut = (f"🎯 Vs sens confirmé {'LONG' if d == 1 else 'SHORT'} : "
+            ref_biais = "biais Pine confirmé" if origine_biais == "pine" else "biais local confirmé"
+            bilan_ut = (f"🎯 Vs {ref_biais} {'LONG' if d == 1 else 'SHORT'} : "
                         f"{alignes}/11 alignées • {opposes} opposées • {neutres} neutres")
         elif haut > bas:
             bilan_ut = f"🧭 Biais de contexte : LONG dominant • {haut}/11 haussières • {bas} baissières • {neutres} neutres (pas un signal)"
