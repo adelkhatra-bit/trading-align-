@@ -74,7 +74,7 @@ class PineTpPlanStateTests(unittest.TestCase):
         for name in ("d1Fermee", "d3Fermee", "d5Fermee", "d10Fermee", "d15Fermee",
                      "d30Fermee", "d45Fermee", "d60Fermee", "d120Fermee", "d240Fermee", "dDFermee"):
             self.assertIn(name, self.source)
-        self.assertIn('d3Fermee = request.security(syminfo.tickerid, "3", f_dir_confirme(), lookahead=barmerge.lookahead_on)', self.source)
+        self.assertIn('[d2, s2, r2, d3Fermee, r2Fermee, bridgeTimeM3] = f_etat_mtf("3")', self.source)
         self.assertIn("dirsFermees = array.from(nz(d1Fermee), nz(d3Fermee), nz(d5Fermee)", self.source)
         self.assertIn("dvLive = array.get(dirs, i)", self.source)
         self.assertIn("dv = array.get(dirsFermees, i)", self.source)
