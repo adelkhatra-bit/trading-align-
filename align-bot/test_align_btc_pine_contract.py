@@ -45,13 +45,10 @@ class AlignBtcPineContract(unittest.TestCase):
 
     def test_every_timeframe_direction_comes_from_its_last_closed_candle(self):
         source = PINE.read_text(encoding="utf-8")
-        for tf, name in (
-            ('"1"', "d1Fermee"), ('"3"', "d3Fermee"), ('"5"', "d5Fermee"),
-            ('"10"', "d10Fermee"), ('"15"', "d15Fermee"), ('"30"', "d30Fermee"),
-            ('"45"', "d45Fermee"), ('"60"', "d60Fermee"), ('"120"', "d120Fermee"),
-            ('"240"', "d240Fermee"), ('"D"', "dDFermee"), ('"W"', "dWFermee"),
-        ):
-            self.assertIn(name + ' = request.security(syminfo.tickerid, ' + tf + ', f_dir_confirme(), lookahead=barmerge.lookahead_on)', source)
+        for tf in ('"1"', '"3"', '"5"', '"10"', '"15"', '"30"', '"45"', '"60"', '"120"', '"240"', '"D"', '"W"'):
+            self.assertIn(f"f_etat_mtf({tf})", source)
+        self.assertIn("request.security_lower_tf(syminfo.tickerid, tf, f_etat())", source)
+        self.assertIn("time_close <= timenow", source)
         self.assertIn("dirs = array.from(nz(d1Fermee), nz(d3Fermee)", source)
         self.assertIn("dirBrut = zoneLongConfirmee ? 1 : zoneShortConfirmee ? -1 : longT >= 2 ? 1 : longT <= -2 ? -1 : 0", source)
         self.assertIn("dirStable = dirBrut", source)
@@ -72,7 +69,7 @@ class AlignBtcPineContract(unittest.TestCase):
         self.assertIn("sl = slC", source)
         self.assertNotIn("var float ent = na", source)
         self.assertNotIn("var int dirStable = 0", source)
-        self.assertIn('request.security(syminfo.tickerid, "15", [open[1], ta.highest(high, 10)[1], ta.lowest(low, 10)[1], close[1]', source)
+        self.assertIn("[planOpen15, planHigh15, planLow15, planClose15, planAtr15, planRsi15, planMom15, planMomPrev15, planVol15, planVolMoy15] = f_plan_snapshot_mtf()", source)
 
     def test_validation_score_and_risk_gate_use_canonical_m15_inputs(self):
         source = PINE.read_text(encoding="utf-8")
