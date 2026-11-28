@@ -232,3 +232,14 @@ The owner retains final authority over production and may revoke an agent's task
 ## Mandatory manual merge approval (legacy validation contract)
 - Contributors must obtain explicit user approval before any merge.
 - All merges require explicit owner approval after diff review, required checks, and applicable runtime validation.
+
+
+## Mandatory PR conflict-prevention gate
+- Before creating or updating any pull request targeting main, fetch the latest main and the exact task-branch head; record both SHAs and inspect the complete diff.
+- Bring the task branch up to date with the latest main using a non-destructive merge/rebase workflow on that task branch only. Never force-push, reset, or overwrite another contributor's commits.
+- Resolve every content conflict by preserving the current main behavior and the task's independently verified requirement. If intent is ambiguous, stop and ask the owner; never choose a side merely to make GitHub green.
+- Do not create a PR, mark it ready, enable auto-merge, or tell the owner it is merge-ready unless GitHub reports mergeable=true and mergeable_state=clean against main, and required checks pass on the exact current head SHA.
+- A green Actions/checks indicator does not override mergeable_state=dirty. Treat merge conflicts and CI checks as independent release gates.
+- Before starting a task, inspect all open PRs for the same issue and overlapping files. Reuse the existing owner-designated PR when it is demonstrably the same task; otherwise keep separate PRs for distinct defects and sequence shared-file changes to avoid competing edits.
+- After every branch update, re-read the branch SHA, PR base/head SHAs, mergeability state, changed-file diff, and check conclusions. If main advances and the PR becomes dirty, stop auto-merge and resolve/retest before requesting owner review.
+- Never close or delete a distinct functional fix merely because it conflicts. Close only verified duplicates, superseded proposals, or expired changes, preserving their branches/history unless the owner separately authorizes deletion.
