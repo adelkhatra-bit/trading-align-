@@ -231,14 +231,13 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn('scOk  = dP != 0 and (not o1h or retLongConfirme or retShortConfirme) and u15 and u5 and u1', self.pine)
         self.assertNotIn("dirBrut = zoneHaut ? 1 : zoneBas ? -1", self.pine)
 
-    def test_dir_stable_initialization_requires_closed_m15_or_h1_confirmation(self):
-        start = self.pine.index("var int dirStable = 0")
-        end = self.pine.index("// GOLD : aucune direction de trade", start)
-        gate = self.pine[start:end]
-        self.assertIn("if dirStable == 0", gate)
-        self.assertIn("if dirBrut != 0 and (nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut)", gate)
-        self.assertNotIn("if dirStable == 0\n        dirStable := dirBrut", gate)
-        self.assertIn("dirBrut != 0 and dirBrut != dirStable and (nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut)", gate)
+    def test_executable_direction_is_derived_only_from_confirmed_mtf_closes(self):
+        self.assertIn("dirStable = dirBrut", self.pine)
+        self.assertIn("dirBrut = zoneLongConfirmee ? 1 : zoneShortConfirmee ? -1 : longT >= 2 ? 1 : longT <= -2 ? -1 : 0", self.pine)
+        self.assertNotIn("var int dirStable = 0", self.pine)
+        decision = self.pine[self.pine.index("dirBrut ="):self.pine.index("// GOLD : aucune direction de trade")]
+        self.assertNotIn("nz(d15)", decision)
+        self.assertNotIn("nz(d60)", decision)
 
     def test_market_scope_remains_btc_and_gold_only_in_indicator(self):
         self.assertIn('bridgeMarket = isBtc ? "BTCUSD" : isGold ? "XAUUSD" : "UNSUPPORTED"', self.pine)
