@@ -103,7 +103,7 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         for assignment, closed_time in tuple_contracts:
             self.assertIn(assignment, self.source)
             self.assertNotIn(closed_time + " = request.security(", self.source)
-        request_sites = self.source.count("request.security(") + self.source.count("request.security_lower_tf(")
+        request_sites = self.source.count("request.security(")
         self.assertLessEqual(request_sites, 40)
         self.assertIn('bridgeTfSeconds == 180 ? "M3"', self.source)
         self.assertIn('bridgeTfSeconds == 600 ? "M10"', self.source)
@@ -192,9 +192,9 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
 
     def test_higher_chart_uses_last_closed_lower_timeframe_intrabar_for_entry_trigger(self):
         export_block = self.source.split(EXPORT_MARKER, 1)[1]
-        self.assertIn("timeframe.in_seconds(bridgeEntryTf) < timeframe.in_seconds()", export_block)
-        self.assertIn("request.security_lower_tf(syminfo.tickerid, bridgeEntryTf", export_block)
-        self.assertIn("array.get(bridgeEntryTimeArray, bridgeEntryLast)", export_block)
+        self.assertIn("bridgeEntryRequested.timePrev", export_block)
+        self.assertIn("EntryTriggerSnapshot bridgeEntryRequested = request.security(syminfo.tickerid, bridgeEntryTf, f_bridge_entry_snapshot(), lookahead=barmerge.lookahead_off)", export_block)
+        self.assertIn("if not bridgeEntryRequested.confirmed", export_block)
         self.assertIn('bridgeEntryTimeSafe = bridgeEntryTf == "" ? na : bridgeEntryTime', export_block)
 
     def test_bridge_reuses_mtf_time_requests_and_stays_below_tv_request_budget(self):
@@ -218,8 +218,8 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         # A higher chart timeframe must not let request.security() select an
         # arbitrary lower-timeframe intrabar for the plan's support/resistance levels.
         self.assertIn("f_niv_mtf(string tf) =>", self.source)
-        self.assertIn("request.security_lower_tf(syminfo.tickerid, tf, f_niv())", self.source)
-        self.assertIn("NivMtfSnapshot nivLast = array.get(nivArray, nivLastIndex)", self.source)
+        self.assertIn("NivMtfSnapshot nivRequested = request.security(syminfo.tickerid, tf, f_niv(), lookahead=barmerge.lookahead_off)", self.source)
+        self.assertIn("nivRequested.confirmed ? nivRequested.rANow : nivRequested.rAPrev", self.source)
         self.assertIn("if not nivLast.confirmed", self.source)
         self.assertIn("NivMtfSnapshot nivRequested = request.security(syminfo.tickerid, tf, f_niv(), lookahead=barmerge.lookahead_off)", self.source)
         for timeframe in ('"15"', '"60"', '"240"', '"D"'):
@@ -254,8 +254,8 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         # request.security() on a chart above the requested timeframe returns only
         # one intrabar. The dashboard must select the last confirmed intrabar instead.
         self.assertIn("f_etat_mtf(string tf) =>", self.source)
-        self.assertIn("request.security_lower_tf(syminfo.tickerid, tf, f_etat())", self.source)
-        self.assertIn("EtatMtfSnapshot etatLast = array.get(etatArray, etatLiveIndex)", self.source)
+        self.assertIn("EtatMtfSnapshot etatRequested = request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)", self.source)
+        self.assertIn("etatRequested.confirmed ? etatRequested.dLive : etatRequested.dPrev", self.source)
         self.assertIn("if not etatLast.confirmed", self.source)
         self.assertIn("EtatMtfSnapshot etatRequested = request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)", self.source)
         timeframes = (
@@ -282,8 +282,8 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
 
     def test_canonical_m15_plan_snapshot_uses_last_closed_intrabar_above_m15(self):
         self.assertIn("f_plan_snapshot_mtf() =>", self.source)
-        self.assertIn('request.security_lower_tf(syminfo.tickerid, "15", f_plan_snapshot())', self.source)
-        self.assertIn("PlanM15Snapshot planLast = array.get(planArray, planLast15Index)", self.source)
+        self.assertIn('PlanM15Snapshot planRequested = request.security(syminfo.tickerid, "15", f_plan_snapshot(), lookahead=barmerge.lookahead_off)', self.source)
+        self.assertIn("planRequested.confirmed ? planRequested.m15OpenNow : planRequested.m15OpenPrev", self.source)
         self.assertIn("if not planLast.confirmed", self.source)
         self.assertIn('PlanM15Snapshot planRequested = request.security(syminfo.tickerid, "15", f_plan_snapshot(), lookahead=barmerge.lookahead_off)', self.source)
         self.assertIn("[planOpen15, planHigh15, planLow15, planClose15, planAtr15, planRsi15, planMom15, planMomPrev15, planVol15, planVolMoy15] = f_plan_snapshot_mtf()", self.source)
@@ -291,8 +291,8 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
 
     def test_fibonacci_ranges_use_the_last_closed_source_candle_for_each_timeframe(self):
         self.assertIn("f_fibo_mtf(string tf) =>", self.source)
-        self.assertIn("request.security_lower_tf(syminfo.tickerid, tf, f_fibo_snapshot())", self.source)
-        self.assertIn("FiboMtfSnapshot fiboLast = array.get(fiboArray, fiboLastIndex)", self.source)
+        self.assertIn("FiboMtfSnapshot fiboRequested = request.security(syminfo.tickerid, tf, f_fibo_snapshot(), lookahead=barmerge.lookahead_off)", self.source)
+        self.assertIn("fiboRequested.confirmed ? fiboRequested.highNow : fiboRequested.highPrev", self.source)
         self.assertIn("if not fiboLast.confirmed", self.source)
         self.assertIn("FiboMtfSnapshot fiboRequested = request.security(syminfo.tickerid, tf, f_fibo_snapshot(), lookahead=barmerge.lookahead_off)", self.source)
         for tf, high_name, low_name in (
