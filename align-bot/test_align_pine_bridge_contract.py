@@ -133,6 +133,11 @@ o1h = d1hStrat == -dP"""
         baseline_decision = 'decisionS = strat == "" ? "AUCUNE ENTRÉE" : scoreV < 60 ? "AUCUNE ENTRÉE : configuration insuffisante" : etatS != "CONFIRMÉ" ? "À SURVEILLER : confirmation manquante" : scoreV >= 85 ? "ENTRÉE POSSIBLE : fortement aligné" : scoreV >= 75 ? "INTÉRESSANT : attendre les conditions finales" : "À SURVEILLER : confirmation manquante"'
         without_tp_change = without_tp_change[:risk_start] + baseline_decision + without_tp_change[decision_end:]
         without_tp_change = without_tp_change.replace(
+            "entryReadyUi = entryTriggeredUi and bridgeEntryClose >= zBas and bridgeEntryClose <= zHaut and (dirPlan == 1 ? bridgeEntryClose > (zBas + zHaut) / 2 : dirPlan == -1 ? bridgeEntryClose < (zBas + zHaut) / 2 : false)",
+            "entryReadyUi = entryTriggeredUi and close >= zBas and close <= zHaut and (dirPlan == 1 ? close > (zBas + zHaut) / 2 : dirPlan == -1 ? close < (zBas + zHaut) / 2 : false)",
+            1,
+        )
+        without_tp_change = without_tp_change.replace(
             "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig or planGeometryMismatch",
             "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig",
             1,
