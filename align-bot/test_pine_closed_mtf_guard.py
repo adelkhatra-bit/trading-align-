@@ -9,7 +9,7 @@ class PineClosedMtfGuard(unittest.TestCase):
     def test_gold_uses_previous_closed_candle_for_m5_m15_h1_h4(self):
         source = PINE.read_text(encoding="utf-8")
         self.assertIn("f_etat_mtf(string tf) =>", source)
-        self.assertIn("request.security_lower_tf(syminfo.tickerid, tf, f_etat())", source)
+        self.assertIn("EtatMtfSnapshot etatRequested = request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)", source)
         self.assertIn("request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)", source)
         self.assertIn("d[1]", source)
         self.assertIn("time_close <= timenow", source)
