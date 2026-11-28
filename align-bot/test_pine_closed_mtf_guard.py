@@ -64,7 +64,10 @@ class PineClosedMtfGuard(unittest.TestCase):
         source = PINE.read_text(encoding="utf-8")
         self.assertIn("dirStable = dirBrut", source)
         self.assertNotIn("var int dirStable = 0", source)
-        decision = source[source.index("dirBrut ="):source.index("// GOLD : aucune direction de trade")]
+        # Include the confirmation declarations: they intentionally precede dirBrut.
+        decision_start = source.index("zoneLongConfirmee =")
+        decision_end = source.index("// GOLD : aucune direction de trade", decision_start)
+        decision = source[decision_start:decision_end]
         self.assertNotIn("nz(d15)", decision)
         self.assertNotIn("nz(d60)", decision)
         self.assertIn("zoneLongConfirmee = (zoneHaut or retHaut) and retLongConfirme", decision)
