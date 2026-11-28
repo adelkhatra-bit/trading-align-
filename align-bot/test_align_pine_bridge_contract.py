@@ -371,20 +371,15 @@ if barstate.isconfirmed
         self.assertIn('f_align_v25_json_num(bridgePlanValid ? (zBas + zHaut) / 2 : na)', export_block)
 
     def test_plan_refreshes_on_direction_or_strategy_change_and_bridge_rejects_stale_plan(self):
-        self.assertIn(
-            "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig",
-            self.source,
-        )
-        self.assertIn(
-            'bridgePlanValid = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and bridgePlanGeometryOk and not na(ent) and not na(sl) and not na(tp1) and not na(tp2)',
-            self.source,
-        )
-        self.assertIn("dirFig := dirPlan", self.source)
-        self.assertIn("stratFig := strat", self.source)
+        self.assertIn("// ═════════ PLAN CANONIQUE : références M15 clôturées, sans mémoire propre au graphique ═════════", self.source)
+        self.assertIn("ent = entC", self.source)
+        self.assertIn("tp1 = tp1C", self.source)
+        self.assertIn("sl = slC", self.source)
+        self.assertIn('bridgePlanValid = dirPlan != 0 and strat != "" and dirPlan == dirFig and strat == stratFig and not planGeometryMismatch and bridgePlanGeometryOk', self.source)
 
     def test_gold_plan_geometry_is_recomputed_and_invalid_direction_is_suppressed(self):
         self.assertIn("planGeometryMismatch = dirPlan != 0 and (", self.source)
-        self.assertIn("or planGeometryMismatch", self.source)
+        self.assertIn("not planGeometryMismatch and bridgePlanGeometryOk", self.source)
         self.assertIn("bridgePlanGeometryOk = dirPlan == 1 ?", self.source)
         self.assertIn("sl < zBas and ent >= zBas and ent <= zHaut and tp1 > zHaut", self.source)
         self.assertIn("tp1 < zBas and ent >= zBas and ent <= zHaut and sl > zHaut", self.source)
