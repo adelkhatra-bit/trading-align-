@@ -30,6 +30,10 @@ class AlignBtcPineContract(unittest.TestCase):
         self.assertIn("nz(d1Fermee) == dirPlan", bridge)
         mtf_source = MTF_PINE.read_text(encoding="utf-8")
         self.assertEqual(bridge, next(line for line in mtf_source.splitlines() if line.startswith("bridgeClosedMtfOk = ")))
+        mtf_ui = next(line for line in mtf_source.splitlines() if line.startswith("planClosedMtfOkUi = "))
+        btc_ui = next(line.strip() for line in source.splitlines() if line.strip().startswith("planClosedMtfOkUi = "))
+        self.assertEqual(btc_ui, mtf_ui)
+        self.assertLess(source.index("planConfirmedUi ="), source.index("if voirPlan and planConfirmedUi"))
         self.assertIn("planConfirmedUi", source)
         self.assertIn("bridgeSignal = bridgeConfirmed ?", source)
 
