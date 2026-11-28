@@ -245,7 +245,7 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn("confirmation microstructure M3 manquante", self.pine)
         self.assertIn("M15 ✔ M5 ✔ M3 ✔ M1 ✔", self.pine)
         self.assertIn("confirmation microstructure SCALP", self.pine)
-        self.assertIn('"3 min " + (u3 ? "✅" : "⏳")', self.pine)
+        self.assertIn('3 min " + (u3 ? "✅" : "⏳")', self.pine)
 
     def test_global_anticipation_score_is_independent_of_chart_timeframe(self):
         self.assertIn("rs += w * (array.get(rsisFermees, i) - 50) / 50", self.pine)
