@@ -769,9 +769,8 @@ bridgeTfSeconds = timeframe.in_seconds()
 bridgeTf = bridgeTfSeconds == 60 ? "M1" : bridgeTfSeconds == 180 ? "M3" : bridgeTfSeconds == 300 ? "M5" : bridgeTfSeconds == 600 ? "M10" : bridgeTfSeconds == 900 ? "M15" : bridgeTfSeconds == 1800 ? "M30" : bridgeTfSeconds == 2700 ? "M45" : bridgeTfSeconds == 3600 ? "H1" : bridgeTfSeconds == 7200 ? "H2" : bridgeTfSeconds == 14400 ? "H4" : bridgeTfSeconds == 86400 ? "D1" : bridgeTfSeconds == 604800 ? "W1" : "UNSUPPORTED"
 
 
-// Chaque timeframe transporte l'heure d'ouverture de SA propre bougie.
-// Sur un chart supérieur, request.security() ne restitue qu'un intrabar ;
-// request.security_lower_tf() donne les intrabars et permet de prendre le dernier clôturé.
+// Chaque timeframe transporte l'heure de clôture de sa dernière bougie confirmée.
+// lookahead_off renvoie le dernier intrabar, puis l'horodatage choisit sa clôture ou la précédente.
 // Déclencheur calculé sur la dernière bougie clôturée de son UT, sans dépendre de l'UT du graphique.
 f_bridge_entry_snapshot() =>
     EntryTriggerSnapshot.new(open, high, low, close, time_close, open[1], high[1], low[1], close[1], time_close[1], time_close <= timenow)
