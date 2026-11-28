@@ -73,8 +73,8 @@ f_etat_mtf(string tf) =>
         timeClosed := timeClosedRequested
     [dLive, sqzLive, rsiLive, dClosed, rsiClosed, timeClosed]
 
-// Sens confirmé : la valeur est décalée d'une bougie HTF et publiée avec lookahead_on.
-// Cela évite d'utiliser une H1/H4/M15/M5 encore en formation pour autoriser une entrée.
+// Contrat MTF : conserve la lecture live pour l'affichage, mais ancre direction, RSI et horodatage sur la dernière bougie clôturée de chaque UT.
+// Les UT inférieures au graphique passent par request.security_lower_tf() et sélectionnent le dernier intrabar confirmé.
 [d1, s1, r1, d1Fermee, r1Fermee, bridgeTimeM1] = f_etat_mtf("1")
 [d2, s2, r2, d3Fermee, r2Fermee, bridgeTimeM3] = f_etat_mtf("3")
 [d5, s5, r5, d5Fermee, r5Fermee, bridgeTimeM5] = f_etat_mtf("5")
