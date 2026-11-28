@@ -875,7 +875,7 @@ if bridgeEntryTf != ""
             bridgeEntryClose := array.get(bridgeEntryCloseArray, bridgeEntryLast)
             bridgeEntryTime := array.get(bridgeEntryTimeArray, bridgeEntryLast)
     else
-        [bridgeEntryOpenRequested, bridgeEntryHighRequested, bridgeEntryLowRequested, bridgeEntryCloseRequested, bridgeEntryTimeRequested] = request.security(syminfo.tickerid, bridgeEntryTf, [open[1], high[1], low[1], close[1], time[1]], lookahead=barmerge.lookahead_on)
+        [bridgeEntryOpenRequested, bridgeEntryHighRequested, bridgeEntryLowRequested, bridgeEntryCloseRequested, bridgeEntryTimeRequested] = request.security(syminfo.tickerid, bridgeEntryTf, [open[1], high[1], low[1], close[1], time_close[1]], lookahead=barmerge.lookahead_on)
         bridgeEntryOpen := bridgeEntryOpenRequested
         bridgeEntryHigh := bridgeEntryHighRequested
         bridgeEntryLow := bridgeEntryLowRequested
