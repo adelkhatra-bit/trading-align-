@@ -82,7 +82,7 @@ dDFermee = request.security(syminfo.tickerid, "D", f_dir_confirme(), lookahead=b
 dWFermee = request.security(syminfo.tickerid, "W", f_dir_confirme(), lookahead=barmerge.lookahead_on)
 noms  = array.from("1", "3", "5", "10", "15", "30", "45", "1h", "2h", "4h", "D")
 nomsL = array.from("1 min", "3 min", "5 min", "10 min", "15 min", "30 min", "45 min", "1 heure", "2 heures", "4 heures", "Daily")
-dirs = array.from(nz(d1), nz(d2), nz(d5), nz(d10), nz(d15), nz(d30), nz(d45), nz(d60), nz(d120), nz(d240), nz(dD))
+dirs = array.from(nz(d1Fermee), nz(d3Fermee), nz(d5Fermee), nz(d10Fermee), nz(d15Fermee), nz(d30Fermee), nz(d45Fermee), nz(d60Fermee), nz(d120Fermee), nz(d240Fermee), nz(dDFermee))
 dirsFermees = array.from(nz(d1Fermee), nz(d3Fermee), nz(d5Fermee), nz(d10Fermee), nz(d15Fermee), nz(d30Fermee), nz(d45Fermee), nz(d60Fermee), nz(d120Fermee), nz(d240Fermee), nz(dDFermee))
 int bullFermee = 0
 int bearFermee = 0
@@ -146,8 +146,8 @@ sens = score > 0.15 ? 1 : score < -0.15 ? -1 : 0
 // Détection progressive : M1 alerte, M3/M5 construisent, M15 confirme.
 microBull = (nz(d1Fermee) == 1 ? 1 : 0) + (nz(d3Fermee) == 1 ? 1 : 0) + (nz(d5Fermee) == 1 ? 1 : 0)
 microBear = (nz(d1Fermee) == -1 ? 1 : 0) + (nz(d3Fermee) == -1 ? 1 : 0) + (nz(d5Fermee) == -1 ? 1 : 0)
-retHaut = nz(d1Fermee) == 1 and microBull >= 2 and longT <= -1 and momS > 0
-retBas  = nz(d1Fermee) == -1 and microBear >= 2 and longT >= 1 and momS < 0
+retHaut = nz(d1Fermee) == 1 and microBull >= 2 and longT <= -1
+retBas  = nz(d1Fermee) == -1 and microBear >= 2 and longT >= 1
 retLongConfirme = microBull >= 2 and nz(d5Fermee) == 1 and nz(d15Fermee) == 1
 retShortConfirme = microBear >= 2 and nz(d5Fermee) == -1 and nz(d15Fermee) == -1
 
@@ -268,19 +268,11 @@ f_plan(d, sMin, sMax, cMin, cMax, refClose, refAtr, refLow10, refHigh10) =>
 // Un retournement contre un biais macro fort exige les deux clôtures M15 et H1 dans le nouveau sens.
 zoneLongConfirmee = (zoneHaut or retHaut) and retLongConfirme
 zoneShortConfirmee = (zoneBas or retBas) and retShortConfirme
-dirBrut = zoneLongConfirmee ? 1 : zoneShortConfirmee ? -1 : longT >= 2 ? 1 : longT <= -2 ? -1 : sens
+dirBrut = zoneLongConfirmee ? 1 : zoneShortConfirmee ? -1 : longT >= 2 ? 1 : longT <= -2 ? -1 : 0
 // Anti-parasites (vue 1 / 3 / 5 min) : le sens ne change qu'à la CLÔTURE d'une bougie,
 // et seulement si le 15 min ou l'1h confirme le nouveau sens. Pas de LONG / SHORT qui clignote en cours de bougie.
-var int dirStable = 0
-if barstate.isconfirmed
-    // Même à l'initialisation, un retournement ne peut jamais imposer un sens sans clôture M15 ou H1 concordante.
-    if dirStable == 0
-        if dirBrut != 0 and (nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut)
-            dirStable := dirBrut
-    else if dirBrut != 0 and dirBrut != dirStable and (nz(d15Fermee) == dirBrut or nz(d60Fermee) == dirBrut)
-        dirStable := dirBrut
-    else if dirBrut == 0 and nz(d15Fermee) != dirStable and nz(d60Fermee) != dirStable
-        dirStable := 0
+// Sens exécutable sans état local au graphique : uniquement le candidat issu des clôtures MTF.
+dirStable = dirBrut
 // GOLD : aucune direction de trade tant que les clôtures M5, M15, H1 et H4 ne concordent pas.
 tickerUpper = str.upper(syminfo.ticker)
 isBtc = str.contains(tickerUpper, "BTC") or str.contains(tickerUpper, "XBT")
@@ -327,17 +319,14 @@ cMinP = profNiv == 3 ? 8 : profNiv == 2 ? 4 : profNiv == 1 ? 0 : 4
 cMaxP = profNiv == 3 ? 15 : profNiv == 2 ? 11 : profNiv == 1 ? 7 : 15
 calePlan = profNiv == 3 ? "SL derrière la zone 1h / 4h • TP 4h / Daily • validation clôture 1h" : profNiv == 2 ? "SL derrière la zone 1h • TP 1h / 4h • validation clôture 5 min" : profNiv == 1 ? "SL derrière la zone 15 min • TP 15 min / 1h • validation clôture 1 min" : "plan standard 1h / 4h"
 [entC, tp1C, tp2C, slC, tTP1, tTP2] = f_plan(dirPlan == 0 ? 1 : dirPlan, sMinP, sMaxP, cMinP, cMaxP, planClose15, planAtr15, planLow15, planHigh15)
-// ═════════ PLAN FIGÉ (anti-parasites en vue 1 / 3 / 5 min) ═════════
-// Entrée, SL et TP ne bougent qu'à la clôture d'une bougie 15 min, ou tout de suite si le sens / la stratégie change
-// ou si le SL est franchi. Entre-temps, les niveaux affichés restent fixes pour pouvoir entrer sans confusion.
-var float ent = na
-var float tp1 = na
-var float tp2 = na
-var float sl = na
-var int dirFig = 0
-var string stratFig = ""
-nouvelle15 = ta.change(time("15")) != 0
-slFranchi = not na(sl) and ((dirFig == -1 and close > sl) or (dirFig == 1 and close < sl))
+// ═════════ PLAN CANONIQUE : références M15 clôturées, sans mémoire propre au graphique ═════════
+ent = entC
+tp1 = tp1C
+tp2 = tp2C
+sl = slC
+dirFig = dirPlan
+stratFig = strat
+slFranchi = not na(sl) and ((dirFig == -1 and planClose15 > sl) or (dirFig == 1 and planClose15 < sl))
 planGeometryMismatch = dirPlan != 0 and (
      na(ent) or na(sl) or na(tp1) or na(tp2) or
      (dirPlan == 1 and (sl >= ent or tp1 <= ent or tp2 <= tp1)) or
@@ -353,13 +342,6 @@ if retDir != 0 and bar_index - retBar > 40
     retDir := 0
 retConf = retDir != 0 and dirPlan == retDir
 retTxt = retDir == 0 ? "" : retConf ? "✅ RETOURNEMENT CONFIRMÉ : " + (retDir == 1 ? "LONG" : "SHORT") + (strat != "" ? " • " + strat : "") : "⛔ SL cassé à la clôture : " + (retDir == 1 ? "SHORT" : "LONG") + " annulé ↩ RETOURNEMENT en cours (attendre la confirmation 15 min / 1h)"
-if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig or planGeometryMismatch
-    ent := entC
-    tp1 := tp1C
-    tp2 := tp2C
-    sl := slC
-    dirFig := dirPlan
-    stratFig := strat
 // Compte à rebours jusqu'à la clôture de l'unité de validation (calé sur l'horloge, comme TradingView)
 f_mmss(ms) =>
     t = math.max(0, int(ms / 1000))
