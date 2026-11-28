@@ -191,7 +191,7 @@ class AlignBtcPineContract(unittest.TestCase):
 
         def trigger_block(source):
             start = source.index("bridgeEntryTfMs =")
-            end = source.index("\\n\\nbridgePayload =", start)
+            end = source.index("\n\nbridgePayload =", start)
             return source[start:end]
 
         self.assertEqual(trigger_block(btc), trigger_block(gold))
