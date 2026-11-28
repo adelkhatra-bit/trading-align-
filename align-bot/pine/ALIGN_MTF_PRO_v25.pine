@@ -167,6 +167,8 @@ atrC = ta.atr(14)
 atr15 = request.security(syminfo.tickerid, "15", ta.atr(14)[1])
 // Référence unique du plan : dernière bougie 15 min clôturée, quel que soit le graphique affiché.
 [planOpen15, planHigh15, planLow15, planClose15, planAtr15] = request.security(syminfo.tickerid, "15", [open[1], ta.highest(high, 10)[1], ta.lowest(low, 10)[1], close[1], ta.atr(14)[1]], lookahead=barmerge.lookahead_on)
+[planRsi15, planMom15, planMomPrev15] = request.security(syminfo.tickerid, "15", [ta.rsi(close, lenRsi)[1], ta.linreg(close - math.avg(math.avg(ta.highest(high, lenSqz), ta.lowest(low, lenSqz)), ta.sma(close, lenSqz)), lenSqz, 0)[1], ta.linreg(close - math.avg(math.avg(ta.highest(high, lenSqz), ta.lowest(low, lenSqz)), ta.sma(close, lenSqz)), lenSqz, 0)[2]], lookahead=barmerge.lookahead_on)
+planMomS15 = planMom15 > 0 ? (planMom15 > planMomPrev15 ? 1.0 : 0.4) : (planMom15 < planMomPrev15 ? -1.0 : -0.4)
 
 // Niveau le plus proche au-dessus / en dessous (1er et 2e)
 f_dessus(refClose, refAtr) =>
@@ -213,9 +215,9 @@ f_dessous(refClose, refAtr) =>
 // Mèche qui touche le niveau + RSI en excès + essoufflement
 surR = not na(hau1) and planHigh15 >= hau1 - planAtr15 * margeAtr and planClose15 < hau1
 surS = not na(bas1) and planLow15 <= bas1 + planAtr15 * margeAtr and planClose15 > bas1
-zBas0  = surR and (r15 > 58 or rsiOB >= 3) and momS < 1.0 and planClose15 < planOpen15
-zHaut0 = surS and (r15 < 42 or rsiOS >= 3) and momS > -1.0 and planClose15 > planOpen15
-zoneBas  = zBas0 and not (zHaut0 and rC < 50)
+zBas0  = surR and (planRsi15 > 58 or rsiOBFermee >= 3) and planMomS15 < 1.0 and planClose15 < planOpen15
+zHaut0 = surS and (planRsi15 < 42 or rsiOSFermee >= 3) and planMomS15 > -1.0 and planClose15 > planOpen15
+zoneBas  = zBas0 and not (zHaut0 and planRsi15 < 50)
 zoneHaut = zHaut0 and not zoneBas
 
 // ═════════ PLAN : direction, TP, SL ═════════
