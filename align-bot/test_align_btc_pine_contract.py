@@ -55,7 +55,8 @@ class AlignBtcPineContract(unittest.TestCase):
                 j += 1
             return "\n".join(lines[i:j]).strip()
 
-        for start in ("f_etat() =>", "f_etat_mtf(string tf) =>"):
+        self.assertEqual(block(btc, "type EntryTriggerSnapshot", "f_etat() =>"), block(mtf, "type EntryTriggerSnapshot", "f_etat() =>"))
+        for start in ("f_etat() =>", "f_etat_mtf(string tf) =>", "f_bridge_entry_snapshot() =>"):
             with self.subTest(helper=start):
                 self.assertEqual(function_block(btc, start), function_block(mtf, start))
 
