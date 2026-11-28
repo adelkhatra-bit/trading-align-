@@ -108,22 +108,13 @@ class BridgeStoreTests(unittest.TestCase):
             "bridgeTimeD1": '"D"',
             "bridgeTimeW1": '"W"',
         }
-        pine_lines = pine.splitlines()
         for variable, interval in expected.items():
             with self.subTest(timeframe=variable):
-                self.assertTrue(
-                    any(
-                        variable in line
-                        and "request.security(syminfo.tickerid," in line
-                        and interval in line
-                        and "f_etat()" in line
-                        for line in pine_lines
-                    ),
-                    msg=f"{variable} must be returned by its matching request.security() tuple",
-                )
-        self.assertIn('[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), ta.rsi(close, lenRsi)[1], time_close[1]]', pine)
-        self.assertNotIn('[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), time]', pine)
-        self.assertNotIn('lookahead=barmerge.lookahead_off)', pine)
+                self.assertIn(variable + '] = f_etat_mtf(' + interval + ')', pine)
+        self.assertIn("request.security_lower_tf(syminfo.tickerid, tf, f_etat())", pine)
+        self.assertIn("request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)", pine)
+        self.assertIn('[d, sqz ? 1 : 0, rsiValue, time_close, d[1], sqz[1] ? 1 : 0, rsiValue[1], time_close[1], time_close <= timenow]', pine)
+        self.assertNotIn('f_dir_confirme()', pine)
 
     def test_accepts_snapshot_and_exposes_workflow_contract(self):
         status, result = self.store.ingest(valid_payload(), INGEST, BASE_MS)
