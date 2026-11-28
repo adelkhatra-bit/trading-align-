@@ -211,6 +211,7 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn("distE = math.abs(planClose15 - ent)", self.pine)
         self.assertIn("ptsZone = strat == \"\" ? 0 : distE <= 0.5 * planAtr15", self.pine)
         self.assertIn("planVol15, planVolMoy15] = f_plan_snapshot_mtf()", self.pine)
+        self.assertIn('tEnt = ent == planClose15 ? "au marché" : "ordre limite"', self.pine)
         self.assertIn("volume, planVolMoy, time_close, open[1]", self.pine)
         self.assertIn("volume[1], planVolMoy[1], time_close[1], time_close <= timenow", self.pine)
         self.assertIn("rsiT = strat == \"SWING\" ? nz(r60Fermee, 50)", self.pine)
