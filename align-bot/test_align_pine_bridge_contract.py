@@ -280,6 +280,22 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertIn('request.security(syminfo.tickerid, "15", f_plan_snapshot(), lookahead=barmerge.lookahead_off)', self.source)
         self.assertIn("[planOpen15, planHigh15, planLow15, planClose15, planAtr15, planRsi15, planMom15, planMomPrev15, planVol15, planVolMoy15] = f_plan_snapshot_mtf()", self.source)
 
+
+    def test_fibonacci_ranges_use_the_last_closed_source_candle_for_each_timeframe(self):
+        self.assertIn("f_fibo_mtf(string tf) =>", self.source)
+        self.assertIn("request.security_lower_tf(syminfo.tickerid, tf, f_fibo_snapshot())", self.source)
+        self.assertIn("array.get(fiboConfirmedArray, fiboLastIndex)", self.source)
+        self.assertIn("if not array.get(fiboConfirmedArray, fiboLastIndex)", self.source)
+        self.assertIn("request.security(syminfo.tickerid, tf, f_fibo_snapshot(), lookahead=barmerge.lookahead_off)", self.source)
+        for tf, high_name, low_name in (
+            ('"15"', "fH", "fL"),
+            ('"60"', "x1H", "x1L"),
+            ('"240"', "x4H", "x4L"),
+            ('"D"', "xDH", "xDL"),
+        ):
+            with self.subTest(timeframe=tf):
+                self.assertIn(f"[{high_name}, {low_name}] = f_fibo_mtf({tf})", self.source)
+
     def test_no_secret_is_embedded_in_pine(self):
         self.assertNotIn("ALIGN_TV_INGEST_TOKEN", self.source)
         self.assertNotIn("ingest_token", self.source)
