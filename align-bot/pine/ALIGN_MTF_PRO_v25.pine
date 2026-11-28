@@ -114,7 +114,7 @@ for i = 0 to 10
     ts += w * dv
     rs += w * (array.get(rsis, i) - 50) / 50
     court += i <= 4 ? dv : 0
-    longT += i >= 8 ? dv : 0
+    longT += i >= 7 ? dv : 0
     rsiOB += array.get(rsis, i) >= 70 ? 1 : 0
     rsiOS += array.get(rsis, i) <= 30 ? 1 : 0
 
@@ -143,8 +143,13 @@ rsiS = math.max(-1.0, math.min(1.0, rs / sw * 2))
 score = 0.45 * trendS + 0.30 * rsiS + 0.25 * momS
 pctH = math.round(50 + 50 * score)
 sens = score > 0.15 ? 1 : score < -0.15 ? -1 : 0
-retHaut = court >= 3 and longT <= -1 and momS > 0
-retBas  = court <= -3 and longT >= 1 and momS < 0
+// Détection progressive : M1 alerte, M3/M5 construisent, M15 confirme.
+microBull = (nz(d1Fermee) == 1 ? 1 : 0) + (nz(d3Fermee) == 1 ? 1 : 0) + (nz(d5Fermee) == 1 ? 1 : 0)
+microBear = (nz(d1Fermee) == -1 ? 1 : 0) + (nz(d3Fermee) == -1 ? 1 : 0) + (nz(d5Fermee) == -1 ? 1 : 0)
+retHaut = nz(d1Fermee) == 1 and microBull >= 2 and longT <= -1 and momS > 0
+retBas  = nz(d1Fermee) == -1 and microBear >= 2 and longT >= 1 and momS < 0
+retLongConfirme = microBull >= 2 and nz(d5Fermee) == 1 and nz(d15Fermee) == 1
+retShortConfirme = microBear >= 2 and nz(d5Fermee) == -1 and nz(d15Fermee) == -1
 
 // ═════════ RÉSISTANCES / SUPPORTS 15m - 1h - 4h ═════════
 f_niv() =>
@@ -161,17 +166,17 @@ atrC = ta.atr(14)
 // ATR de la vue 15 min (la référence du bot) : le SL ne dépend plus de la petite unité de temps affichée
 atr15 = request.security(syminfo.tickerid, "15", ta.atr(14)[1])
 // Référence unique du plan : dernière bougie 15 min clôturée, quel que soit le graphique affiché.
-[planClose15, planAtr15, planLow15, planHigh15] = request.security(syminfo.tickerid, "15", [close[1], ta.atr(14)[1], ta.lowest(low, 10)[1], ta.highest(high, 10)[1]], lookahead=barmerge.lookahead_on)
+[planOpen15, planHigh15, planLow15, planClose15, planAtr15] = request.security(syminfo.tickerid, "15", [open[1], ta.highest(high, 10)[1], ta.lowest(low, 10)[1], close[1], ta.atr(14)[1]], lookahead=barmerge.lookahead_on)
 
 // Niveau le plus proche au-dessus / en dessous (1er et 2e)
-f_dessus() =>
+f_dessus(refClose, refAtr) =>
     float a1 = na
     float a2 = na
     string t1 = ""
     string t2 = ""
     for k = 0 to 11
         v = array.get(niveaux, k)
-        if not na(v) and v > close + atrC * 0.3
+        if not na(v) and v > refClose + refAtr * 0.3
             if na(a1) or v < a1
                 if not na(a1) and math.abs(v - a1) > atrC * 0.3
                     a2 := a1
@@ -182,14 +187,14 @@ f_dessus() =>
                 a2 := v
                 t2 := array.get(nomsNiv, k)
     [a1, t1, a2, t2]
-f_dessous() =>
+f_dessous(refClose, refAtr) =>
     float b1 = na
     float b2 = na
     string t1 = ""
     string t2 = ""
     for k = 0 to 11
         v = array.get(niveaux, k)
-        if not na(v) and v < close - atrC * 0.3
+        if not na(v) and v < refClose - refAtr * 0.3
             if na(b1) or v > b1
                 if not na(b1) and math.abs(v - b1) > atrC * 0.3
                     b2 := b1
@@ -201,15 +206,15 @@ f_dessous() =>
                 t2 := array.get(nomsNiv, k)
     [b1, t1, b2, t2]
 
-[hau1, tH1, hau2, tH2] = f_dessus()
-[bas1, tB1, bas2, tB2] = f_dessous()
+[hau1, tH1, hau2, tH2] = f_dessus(planClose15, planAtr15)
+[bas1, tB1, bas2, tB2] = f_dessous(planClose15, planAtr15)
 
 // Zone de retournement : prix collé à une résistance / un support de grosse UT
 // Mèche qui touche le niveau + RSI en excès + essoufflement
-surR = not na(hau1) and high >= hau1 - atrC * margeAtr and close < hau1
-surS = not na(bas1) and low <= bas1 + atrC * margeAtr and close > bas1
-zBas0  = surR and (rC > 58 or rsiOB >= 3) and momS < 1.0 and close < open
-zHaut0 = surS and (rC < 42 or rsiOS >= 3) and momS > -1.0 and close > open
+surR = not na(hau1) and planHigh15 >= hau1 - planAtr15 * margeAtr and planClose15 < hau1
+surS = not na(bas1) and planLow15 <= bas1 + planAtr15 * margeAtr and planClose15 > bas1
+zBas0  = surR and (r15 > 58 or rsiOB >= 3) and momS < 1.0 and planClose15 < planOpen15
+zHaut0 = surS and (r15 < 42 or rsiOS >= 3) and momS > -1.0 and planClose15 > planOpen15
 zoneBas  = zBas0 and not (zHaut0 and rC < 50)
 zoneHaut = zHaut0 and not zoneBas
 
@@ -261,9 +266,9 @@ f_plan(d, sMin, sMax, cMin, cMax, refClose, refAtr, refLow10, refHigh10) =>
     [e, t1, t2, s, n1, n2]
 // Plan automatique : les grosses UT (2h, 4h, Daily) décident, sauf zone de retournement
 // Un retournement contre un biais macro fort exige les deux clôtures M15 et H1 dans le nouveau sens.
-zoneLongConfirmee = zoneHaut and (longT <= -2 ? (nz(d15Fermee) == 1 and nz(d60Fermee) == 1) : (nz(d15Fermee) == 1 or nz(d60Fermee) == 1))
-zoneShortConfirmee = zoneBas and (longT >= 2 ? (nz(d15Fermee) == -1 and nz(d60Fermee) == -1) : (nz(d15Fermee) == -1 or nz(d60Fermee) == -1))
-dirBrut = zoneLongConfirmee ? 1 : zoneShortConfirmee ? -1 : longT >= 2 ? 1 : longT <= -2 ? -1 : retHaut ? 1 : retBas ? -1 : sens
+zoneLongConfirmee = (zoneHaut or retHaut) and retLongConfirme
+zoneShortConfirmee = (zoneBas or retBas) and retShortConfirme
+dirBrut = zoneLongConfirmee ? 1 : zoneShortConfirmee ? -1 : longT >= 2 ? 1 : longT <= -2 ? -1 : sens
 // Anti-parasites (vue 1 / 3 / 5 min) : le sens ne change qu'à la CLÔTURE d'une bougie,
 // et seulement si le 15 min ou l'1h confirme le nouveau sens. Pas de LONG / SHORT qui clignote en cours de bougie.
 var int dirStable = 0
