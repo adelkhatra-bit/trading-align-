@@ -86,6 +86,19 @@ type PlanM15Snapshot
     int m15TimePrev
     bool confirmed
 
+type EntryTriggerSnapshot
+    float openNow
+    float highNow
+    float lowNow
+    float closeNow
+    int timeNow
+    float openPrev
+    float highPrev
+    float lowPrev
+    float closePrev
+    int timePrev
+    bool confirmed
+
 f_etat() =>
     ef = ta.ema(close, lenFast)
     es = ta.ema(close, lenSlow)
@@ -99,37 +112,11 @@ f_etat() =>
     EtatMtfSnapshot.new(d, sqz ? 1 : 0, rsiValue, time_close, d[1], sqz[1] ? 1 : 0, rsiValue[1], time_close[1], time_close <= timenow)
 
 f_etat_mtf(string tf) =>
-    int dLive = na
-    int sqzLive = na
-    float rsiLive = na
-    int dClosed = na
-    float rsiClosed = na
-    int timeClosed = na
-    if timeframe.in_seconds(tf) < timeframe.in_seconds()
-        array<EtatMtfSnapshot> etatArray = request.security_lower_tf(syminfo.tickerid, tf, f_etat())
-        int etatLiveIndex = array.size(etatArray) - 1
-        if etatLiveIndex >= 0
-            EtatMtfSnapshot etatLast = array.get(etatArray, etatLiveIndex)
-            dLive := etatLast.dLive
-            sqzLive := etatLast.sqzLive
-            rsiLive := etatLast.rsiLive
-            if not etatLast.confirmed
-                dClosed := etatLast.dPrev
-                rsiClosed := etatLast.rsiPrev
-                timeClosed := etatLast.timePrev
-            else
-                dClosed := etatLast.dLive
-                rsiClosed := etatLast.rsiLive
-                timeClosed := etatLast.timeLive
-    else
-        EtatMtfSnapshot etatRequested = request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)
-        dLive := etatRequested.dLive
-        sqzLive := etatRequested.sqzLive
-        rsiLive := etatRequested.rsiLive
-        dClosed := etatRequested.dPrev
-        rsiClosed := etatRequested.rsiPrev
-        timeClosed := etatRequested.timePrev
-    [dLive, sqzLive, rsiLive, dClosed, rsiClosed, timeClosed]
+    EtatMtfSnapshot etatRequested = request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)
+    int dClosed = etatRequested.confirmed ? etatRequested.dLive : etatRequested.dPrev
+    float rsiClosed = etatRequested.confirmed ? etatRequested.rsiLive : etatRequested.rsiPrev
+    int timeClosed = etatRequested.confirmed ? etatRequested.timeLive : etatRequested.timePrev
+    [etatRequested.dLive, etatRequested.sqzLive, etatRequested.rsiLive, dClosed, rsiClosed, timeClosed]
 [d1, s1, r1, d1Fermee, r1Fermee, bridgeTimeM1] = f_etat_mtf("1")
 [d2, s2, r2, d3Fermee, r2Fermee, bridgeTimeM3] = f_etat_mtf("3")
 [d5, s5, r5, d5Fermee, r5Fermee, bridgeTimeM5] = f_etat_mtf("5")
@@ -238,31 +225,11 @@ f_niv() =>
     NivMtfSnapshot.new(rA, sA, rB, sB, time_close, rA[1], sA[1], rB[1], sB[1], time_close[1], time_close <= timenow)
 
 f_niv_mtf(string tf) =>
-    float rA = na
-    float sA = na
-    float rB = na
-    float sB = na
-    if timeframe.in_seconds(tf) < timeframe.in_seconds()
-        array<NivMtfSnapshot> nivArray = request.security_lower_tf(syminfo.tickerid, tf, f_niv())
-        int nivLastIndex = array.size(nivArray) - 1
-        if nivLastIndex >= 0
-            NivMtfSnapshot nivLast = array.get(nivArray, nivLastIndex)
-            if not nivLast.confirmed
-                rA := nivLast.rAPrev
-                sA := nivLast.sAPrev
-                rB := nivLast.rBPrev
-                sB := nivLast.sBPrev
-            else
-                rA := nivLast.rANow
-                sA := nivLast.sANow
-                rB := nivLast.rBNow
-                sB := nivLast.sBNow
-    else
-        NivMtfSnapshot nivRequested = request.security(syminfo.tickerid, tf, f_niv(), lookahead=barmerge.lookahead_off)
-        rA := nivRequested.rAPrev
-        sA := nivRequested.sAPrev
-        rB := nivRequested.rBPrev
-        sB := nivRequested.sBPrev
+    NivMtfSnapshot nivRequested = request.security(syminfo.tickerid, tf, f_niv(), lookahead=barmerge.lookahead_off)
+    float rA = nivRequested.confirmed ? nivRequested.rANow : nivRequested.rAPrev
+    float sA = nivRequested.confirmed ? nivRequested.sANow : nivRequested.sAPrev
+    float rB = nivRequested.confirmed ? nivRequested.rBNow : nivRequested.rBPrev
+    float sB = nivRequested.confirmed ? nivRequested.sBNow : nivRequested.sBPrev
     [rA, sA, rB, sB]
 [rA15, sA15, rB15, sB15] = f_niv_mtf("15")
 [rA60, sA60, rB60, sB60] = f_niv_mtf("60")
@@ -275,23 +242,9 @@ f_fibo_snapshot() =>
     FiboMtfSnapshot.new(fiboHigh, fiboLow, time_close, fiboHigh[1], fiboLow[1], time_close[1], time_close <= timenow)
 
 f_fibo_mtf(string tf) =>
-    float fiboHigh = na
-    float fiboLow = na
-    if timeframe.in_seconds(tf) < timeframe.in_seconds()
-        array<FiboMtfSnapshot> fiboArray = request.security_lower_tf(syminfo.tickerid, tf, f_fibo_snapshot())
-        int fiboLastIndex = array.size(fiboArray) - 1
-        if fiboLastIndex >= 0
-            FiboMtfSnapshot fiboLast = array.get(fiboArray, fiboLastIndex)
-            if not fiboLast.confirmed
-                fiboHigh := fiboLast.highPrev
-                fiboLow := fiboLast.lowPrev
-            else
-                fiboHigh := fiboLast.highNow
-                fiboLow := fiboLast.lowNow
-    else
-        FiboMtfSnapshot fiboRequested = request.security(syminfo.tickerid, tf, f_fibo_snapshot(), lookahead=barmerge.lookahead_off)
-        fiboHigh := fiboRequested.highPrev
-        fiboLow := fiboRequested.lowPrev
+    FiboMtfSnapshot fiboRequested = request.security(syminfo.tickerid, tf, f_fibo_snapshot(), lookahead=barmerge.lookahead_off)
+    float fiboHigh = fiboRequested.confirmed ? fiboRequested.highNow : fiboRequested.highPrev
+    float fiboLow = fiboRequested.confirmed ? fiboRequested.lowNow : fiboRequested.lowPrev
     [fiboHigh, fiboLow]
 niveaux = array.from(rA15, sA15, rB15, sB15, rA60, sA60, rB60, sB60, rA4h, sA4h, rB4h, sB4h, rAD, sAD, rBD, sBD)
 nomsNiv = array.from("15m", "15m", "15m", "15m", "1h", "1h", "1h", "1h", "4h", "4h", "4h", "4h", "Daily", "Daily", "Daily", "Daily")
@@ -303,55 +256,17 @@ f_plan_snapshot() =>
     PlanM15Snapshot.new(open, ta.highest(high, 10), ta.lowest(low, 10), close, ta.atr(14), ta.rsi(close, lenRsi), planMom, planMom[1], volume, planVolMoy, time_close, open[1], ta.highest(high, 10)[1], ta.lowest(low, 10)[1], close[1], ta.atr(14)[1], ta.rsi(close, lenRsi)[1], planMom[1], planMom[2], volume[1], planVolMoy[1], time_close[1], time_close <= timenow)
 
 f_plan_snapshot_mtf() =>
-    float planOpen = na
-    float planHigh = na
-    float planLow = na
-    float planClose = na
-    float planAtr = na
-    float planRsi = na
-    float planMom = na
-    float planMomPrev = na
-    float planVol = na
-    float planVolMoy = na
-    if timeframe.in_seconds("15") < timeframe.in_seconds()
-        array<PlanM15Snapshot> planArray = request.security_lower_tf(syminfo.tickerid, "15", f_plan_snapshot())
-        int planLast15Index = array.size(planArray) - 1
-        if planLast15Index >= 0
-            PlanM15Snapshot planLast = array.get(planArray, planLast15Index)
-            if not planLast.confirmed
-                planOpen := planLast.m15OpenPrev
-                planHigh := planLast.m15HighPrev
-                planLow := planLast.m15LowPrev
-                planClose := planLast.m15ClosePrev
-                planAtr := planLast.m15AtrPrev
-                planRsi := planLast.m15RsiPrev
-                planMom := planLast.m15MomPrev
-                planMomPrev := planLast.m15MomPrevPrev
-                planVol := planLast.m15VolumePrev
-                planVolMoy := planLast.m15VolumeAvgPrev
-            else
-                planOpen := planLast.m15OpenNow
-                planHigh := planLast.m15HighNow
-                planLow := planLast.m15LowNow
-                planClose := planLast.m15CloseNow
-                planAtr := planLast.m15AtrNow
-                planRsi := planLast.m15RsiNow
-                planMom := planLast.m15MomNow
-                planMomPrev := planLast.m15MomPrevNow
-                planVol := planLast.m15VolumeNow
-                planVolMoy := planLast.m15VolumeAvgNow
-    else
-        PlanM15Snapshot planRequested = request.security(syminfo.tickerid, "15", f_plan_snapshot(), lookahead=barmerge.lookahead_off)
-        planOpen := planRequested.m15OpenPrev
-        planHigh := planRequested.m15HighPrev
-        planLow := planRequested.m15LowPrev
-        planClose := planRequested.m15ClosePrev
-        planAtr := planRequested.m15AtrPrev
-        planRsi := planRequested.m15RsiPrev
-        planMom := planRequested.m15MomPrev
-        planMomPrev := planRequested.m15MomPrevPrev
-        planVol := planRequested.m15VolumePrev
-        planVolMoy := planRequested.m15VolumeAvgPrev
+    PlanM15Snapshot planRequested = request.security(syminfo.tickerid, "15", f_plan_snapshot(), lookahead=barmerge.lookahead_off)
+    float planOpen = planRequested.confirmed ? planRequested.m15OpenNow : planRequested.m15OpenPrev
+    float planHigh = planRequested.confirmed ? planRequested.m15HighNow : planRequested.m15HighPrev
+    float planLow = planRequested.confirmed ? planRequested.m15LowNow : planRequested.m15LowPrev
+    float planClose = planRequested.confirmed ? planRequested.m15CloseNow : planRequested.m15ClosePrev
+    float planAtr = planRequested.confirmed ? planRequested.m15AtrNow : planRequested.m15AtrPrev
+    float planRsi = planRequested.confirmed ? planRequested.m15RsiNow : planRequested.m15RsiPrev
+    float planMom = planRequested.confirmed ? planRequested.m15MomNow : planRequested.m15MomPrev
+    float planMomPrev = planRequested.confirmed ? planRequested.m15MomPrevNow : planRequested.m15MomPrevPrev
+    float planVol = planRequested.confirmed ? planRequested.m15VolumeNow : planRequested.m15VolumePrev
+    float planVolMoy = planRequested.confirmed ? planRequested.m15VolumeAvgNow : planRequested.m15VolumeAvgPrev
     [planOpen, planHigh, planLow, planClose, planAtr, planRsi, planMom, planMomPrev, planVol, planVolMoy]
 [planOpen15, planHigh15, planLow15, planClose15, planAtr15, planRsi15, planMom15, planMomPrev15, planVol15, planVolMoy15] = f_plan_snapshot_mtf()
 atr15 = planAtr15
@@ -876,6 +791,10 @@ bridgeTf = bridgeTfSeconds == 60 ? "M1" : bridgeTfSeconds == 180 ? "M3" : bridge
 // Chaque timeframe transporte l'heure de clôture de sa dernière bougie clôturée.
 // Sur un chart supérieur, request.security() ne restitue qu'un intrabar ;
 // request.security_lower_tf() donne les intrabars et permet de prendre le dernier clôturé.
+// Déclencheur calculé sur la dernière bougie clôturée de son UT, sans dépendre de l'UT du graphique.
+f_bridge_entry_snapshot() =>
+    EntryTriggerSnapshot.new(open, high, low, close, time_close, open[1], high[1], low[1], close[1], time_close[1], time_close <= timenow)
+
 bridgeEntryTf = strat == "SWING" ? "60" : strat == "DAY" ? "5" : strat == "SCALPING" ? "1" : ""
 float bridgeEntryOpen = na
 float bridgeEntryHigh = na
@@ -883,23 +802,19 @@ float bridgeEntryLow = na
 float bridgeEntryClose = na
 int bridgeEntryTime = na
 if bridgeEntryTf != ""
-    if timeframe.in_seconds(bridgeEntryTf) < timeframe.in_seconds()
-        [bridgeEntryOpenArray, bridgeEntryHighArray, bridgeEntryLowArray, bridgeEntryCloseArray, bridgeEntryTimeArray] = request.security_lower_tf(syminfo.tickerid, bridgeEntryTf, [open[1], high[1], low[1], close[1], time_close[1]])
-        int bridgeEntryCount = array.size(bridgeEntryTimeArray)
-        if bridgeEntryCount > 0
-            int bridgeEntryLast = bridgeEntryCount - 1
-            bridgeEntryOpen := array.get(bridgeEntryOpenArray, bridgeEntryLast)
-            bridgeEntryHigh := array.get(bridgeEntryHighArray, bridgeEntryLast)
-            bridgeEntryLow := array.get(bridgeEntryLowArray, bridgeEntryLast)
-            bridgeEntryClose := array.get(bridgeEntryCloseArray, bridgeEntryLast)
-            bridgeEntryTime := array.get(bridgeEntryTimeArray, bridgeEntryLast)
+    EntryTriggerSnapshot bridgeEntryRequested = request.security(syminfo.tickerid, bridgeEntryTf, f_bridge_entry_snapshot(), lookahead=barmerge.lookahead_off)
+    if not bridgeEntryRequested.confirmed
+        bridgeEntryOpen := bridgeEntryRequested.openPrev
+        bridgeEntryHigh := bridgeEntryRequested.highPrev
+        bridgeEntryLow := bridgeEntryRequested.lowPrev
+        bridgeEntryClose := bridgeEntryRequested.closePrev
+        bridgeEntryTime := bridgeEntryRequested.timePrev
     else
-        [bridgeEntryOpenRequested, bridgeEntryHighRequested, bridgeEntryLowRequested, bridgeEntryCloseRequested, bridgeEntryTimeRequested] = request.security(syminfo.tickerid, bridgeEntryTf, [open[1], high[1], low[1], close[1], time_close[1]], lookahead=barmerge.lookahead_on)
-        bridgeEntryOpen := bridgeEntryOpenRequested
-        bridgeEntryHigh := bridgeEntryHighRequested
-        bridgeEntryLow := bridgeEntryLowRequested
-        bridgeEntryClose := bridgeEntryCloseRequested
-        bridgeEntryTime := bridgeEntryTimeRequested
+        bridgeEntryOpen := bridgeEntryRequested.openNow
+        bridgeEntryHigh := bridgeEntryRequested.highNow
+        bridgeEntryLow := bridgeEntryRequested.lowNow
+        bridgeEntryClose := bridgeEntryRequested.closeNow
+        bridgeEntryTime := bridgeEntryRequested.timeNow
 bridgeEntryTimeSafe = bridgeEntryTf == "" ? na : bridgeEntryTime
 // Même déclencheur clôturé que align_tv_bridge.py : la ligne blanche de décision s'allume
 // uniquement si la bougie de validation fraîche reteste la zone, clôture au-delà du milieu
