@@ -40,7 +40,7 @@ class PineClosedMtfGuard(unittest.TestCase):
             source,
         )
         self.assertIn(
-            'strat == "SCALPING" ? (nz(d60Fermee) != -dirPlan and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan)',
+            'strat == "SCALPING" ? ((nz(d60Fermee) != -dirPlan or (dirPlan == 1 and retLongConfirme) or (dirPlan == -1 and retShortConfirme)) and nz(d15Fermee) == dirPlan and nz(d5Fermee) == dirPlan and nz(d1Fermee) == dirPlan)',
             source,
         )
 
@@ -48,6 +48,7 @@ class PineClosedMtfGuard(unittest.TestCase):
         source = PINE.read_text(encoding="utf-8")
         ui_line = next(line for line in source.splitlines() if line.startswith("planClosedMtfOkUi = "))
         bridge_line = next(line for line in source.splitlines() if line.startswith("bridgeClosedMtfOk = "))
+        self.assertEqual(ui_line.replace("planClosedMtfOkUi", "bridgeClosedMtfOk", 1), bridge_line)
         for gate in (
             'strat == "SWING" ?',
             'strat == "DAY" ?',
