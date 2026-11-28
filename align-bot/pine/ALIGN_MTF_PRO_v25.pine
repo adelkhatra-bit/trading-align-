@@ -180,7 +180,7 @@ f_dessus(refClose, refAtr) =>
         v = array.get(niveaux, k)
         if not na(v) and v > refClose + refAtr * 0.3
             if na(a1) or v < a1
-                if not na(a1) and math.abs(v - a1) > atrC * 0.3
+                if not na(a1) and math.abs(v - a1) > refAtr * 0.3
                     a2 := a1
                     t2 := t1
                 a1 := v
@@ -198,7 +198,7 @@ f_dessous(refClose, refAtr) =>
         v = array.get(niveaux, k)
         if not na(v) and v < refClose - refAtr * 0.3
             if na(b1) or v > b1
-                if not na(b1) and math.abs(v - b1) > atrC * 0.3
+                if not na(b1) and math.abs(v - b1) > refAtr * 0.3
                     b2 := b1
                     t2 := t1
                 b1 := v
@@ -357,15 +357,17 @@ ptsAlign = math.round(25.0 * alignN / 4.0)
 ctxU = strat == "SWING" ? uD : strat == "DAY" ? u4 : u1h
 ctxO = strat == "SWING" ? oW : strat == "DAY" ? o4 : o1h
 ptsStruct = strat == "" ? 0 : ctxU ? 20 : ctxO ? 0 : 10
-distE = math.abs(close - ent)
-ptsZone = strat == "" ? 0 : distE <= 0.5 * atrC ? 20 : distE <= 1.5 * atrC ? 10 : 0
-volMoy = ta.sma(volume, 20)
-volOk = not na(volume) and volume > 0 and not na(volMoy) and volMoy > 0
-volR = volOk ? volume / volMoy : 0.0
+distE = math.abs(planClose15 - ent)
+ptsZone = strat == "" ? 0 : distE <= 0.5 * planAtr15 ? 20 : distE <= 1.5 * planAtr15 ? 10 : 0
+planVol15 = request.security(syminfo.tickerid, "15", volume[1], lookahead=barmerge.lookahead_on)
+planVolMoy15 = request.security(syminfo.tickerid, "15", ta.sma(volume, 20)[1], lookahead=barmerge.lookahead_on)
+volOk = not na(planVol15) and planVol15 > 0 and not na(planVolMoy15) and planVolMoy15 > 0
+volR = volOk ? planVol15 / planVolMoy15 : 0.0
 ptsVol = strat == "" or not volOk ? 0 : volR >= 1.0 ? 15 : volR >= 0.7 ? 7 : 0
-rsiT = strat == "SWING" ? nz(r60, 50) : strat == "DAY" ? nz(r5, 50) : nz(r1, 50)
+rsiT = strat == "SWING" ? nz(r60Fermee, 50) : strat == "DAY" ? nz(r5Fermee, 50) : nz(r1Fermee, 50)
 rsiSain = dP == 1 ? rsiT < 70 : rsiT > 30
-ptsInd = strat == "" ? 0 : rsiSain ? (sens == dP ? 10 : 5) : 0
+sensPlan = longT > 0 ? 1 : longT < 0 ? -1 : 0
+ptsInd = strat == "" ? 0 : rsiSain ? (sensPlan == dP ? 10 : 5) : 0
 rrS = math.abs(tp1 - ent) / math.max(math.abs(ent - sl), syminfo.mintick)
 ptsRR = strat == "" ? 0 : rrS >= 2.0 ? 10 : rrS >= 1.5 ? 7 : 0
 scoreV = ptsAlign + ptsStruct + ptsZone + ptsVol + ptsInd + ptsRR
