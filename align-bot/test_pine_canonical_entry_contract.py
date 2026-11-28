@@ -210,7 +210,7 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn("planClose15 > sl", self.pine)
         self.assertIn("distE = math.abs(planClose15 - ent)", self.pine)
         self.assertIn("ptsZone = strat == \"\" ? 0 : distE <= 0.5 * planAtr15", self.pine)
-        self.assertIn("planVol15, planVolMoy15] = request.security(syminfo.tickerid, \"15\"", self.pine)
+        self.assertIn("planVol15, planVolMoy15] = f_plan_snapshot_mtf()", self.pine)
         self.assertIn("volume[1], ta.sma(volume, 20)[1]", self.pine)
         self.assertIn("rsiT = strat == \"SWING\" ? nz(r60Fermee, 50)", self.pine)
         self.assertIn("math.abs(v - a1) > refAtr * 0.3", self.pine)
@@ -248,7 +248,7 @@ class PineCanonicalEntryContract(unittest.TestCase):
 
     def test_bridge_rsi_matches_the_same_closed_mtf_candle_as_direction_and_timestamp(self):
         self.assertIn(
-            "[d, sqz ? 1 : 0, ta.rsi(close, lenRsi), ta.rsi(close, lenRsi)[1], time_close[1]]",
+            "[d, sqz ? 1 : 0, rsiValue, time_close, d[1], sqz[1] ? 1 : 0, rsiValue[1], time_close[1], time_close <= timenow]",
             self.pine,
         )
         payload = self.pine.split("bridgePayload = ", 1)[1]
@@ -273,7 +273,7 @@ class PineCanonicalEntryContract(unittest.TestCase):
 
     def test_closed_rsi_export_does_not_change_live_chart_rsi_calculations(self):
         self.assertIn("rsis = array.from(nz(r1, 50)", self.pine)
-        self.assertIn("[dC, sC, rC, _, _] = f_etat()", self.pine)
+        self.assertIn("[dC, sC, rC, _, _, _, _, _, _] = f_etat()", self.pine)
         self.assertIn("rsiSig = ta.ema(rC, 9)", self.pine)
         self.assertIn("rsiAchat =", self.pine)
         self.assertIn("rsiVente =", self.pine)
