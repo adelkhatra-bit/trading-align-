@@ -196,12 +196,20 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn("🟢 ZONE ATTEINTE — LONG PRÊT", self.pine)
         self.assertIn("🔴 ZONE ATTEINTE — SHORT PRÊT", self.pine)
 
-    def test_reversal_zone_cannot_override_strong_opposite_macro_without_both_closes(self):
-        self.assertIn("zoneLongConfirmee = zoneHaut and (longT <= -2 ?", self.pine)
-        self.assertIn("(nz(d15Fermee) == 1 and nz(d60Fermee) == 1)", self.pine)
-        self.assertIn("zoneShortConfirmee = zoneBas and (longT >= 2 ?", self.pine)
-        self.assertIn("(nz(d15Fermee) == -1 and nz(d60Fermee) == -1)", self.pine)
+    def test_progressive_mtf_reversal_requires_micro_build_and_m15_confirmation(self):
+        # M1 is the early warning; at least two of M1/M3/M5 must build the move.
+        self.assertIn("microBull = (nz(d1Fermee) == 1 ? 1 : 0) + (nz(d3Fermee) == 1 ? 1 : 0) + (nz(d5Fermee) == 1 ? 1 : 0)", self.pine)
+        self.assertIn("microBear = (nz(d1Fermee) == -1 ? 1 : 0) + (nz(d3Fermee) == -1 ? 1 : 0) + (nz(d5Fermee) == -1 ? 1 : 0)", self.pine)
+        self.assertIn("retLongConfirme = microBull >= 2 and nz(d5Fermee) == 1 and nz(d15Fermee) == 1", self.pine)
+        self.assertIn("retShortConfirme = microBear >= 2 and nz(d5Fermee) == -1 and nz(d15Fermee) == -1", self.pine)
+        self.assertIn("zoneLongConfirmee = (zoneHaut or retHaut) and retLongConfirme", self.pine)
+        self.assertIn("zoneShortConfirmee = (zoneBas or retBas) and retShortConfirme", self.pine)
+        # H1 is included in the macro context; a confirmed reversal is still a scalp,
+        # not permission to override the higher-timeframe filter for DAY/SWING.
+        self.assertIn("longT += i >= 7 ? dv : 0", self.pine)
         self.assertIn("dirBrut = zoneLongConfirmee ? 1 : zoneShortConfirmee ? -1 : longT >= 2 ? 1", self.pine)
+        self.assertIn('(nz(d60Fermee) != -dirPlan or (dirPlan == 1 and retLongConfirme) or (dirPlan == -1 and retShortConfirme))', self.pine)
+        self.assertIn('scOk  = dP != 0 and (not o1h or retLongConfirme or retShortConfirme) and u15 and u5 and u1', self.pine)
         self.assertNotIn("dirBrut = zoneHaut ? 1 : zoneBas ? -1", self.pine)
 
     def test_dir_stable_initialization_requires_closed_m15_or_h1_confirmation(self):
