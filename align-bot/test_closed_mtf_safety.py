@@ -326,7 +326,7 @@ class ClosedMtfSafety(unittest.TestCase):
         self.assertIn("🔴 baisse", message)
         english = ab.traduire(message)
         self.assertIn("📊 Timeframes:", english)
-        self.assertIn("🎯 Vs confirmed direction SHORT : 11/11 aligned", english)
+        self.assertIn("🎯 Vs confirmed local bias SHORT : 11/11 aligned", english)
         self.assertIn("🌐 W1 context:", english)
         self.assertIn("🎯 Roles:", english)
         self.assertNotIn("UT clôturées", english)
