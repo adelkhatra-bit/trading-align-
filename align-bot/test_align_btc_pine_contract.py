@@ -184,5 +184,32 @@ class AlignBtcPineContract(unittest.TestCase):
         self.assertIn(reversal_exception, ui)
         self.assertIn(reversal_exception, bridge)
 
+
+    def test_btc_visual_entry_trigger_matches_gold_fresh_closed_candle_gate(self):
+        btc = PINE.read_text(encoding="utf-8")
+        gold = MTF_PINE.read_text(encoding="utf-8")
+
+        def trigger_block(source):
+            start = source.index("bridgeEntryTfMs =")
+            end = source.index("\\n\\nbridgePayload =", start)
+            return source[start:end]
+
+        self.assertEqual(trigger_block(btc), trigger_block(gold))
+        for required in (
+            "bridgeEntryFreshUi",
+            "bridgeEntryOhlcValidUi",
+            "bridgeEntryRetestedUi",
+            "bridgeEntryDecisionUi",
+            "bridgeEntryBeforeStopUi",
+            "entryTriggeredUi = bridgeConfirmed and bridgeEntryFreshUi",
+            "entryReadyUi = entryTriggeredUi",
+            "🟢 DÉCLENCHEUR LONG VALIDÉ",
+            "🔴 DÉCLENCHEUR SHORT VALIDÉ",
+            "🟢 ZONE ATTEINTE — LONG PRÊT",
+            "🔴 ZONE ATTEINTE — SHORT PRÊT",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, btc)
+
 if __name__ == "__main__":
     unittest.main()
