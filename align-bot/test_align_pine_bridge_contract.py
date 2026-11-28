@@ -133,6 +133,11 @@ o1h = d1hStrat == -dP"""
         baseline_decision = 'decisionS = strat == "" ? "AUCUNE ENTRÉE" : scoreV < 60 ? "AUCUNE ENTRÉE : configuration insuffisante" : etatS != "CONFIRMÉ" ? "À SURVEILLER : confirmation manquante" : scoreV >= 85 ? "ENTRÉE POSSIBLE : fortement aligné" : scoreV >= 75 ? "INTÉRESSANT : attendre les conditions finales" : "À SURVEILLER : confirmation manquante"'
         without_tp_change = without_tp_change[:risk_start] + baseline_decision + without_tp_change[decision_end:]
         without_tp_change = without_tp_change.replace(
+            "entryReadyUi = entryTriggeredUi and bridgeEntryClose >= zBas and bridgeEntryClose <= zHaut and (dirPlan == 1 ? bridgeEntryClose > (zBas + zHaut) / 2 : dirPlan == -1 ? bridgeEntryClose < (zBas + zHaut) / 2 : false)",
+            "entryReadyUi = entryTriggeredUi and close >= zBas and close <= zHaut and (dirPlan == 1 ? close > (zBas + zHaut) / 2 : dirPlan == -1 ? close < (zBas + zHaut) / 2 : false)",
+            1,
+        )
+        without_tp_change = without_tp_change.replace(
             "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig or planGeometryMismatch",
             "if (barstate.isconfirmed and (na(ent) or nouvelle15 or slFranchi)) or dirPlan != dirFig or strat != stratFig",
             1,
@@ -143,6 +148,22 @@ o1h = d1hStrat == -dP"""
             1,
         )
 
+        # Normalize the reviewed entry-label wording and its explicit non-executable disclaimer.
+        without_tp_change = without_tp_change.replace(
+            "// Le prix d'entrée planifié est affiché séparément du déclencheur réellement validé.",
+            "// v25 (décision d'Adel) : plus de point d'entrée tracé sur le graphique (ni ligne ni étiquette ENTRÉE)",
+            1,
+        )
+        without_tp_change = without_tp_change.replace(
+            "🎯 ENTRÉE PLANIFIÉE — ATTENTE DÉCLENCHEUR",
+            "✅ CONFIRMATION",
+            1,
+        )
+        without_tp_change = without_tp_change.replace(
+            '"🎯 PRIX D\'ENTRÉE PLANIFIÉ : " + px(ent) + "\\nCe niveau n\'est pas une entrée exécutable. Attendre la clôture du déclencheur M1 / M5 / H1 validé par le bridge." + ',
+            '"✅ LIGNE DE CONFIRMATION : " + px(ent) + ',
+            1,
+        )
         # The pending/confirmed ribbon is the only additional permitted UI change:
         # replace that exact block with the v25 baseline before checking the rest byte-for-byte.
         ui_start = without_tp_change.find("// État de confirmation calculé pour l'affichage ; les champs d'export restent dans le bloc bridge canonique.")

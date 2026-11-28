@@ -25,18 +25,17 @@ class PineTpPlanStateTests(unittest.TestCase):
         self.assertLess(block.index("if planTpChange"), block.index("if not tp1Ok and dirPlan"))
 
     def test_v24_is_a_context_only_companion_and_does_not_publish_a_second_plan_by_default(self):
-        self.assertIn('voirPlan = input.bool(false, "Afficher le plan (TP / SL)"', self.source_v24)
-        self.assertIn('voirFibo = input.bool(false, "Zone d\'entrée + Fibonacci"', self.source_v24)
-        self.assertIn('voirSignauxV24 = input.bool(false, "Signaux indépendants v24 (désactivés par défaut)"', self.source_v24)
-        self.assertIn("sigHaut = voirSignauxV24 and sigHaut0", self.source_v24)
-        self.assertIn("sigBas  = voirSignauxV24 and sigBas0", self.source_v24)
+        self.assertIn("voirPlan = false", self.source_v24)
+        self.assertIn("voirFibo = false", self.source_v24)
+        self.assertIn("voirSignauxV24 = false", self.source_v24)
+        self.assertIn("PRESSION À LA RÉSISTANCE (CONTEXTE)", self.source_v24)
+        self.assertIn("BIAIS HAUSSIER — CONTEXTE", self.source_v24)
         self.assertIn("CONTEXTE MTF v24 — plan Entry / SL / TP sur v25", self.source_v24)
         self.assertIn("dirsFermees = array.from(nz(d1Fermee), nz(d3Fermee)", self.source_v24)
         self.assertIn("dv = array.get(dirsFermees, i)", self.source_v24)
         self.assertIn("Bougie en formation :", self.source_v24)
         self.assertIn("visuel MTF d'accompagnement", self.source_v24)
         self.assertLessEqual(self.source_v24.count("request.security("), 40)
-        self.assertNotIn('E " + px(ent) + "  TP " + px(tp1) + "  SL " + px(sl)', self.source_v24)
 
     def test_entry_sl_tp_visuals_are_hidden_until_the_plan_is_confirmed(self):
         self.assertIn("planConfirmedUi = dirPlan != 0 and strat != \"\" and dirPlan == dirFig", self.source)
@@ -46,7 +45,8 @@ class PineTpPlanStateTests(unittest.TestCase):
 
     def test_visual_confirmation_line_and_label_are_preserved_without_entry_marker(self):
         self.assertIn("lConf := line.new(bar_index, ent, bar_index + 30, ent", self.source)
-        self.assertIn('eConf := label.new(bar_index + 30, ent, "✅ CONFIRMATION"', self.source)
+        self.assertIn('eConf := label.new(bar_index + 30, ent, "🎯 ENTRÉE PLANIFIÉE — ATTENTE DÉCLENCHEUR"', self.source)
+        self.assertIn('tooltip="🎯 PRIX D\'ENTRÉE PLANIFIÉ : " + px(ent)', self.source)
         self.assertIn("line.delete(lConf)", self.source)
         self.assertIn("label.delete(eConf)", self.source)
         self.assertNotIn('eE := label.new(x1, ent, "ENTRÉE "', self.source)

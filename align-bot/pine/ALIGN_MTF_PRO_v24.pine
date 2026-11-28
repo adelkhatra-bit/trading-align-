@@ -13,9 +13,11 @@ lenSlow = input.int(50, "EMA lente", group=grpP)
 lenSqz  = input.int(20, "Période compression", group=grpP)
 lenRsi  = input.int(14, "RSI", group=grpP)
 grpA = "Affichage"
-voirPlan = input.bool(false, "Afficher le plan (TP / SL)", group=grpA)
-voirFibo = input.bool(false, "Zone d'entrée + Fibonacci", group=grpA)
-voirSignauxV24 = input.bool(false, "Signaux indépendants v24 (désactivés par défaut)", group=grpA)
+// v24 est strictement contextuel : aucun Entry / SL / TP indépendant ne peut être affiché.
+voirPlan = false
+voirFibo = false
+// Les signaux directionnels exécutables appartiennent exclusivement au v25.
+voirSignauxV24 = false
 animer   = input.bool(true, "Animation en temps réel", group=grpA)
 largCol  = input.float(4.4, "Largeur des cases (%)", step=0.2, group=grpA)
 posTxt   = input.string("En bas à droite", "Position de la barre", options=["En bas à droite", "En bas à gauche", "En haut à droite", "En haut à gauche"], group=grpA)
@@ -474,7 +476,7 @@ if barstate.islast
         tip = array.get(nomsL, i) + " — clôture : " + sensUT + "\nBougie en formation : " + sensLive + (dvLive != dv ? " • divergence temporaire (~)" : " • cohérente avec la clôture") + "\n━━━━━━━━━━━━\nTendance : " + tendUT + "\nRSI : " + str.tostring(rv, "#") + " — " + rsiUT + "\nCompression : " + (sq ? "OUI ⚡ prêt à exploser (attendre la direction)" : "non") + "\nRôle : " + roleUT + (minUT > 0 ? "\nClôture dans : " + f_mmss(f_reste(minUT)) : "") + "\n━━━━━━━━━━━━\n" + planUT + (dirPlan != 0 and dv == -dirPlan and i <= 4 ? "\n↩ VOYANT RETOURNEMENT allumé : " + str.tostring(nVoy) + "/5 petites unités (1 à 15 min) ont tourné contre le plan\n3/5 = le retournement se prépare • confirmé quand le 15 min ET la 1h clôturent dans le nouveau sens" : "")
         table.cell(t, i, 0, array.get(noms, i), width=largCol, bgcolor=rv >= 70 ?  color.rgb(120, 20, 30) : rv <= 30 ?  color.rgb(0, 90, 50) :  color.rgb(30, 34, 45), text_color=rv >= 70 or rv <= 30 ?  color.white :  color.gray, text_size=size.small, tooltip=tip)
         table.cell(t, i, 1, sym, width=largCol, bgcolor=bg, text_color= color.white, text_size=size.normal, tooltip=tip)
-    titre = zoneBas ? "RETOURNEMENT ▼" : zoneHaut ? "REBOND ▲" : fortHaut ? "★ ACHAT FORT" : fortBas ? "★ VENTE FORTE" : retHaut ? "RETOURNEMENT ▲" : retBas ? "RETOURNEMENT ▼" : rsiOB >= 3 ? "RSI SURACHAT " + str.tostring(rsiOB) + "/11" : rsiOS >= 3 ? "RSI SURVENTE " + str.tostring(rsiOS) + "/11" : surcharge ? "⚡ SURCHARGE" : sens == 1 ? "HAUSSE" : sens == -1 ? "BAISSE" : "ATTENDRE"
+    titre = zoneBas ? "PRESSION À LA RÉSISTANCE (CONTEXTE)" : zoneHaut ? "PRESSION AU SUPPORT (CONTEXTE)" : rsiOB >= 3 ? "RSI SURACHAT — CONTEXTE" : rsiOS >= 3 ? "RSI SURVENTE — CONTEXTE" : surcharge ? "COMPRESSION — SURVEILLANCE" : sens == 1 ? "BIAIS HAUSSIER — CONTEXTE" : sens == -1 ? "BIAIS BAISSIER — CONTEXTE" : "CONTEXTE MIXTE"
     ligne = "📊 CONTEXTE MTF v24 — plan Entry / SL / TP sur v25 • " + titre
     plan = "VISUEL COMPLÉMENTAIRE v24 : contexte et clôtures uniquement.\nClôture de validation : seule une bougie clôturée compte.\nLa direction du plan, Entry, SL et TP de référence sont exclusivement ceux de ALIGN MTF PRO v25."
     vbg0 = zoneBas or zoneHaut ?  color.rgb(170, 130, 0) : dirPlan == 1 ?  color.rgb(0, 140, 70) : dirPlan == -1 ?  color.rgb(190, 30, 45) :  color.rgb(60, 60, 60)

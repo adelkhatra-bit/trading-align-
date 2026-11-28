@@ -1363,4 +1363,6 @@ class VoixNaturelleSeulementV1228(unittest.TestCase):
         pine = self._lire(["align-bot", "pine", "ALIGN_MTF_PRO_v25.pine"])
         self.assertNotIn('label.new(x1, ent, "ENTRÉE "', pine)
         self.assertNotIn("lE := line.new(x1, ent", pine)
-        self.assertIn("plus de point d'entrée tracé", pine)
+        self.assertIn("🎯 ENTRÉE PLANIFIÉE — ATTENTE DÉCLENCHEUR", pine)
+        self.assertIn("Ce niveau n'est pas une entrée exécutable.", pine)
+        self.assertNotIn('label.new(x1, ent, "ENTRÉE "', pine)

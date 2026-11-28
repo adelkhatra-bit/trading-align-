@@ -61,6 +61,10 @@ class VisualOnlyPineContractTests(unittest.TestCase):
     def test_all_other_v24_source_bytes_match_the_verified_baseline(self):
         normalized = self.source.replace(RSI_CROSSOVER_BLOCK, RSI_CROSSOVER_BASELINE_BLOCK, 1)
         normalized = normalized.replace(VISUAL_ONLY_MARKER, BASELINE_ALERT_BLOCK, 1)
+        normalized = normalized.replace("// v24 est strictement contextuel : aucun Entry / SL / TP indépendant ne peut être affiché.\nvoirPlan = false", 'voirPlan = input.bool(false, "Afficher le plan (TP / SL)", group=grpA)', 1)
+        normalized = normalized.replace('voirFibo = false', 'voirFibo = input.bool(false, "Zone d\'entrée + Fibonacci", group=grpA)', 1)
+        normalized = normalized.replace("// Les signaux directionnels exécutables appartiennent exclusivement au v25.\nvoirSignauxV24 = false", 'voirSignauxV24 = input.bool(false, "Signaux indépendants v24 (désactivés par défaut)", group=grpA)', 1)
+        normalized = normalized.replace('titre = zoneBas ? "PRESSION À LA RÉSISTANCE (CONTEXTE)" : zoneHaut ? "PRESSION AU SUPPORT (CONTEXTE)" : rsiOB >= 3 ? "RSI SURACHAT — CONTEXTE" : rsiOS >= 3 ? "RSI SURVENTE — CONTEXTE" : surcharge ? "COMPRESSION — SURVEILLANCE" : sens == 1 ? "BIAIS HAUSSIER — CONTEXTE" : sens == -1 ? "BIAIS BAISSIER — CONTEXTE" : "CONTEXTE MIXTE"', 'titre = zoneBas ? "RETOURNEMENT ▼" : zoneHaut ? "REBOND ▲" : fortHaut ? "★ ACHAT FORT" : fortBas ? "★ VENTE FORTE" : retHaut ? "RETOURNEMENT ▲" : retBas ? "RETOURNEMENT ▼" : rsiOB >= 3 ? "RSI SURACHAT " + str.tostring(rsiOB) + "/11" : rsiOS >= 3 ? "RSI SURVENTE " + str.tostring(rsiOS) + "/11" : surcharge ? "⚡ SURCHARGE" : sens == 1 ? "HAUSSE" : sens == -1 ? "BAISSE" : "ATTENDRE"', 1)
         raw = normalized.encode("utf-8")
         git_blob = hashlib.sha1(
             b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw
