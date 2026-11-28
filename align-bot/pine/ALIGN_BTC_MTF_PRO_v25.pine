@@ -864,7 +864,7 @@ float bridgeEntryClose = na
 int bridgeEntryTime = na
 if bridgeEntryTf != ""
     if timeframe.in_seconds(bridgeEntryTf) < timeframe.in_seconds()
-        [bridgeEntryOpenArray, bridgeEntryHighArray, bridgeEntryLowArray, bridgeEntryCloseArray, bridgeEntryTimeArray] = request.security_lower_tf(syminfo.tickerid, bridgeEntryTf, [open[1], high[1], low[1], close[1], time[1]])
+        [bridgeEntryOpenArray, bridgeEntryHighArray, bridgeEntryLowArray, bridgeEntryCloseArray, bridgeEntryTimeArray] = request.security_lower_tf(syminfo.tickerid, bridgeEntryTf, [open[1], high[1], low[1], close[1], time_close[1]])
         int bridgeEntryCount = array.size(bridgeEntryTimeArray)
         if bridgeEntryCount > 0
             int bridgeEntryLast = bridgeEntryCount - 1
