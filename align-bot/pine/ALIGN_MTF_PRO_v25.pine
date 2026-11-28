@@ -27,6 +27,64 @@ bridgeEnabled = input.bool(true, "Envoyer les snapshots au ROBOT V12", group=grp
 
 // ═════════ ÉTAT DE CHAQUE UNITÉ DE TEMPS ═════════
 // Tendance : +1 (prix > EMA20 > EMA50) / -1 / 0  •  Compression : Bollinger dans Keltner  •  RSI
+type EtatMtfSnapshot
+    int dLive
+    int sqzLive
+    float rsiLive
+    int timeLive
+    int dPrev
+    int sqzPrev
+    float rsiPrev
+    int timePrev
+    bool confirmed
+
+type NivMtfSnapshot
+    float rANow
+    float sANow
+    float rBNow
+    float sBNow
+    int timeNow
+    float rAPrev
+    float sAPrev
+    float rBPrev
+    float sBPrev
+    int timePrev
+    bool confirmed
+
+type FiboMtfSnapshot
+    float highNow
+    float lowNow
+    int timeNow
+    float highPrev
+    float lowPrev
+    int timePrev
+    bool confirmed
+
+type PlanM15Snapshot
+    float m15OpenNow
+    float m15HighNow
+    float m15LowNow
+    float m15CloseNow
+    float m15AtrNow
+    float m15RsiNow
+    float m15MomNow
+    float m15MomPrevNow
+    float m15VolumeNow
+    float m15VolumeAvgNow
+    int m15TimeNow
+    float m15OpenPrev
+    float m15HighPrev
+    float m15LowPrev
+    float m15ClosePrev
+    float m15AtrPrev
+    float m15RsiPrev
+    float m15MomPrev
+    float m15MomPrevPrev
+    float m15VolumePrev
+    float m15VolumeAvgPrev
+    int m15TimePrev
+    bool confirmed
+
 f_etat() =>
     ef = ta.ema(close, lenFast)
     es = ta.ema(close, lenSlow)
@@ -37,7 +95,7 @@ f_etat() =>
     rng = 1.5 * ta.atr(lenSqz)
     sqz = (basis + dev) < (kc + rng) and (basis - dev) > (kc - rng)
     rsiValue = ta.rsi(close, lenRsi)
-    [d, sqz ? 1 : 0, rsiValue, time_close, d[1], sqz[1] ? 1 : 0, rsiValue[1], time_close[1], time_close <= timenow]
+    EtatMtfSnapshot.new(d, sqz ? 1 : 0, rsiValue, time_close, d[1], sqz[1] ? 1 : 0, rsiValue[1], time_close[1], time_close <= timenow)
 
 f_etat_mtf(string tf) =>
     int dLive = na
@@ -47,31 +105,30 @@ f_etat_mtf(string tf) =>
     float rsiClosed = na
     int timeClosed = na
     if timeframe.in_seconds(tf) < timeframe.in_seconds()
-        [etatDArray, etatSqzArray, etatRsiArray, etatTimeArray, etatDPrevArray, etatSqzPrevArray, etatRsiPrevArray, etatTimePrevArray, etatConfirmedArray] = request.security_lower_tf(syminfo.tickerid, tf, f_etat())
-        int etatLiveIndex = array.size(etatTimeArray) - 1
+        array<EtatMtfSnapshot> etatArray = request.security_lower_tf(syminfo.tickerid, tf, f_etat())
+        int etatLiveIndex = array.size(etatArray) - 1
         if etatLiveIndex >= 0
-            dLive := array.get(etatDArray, etatLiveIndex)
-            sqzLive := array.get(etatSqzArray, etatLiveIndex)
-            rsiLive := array.get(etatRsiArray, etatLiveIndex)
-            if not array.get(etatConfirmedArray, etatLiveIndex)
-                dClosed := array.get(etatDPrevArray, etatLiveIndex)
-                rsiClosed := array.get(etatRsiPrevArray, etatLiveIndex)
-                timeClosed := array.get(etatTimePrevArray, etatLiveIndex)
+            EtatMtfSnapshot etatLast = array.get(etatArray, etatLiveIndex)
+            dLive := etatLast.dLive
+            sqzLive := etatLast.sqzLive
+            rsiLive := etatLast.rsiLive
+            if not etatLast.confirmed
+                dClosed := etatLast.dPrev
+                rsiClosed := etatLast.rsiPrev
+                timeClosed := etatLast.timePrev
             else
-                dClosed := dLive
-                rsiClosed := rsiLive
-                timeClosed := array.get(etatTimeArray, etatLiveIndex)
+                dClosed := etatLast.dLive
+                rsiClosed := etatLast.rsiLive
+                timeClosed := etatLast.timeLive
     else
-        [dLiveRequested, sqzLiveRequested, rsiLiveRequested, _, dClosedRequested, _, rsiClosedRequested, timeClosedRequested, _] = request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)
-        dLive := dLiveRequested
-        sqzLive := sqzLiveRequested
-        rsiLive := rsiLiveRequested
-        dClosed := dClosedRequested
-        rsiClosed := rsiClosedRequested
-        timeClosed := timeClosedRequested
-    [dLive, sqzLive, rsiLive, dClosed, rsiClosed, timeClosed]
-
-[d1, s1, r1, d1Fermee, r1Fermee, bridgeTimeM1] = f_etat_mtf("1")
+        EtatMtfSnapshot etatRequested = request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)
+        dLive := etatRequested.dLive
+        sqzLive := etatRequested.sqzLive
+        rsiLive := etatRequested.rsiLive
+        dClosed := etatRequested.dPrev
+        rsiClosed := etatRequested.rsiPrev
+        timeClosed := etatRequested.timePrev
+    [dLive, sqzLive, rsiLive, dClosed, rsiClosed, timeClosed][d1, s1, r1, d1Fermee, r1Fermee, bridgeTimeM1] = f_etat_mtf("1")
 [d2, s2, r2, d3Fermee, r2Fermee, bridgeTimeM3] = f_etat_mtf("3")
 [d5, s5, r5, d5Fermee, r5Fermee, bridgeTimeM5] = f_etat_mtf("5")
 [d10, s10, r10, d10Fermee, r10Fermee, bridgeTimeM10] = f_etat_mtf("10")
@@ -137,7 +194,10 @@ alignBas  = bear >= minAlign
 surcharge = comp >= minSqz
 
 // ═════════ UT DU GRAPHIQUE : RSI, MOMENTUM, EXPLOSION ═════════
-[dC, sC, rC, _, _, _, _, _, _] = f_etat()
+EtatMtfSnapshot etatChart = f_etat()
+dC = etatChart.dLive
+sC = etatChart.sqzLive
+rC = etatChart.rsiLive
 rsiSig = ta.ema(rC, 9)
 rsiCrossSigUp   = ta.crossover(rC, rsiSig)
 rsiCross30Up     = ta.crossover(rC, 30)
@@ -173,7 +233,7 @@ f_niv() =>
     sA = ta.valuewhen(not na(pl), pl, 0)
     rB = ta.valuewhen(not na(ph), ph, 1)
     sB = ta.valuewhen(not na(pl), pl, 1)
-    [rA, sA, rB, sB, time_close, rA[1], sA[1], rB[1], sB[1], time_close[1], time_close <= timenow]
+    NivMtfSnapshot.new(rA, sA, rB, sB, time_close, rA[1], sA[1], rB[1], sB[1], time_close[1], time_close <= timenow)
 
 f_niv_mtf(string tf) =>
     float rA = na
@@ -181,27 +241,27 @@ f_niv_mtf(string tf) =>
     float rB = na
     float sB = na
     if timeframe.in_seconds(tf) < timeframe.in_seconds()
-        [rAArray, sAArray, rBArray, sBArray, nivTimeArray, rAPrevArray, sAPrevArray, rBPrevArray, sBPrevArray, _, nivConfirmedArray] = request.security_lower_tf(syminfo.tickerid, tf, f_niv())
-        int nivLastIndex = array.size(nivTimeArray) - 1
+        array<NivMtfSnapshot> nivArray = request.security_lower_tf(syminfo.tickerid, tf, f_niv())
+        int nivLastIndex = array.size(nivArray) - 1
         if nivLastIndex >= 0
-            if not array.get(nivConfirmedArray, nivLastIndex)
-                rA := array.get(rAPrevArray, nivLastIndex)
-                sA := array.get(sAPrevArray, nivLastIndex)
-                rB := array.get(rBPrevArray, nivLastIndex)
-                sB := array.get(sBPrevArray, nivLastIndex)
+            NivMtfSnapshot nivLast = array.get(nivArray, nivLastIndex)
+            if not nivLast.confirmed
+                rA := nivLast.rAPrev
+                sA := nivLast.sAPrev
+                rB := nivLast.rBPrev
+                sB := nivLast.sBPrev
             else
-                rA := array.get(rAArray, nivLastIndex)
-                sA := array.get(sAArray, nivLastIndex)
-                rB := array.get(rBArray, nivLastIndex)
-                sB := array.get(sBArray, nivLastIndex)
+                rA := nivLast.rANow
+                sA := nivLast.sANow
+                rB := nivLast.rBNow
+                sB := nivLast.sBNow
     else
-        [_, _, _, _, _, rAClosed, sAClosed, rBClosed, sBClosed, _, _] = request.security(syminfo.tickerid, tf, f_niv(), lookahead=barmerge.lookahead_off)
-        rA := rAClosed
-        sA := sAClosed
-        rB := rBClosed
-        sB := sBClosed
-    [rA, sA, rB, sB]
-[rA15, sA15, rB15, sB15] = f_niv_mtf("15")
+        NivMtfSnapshot nivRequested = request.security(syminfo.tickerid, tf, f_niv(), lookahead=barmerge.lookahead_off)
+        rA := nivRequested.rAPrev
+        sA := nivRequested.sAPrev
+        rB := nivRequested.rBPrev
+        sB := nivRequested.sBPrev
+    [rA, sA, rB, sB][rA15, sA15, rB15, sB15] = f_niv_mtf("15")
 [rA60, sA60, rB60, sB60] = f_niv_mtf("60")
 [rA4h, sA4h, rB4h, sB4h] = f_niv_mtf("240")
 [rAD, sAD, rBD, sBD] = f_niv_mtf("D")
@@ -209,25 +269,26 @@ f_niv_mtf(string tf) =>
 f_fibo_snapshot() =>
     fiboHigh = ta.highest(high, 24)
     fiboLow = ta.lowest(low, 24)
-    [fiboHigh, fiboLow, time_close, fiboHigh[1], fiboLow[1], time_close[1], time_close <= timenow]
+    FiboMtfSnapshot.new(fiboHigh, fiboLow, time_close, fiboHigh[1], fiboLow[1], time_close[1], time_close <= timenow)
 
 f_fibo_mtf(string tf) =>
     float fiboHigh = na
     float fiboLow = na
     if timeframe.in_seconds(tf) < timeframe.in_seconds()
-        [fiboHighArray, fiboLowArray, fiboTimeArray, fiboHighPrevArray, fiboLowPrevArray, _, fiboConfirmedArray] = request.security_lower_tf(syminfo.tickerid, tf, f_fibo_snapshot())
-        int fiboLastIndex = array.size(fiboTimeArray) - 1
+        array<FiboMtfSnapshot> fiboArray = request.security_lower_tf(syminfo.tickerid, tf, f_fibo_snapshot())
+        int fiboLastIndex = array.size(fiboArray) - 1
         if fiboLastIndex >= 0
-            if not array.get(fiboConfirmedArray, fiboLastIndex)
-                fiboHigh := array.get(fiboHighPrevArray, fiboLastIndex)
-                fiboLow := array.get(fiboLowPrevArray, fiboLastIndex)
+            FiboMtfSnapshot fiboLast = array.get(fiboArray, fiboLastIndex)
+            if not fiboLast.confirmed
+                fiboHigh := fiboLast.highPrev
+                fiboLow := fiboLast.lowPrev
             else
-                fiboHigh := array.get(fiboHighArray, fiboLastIndex)
-                fiboLow := array.get(fiboLowArray, fiboLastIndex)
+                fiboHigh := fiboLast.highNow
+                fiboLow := fiboLast.lowNow
     else
-        [_, _, _, fiboHighClosed, fiboLowClosed, _, _] = request.security(syminfo.tickerid, tf, f_fibo_snapshot(), lookahead=barmerge.lookahead_off)
-        fiboHigh := fiboHighClosed
-        fiboLow := fiboLowClosed
+        FiboMtfSnapshot fiboRequested = request.security(syminfo.tickerid, tf, f_fibo_snapshot(), lookahead=barmerge.lookahead_off)
+        fiboHigh := fiboRequested.highPrev
+        fiboLow := fiboRequested.lowPrev
     [fiboHigh, fiboLow]
 niveaux = array.from(rA15, sA15, rB15, sB15, rA60, sA60, rB60, sB60, rA4h, sA4h, rB4h, sB4h, rAD, sAD, rBD, sBD)
 nomsNiv = array.from("15m", "15m", "15m", "15m", "1h", "1h", "1h", "1h", "4h", "4h", "4h", "4h", "Daily", "Daily", "Daily", "Daily")
@@ -236,7 +297,7 @@ atrC = ta.atr(14)
 f_plan_snapshot() =>
     planMom = ta.linreg(close - math.avg(math.avg(ta.highest(high, lenSqz), ta.lowest(low, lenSqz)), ta.sma(close, lenSqz)), lenSqz, 0)
     planVolMoy = ta.sma(volume, 20)
-    [open, ta.highest(high, 10), ta.lowest(low, 10), close, ta.atr(14), ta.rsi(close, lenRsi), planMom, planMom[1], volume, planVolMoy, time_close, open[1], ta.highest(high, 10)[1], ta.lowest(low, 10)[1], close[1], ta.atr(14)[1], ta.rsi(close, lenRsi)[1], planMom[1], planMom[2], volume[1], planVolMoy[1], time_close[1], time_close <= timenow]
+    PlanM15Snapshot.new(open, ta.highest(high, 10), ta.lowest(low, 10), close, ta.atr(14), ta.rsi(close, lenRsi), planMom, planMom[1], volume, planVolMoy, time_close, open[1], ta.highest(high, 10)[1], ta.lowest(low, 10)[1], close[1], ta.atr(14)[1], ta.rsi(close, lenRsi)[1], planMom[1], planMom[2], volume[1], planVolMoy[1], time_close[1], time_close <= timenow)
 
 f_plan_snapshot_mtf() =>
     float planOpen = na
@@ -250,43 +311,44 @@ f_plan_snapshot_mtf() =>
     float planVol = na
     float planVolMoy = na
     if timeframe.in_seconds("15") < timeframe.in_seconds()
-        [planOpenArray, planHighArray, planLowArray, planCloseArray, planAtrArray, planRsiArray, planMomArray, planMomPrevArray, planVolArray, planVolMoyArray, planTimeArray, planOpenPrevArray, planHighPrevArray, planLowPrevArray, planClosePrevArray, planAtrPrevArray, planRsiPrevArray, planMomPrevArray2, planMomPrevPrevArray, planVolPrevArray, planVolMoyPrevArray, _, planConfirmed15Array] = request.security_lower_tf(syminfo.tickerid, "15", f_plan_snapshot())
-        int planLast15Index = array.size(planTimeArray) - 1
+        array<PlanM15Snapshot> planArray = request.security_lower_tf(syminfo.tickerid, "15", f_plan_snapshot())
+        int planLast15Index = array.size(planArray) - 1
         if planLast15Index >= 0
-            if not array.get(planConfirmed15Array, planLast15Index)
-                planOpen := array.get(planOpenPrevArray, planLast15Index)
-                planHigh := array.get(planHighPrevArray, planLast15Index)
-                planLow := array.get(planLowPrevArray, planLast15Index)
-                planClose := array.get(planClosePrevArray, planLast15Index)
-                planAtr := array.get(planAtrPrevArray, planLast15Index)
-                planRsi := array.get(planRsiPrevArray, planLast15Index)
-                planMom := array.get(planMomPrevArray2, planLast15Index)
-                planMomPrev := array.get(planMomPrevPrevArray, planLast15Index)
-                planVol := array.get(planVolPrevArray, planLast15Index)
-                planVolMoy := array.get(planVolMoyPrevArray, planLast15Index)
+            PlanM15Snapshot planLast = array.get(planArray, planLast15Index)
+            if not planLast.confirmed
+                planOpen := planLast.m15OpenPrev
+                planHigh := planLast.m15HighPrev
+                planLow := planLast.m15LowPrev
+                planClose := planLast.m15ClosePrev
+                planAtr := planLast.m15AtrPrev
+                planRsi := planLast.m15RsiPrev
+                planMom := planLast.m15MomPrev
+                planMomPrev := planLast.m15MomPrevPrev
+                planVol := planLast.m15VolumePrev
+                planVolMoy := planLast.m15VolumeAvgPrev
             else
-                planOpen := array.get(planOpenArray, planLast15Index)
-                planHigh := array.get(planHighArray, planLast15Index)
-                planLow := array.get(planLowArray, planLast15Index)
-                planClose := array.get(planCloseArray, planLast15Index)
-                planAtr := array.get(planAtrArray, planLast15Index)
-                planRsi := array.get(planRsiArray, planLast15Index)
-                planMom := array.get(planMomArray, planLast15Index)
-                planMomPrev := array.get(planMomPrevArray, planLast15Index)
-                planVol := array.get(planVolArray, planLast15Index)
-                planVolMoy := array.get(planVolMoyArray, planLast15Index)
+                planOpen := planLast.m15OpenNow
+                planHigh := planLast.m15HighNow
+                planLow := planLast.m15LowNow
+                planClose := planLast.m15CloseNow
+                planAtr := planLast.m15AtrNow
+                planRsi := planLast.m15RsiNow
+                planMom := planLast.m15MomNow
+                planMomPrev := planLast.m15MomPrevNow
+                planVol := planLast.m15VolumeNow
+                planVolMoy := planLast.m15VolumeAvgNow
     else
-        [_, _, _, _, _, _, _, _, _, _, _, planOpenRequested, planHighRequested, planLowRequested, planCloseRequested, planAtrRequested, planRsiRequested, planMomRequested, planMomPrevRequested, planVolRequested, planVolMoyRequested, _, _] = request.security(syminfo.tickerid, "15", f_plan_snapshot(), lookahead=barmerge.lookahead_off)
-        planOpen := planOpenRequested
-        planHigh := planHighRequested
-        planLow := planLowRequested
-        planClose := planCloseRequested
-        planAtr := planAtrRequested
-        planRsi := planRsiRequested
-        planMom := planMomRequested
-        planMomPrev := planMomPrevRequested
-        planVol := planVolRequested
-        planVolMoy := planVolMoyRequested
+        PlanM15Snapshot planRequested = request.security(syminfo.tickerid, "15", f_plan_snapshot(), lookahead=barmerge.lookahead_off)
+        planOpen := planRequested.m15OpenPrev
+        planHigh := planRequested.m15HighPrev
+        planLow := planRequested.m15LowPrev
+        planClose := planRequested.m15ClosePrev
+        planAtr := planRequested.m15AtrPrev
+        planRsi := planRequested.m15RsiPrev
+        planMom := planRequested.m15MomPrev
+        planMomPrev := planRequested.m15MomPrevPrev
+        planVol := planRequested.m15VolumePrev
+        planVolMoy := planRequested.m15VolumeAvgPrev
     [planOpen, planHigh, planLow, planClose, planAtr, planRsi, planMom, planMomPrev, planVol, planVolMoy]
 [planOpen15, planHigh15, planLow15, planClose15, planAtr15, planRsi15, planMom15, planMomPrev15, planVol15, planVolMoy15] = f_plan_snapshot_mtf()
 atr15 = planAtr15
