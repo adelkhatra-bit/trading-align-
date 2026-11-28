@@ -232,8 +232,29 @@ class PineCanonicalEntryContract(unittest.TestCase):
         self.assertIn("longT += i >= 7 ? dv : 0", self.pine)
         self.assertIn("dirBrut = zoneLongConfirmee ? 1 : zoneShortConfirmee ? -1 : longT >= 2 ? 1", self.pine)
         self.assertIn('(nz(d60Fermee) != -dirPlan or (dirPlan == 1 and retLongConfirme) or (dirPlan == -1 and retShortConfirme))', self.pine)
-        self.assertIn('scOk  = dP != 0 and (not o1h or retLongConfirme or retShortConfirme) and u15 and u5 and u1', self.pine)
+        self.assertIn('scOk  = dP != 0 and (not o1h or retLongConfirme or retShortConfirme) and u15 and u5 and u3 and u1', self.pine)
         self.assertNotIn("dirBrut = zoneHaut ? 1 : zoneBas ? -1", self.pine)
+
+
+    def test_m3_is_mandatory_scalp_microstructure_confirmation(self):
+        self.assertIn("d3Strat = nz(d3Fermee)", self.pine)
+        self.assertIn("u3  = d3Strat == dP", self.pine)
+        self.assertIn("and u15 and u5 and u3 and u1", self.pine)
+        self.assertIn("and (not u3 or not u1)", self.pine)
+        self.assertIn("nz(d3Fermee) == dirPlan", self.pine)
+        self.assertIn("confirmation microstructure M3 manquante", self.pine)
+        self.assertIn("M15 ✔ M5 ✔ M3 ✔ M1 ✔", self.pine)
+        self.assertIn("confirmation microstructure SCALP", self.pine)
+        self.assertIn('"3 min " + (u3 ? "✅" : "⏳")', self.pine)
+
+    def test_global_anticipation_score_is_independent_of_chart_timeframe(self):
+        self.assertIn("rs += w * (array.get(rsisFermees, i) - 50) / 50", self.pine)
+        self.assertIn("rsiOB += array.get(rsisFermees, i) >= 70 ? 1 : 0", self.pine)
+        self.assertIn("rsiOS += array.get(rsisFermees, i) <= 30 ? 1 : 0", self.pine)
+        self.assertIn("score = 0.45 * trendS + 0.30 * rsiS + 0.25 * planMomS15", self.pine)
+        self.assertIn("momS reste réservé aux signaux locaux", self.pine)
+        self.assertIn("planRiskRewardOk = not na(atr15) and atr15 > 0 and rrS >= 2.0", self.pine)
+
 
     def test_executable_direction_is_derived_only_from_confirmed_mtf_closes(self):
         self.assertIn("dirStable = dirBrut", self.pine)
