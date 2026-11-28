@@ -98,23 +98,55 @@ class TelegramMarketChannelCommentaryTests(unittest.TestCase):
         market = {
             "m1": [
                 {"o": 100.0, "c": 100.0},
-                {"o": 100.0, "c": 101.0},
-                {"o": 101.0, "c": 102.0},
-                {"o": 102.0, "c": 104.0},
+                {"o": 100.0, "c": 99.0},
+                {"o": 99.0, "c": 98.0},
+                {"o": 98.0, "c": 98.0},
             ],
             "atr": 1.0,
-            "confirme": 1,
+            "confirme": 1,  # direction locale volontairement opposée au plan Pine
+            "require_tv_bridge": True,
         }
-        flash = ab.flash_commentateur("BTC", market, {})
+        with patch.object(ab, "plan_indicateur", return_value={
+                 "available": True, "confirmed": True, "direction": -1
+             }):
+            flash = ab.flash_commentateur("BTC", market, {})
         english = ab.traduire(flash)
-        for expected in ("IT'S MOVING!", "Buyers are accelerating", "in 3 min",
-                         "With the trend", "Waiting for the 15-min close"):
+        for expected in ("IT'S MOVING!", "Bearish move observed", "in 3 min",
+                         "Move in line with confirmed Pine bias", "Waiting for the 15-min close"):
             with self.subTest(expected=expected):
                 self.assertIn(expected, english)
-        for french_label in ("ÇA BOUGE", "Les acheteurs accélèrent",
-                             "Dans le sens de la tendance", "J'attends la clôture"):
+        for french_label in ("ÇA BOUGE", "Les vendeurs accélèrent",
+                             "Mouvement dans le sens du biais Pine confirmé", "J'attends la clôture"):
             with self.subTest(french_label=french_label):
                 self.assertNotIn(french_label, english)
+
+    def test_flash_commentary_keeps_unconfirmed_pine_bias_separate_from_bearish_move(self):
+        market = {
+            "m1": [
+                {"o": 100.0, "c": 100.0},
+                {"o": 100.0, "c": 99.0},
+                {"o": 99.0, "c": 98.0},
+                {"o": 98.0, "c": 98.0},
+            ],
+            "atr": 1.0,
+            "confirme": -1,  # biais local baissier, mais le plan Pine n'est pas confirmé
+            "dirs_cloturees": [-1] * 11,
+            "require_tv_bridge": True,
+        }
+        with patch.object(ab, "plan_indicateur", return_value={
+                 "available": True, "confirmed": False, "direction": -1
+             }):
+            flash = ab.flash_commentateur("BTC", market, {})
+        self.assertIn("Mouvement baissier observé", flash)
+        self.assertIn("Biais Pine non confirmé — mouvement observé", flash)
+        self.assertIn("Biais de contexte : SHORT dominant", flash)
+        self.assertNotIn("Les vendeurs accélèrent", flash)
+        self.assertNotIn("Clôtures vs biais Pine confirmé", flash)
+        english = ab.traduire(flash)
+        self.assertIn("Bearish move observed", english)
+        self.assertIn("Pine bias unconfirmed — move observed", english)
+        self.assertIn("Context bias: SHORT dominant", english)
+
 
     def test_private_coach_position_requires_exact_opt_in_and_confirmed_position_text(self):
         state = {"coach_live": {"BTC": {"101": {"started_t": 1000}}}}
