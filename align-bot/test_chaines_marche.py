@@ -60,7 +60,7 @@ class PasDeDoublon(unittest.TestCase):
         t = ab.flash_commentateur("BTC", {"m1": m1, "atr": 10}, {"trade": {"d": -1, "e": 101, "sl": 110, "tp1": 85}})
         self.assertIn("ÇA BOUGE", t); self.assertIn("Direction TP2", t)
         t = ab.flash_commentateur("BTC", {"m1": m1, "atr": 10, "confirme": -1}, {})
-        self.assertIn("sens de la tendance", t)
+        self.assertIn("Mouvement dans le sens du biais local confirmé", t)
 
 
 class TpFrole(unittest.TestCase):
