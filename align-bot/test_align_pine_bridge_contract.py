@@ -221,7 +221,7 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertIn("request.security_lower_tf(syminfo.tickerid, tf, f_niv())", self.source)
         self.assertIn("array.get(nivConfirmedArray, nivLastIndex)", self.source)
         self.assertIn("if not array.get(nivConfirmedArray, nivLastIndex)", self.source)
-        self.assertIn("request.security(syminfo.tickerid, tf, f_niv_previous(), lookahead=barmerge.lookahead_on)", self.source)
+        self.assertIn("request.security(syminfo.tickerid, tf, f_niv(), lookahead=barmerge.lookahead_off)", self.source)
         for timeframe in ('"15"', '"60"', '"240"', '"D"'):
             with self.subTest(timeframe=timeframe):
                 self.assertIn("f_niv_mtf(" + timeframe + ")", self.source)
@@ -231,7 +231,7 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertNotIn('request.security(syminfo.tickerid, "D",   f_niv())', self.source)
 
     def test_canonical_plan_levels_and_m15_price_snapshot_share_closed_bar_semantics(self):
-        self.assertIn("f_niv_previous() =>", self.source)
+        self.assertIn("time_close <= timenow", self.source)
         self.assertIn("nivConfirmedArray", self.source)
         self.assertIn("nivLastIndex", self.source)
         self.assertIn("timeframe.in_seconds(tf) < timeframe.in_seconds()", self.source)
@@ -249,7 +249,7 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertIn("request.security_lower_tf(syminfo.tickerid, tf, f_etat())", self.source)
         self.assertIn("array.get(etatConfirmedArray, etatLiveIndex)", self.source)
         self.assertIn("if not array.get(etatConfirmedArray, etatLiveIndex)", self.source)
-        self.assertIn("request.security(syminfo.tickerid, tf, f_etat_precedent(), lookahead=barmerge.lookahead_on)", self.source)
+        self.assertIn("request.security(syminfo.tickerid, tf, f_etat(), lookahead=barmerge.lookahead_off)", self.source)
         timeframes = (
             ('"1"', "d1", "s1", "r1", "d1Fermee", "r1Fermee", "bridgeTimeM1"),
             ('"3"', "d2", "s2", "r2", "d3Fermee", "r2Fermee", "bridgeTimeM3"),
@@ -277,7 +277,7 @@ class CanonicalPineBridgeContractTests(unittest.TestCase):
         self.assertIn('request.security_lower_tf(syminfo.tickerid, "15", f_plan_snapshot())', self.source)
         self.assertIn("array.get(planConfirmed15Array, planLast15Index)", self.source)
         self.assertIn("if not array.get(planConfirmed15Array, planLast15Index)", self.source)
-        self.assertIn('request.security(syminfo.tickerid, "15", f_plan_snapshot_precedent(), lookahead=barmerge.lookahead_on)', self.source)
+        self.assertIn('request.security(syminfo.tickerid, "15", f_plan_snapshot(), lookahead=barmerge.lookahead_off)', self.source)
         self.assertIn("[planOpen15, planHigh15, planLow15, planClose15, planAtr15, planRsi15, planMom15, planMomPrev15, planVol15, planVolMoy15] = f_plan_snapshot_mtf()", self.source)
 
     def test_no_secret_is_embedded_in_pine(self):
