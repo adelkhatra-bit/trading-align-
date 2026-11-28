@@ -8591,6 +8591,49 @@ def capturer_snapshot_audit(etat, m, r, cle, messages=None):
                                    "cloture_dans_ce_cycle" if trade_clos else "ordre_en_preparation")
             if trade_actif or trade_clos:
                 plan["audit_key"] = cle_audit_trade(m, trade)
+            subscribers = trade.get("qui") if isinstance(trade.get("qui"), dict) else {}
+            subscriber_stops = {}
+            for cid, position in subscribers.items():
+                if not isinstance(position, dict):
+                    continue
+                raw_sl = position.get("sl_conseil")
+                if raw_sl is None:
+                    raw_sl = position.get("sl")
+                try:
+                    stop_value = float(raw_sl)
+                except (TypeError, ValueError):
+                    continue
+                if not math.isfinite(stop_value):
+                    continue
+                try:
+                    entry_value = float(position.get("e", trade.get("e")))
+                    if not math.isfinite(entry_value):
+                        entry_value = None
+                except (TypeError, ValueError):
+                    entry_value = None
+                try:
+                    initial_sl = float(position.get("sl"))
+                    if not math.isfinite(initial_sl):
+                        initial_sl = None
+                except (TypeError, ValueError):
+                    initial_sl = None
+                try:
+                    updated_at = int(float(position.get("sl_conseil_updated_at") or 0))
+                except (TypeError, ValueError):
+                    updated_at = 0
+                subscriber_key = hashlib.sha256(str(cid).encode("utf-8")).hexdigest()[:16]
+                subscriber_stops[subscriber_key] = {
+                    "sl": round(stop_value, 8),
+                    "entry": round(entry_value, 8) if entry_value is not None else None,
+                    "initial_sl": round(initial_sl, 8) if initial_sl is not None else None,
+                    "reason": str(position.get("sl_conseil_reason") or "")[:32],
+                    "updated_at": updated_at,
+                    "price": position.get("sl_conseil_price"),
+                    "bar_t": position.get("sl_conseil_bar_t"),
+                    "closed": bool(position.get("fini")),
+                }
+            if subscriber_stops:
+                plan["subscriber_stops"] = subscriber_stops
 
         decision = {"reason": None, "verdict": None, "detail": None}
         try:
@@ -8625,8 +8668,37 @@ def capturer_snapshot_audit(etat, m, r, cle, messages=None):
             "messages": [str(x[0] if isinstance(x, tuple) else x)[:250] for x in (messages or [])[:3]]
         }
         hist = etat.setdefault("audit_mtf", {}).setdefault(m, [])
+        previous_plan = (hist[-1].get("trade") or {}) if hist else {}
+        stop_changes = []
+        if previous_plan and plan and previous_plan.get("sl") != plan.get("sl"):
+            stop_changes.append({
+                "scope": "bot", "old_sl": previous_plan.get("sl"), "new_sl": plan.get("sl"),
+                "reason": plan.get("statut"), "observed_at": decision_ts,
+            })
+        previous_stops = previous_plan.get("subscriber_stops") or {}
+        current_stops = plan.get("subscriber_stops") or {}
+        for subscriber_key in sorted(set(previous_stops) | set(current_stops)):
+            old_stop = previous_stops.get(subscriber_key) or {}
+            new_stop = current_stops.get(subscriber_key) or {}
+            if (old_stop.get("sl"), old_stop.get("reason"), old_stop.get("closed")) == (
+                new_stop.get("sl"), new_stop.get("reason"), new_stop.get("closed")
+            ):
+                continue
+            stop_changes.append({
+                "scope": "subscriber", "subscriber_key": subscriber_key,
+                "old_sl": old_stop.get("sl"), "new_sl": new_stop.get("sl"),
+                "reason": new_stop.get("reason") or "position_changed",
+                "updated_at": new_stop.get("updated_at"), "observed_at": decision_ts,
+                "closed": new_stop.get("closed"),
+            })
+        if stop_changes:
+            snap["stop_changes"] = stop_changes
         signature = [snap["confirm"], list(dirs), snap["dirPlan"],
                      plan.get("audit_key"), plan.get("plan_source"),
+                     plan.get("d"), plan.get("e"), plan.get("sl0"), plan.get("sl"),
+                     plan.get("tp1"), plan.get("tp2"), plan.get("statut"),
+                     plan.get("sl_ut"), plan.get("sl_h"),
+                     json.dumps(plan.get("subscriber_stops") or {}, sort_keys=True, ensure_ascii=False),
                      tv.get("activeTimeframe"),
                      [[tf, x.get("fresh"), (x.get("robotV12") or {}).get("signal")]
                       for tf, x in sorted(tv["snapshots"].items())],
@@ -13095,6 +13167,10 @@ def gerer_stop(etat, m, r, tr, c):
         nouveau, pourquoi = e + d * 0.05 * a, "be"
     if nouveau is not None and d * (nouveau - sl) > 0.3 * a and d * (p - nouveau) > 0.5 * a:
         pos["sl_conseil"] = nouveau
+        pos["sl_conseil_reason"] = pourquoi
+        pos["sl_conseil_updated_at"] = int(time.time())
+        pos["sl_conseil_price"] = round(float(p), 8)
+        pos["sl_conseil_bar_t"] = int(r["b15"][-1].get("t") or 0)
         if pourquoi == "be" or abs(nouveau - e) < 0.2 * a:
             texte = (f"🔒 METS-TOI À BE — {ICONE.get(m, '')} {m}\n🚦 🟢 ON RESTE EN POSITION\n{SENS[d]}\n"
                      f"🛑 Nouveau SL : {px(nouveau)} (entrée {px(e)} • BE sécurisé)\n"
@@ -16533,6 +16609,8 @@ def un_tour(etat, chats):
                 print("prix topstep inscrits", ex)
         if TOKEN:
             coach(etat, nom_marche, r, cle)
+            # Deuxième capture après le coach : inclut les SL personnels modifiés pendant ce cycle.
+            capturer_snapshot_audit(etat, nom_marche, r, cle, nouveaux)
             try:
                 live_pnl(etat, nom_marche, cle, r)       # 💰 gain réel en cours sur le live (après la moitié du chemin vers le TP1)
             except Exception as ex:

@@ -315,3 +315,71 @@ class ForensicAuditSnapshotTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ForensicStopTransitionTest(unittest.TestCase):
+    """Ensure bot and subscriber SL moves remain auditable within one M5 candle."""
+    @staticmethod
+    def _fixture():
+        trade = {
+            "d": 1, "e": 100.0, "sl": 98.0, "sl0": 98.0,
+            "tp1": 104.0, "tp2": 108.0, "cree": 1700000200,
+            "src": "FVG", "statut": "entree",
+        }
+        r = {
+            "t": 1700000400, "decision_ts": 1700000500,
+            "b5": [{"t": 1700000100, "o": 99, "h": 101, "l": 98, "c": 100}],
+            "m1": [{"c": 100}], "dirs": [1] * 11, "rsis": [55] * 11,
+        }
+        return trade, r
+
+    def _capture(self, state, r):
+        with (
+            unittest.mock.patch.object(align_bot, "raison_attente", return_value="A"),
+            unittest.mock.patch.object(align_bot, "verdict", return_value=("N", "D")),
+        ):
+            align_bot.capturer_snapshot_audit(state, "BTC", r, state["cle"])
+
+    def test_snapshot_records_global_stop_transition_inside_same_m5_bar(self):
+        trade, r = self._fixture()
+        state = {"cle": {"trade": trade}}
+        self._capture(state, r)
+        trade["sl"] = 100.0
+        trade["statut"] = "tp1"
+        r["decision_ts"] += 1
+        self._capture(state, r)
+
+        snapshots = state["audit_mtf"]["BTC"]
+        self.assertEqual(len(snapshots), 2)
+        self.assertEqual(snapshots[0]["trade"]["sl"], 98.0)
+        self.assertEqual(snapshots[1]["trade"]["sl"], 100.0)
+        self.assertEqual(snapshots[1]["trade"]["statut"], "tp1")
+        self.assertEqual(snapshots[1]["stop_changes"][0]["scope"], "bot")
+        self.assertEqual(snapshots[1]["stop_changes"][0]["old_sl"], 98.0)
+        self.assertEqual(snapshots[1]["stop_changes"][0]["new_sl"], 100.0)
+
+    def test_snapshot_records_subscriber_stop_transition_without_raw_user_id(self):
+        trade, r = self._fixture()
+        position = {"e": 100.0, "sl": 98.0, "sl_conseil": 98.0, "fini": False}
+        trade["qui"] = {"telegram-user-123": position}
+        state = {"cle": {"trade": trade}}
+        self._capture(state, r)
+        position["sl_conseil"] = 100.1
+        position["sl_conseil_reason"] = "be"
+        position["sl_conseil_updated_at"] = 1700000501
+        position["sl_conseil_price"] = 102.0
+        position["sl_conseil_bar_t"] = 1700000100
+        r["decision_ts"] += 1
+        self._capture(state, r)
+
+        snapshots = state["audit_mtf"]["BTC"]
+        subscriber_key = align_bot.hashlib.sha256(b"telegram-user-123").hexdigest()[:16]
+        self.assertEqual(len(snapshots), 2)
+        self.assertNotIn("telegram-user-123", json.dumps(snapshots, ensure_ascii=False))
+        self.assertEqual(snapshots[0]["trade"]["subscriber_stops"][subscriber_key]["sl"], 98.0)
+        self.assertEqual(snapshots[1]["trade"]["subscriber_stops"][subscriber_key]["sl"], 100.1)
+        change = next(x for x in snapshots[1]["stop_changes"] if x["scope"] == "subscriber")
+        self.assertEqual(change["old_sl"], 98.0)
+        self.assertEqual(change["new_sl"], 100.1)
+        self.assertEqual(change["reason"], "be")
+        self.assertEqual(change["updated_at"], 1700000501)
