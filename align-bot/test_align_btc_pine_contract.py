@@ -61,6 +61,8 @@ class AlignBtcPineContract(unittest.TestCase):
             self.assertIn('tEnt = ent == planClose15 ? "au marché" : "ordre limite"', source)
             self.assertIn("contexteOpposeCourt", source)
             self.assertIn("contexteOpposeTxt", source)
+            self.assertIn("nz(d120Fermee) == -dirPlan", source)
+            self.assertIn('"H2 "', source)
             self.assertIn("+ contexteOpposeCourt", next(line for line in source.splitlines() if line.strip().startswith("ligne = ")))
             request_sites = source.count("request.security(") + source.count("request.security_lower_tf(")
             self.assertLessEqual(request_sites, 40)
