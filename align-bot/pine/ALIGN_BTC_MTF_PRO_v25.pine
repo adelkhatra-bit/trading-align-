@@ -609,8 +609,8 @@ if barstate.islast
 // État de confirmation calculé pour l'affichage ; les champs d'export restent dans le bloc bridge canonique.
     titre = zoneBas ? "RETOURNEMENT ▼" : zoneHaut ? "REBOND ▲" : fortHaut ? "★ ACHAT FORT" : fortBas ? "★ VENTE FORTE" : retHaut ? "RETOURNEMENT ▲" : retBas ? "RETOURNEMENT ▼" : rsiOB >= 3 ? "RSI SURACHAT " + str.tostring(rsiOB) + "/11" : rsiOS >= 3 ? "RSI SURVENTE " + str.tostring(rsiOS) + "/11" : surcharge ? "⚡ SURCHARGE" : sens == 1 ? "HAUSSE" : sens == -1 ? "BAISSE" : "ATTENDRE"
     statutPlan = planConfirmedUi ? (dirPlan == 1 ? "▲ LONG CONFIRMÉ" : "▼ SHORT CONFIRMÉ") : strat != "" and dirPlan != 0 ? (dirPlan == 1 ? "⏳ BIAIS LONG — EN ATTENTE" : "⏳ BIAIS SHORT — EN ATTENTE") : "ATTENDRE • AUCUNE STRATÉGIE"
-    contexteOppose = dirPlan != 0 and (nz(dWFermee) == -dirPlan or nz(dDFermee) == -dirPlan or nz(d240Fermee) == -dirPlan or nz(d60Fermee) == -dirPlan)
-    contexteOpposeUts = (nz(dWFermee) == -dirPlan ? "W1 " : "") + (nz(dDFermee) == -dirPlan ? "D1 " : "") + (nz(d240Fermee) == -dirPlan ? "H4 " : "") + (nz(d60Fermee) == -dirPlan ? "H1 " : "")
+    contexteOppose = dirPlan != 0 and (nz(dWFermee) == -dirPlan or nz(dDFermee) == -dirPlan or nz(d240Fermee) == -dirPlan or nz(d120Fermee) == -dirPlan or nz(d60Fermee) == -dirPlan)
+    contexteOpposeUts = (nz(dWFermee) == -dirPlan ? "W1 " : "") + (nz(dDFermee) == -dirPlan ? "D1 " : "") + (nz(d240Fermee) == -dirPlan ? "H4 " : "") + (nz(d120Fermee) == -dirPlan ? "H2 " : "") + (nz(d60Fermee) == -dirPlan ? "H1 " : "")
     contexteOpposeSens = dirPlan == 1 ? "SHORT" : "LONG"
     contexteOpposeCourt = contexteOppose ? " • ⚠ " + contexteOpposeUts + contexteOpposeSens + " contre-plan" : ""
     contexteOpposeTxt = contexteOppose ? "\n⚠ CONTEXTE SUPÉRIEUR OPPOSÉ : " + contexteOpposeUts + contexteOpposeSens + " contre le plan " + (dirPlan == 1 ? "LONG" : "SHORT") + ". Le biais macro est distinct du plan d'exécution." : ""
